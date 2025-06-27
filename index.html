@@ -12,16 +12,16 @@
     <!-- Chosen Palette: Corporate Clarity -->
     <!-- Application Structure Plan: The SPA is designed as a user-friendly, thematic journey. It starts with a high-impact "Before vs. After" comparison to show value. It then presents a high-level process flowchart ("O Ciclo de Vida"). A central "Rules Dashboard" uses a table for allowed expenses and an icon-driven list for forbidden ones, facilitating quick understanding. The critical expense reporting process gets its own detailed flowchart section. Consequences are visualized with a bar chart for blocking criteria, making complex rules easy to grasp. A new section covers specific use cases for card usage during manager absences. A dedicated "Suporte" section is added for external help resources. A new "Pesquisa no Documento" section allows direct content search within the policy document. The app concludes with a practical, searchable table of all allowed expense categories from Annex I, acting as a quick-reference tool. This structure prioritizes user task-flow and comprehension over the report's linear chapter format. -->
     <!-- Visualization & Content Choices:
-        - Report Info: Before vs. After (Cash vs. Card). Goal: Inform/Compare. Method: HTML/CSS side-by-side cards. Justification: Immediate visual impact. Library: None.
-        - Report Info: Card Lifecycle. Goal: Organize. Method: HTML/CSS flowchart. Justification: Simple overview of the core process. Library: None.
-        - Report Info: Allowed Expense Categories. Goal: Compare/Inform. Method: Table. Justification: Provides clear, structured details for each category instead of a general proportion. Library: None (HTML/CSS).
-        - Report Info: Blocking Criteria. Goal: Compare. Method: Bar Chart. Justification: Intuitively compares urgency levels based on transaction value. Library: Chart.js (Canvas).
-        - Report Info: Usage in Specific Situations (Absences). Goal: Organize/Inform. Method: Table. Justification: Clearly outlines rules and responsibilities for specific scenarios. Library: None (HTML/CSS).
-        - Report Info: Support/Help Resources. Goal: Inform. Method: Text link. Justification: Provides direct access to external support. Library: None (HTML).
-        - Report Info: Document Search. Goal: Inform/Explore. Method: Text search input with results display. Justification: Allows direct keyword search within the source document. Library: Vanilla JS.
-        - Report Info: Annex I Categories. Goal: Inform/Organize. Method: Interactive searchable list. Justification: Provides a practical quick-reference tool for users. Library: Vanilla JS.
-        CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. All diagrams are HTML/CSS, charts use Chart.js Canvas. -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+        - Report Info: Before vs. After (Cash vs. Card). Goal: Inform. Justification=Directly compares the old vs. new system for immediate impact.
+        - Report Info: Card Lifecycle. Goal: Organize. Justification=Best method to illustrate sequential processes like card lifecycle and reporting.
+        - Report Info: Allowed Expense Categories. Goal: Compare/Inform. Justification=Provides clear, structured details for each category instead of a general proportion.
+        - Report Info: Blocking Criteria. Goal: Compare. Justification=Intuitively compares urgency levels based on transaction value.
+        - Report Info: Usage in Specific Situations (Absences). Goal: Organize/Inform. Justification=Clearly outlines rules and responsibilities for specific scenarios.
+        - Report Info: Support/Help Resources. Goal: Inform. Justification=Provides direct access to external support.
+        - Report Info: Document Search. Goal: Inform/Explore. Justification=Allows direct keyword search within the source document.
+        - Report Info: Annex I Categories. Goal: Inform/Organize. Justification=Provides a practical quick-reference tool for users.
+        All charts use Chart.js with Canvas rendering, and all diagrams are built with pure HTML and Tailwind CSS.
+    -->
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f4f7fa; }
         .chart-container { position: relative; width: 100%; max-width: 400px; margin-left: auto; margin-right: auto; height: 350px; }
@@ -218,7 +218,7 @@
 
         <section id="support" class="mb-20 bg-white rounded-xl shadow-lg p-6 text-center">
             <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Suporte e Canais de Ajuda</h2>
-            <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-8">Precisa de ajuda com a plataforma Clara, tem dúvidas sobre funcionalidades ou encontrou algum problema?</p>
+            <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Precisa de ajuda com a plataforma Clara, tem dúvidas sobre funcionalidades ou encontrou algum problema?</p>
             <p class="mb-4 text-slate-700">Acesse a central de ajuda completa da Clara para encontrar respostas e soluções:</p>
             <a href="https://ajuda.clara.com/hc/pt-br/categories/4413203275155-Funcionalidades-da-Plataforma-Clara" target="_blank" class="inline-block bg-sky-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 shadow-md">
                 https://l1nq.com/47TUr
@@ -250,6 +250,8 @@
             <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg">
                 <input type="text" id="searchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-6" placeholder="Pesquisar por tipo de gasto (ex: limpeza, frete, marketing)...">
                 <div id="expenseTable" class="space-y-3">
+                    <!-- Conteúdo será carregado dinamicamente via JavaScript após a pesquisa -->
+                    <p class="text-center text-slate-500">Digite para pesquisar categorias de despesas.</p>
                 </div>
             </div>
         </section>
@@ -410,7 +412,12 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     
     searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
+        const searchTerm = e.target.value.trim().toLowerCase(); // Use trim() for empty check
+        if (searchTerm === '') {
+            expenseTable.innerHTML = `<p class="text-center text-slate-500">Digite para pesquisar categorias de despesas.</p>`;
+            return;
+        }
+
         const filteredData = fullExpenseData.filter(item => 
             item.label.toLowerCase().includes(searchTerm) || 
             item.examples.toLowerCase().includes(searchTerm)
@@ -418,7 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
         renderTable(filteredData);
     });
 
-    renderTable(fullExpenseData); // Render all data initially
+    // Removido: renderTable(fullExpenseData); // Não renderiza todos os dados inicialmente no carregamento
 
     const navButtons = document.querySelectorAll('.nav-button');
     const sections = document.querySelectorAll('main section');
@@ -475,7 +482,7 @@ Anexo I – Quadro de Etiquetas por Tipo de Gasto 	35
 Objetivo
 Estabelecer os  conceitos, responsabilidades, critérios operacionais e limites  aplicáveis à utilização dos cartões da Clara para despesas operacionais, fornecidos aos gerentes das lojas do Grupo SBF, incluindo as unidades Centauro e Fisia.
 Esta política tem como objetivo principal o  uso adequado, transparente e controlado  dos   cartões no contexto das atividades operacionais das lojas, abrangendo desde a autorização de despesas até a prestação de contas obrigatória.
-As diretrizes aqui descritas visam assegurar a  aderência às normas internas da companhia,  à  legislação vigente  e às boas práticas de governança, reduzindo riscos financeiros e operacionais.
+As diretrizes aqui descritas visam assegurar a  aderência às normas internas da companhia,  à  legislação vigente  e às boas práticas de governança corporativa, reduzindo riscos financeiros e operacionais.
 A gestão dos cartões é realizada por meio da  plataforma digital da CLARA INSTITUIÇÃO DE PAGAMENTO LTDA ., que centraliza os registros de transações, limites, comprovantes fiscais e relatórios para conciliação e pagamentos.
 O documento ainda define o papel e as obrigações dos portadores dos cartões, da liderança imediata, do departamento financeiro e demais envolvidos, bem como estabelece as medidas corretivas e preventivas aplicáveis em caso de uso indevido ou descumprimento das regras.
 Abrangência
@@ -509,7 +516,7 @@ Definições Importantes Para fins desta política, adotam-se as seguintes defin
 4.14. Treinamento Obrigatório:  Encontro ou conteúdo disponibilizado pelo financeiro que aborda o uso correto do cartão e da plataforma Clara, sendo condição obrigatória para liberação e ativação do cartão ao portador designado.
 4.15. Service Now:  Sistema interno para abertura de chamados.
 Limite dos Cartões
-Os cartões têm limites predefinidos para despesas mensais, de acordo com a hierarquia e as necessidades operacionais de cada loja, e conforme estabelecido pela política interna da empresa e em conformidade com a legislação aplicável relacionada à gestão financeira, podendo sofrer alteração para limite diário caso se julgue necessário.
+Os cartões têm limites predefinidos para despesas mensais, de acordo com a hierarquia e as necessidades operacionais de cada loja, e conforme estabelecido pela política interna da empresa e em conformidade com a legislação aplicável relacionada à gestão financeira corporativa, podendo sofrer alteração para limite diário caso se julgue necessário.
 Cada gerente regional (responsável por seu grupo de lojas) terá acesso às transações e limites de despesas das lojas que gerencia/administra, trazendo assim um controle mais eficaz sobre os gastos. Cada gerente de loja arcará e prestará contas a respeito dos custos da loja que gerencia. 
 O cartão pode ser utilizado  todos os dias da semana , inclusive aos finais de semana e feriados, sem restrição de data, desde que respeitadas as diretrizes de uso desta política.
 Importante destacar que o  limite disponível é mensal e não diário , ou seja, o valor total liberado deve ser utilizado de forma planejada ao longo do mês, para cobrir as despesas operacionais recorrentes da loja. O mesmo será reposto assim que houver o pagamento da fatura no período corrente, porém, pode sofrer alteração para limite diário caso se julgue necessário.
