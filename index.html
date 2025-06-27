@@ -31,6 +31,27 @@
         .nav-button.active { background-color: #0c4a6e; color: white; }
         .nav-button:not(.active):hover { background-color: #e0f2fe; }
         section { scroll-margin-top: 80px; }
+        .search-result-item:hover {
+            cursor: pointer;
+            background-color: #e0f2fe; /* light sky blue on hover */
+            border-color: #93c5fd; /* blue-300 */
+        }
+        .policy-content-highlight {
+            background-color: #fee300; /* Yellow highlight for search terms in full document */
+            padding: 1px 0;
+            border-radius: 2px;
+        }
+        .policy-section-anchor {
+            display: block;
+            visibility: hidden;
+            height: 0;
+            margin-top: -80px; /* Offset for sticky header */
+            padding-top: 80px; /* Counteract margin-top for content below */
+            pointer-events: none; /* Make it not clickable */
+        }
+        #policyTextRendered p, #policyTextRendered h4, #policyTextRendered h5 {
+            color: #000000; /* All text in the policy display should be black */
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -60,7 +81,7 @@
                 <div class="bg-rose-100/50 border-2 border-rose-200 rounded-xl p-6 shadow-sm">
                     <h3 class="text-2xl font-bold text-rose-800 mb-4">❌ Antes: Sangria de Caixa</h3>
                     <ul class="text-left space-y-3 text-rose-900">
-                        <li class="flex items-start"><span class="text-xl mr-3">⚠️</span><div><strong class="block">Alto Risco Operacional:</strong> Manuseio de dinheiro em espécie, vulnerável a perdas e falta de controle.</div></li>
+                        <li class="flex items-start"><span class="text-xl mr-3">⚠️</span><div><strong class="block">Alto Risco Operacional:</strong> Manuseio de dinheiro em espécie, vulnerável a perdas e roubos.</div></li>
                         <li class="flex items-start"><span class="text-xl mr-3">🐌</span><div><strong class="block">Processos Manuais e Lentos:</b> Burocracia na solicitação, aprovação e conciliação de despesas.</div></li>
                         <li class="flex items-start"><span class="text-xl mr-3">📉</span><div><strong class="block">Falta de Visibilidade:</strong> Controle financeiro reativo, dificultando o rastreamento de gastos.</div></li>
                     </ul>
@@ -230,15 +251,27 @@
             <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Pesquisa no Documento da Política</h2>
             <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Pesquise por qualquer termo diretamente no conteúdo completo da Política de Uso dos Cartões Clara.</p>
             <div class="max-w-4xl mx-auto">
-                <input type="text" id="documentSearchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-4" placeholder="Digite seu termo de busca (ex: 'fraude', 'prazo')... ">
-                <button id="documentSearchBtn" class="w-full bg-sky-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 ease-in-out shadow-md">
-                    Buscar no Documento
-                </button>
-                <div id="documentSearchResults" class="mt-6 space-y-4">
-                    <p id="searchStatus" class="text-center text-slate-500">Documento da política carregado e pronto para busca.</p>
-                    <div id="searchLoadingIndicator" class="mt-2 text-center text-sky-600 hidden">
-                        <span class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></span>
-                        <span class="ml-2">Buscando no documento...</span>
+                <div id="documentSearchArea">
+                    <input type="text" id="documentSearchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-4" placeholder="Digite seu termo de busca (ex: 'fraude', 'prazo')... ">
+                    <button id="documentSearchBtn" class="w-full bg-sky-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 ease-in-out shadow-md">
+                        Buscar no Documento
+                    </button>
+                    <div id="documentSearchResults" class="mt-6 space-y-4">
+                        <p id="searchStatus" class="text-center text-slate-500">Documento da política carregado e pronto para busca.</p>
+                        <div id="searchLoadingIndicator" class="mt-2 text-center text-sky-600 hidden">
+                            <span class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></span>
+                            <span class="ml-2">Buscando no documento...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="fullPolicyContentDisplay" class="hidden mt-8 p-4 border border-slate-200 rounded-lg bg-slate-50 relative">
+                    <button id="backToSearchBtn" class="absolute top-4 right-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg text-sm">
+                        Voltar à Pesquisa
+                    </button>
+                    <h3 class="text-xl font-bold text-sky-900 mb-4">Documento Completo da Política</h3>
+                    <div id="policyTextRendered" class="text-sm text-black max-h-96 overflow-y-auto pr-2">
+                        <!-- Policy content will be rendered here with highlights -->
                     </div>
                 </div>
             </div>
@@ -385,13 +418,13 @@ document.addEventListener('DOMContentLoaded', function () {
         { sap: '5103510010', label: 'MANUTENÇÃO AR-CONDICIONADO', examples: 'Manutenção corretiva/preventiva simples de ar-condicionado (limpeza de filtro, carga de gás, troca de controle remoto ou peças simples).' },
         { sap: '5104007003', label: 'TRANSPORTE SERVIÇOS EMERGENCIAS', examples: 'Frete local emergencial, motoboy para transporte de documentos ou itens urgentes entre lojas ou matriz, entrega de materiais críticos.' },
         { sap: '5104505006', label: 'SERVIÇOS GRÁFICOS E DE COPIADORAS', examples: 'Impressão de banners, adesivos promocionais, folders, encadernações, produção de manuais impressos.' },
-        // Removed entry: { sap: '5104505007', label: 'SERVIÇOS DE LIMPEZA', examples: 'Contratação pontual de diaristas, faxineiras para limpeza extra, empresas terceirizadas em serviços avulsos de limpeza ou desinfecção emergencial.' },
         { sap: '5104610002', label: 'CORREIOS_SEDEX/AR/POSTAGEM', examples: 'Envio de documentos físicos via Sedex, AR, carta registrada, pacotes pequenos, devoluções via Correios.' },
         { sap: '5105505008', label: 'LANCHES DE REFEIÇÕES', examples: 'Compra de coffee break para ações internas, lanches para treinamentos, premiações, eventos internos autorizados.' },
         { sap: '5103505007', label: 'AGUA POTÁVEL', examples: 'Compra de galões de água mineral, garrafas para abastecimento da equipe ou clientes em loja (se previsto nas diretrizes operacionais).' },
         { sap: '5103505006', label: 'BOBINA ECF', examples: 'Compra de bobinas para ECF ou impressoras fiscais (uso obrigatório nas lojas que não têm fornecimento centralizado).' },
         { sap: '5103510007', label: 'CHAVEIRO EMERGENCIAL', examples: 'Serviços de abertura ou troca de fechadura de cofres, salas administrativas, estoques, vitrines – exclusivamente em situações emergenciais.' },
-        { sap: '5103510007', label: 'MANUTENÇÃO MAQ ESTAMPAR', examples: 'Reparos simples ou ajustes técnicos em máquinas de estampar produtos promocionais nas lojas – sem controle patrimonial e com nota fiscal do prestador.' }
+        { sap: '5103510007', label: 'MANUTENÇÃO MAQ ESTAMPAR', examples: 'Reparos simples ou ajustes técnicos em máquinas de estampar produtos promocionais nas lojas – sem controle patrimonial e com nota fiscal do prestador.' },
+        { sap: '5104505007', label: 'SERVIÇOS DE LIMPEZA', examples: 'Contratação pontual de diaristas, faxineiras para limpeza extra, empresas terceirizadas em serviços avulsos de limpeza ou desinfecção emergencial.' }
     ];
 
     const renderTable = (data) => {
@@ -424,8 +457,6 @@ document.addEventListener('DOMContentLoaded', function () {
         );
         renderTable(filteredData);
     });
-
-    // Removido: renderTable(fullExpenseData); // Não renderiza todos os dados inicialmente no carregamento
 
     const navButtons = document.querySelectorAll('.nav-button');
     const sections = document.querySelectorAll('main section');
@@ -460,6 +491,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const documentSearchResults = document.getElementById('documentSearchResults');
     const searchStatus = document.getElementById('searchStatus');
     const searchLoadingIndicator = document.getElementById('searchLoadingIndicator');
+    const documentSearchArea = document.getElementById('documentSearchArea'); // Area containing input, button, results
+    const fullPolicyContentDisplay = document.getElementById('fullPolicyContentDisplay');
+    const policyTextRendered = document.getElementById('policyTextRendered');
+    const backToSearchBtn = document.getElementById('backToSearchBtn');
 
     // Content of POLITICA DE UTILIZAÇÃO_CARTÕES CLARA.docx embedded directly
     let policyDocumentContent = `Política de Uso dos Cartões Clara nas Lojas
@@ -585,9 +620,187 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
     policyDocumentContent = policyDocumentContent.replace(/\bcorporativo(s)?\b/g, '');
 
 
-    // The fetchPolicyDocument function is no longer needed as content is embedded
-    // and can be removed, or left as a placeholder for potential future external fetching.
-    // For now, it's simplified as the content is immediately available.
+    // Helper to escape regex special characters
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Map of common section titles to their desired HTML IDs for anchoring
+    // This needs to be comprehensive for all main sections of the policy that could be targets
+    const sectionToIdMap = {
+        'Objetivo': 'objetivo',
+        'Abrangência': 'abrangencia',
+        'Melhorias': 'melhorias',
+        'Definições Importantes': 'definicoes-importantes',
+        'Limite dos Cartões': 'limite-cartoes',
+        'Prestação de Contas': 'prestacao-contas',
+        'Critérios de Bloqueio do Cartão': 'criterios-bloqueio',
+        'QUADRO DE PRAZOS PARA PRESTAÇÃO DE CONTAS': 'quadro-prazos',
+        'Situações excepcionais e devidamente justificadas': 'situacoes-excepcionais',
+        'Compras Realizadas em Aplicativos de E-commerce': 'compras-e-commerce',
+        'Substituição de uso do cartão': 'substituicao-cartao',
+        'Utilização provisória de cartão de outra loja': 'utilizacao-provisoria'
+    };
+
+    // Function to process policy text and insert anchors and basic formatting
+    function generateFullPolicyHtml(text, queryToHighlight = '') {
+        let processedText = text;
+
+        // 1. Normalize whitespace and remove potential unwanted characters
+        processedText = processedText.replace(/\r/g, '').replace(/ {2,}/g, ' '); // Remove carriage returns, normalize multiple spaces
+
+        const lines = processedText.split('\n');
+        let htmlContent = [];
+        let currentParagraphLines = [];
+
+        const mainSectionTitles = Object.keys(sectionToIdMap);
+        // Regex for specific bolded sub-points within sections
+        const specificBoldPointsRegex = new RegExp(
+            [
+                'Redução de Riscos e Segurança Financeira',
+                'Facilidade de Controle e Gestão Financeira',
+                'Flexibilidade e Adaptabilidade às Necessidades',
+                'Melhoria no Fluxo de Caixa e Antecipação de Numerário',
+                'Comprovante Fiscal',
+                'Comprovante de Pagamento',
+                'Etiqueta',
+                'Bloqueio Preventivo',
+                'Transação',
+                'Prestação de Contas',
+                'Responsável pela Prestação de Contas',
+                'Departamento Financeiro',
+                'Reincidência',
+                'Contestação',
+                'Revisão das Categorias Liberadas',
+                'Portador Temporário',
+                'Sangrias de Caixa',
+                'Treinamento Obrigatório',
+                'Service Now',
+                'Critérios de Bloqueio do Cartão',
+                'Transações de valor elevado',
+                'Transações de valor médio',
+                'Transações de pequeno valor',
+                'Marketplaces', // From QUADRO DE PRAZOS
+                'Situações excepcionais e devidamente justificadas',
+                'Nota de Esclarecimento',
+                'Anexação posterior',
+                'Utilização provisória de cartão de outra loja'
+            ].map(escapeRegExp).join('|'),
+            'i' // Case-insensitive
+        );
+
+        lines.forEach(line => {
+            const trimmedLine = line.trim();
+
+            // Check for empty lines to signal paragraph breaks
+            if (trimmedLine === '') {
+                if (currentParagraphLines.length > 0) {
+                    htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                    currentParagraphLines = [];
+                }
+                return; // Skip to next line if it's just a blank line
+            }
+
+            let isFormatted = false;
+
+            // Check for main section titles first
+            for (const title of mainSectionTitles) {
+                // Use regex for more robust matching of titles, including possible leading numbers/tabs
+                const titleRegex = new RegExp(`^(\\d+\\.?\\s*|\\s*)${escapeRegExp(title)}(\\s*|$)`, 'i');
+                if (trimmedLine.match(titleRegex)) {
+                    if (currentParagraphLines.length > 0) { // Close previous paragraph if open
+                        htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                        currentParagraphLines = [];
+                    }
+                    const id = sectionToIdMap[title];
+                    htmlContent.push(`<span id="${id}" class="policy-section-anchor"></span><h4 class="font-bold text-lg mt-6 mb-2">${trimmedLine}</h4>`);
+                    isFormatted = true;
+                    break;
+                }
+            }
+
+            if (isFormatted) {
+                return; // Move to next line after processing main title
+            }
+
+            // Check for specific bolded sub-points or numbered sub-points (e.g., "4.1. Comprovante Fiscal:", "Redução de Riscos e Segurança Financeira :")
+            const boldPointMatch = trimmedLine.match(specificBoldPointsRegex);
+            const numberedSubPointMatch = trimmedLine.match(/^(\d+\.\d+\.?)\s/); // Matches "4.1. " or "4.1.1. "
+
+            if (boldPointMatch || numberedSubPointMatch) {
+                if (currentParagraphLines.length > 0) { // Close previous paragraph if open
+                    htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                    currentParagraphLines = [];
+                }
+
+                // Attempt to split at the first colon if it exists, to bold only the heading part
+                const firstColonIndex = trimmedLine.indexOf(':');
+                if (firstColonIndex !== -1) {
+                    const boldPart = trimmedLine.substring(0, firstColonIndex + 1); // Include the colon in bold
+                    const normalPart = trimmedLine.substring(firstColonIndex + 1).trim();
+                    htmlContent.push(`<p class="mt-2"><strong>${boldPart}</strong> ${normalPart}</p>`);
+                } else {
+                    // If no colon, but it's a specific bold point, bold the entire line
+                    htmlContent.push(`<p class="mt-2"><strong>${trimmedLine}</strong></p>`);
+                }
+                isFormatted = true;
+            }
+
+
+            if (isFormatted) {
+                return;
+            }
+
+            // Handle list items starting with '-' but not recognized as specific bold points
+            if (trimmedLine.startsWith('- ')) {
+                if (currentParagraphLines.length > 0) {
+                    htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                    currentParagraphLines = [];
+                }
+                htmlContent.push(`<p class="mt-2">${trimmedLine}</p>`); // Just a regular list item
+                isFormatted = true;
+            }
+            
+            if (isFormatted) {
+                return;
+            }
+
+            // Handle "QUADRO DE PRAZOS PARA PRESTAÇÃO DE CONTAS" table header
+            if (trimmedLine.startsWith('Tipo de Transação,Valor da Transação')) {
+                if (currentParagraphLines.length > 0) {
+                    htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                    currentParagraphLines = [];
+                }
+                htmlContent.push('<h5 class="font-bold text-base mt-4 mb-2">QUADRO DE PRAZOS PARA PRESTAÇÃO DE CONTAS</h5>');
+                isFormatted = true;
+            }
+            
+            // If it's none of the above, it's regular paragraph text
+            if (!isFormatted) {
+                currentParagraphLines.push(trimmedLine);
+            }
+        });
+
+        // Add any remaining paragraph lines
+        if (currentParagraphLines.length > 0) {
+            htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+        }
+        
+        // Apply highlighting for the search query if provided
+        let finalHtml = htmlContent.join('');
+        if (queryToHighlight) {
+            finalHtml = finalHtml.replace(
+                new RegExp(escapeRegExp(queryToHighlight), 'gi'),
+                match => `<span class="policy-content-highlight">${match}</span>`
+            );
+        }
+
+        return finalHtml;
+    }
+
+    // Render the full policy document once on load
+    policyTextRendered.innerHTML = generateFullPolicyHtml(policyDocumentContent);
+
 
     documentSearchBtn.addEventListener('click', () => {
         const query = documentSearchInput.value.trim();
@@ -629,9 +842,24 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
             
             // Ensure sentence is not empty after trimming
             if (sentence) {
-                // Highlight the query in the sentence
-                const highlightedSentence = sentence.replace(new RegExp(query, 'gi'), match => `<strong class="bg-yellow-200 px-1 rounded">${match}</strong>`);
-                results.push(highlightedSentence);
+                // Highlight the query in the sentence for the snippet view
+                const highlightedSentence = sentence.replace(new RegExp(escapeRegExp(query), 'gi'), match => `<strong class="bg-yellow-200 px-1 rounded">${match}</strong>`);
+                
+                // Determine the closest section ID for linking
+                let closestSectionId = 'top'; // Default to top of document
+                for (const sectionTitle in sectionToIdMap) {
+                    const sectionRegex = new RegExp(`(^|\\n)([\\s]*${escapeRegExp(sectionTitle)})`, 'i');
+                    const match = policyDocumentContent.substring(0, startIndex).match(sectionRegex);
+                    if (match) {
+                        closestSectionId = sectionToIdMap[sectionTitle];
+                    }
+                }
+
+                results.push({
+                    snippet: highlightedSentence,
+                    sectionId: closestSectionId, // The ID of the section this snippet belongs to
+                    originalQuery: query // Store original query for highlighting in full document
+                });
             }
             
             startIndex += lowerCaseQuery.length; // Move past the found query to find next occurrence
@@ -641,15 +869,51 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
         if (results.length > 0) {
             searchStatus.textContent = `Encontrado ${results.length} resultado(s) para "${query}":`;
             results.forEach((result, index) => {
-                documentSearchResults.innerHTML += `
-                    <div class="p-3 border border-slate-200 rounded-lg bg-slate-50">
-                        <p class="text-sm text-slate-700">${result}</p>
-                    </div>
-                `;
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'p-3 border border-slate-200 rounded-lg bg-slate-50 search-result-item';
+                resultDiv.setAttribute('data-section-id', result.sectionId);
+                resultDiv.setAttribute('data-query', result.originalQuery);
+                resultDiv.innerHTML = `<p class="text-sm text-slate-700">${result.snippet}</p>`;
+                documentSearchResults.appendChild(resultDiv);
             });
         } else {
             searchStatus.textContent = `Nenhum resultado encontrado para "${query}".`;
         }
+
+        // Add event listeners to newly created search result items
+        document.querySelectorAll('.search-result-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const sectionId = this.getAttribute('data-section-id');
+                const queryToHighlight = this.getAttribute('data-query');
+
+                // Hide search area, show full policy display
+                documentSearchArea.classList.add('hidden');
+                fullPolicyContentDisplay.classList.remove('hidden');
+
+                // Clear previous highlights and re-render with new highlights
+                policyTextRendered.innerHTML = generateFullPolicyHtml(policyDocumentContent, queryToHighlight);
+
+                // Scroll to the specific section or the first occurrence of the query
+                const targetElement = document.getElementById(sectionId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                    // Fallback to scrolling to the top of the policy content if section not found
+                    policyTextRendered.scrollTop = 0;
+                }
+            });
+        });
+    });
+
+    // Back to Search button functionality
+    backToSearchBtn.addEventListener('click', () => {
+        fullPolicyContentDisplay.classList.add('hidden');
+        documentSearchArea.classList.remove('hidden');
+        documentSearchResults.innerHTML = ''; // Clear previous search results
+        documentSearchInput.value = ''; // Clear search input
+        searchStatus.textContent = 'Documento da política carregado e pronto para busca.';
+        // Clear highlights in the full policy display
+        policyTextRendered.innerHTML = generateFullPolicyHtml(policyDocumentContent);
     });
 
 });
