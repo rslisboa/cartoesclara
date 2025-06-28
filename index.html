@@ -32,7 +32,7 @@
         .nav-button:not(.active):hover { background-color: #e0f2fe; }
         section { scroll-margin-top: 80px; }
         .search-result-item:hover {
-            cursor: pointer;
+            cursor: default; /* Changed from pointer as it's no longer clickable to show full section */
             background-color: #e0f2fe; /* light sky blue on hover */
             border-color: #93c5fd; /* blue-300 */
         }
@@ -49,8 +49,20 @@
             padding-top: 80px; /* Counteract margin-top for content below */
             pointer-events: none; /* Make it not clickable */
         }
+        /* All text in the policy display should be black */
         #policyTextRendered p, #policyTextRendered h4, #policyTextRendered h5 {
-            color: #000000; /* All text in the policy display should be black */
+            color: #000000; 
+        }
+        /* Titles and subtitles should be bold and black (no specific background color) */
+        .policy-title {
+            color: #000000; /* Black */
+            font-weight: bold; /* Bold */
+            /* Removed background-color, padding, border-radius */
+            display: inline; /* To not break line if not needed */
+        }
+        /* Background for the displayed policy section after search should be white */
+        #fullPolicyContentDisplay {
+            background-color: #FFFFFF; /* White background */
         }
     </style>
 </head>
@@ -83,7 +95,7 @@
                     <ul class="text-left space-y-3 text-rose-900">
                         <li class="flex items-start"><span class="text-xl mr-3">⚠️</span><div><strong class="block">Alto Risco Operacional:</strong> Manuseio de dinheiro em espécie, vulnerável a perdas e roubos.</div></li>
                         <li class="flex items-start"><span class="text-xl mr-3">🐌</span><div><strong class="block">Processos Manuais e Lentos:</b> Burocracia na solicitação, aprovação e conciliação de despesas.</div></li>
-                        <li class="flex items-start"><span class="text-xl mr-3">📉</span><div><strong class="block">Falta de Visibilidade:</strong> Controle financeiro reativo, dificultando o rastreamento de gastos.</div></li>
+                        <li class="flex items-start"><span class="text-xl mr-3">📉</span><div><strong class="block">Falta de Visibilidade:</b> Controle financeiro reativo, dificultando o rastreamento de gastos.</div></li>
                     </ul>
                 </div>
                 <div class="bg-sky-100/50 border-2 border-sky-200 rounded-xl p-6 shadow-sm">
@@ -120,7 +132,7 @@
                     <p class="text-sm text-slate-600">O cartão da Clara é usado para despesas autorizadas. A **inserção da etiqueta e da nota fiscal/recibo é essencial** para cada compra na plataforma, em até 48h.</p>
                 </div>
                 <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div>
-                <div class="text-4xl text-sky-400 font-light block md:hidden my-4 transform rotate-90">→</div>
+                 <div class="text-4xl text-sky-400 font-light block md:hidden my-4 transform rotate-90">→</div>
                 <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full">
                     <div class="text-5xl mb-3">3️⃣</div>
                     <h3 class="text-lg font-bold text-slate-900">Monitoramento e Ação</h3>
@@ -265,11 +277,11 @@
                     </div>
                 </div>
 
-                <div id="fullPolicyContentDisplay" class="hidden mt-8 p-4 border border-slate-200 rounded-lg bg-slate-50 relative">
+                <div id="fullPolicyContentDisplay" class="hidden mt-8 p-4 border border-slate-200 rounded-lg shadow-lg">
                     <button id="backToSearchBtn" class="absolute top-4 right-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg text-sm">
                         Voltar à Pesquisa
                     </button>
-                    <h3 class="text-xl font-bold text-sky-900 mb-4">Documento Completo da Política</h3>
+                    <h3 class="text-xl font-bold text-sky-900 mb-4">Trecho da Política</h3>
                     <div id="policyTextRendered" class="text-sm text-black max-h-96 overflow-y-auto pr-2">
                         <!-- Policy content will be rendered here with highlights -->
                     </div>
@@ -617,7 +629,7 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
     policyDocumentContent = policyDocumentContent.replace(/cartão corporativo/g, 'cartão da Clara');
     // Replace standalone "corporativo" or "corporativos" that are not part of the previously replaced phrases.
     // This regex looks for ' corporativo' or ' corporativos' preceded by a word boundary and followed by a word boundary or a punctuation mark.
-    policyDocumentContent = policyDocumentContent.replace(/\bcorporativo(s)?\b/g, '');
+    policyDocumentContent = policyDocumentContent.concat(' ').replace(/\bcorporativo(s)?\b/g, '').trim(); // Add space to handle end-of-content matches
 
 
     // Helper to escape regex special characters
@@ -628,154 +640,180 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
     // Map of common section titles to their desired HTML IDs for anchoring
     // This needs to be comprehensive for all main sections of the policy that could be targets
     const sectionToIdMap = {
-        'Objetivo': 'objetivo',
-        'Abrangência': 'abrangencia',
-        'Melhorias': 'melhorias',
-        'Definições Importantes': 'definicoes-importantes',
-        'Limite dos Cartões': 'limite-cartoes',
-        'Prestação de Contas': 'prestacao-contas',
+        'Política de Uso dos Cartões Clara nas Lojas': 'politica-uso', // Added for the main title
+        'POLÍTICA INTERNA': 'politica-interna', // Added for main title
+        '[CONTAS A RECEBER]': 'contas-a-receber',
+        'ÚLTIMA ATUALIZAÇÃO: 24/06/2025': 'ultima-atualizacao',
+        'SUMÁRIO': 'sumario', // Added for main title
+        '1. 	 Objetivo': 'objetivo',
+        '2. 	 Abrangência': 'abrangencia',
+        '3. 	 Melhorias': 'melhorias',
+        '4. 	 Definições Importantes': 'definicoes-importantes',
+        '5. 	 Limite dos Cartões': 'limite-cartoes',
+        '6. 	 Prestação de Contas': 'prestacao-contas',
         'Critérios de Bloqueio do Cartão': 'criterios-bloqueio',
         'QUADRO DE PRAZOS PARA PRESTAÇÃO DE CONTAS': 'quadro-prazos',
-        'Situações excepcionais e devidamente justificadas': 'situacoes-excepcionais',
+        'Situações excepcionais e devidamente justificadas': 'situacoes-excepcionais-justificadas',
         'Compras Realizadas em Aplicativos de E-commerce': 'compras-e-commerce',
         'Substituição de uso do cartão': 'substituicao-cartao',
-        'Utilização provisória de cartão de outra loja': 'utilizacao-provisoria'
+        'Utilização provisória de cartão de outra loja': 'utilizacao-provisoria',
+        '7. 	 Restrições de Uso': 'restricoes-uso',
+        '8. 	 Responsabilidades': 'responsabilidades',
+        '9. 	 Monitoramento, Auditoria e Fraudes': 'monitoramento-auditoria-fraudes',
+        '10. 	 Revisão': 'revisao',
+        'Anexo I – Quadro de Etiquetas por Tipo de Gasto': 'anexo-i'
     };
 
-    // Function to process policy text and insert anchors and basic formatting
-    function generateFullPolicyHtml(text, queryToHighlight = '') {
-        let processedText = text;
+    const mainSectionHeadings = Object.keys(sectionToIdMap);
+    let parsedPolicySections = {}; // Global variable to store parsed content with its start/end character indices
 
-        // 1. Normalize whitespace and remove potential unwanted characters
-        processedText = processedText.replace(/\r/g, '').replace(/ {2,}/g, ' '); // Remove carriage returns, normalize multiple spaces
+    // Function to parse the policy content into structured sections based on headings
+    function parsePolicyIntoSections() {
+        parsedPolicySections = {}; // Reset parsed sections for each call (important for updates)
+
+        const detectedHeadings = []; // Store { title: "...", startIndex: <char_index>, originalLine: "..." }
+
+        // Step 1: Detect all actual heading occurrences and their start indices
+        for (const headingText of mainSectionHeadings) {
+            // Create a regex to match the heading text, accounting for potential leading numbers/tabs
+            const headingRegex = new RegExp(`^(\\s*\\d+\\.?\\s*|\\s*)${escapeRegExp(headingText)}(\\s*|$)`, 'gmi');
+            let match;
+            while ((match = headingRegex.exec(policyDocumentContent)) !== null) {
+                detectedHeadings.push({
+                    title: headingText, // Canonical title
+                    startIndex: match.index,
+                    originalLine: match[0].trim() // The exact matched line including numbers/tabs
+                });
+            }
+        }
+
+        // Sort detected headings by their appearance in the document
+        detectedHeadings.sort((a, b) => a.startIndex - b.startIndex);
+
+        // Step 2: Populate parsedPolicySections with content based on detected headings
+        // Handle content before the first detected heading (preamble)
+        if (detectedHeadings.length > 0 && detectedHeadings[0].startIndex > 0) {
+            const preambleContent = policyDocumentContent.substring(0, detectedHeadings[0].startIndex).trim();
+            if (preambleContent) {
+                parsedPolicySections['Introdução ao Documento'] = {
+                    rawContent: preambleContent,
+                    startCharIndex: 0,
+                    endCharIndex: preambleContent.length
+                };
+            }
+        } else if (detectedHeadings.length === 0 && policyDocumentContent.trim().length > 0) {
+            // If no headings found, treat entire document as one "Introduction"
+            parsedPolicySections['Introdução ao Documento'] = {
+                rawContent: policyDocumentContent.trim(),
+                startCharIndex: 0,
+                endCharIndex: policyDocumentContent.trim().length
+            };
+            return;
+        }
+
+        // Iterate through detected headings to extract section content
+        for (let i = 0; i < detectedHeadings.length; i++) {
+            const currentHeading = detectedHeadings[i];
+            const nextHeading = detectedHeadings[i + 1];
+            
+            const sectionEndIndex = nextHeading ? nextHeading.startIndex : policyDocumentContent.length;
+            
+            // Extract content from current heading's start to the next heading's start (or end of document)
+            const rawContent = policyDocumentContent.substring(currentHeading.startIndex, sectionEndIndex);
+            
+            if (rawContent.trim()) { // Ensure there's actual content
+                parsedPolicySections[currentHeading.title] = {
+                    rawContent: rawContent,
+                    startCharIndex: currentHeading.startIndex,
+                    endCharIndex: sectionEndIndex
+                };
+            }
+        }
+        // console.log("Parsed Sections:", parsedPolicySections); // Debugging
+    }
+
+    // Function to process policy text and apply formatting (bold titles/subtitles, black text)
+    function formatPolicyText(text, queryToHighlight = '') {
+        let processedText = text;
+        processedText = processedText.replace(/\r/g, '').replace(/ {2,}/g, ' ');
 
         const lines = processedText.split('\n');
         let htmlContent = [];
         let currentParagraphLines = [];
 
-        const mainSectionTitles = Object.keys(sectionToIdMap);
         // Regex for specific bolded sub-points within sections
         const specificBoldPointsRegex = new RegExp(
             [
-                'Redução de Riscos e Segurança Financeira',
-                'Facilidade de Controle e Gestão Financeira',
-                'Flexibilidade e Adaptabilidade às Necessidades',
-                'Melhoria no Fluxo de Caixa e Antecipação de Numerário',
-                'Comprovante Fiscal',
-                'Comprovante de Pagamento',
-                'Etiqueta',
-                'Bloqueio Preventivo',
-                'Transação',
-                'Prestação de Contas',
-                'Responsável pela Prestação de Contas',
-                'Departamento Financeiro',
-                'Reincidência',
-                'Contestação',
-                'Revisão das Categorias Liberadas',
-                'Portador Temporário',
-                'Sangrias de Caixa',
-                'Treinamento Obrigatório',
-                'Service Now',
+                'Redução de Riscos e Segurança Financeira', 'Facilidade de Controle e Gestão Financeira',
+                'Flexibilidade e Adaptabilidade às Necessidades', 'Melhoria no Fluxo de Caixa e Antecipação de Numerário',
+                'Comprovante Fiscal', 'Comprovante de Pagamento', 'Etiqueta', 'Bloqueio Preventivo',
+                'Transação', 'Prestação de Contas', 'Responsável pela Prestação de Contas',
+                'Departamento Financeiro', 'Reincidência', 'Contestação', 'Revisão das Categorias Liberadas',
+                'Portador Temporário', 'Sangrias de Caixa', 'Treinamento Obrigatório', 'Service Now',
                 'Critérios de Bloqueio do Cartão',
-                'Transações de valor elevado',
-                'Transações de valor médio',
-                'Transações de pequeno valor',
-                'Marketplaces', // From QUADRO DE PRAZOS
-                'Situações excepcionais e devidamente justificadas',
-                'Nota de Esclarecimento',
-                'Anexação posterior',
-                'Utilização provisória de cartão de outra loja'
+                'Transações de valor elevado', 'Transações de valor médio', 'Transações de pequeno valor',
+                'Tipo de Transação,Valor da Transação,Prazo para Regularização,Medida Corretiva',
+                'Marketplaces', 'Situações excepcionais e devidamente justificadas', 'Nota de Esclarecimento',
+                'Anexação posterior', 'Utilização provisória de cartão de outra loja'
             ].map(escapeRegExp).join('|'),
-            'i' // Case-insensitive
+            'i'
         );
+        const numberedSubPointRegex = /^(\d+\.\d+\.?)\s/;
 
         lines.forEach(line => {
             const trimmedLine = line.trim();
-
-            // Check for empty lines to signal paragraph breaks
             if (trimmedLine === '') {
                 if (currentParagraphLines.length > 0) {
                     htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
                     currentParagraphLines = [];
                 }
-                return; // Skip to next line if it's just a blank line
+                return;
             }
 
             let isFormatted = false;
 
-            // Check for main section titles first
-            for (const title of mainSectionTitles) {
-                // Use regex for more robust matching of titles, including possible leading numbers/tabs
-                const titleRegex = new RegExp(`^(\\d+\\.?\\s*|\\s*)${escapeRegExp(title)}(\\s*|$)`, 'i');
+            // Check for main section titles from the sectionToIdMap
+            for (const canonicalTitle of mainSectionHeadings) {
+                const titleRegex = new RegExp(`^(\\s*\\d+\\.?\\s*|\\s*)${escapeRegExp(canonicalTitle)}(\\s*|$)`, 'i');
                 if (trimmedLine.match(titleRegex)) {
-                    if (currentParagraphLines.length > 0) { // Close previous paragraph if open
+                    if (currentParagraphLines.length > 0) {
                         htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
                         currentParagraphLines = [];
                     }
-                    const id = sectionToIdMap[title];
-                    htmlContent.push(`<span id="${id}" class="policy-section-anchor"></span><h4 class="font-bold text-lg mt-6 mb-2">${trimmedLine}</h4>`);
+                    htmlContent.push(`<h4 class="font-bold text-lg mt-6 mb-2 policy-title">${trimmedLine}</h4>`);
                     isFormatted = true;
                     break;
                 }
             }
-
-            if (isFormatted) {
-                return; // Move to next line after processing main title
-            }
-
-            // Check for specific bolded sub-points or numbered sub-points (e.g., "4.1. Comprovante Fiscal:", "Redução de Riscos e Segurança Financeira :")
-            const boldPointMatch = trimmedLine.match(specificBoldPointsRegex);
-            const numberedSubPointMatch = trimmedLine.match(/^(\d+\.\d+\.?)\s/); // Matches "4.1. " or "4.1.1. "
-
-            if (boldPointMatch || numberedSubPointMatch) {
-                if (currentParagraphLines.length > 0) { // Close previous paragraph if open
+            
+            // Check for specific bolded sub-points or numbered sub-points if not a main title
+            if (!isFormatted && (specificBoldPointsRegex.test(trimmedLine) || numberedSubPointRegex.test(trimmedLine) || trimmedLine.startsWith('Tipo de Transação,Valor da Transação'))) {
+                if (currentParagraphLines.length > 0) {
                     htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
                     currentParagraphLines = [];
                 }
-
-                // Attempt to split at the first colon if it exists, to bold only the heading part
                 const firstColonIndex = trimmedLine.indexOf(':');
-                if (firstColonIndex !== -1) {
-                    const boldPart = trimmedLine.substring(0, firstColonIndex + 1); // Include the colon in bold
+                if (firstColonIndex !== -1 && trimmedLine.includes(' :')) {
+                    const boldPart = trimmedLine.substring(0, firstColonIndex + 1);
                     const normalPart = trimmedLine.substring(firstColonIndex + 1).trim();
-                    htmlContent.push(`<p class="mt-2"><strong>${boldPart}</strong> ${normalPart}</p>`);
+                    htmlContent.push(`<p class="mt-2"><strong class="policy-title">${boldPart}</strong> ${normalPart}</p>`);
                 } else {
-                    // If no colon, but it's a specific bold point, bold the entire line
-                    htmlContent.push(`<p class="mt-2"><strong>${trimmedLine}</strong></p>`);
+                    htmlContent.push(`<p class="mt-2"><strong class="policy-title">${trimmedLine}</strong></p>`);
                 }
                 isFormatted = true;
             }
 
-
-            if (isFormatted) {
-                return;
-            }
-
-            // Handle list items starting with '-' but not recognized as specific bold points
-            if (trimmedLine.startsWith('- ')) {
+            // Handle list items starting with '-'
+            if (!isFormatted && trimmedLine.startsWith('- ')) {
                 if (currentParagraphLines.length > 0) {
                     htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
                     currentParagraphLines = [];
                 }
-                htmlContent.push(`<p class="mt-2">${trimmedLine}</p>`); // Just a regular list item
+                htmlContent.push(`<p class="mt-2">${trimmedLine}</p>`);
                 isFormatted = true;
-            }
-            
-            if (isFormatted) {
-                return;
             }
 
-            // Handle "QUADRO DE PRAZOS PARA PRESTAÇÃO DE CONTAS" table header
-            if (trimmedLine.startsWith('Tipo de Transação,Valor da Transação')) {
-                if (currentParagraphLines.length > 0) {
-                    htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
-                    currentParagraphLines = [];
-                }
-                htmlContent.push('<h5 class="font-bold text-base mt-4 mb-2">QUADRO DE PRAZOS PARA PRESTAÇÃO DE CONTAS</h5>');
-                isFormatted = true;
-            }
-            
-            // If it's none of the above, it's regular paragraph text
+            // If none of the above, it's regular paragraph text
             if (!isFormatted) {
                 currentParagraphLines.push(trimmedLine);
             }
@@ -786,7 +824,6 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
             htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
         }
         
-        // Apply highlighting for the search query if provided
         let finalHtml = htmlContent.join('');
         if (queryToHighlight) {
             finalHtml = finalHtml.replace(
@@ -794,12 +831,24 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
                 match => `<span class="policy-content-highlight">${match}</span>`
             );
         }
-
         return finalHtml;
     }
 
-    // Render the full policy document once on load
-    policyTextRendered.innerHTML = generateFullPolicyHtml(policyDocumentContent);
+    // New function to render a specific section with formatting and highlighting
+    function renderSpecificSectionContent(sectionTitle, queryToHighlight) {
+        const sectionData = parsedPolicySections[sectionTitle];
+        if (!sectionData || !sectionData.rawContent) {
+            return `<p>Conteúdo da seção "${sectionTitle}" não encontrado.</p>`;
+        }
+        return formatPolicyText(sectionData.rawContent, queryToHighlight);
+    }
+
+    // Parse the policy content into sections when the DOM is ready
+    parsePolicyIntoSections();
+
+    // Render the full policy document initially
+    policyTextRendered.innerHTML = formatPolicyText(policyDocumentContent);
+    document.querySelector('#fullPolicyContentDisplay h3').textContent = 'Documento Completo da Política';
 
 
     documentSearchBtn.addEventListener('click', () => {
@@ -807,6 +856,9 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
         if (!query) {
             searchStatus.textContent = 'Por favor, digite um termo para buscar.';
             documentSearchResults.innerHTML = '';
+            // Ensure fullPolicyContentDisplay is hidden and documentSearchArea is shown when search is empty
+            fullPolicyContentDisplay.classList.add('hidden');
+            documentSearchArea.classList.remove('hidden');
             return;
         }
 
@@ -820,49 +872,52 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
         let startIndex = 0;
 
         while ((startIndex = lowerCaseContent.indexOf(lowerCaseQuery, startIndex)) > -1) {
-            // Find the start of the sentence (or a reasonable chunk)
-            const sentenceStart = Math.max(
+            let foundSectionTitle = 'Introdução ao Documento'; // Default if no specific section is found
+            
+            // Find the section this match belongs to using the structuredPolicy
+            const sectionsKeys = Object.keys(parsedPolicySections);
+            for (let i = sectionsKeys.length - 1; i >= 0; i--) {
+                const sectionTitleKey = sectionsKeys[i];
+                const section = parsedPolicySections[sectionTitleKey];
+                
+                if (startIndex >= section.startCharIndex && startIndex < section.endCharIndex) {
+                    foundSectionTitle = sectionTitleKey;
+                    break;
+                }
+            }
+
+            // Get a snippet for display in the search results list (e.g., the sentence containing the match)
+            const snippetStart = Math.max(
                 0,
                 policyDocumentContent.lastIndexOf('.', startIndex - 1) + 1,
                 policyDocumentContent.lastIndexOf('\n', startIndex - 1) + 1,
                 policyDocumentContent.lastIndexOf(':', startIndex - 1) + 1
             );
-            // Find the end of the sentence (or a reasonable chunk)
-            const sentenceEnd = Math.min(
-                policyDocumentContent.length,
-                policyDocumentContent.indexOf('.', startIndex + lowerCaseQuery.length),
-                policyDocumentContent.indexOf('\n', startIndex + lowerCaseQuery.length),
-                policyDocumentContent.indexOf(':', startIndex + lowerCaseQuery.length)
-            );
-            
-            // Adjust endOfSentence if not found, to capture till end of content or a larger chunk
-            const actualSentenceEnd = (sentenceEnd === -1) ? policyDocumentContent.length : sentenceEnd + 1; // +1 to include the delimiter
+            const tempSnippetEnd = policyDocumentContent.indexOf('.', startIndex + query.length);
+            const tempNewlineEnd = policyDocumentContent.indexOf('\n', startIndex + query.length);
+            const tempColonEnd = policyDocumentContent.indexOf(':', startIndex + query.length);
 
-            let sentence = policyDocumentContent.substring(sentenceStart, actualSentenceEnd).trim();
-            
-            // Ensure sentence is not empty after trimming
-            if (sentence) {
-                // Highlight the query in the sentence for the snippet view
-                const highlightedSentence = sentence.replace(new RegExp(escapeRegExp(query), 'gi'), match => `<strong class="bg-yellow-200 px-1 rounded">${match}</strong>`);
-                
-                // Determine the closest section ID for linking
-                let closestSectionId = 'top'; // Default to top of document
-                for (const sectionTitle in sectionToIdMap) {
-                    const sectionRegex = new RegExp(`(^|\\n)([\\s]*${escapeRegExp(sectionTitle)})`, 'i');
-                    const match = policyDocumentContent.substring(0, startIndex).match(sectionRegex);
-                    if (match) {
-                        closestSectionId = sectionToIdMap[sectionTitle];
-                    }
-                }
+            let snippetEndCandidate = policyDocumentContent.length;
+            if (tempSnippetEnd !== -1) snippetEndCandidate = Math.min(snippetEndCandidate, tempSnippetEnd);
+            if (tempNewlineEnd !== -1) snippetEndCandidate = Math.min(snippetEndCandidate, tempNewlineEnd);
+            if (tempColonEnd !== -1) snippetEndCandidate = Math.min(snippetEndCandidate, tempColonEnd);
 
-                results.push({
-                    snippet: highlightedSentence,
-                    sectionId: closestSectionId, // The ID of the section this snippet belongs to
-                    originalQuery: query // Store original query for highlighting in full document
-                });
+            const actualSnippetEnd = (snippetEndCandidate === policyDocumentContent.length) ? policyDocumentContent.length : snippetEndCandidate + 1;
+
+            let displaySnippet = policyDocumentContent.substring(snippetStart, actualSnippetEnd).trim();
+            if (displaySnippet.length < 50 && actualSnippetEnd === policyDocumentContent.length) {
+                 displaySnippet = policyDocumentContent.substring(snippetStart, Math.min(policyDocumentContent.length, snippetStart + 150)).trim();
             }
+
+            const highlightedSnippetForDisplay = displaySnippet.replace(new RegExp(escapeRegExp(query), 'gi'), match => `<strong class="bg-yellow-200 px-1 rounded">${match}</strong>`);
             
-            startIndex += lowerCaseQuery.length; // Move past the found query to find next occurrence
+            results.push({
+                snippetForDisplay: highlightedSnippetForDisplay,
+                sectionTitle: foundSectionTitle,
+                originalQuery: query,
+            });
+            
+            startIndex += query.length;
         }
 
         searchLoadingIndicator.classList.add('hidden');
@@ -871,50 +926,55 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
             results.forEach((result, index) => {
                 const resultDiv = document.createElement('div');
                 resultDiv.className = 'p-3 border border-slate-200 rounded-lg bg-slate-50 search-result-item';
-                resultDiv.setAttribute('data-section-id', result.sectionId);
-                resultDiv.setAttribute('data-query', result.originalQuery);
-                resultDiv.innerHTML = `<p class="text-sm text-slate-700">${result.snippet}</p>`;
+                // Removed click event listener: // resultDiv.addEventListener('click', function() { ... });
+                resultDiv.innerHTML = `<p class="text-sm text-slate-700"><strong>${result.sectionTitle}:</strong> ${result.snippetForDisplay}</p>`;
                 documentSearchResults.appendChild(resultDiv);
             });
+            // When search results are displayed, the fullPolicyContentDisplay should be hidden
+            fullPolicyContentDisplay.classList.add('hidden');
+            documentSearchArea.classList.remove('hidden');
+
         } else {
             searchStatus.textContent = `Nenhum resultado encontrado para "${query}".`;
+            fullPolicyContentDisplay.classList.add('hidden');
+            documentSearchArea.classList.remove('hidden');
         }
-
-        // Add event listeners to newly created search result items
-        document.querySelectorAll('.search-result-item').forEach(item => {
-            item.addEventListener('click', function() {
-                const sectionId = this.getAttribute('data-section-id');
-                const queryToHighlight = this.getAttribute('data-query');
-
-                // Hide search area, show full policy display
-                documentSearchArea.classList.add('hidden');
-                fullPolicyContentDisplay.classList.remove('hidden');
-
-                // Clear previous highlights and re-render with new highlights
-                policyTextRendered.innerHTML = generateFullPolicyHtml(policyDocumentContent, queryToHighlight);
-
-                // Scroll to the specific section or the first occurrence of the query
-                const targetElement = document.getElementById(sectionId);
-                if (targetElement) {
-                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } else {
-                    // Fallback to scrolling to the top of the policy content if section not found
-                    policyTextRendered.scrollTop = 0;
-                }
-            });
-        });
     });
 
-    // Back to Search button functionality
+    // Back to Search button functionality (this button should always be visible IF fullPolicyContentDisplay is visible)
     backToSearchBtn.addEventListener('click', () => {
         fullPolicyContentDisplay.classList.add('hidden');
         documentSearchArea.classList.remove('hidden');
-        documentSearchResults.innerHTML = ''; // Clear previous search results
-        documentSearchInput.value = ''; // Clear search input
+        documentSearchResults.innerHTML = '';
+        documentSearchInput.value = '';
         searchStatus.textContent = 'Documento da política carregado e pronto para busca.';
-        // Clear highlights in the full policy display
-        policyTextRendered.innerHTML = generateFullPolicyHtml(policyDocumentContent);
+        // Reset the display to the full policy document when returning from a specific section view
+        policyTextRendered.innerHTML = formatPolicyText(policyDocumentContent);
+        document.querySelector('#fullPolicyContentDisplay h3').textContent = 'Documento Completo da Política';
     });
+
+    // Initial state setup for the "Pesquisa no Documento" section
+    // Ensure the "Voltar à Pesquisa" button is only visible when fullPolicyContentDisplay is active
+    const observerForButtonVisibility = new MutationObserver(mutations => {
+        mutations.forEach(mutation => {
+            if (mutation.attributeName === 'class') {
+                if (fullPolicyContentDisplay.classList.contains('hidden')) {
+                    backToSearchBtn.style.display = 'none';
+                } else {
+                    backToSearchBtn.style.display = 'inline-block'; // Or 'block' depending on desired layout
+                }
+            }
+        });
+    });
+    observerForButtonVisibility.observe(fullPolicyContentDisplay, { attributes: true });
+
+    // Initial check for button visibility on load
+    if (fullPolicyContentDisplay.classList.contains('hidden')) {
+        backToSearchBtn.style.display = 'none';
+    } else {
+        backToSearchBtn.style.display = 'inline-block';
+    }
+
 
 });
 </script>
