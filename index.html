@@ -28,11 +28,11 @@
         .flow-step { transition: all 0.3s ease; }
         .flow-step:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
         .nav-button { transition: all 0.2s ease-in-out; }
-        .nav-button.active { background-color: #0c4a6e; color: white; }
-        .nav-button:not(.active):hover { background-color: #e0f2fe; }
+        .nav-button.active { background-color: #0c4a6e; color: white; } /* Dark Blue */
+        .nav-button:not(.active):hover { background-color: #e0f2fe; } /* Light Sky Blue */
         section { scroll-margin-top: 80px; }
         .search-result-item:hover {
-            cursor: default; /* Changed from pointer as it's no longer clickable to show full section */
+            cursor: default;
             background-color: #e0f2fe; /* light sky blue on hover */
             border-color: #93c5fd; /* blue-300 */
         }
@@ -70,7 +70,7 @@
 
     <header class="bg-white shadow-md sticky top-0 z-50">
         <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-            <h1 class="text-xl md:text-2xl font-bold text-sky-900">Guia Interativo | Política de Cartões Clara</h1>
+            <h1 class="text-xl md:text-2xl font-bold text-sky-900">Guia Interativo | Política de Cartões Clara</h1> <!-- Reverted to sky-900 -->
             <nav id="navbar" class="hidden md:flex space-x-2">
                 <button data-target="intro" class="nav-button active text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Início</button>
                 <button data-target="process" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Processo</button>
@@ -87,7 +87,7 @@
     <main class="container mx-auto p-4 md:p-8">
 
         <section id="intro" class="mb-20 text-center">
-            <h2 class="text-4xl font-extrabold text-sky-900 mb-4">A Evolução da Gestão de Despesas</h2>
+            <h2 class="text-4xl font-extrabold text-sky-900 mb-4">A Evolução da Gestão de Despesas</h2> <!-- Reverted to sky-900 -->
             <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-12">Substituímos o arriscado processo de "sangria de caixa" por uma solução digital, ágil e segura. Entenda a mudança.</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
                 <div class="bg-rose-100/50 border-2 border-rose-200 rounded-xl p-6 shadow-sm">
@@ -98,9 +98,9 @@
                         <li class="flex items-start"><span class="text-xl mr-3">📉</span><div><strong class="block">Falta de Visibilidade:</b> Controle financeiro reativo, dificultando o rastreamento de gastos.</div></li>
                     </ul>
                 </div>
-                <div class="bg-sky-100/50 border-2 border-sky-200 rounded-xl p-6 shadow-sm">
-                     <h3 class="text-2xl font-bold text-sky-800 mb-4">✅ Agora: Cartão da Clara</h3>
-                    <ul class="text-left space-y-3 text-sky-900">
+                <div class="bg-sky-100/50 border-2 border-sky-200 rounded-xl p-6 shadow-sm"> <!-- Reverted to sky-100/50 and sky-200 -->
+                     <h3 class="text-2xl font-bold text-sky-800 mb-4">✅ Agora: Cartão da Clara</h3> <!-- Reverted to sky-800 -->
+                    <ul class="text-left space-y-3 text-sky-900"> <!-- Reverted to sky-900 -->
                         <li class="flex items-start"><span class="text-xl mr-3">🛡️</span><div><strong class="block">Segurança e Controle:</strong> Transações digitais e limites predefinidos reduzem fraudes e perdas.</div></li>
                         <li class="flex items-start"><span class="text-xl mr-3">⚡️</span><div><strong class="block">Agilidade e Eficiência:</strong> Autonomia para os gerentes com processos simplificados na plataforma online.</div></li>
                         <li class="flex items-start"><span class="text-xl mr-3">📊</span><div><strong class="block">Transparência Total:</b> Monitoramento de despesas em tempo real, facilitando a gestão e auditoria.</div></li>
@@ -108,32 +108,32 @@
                 </div>
             </div>
             <!-- Novo comunicado adicionado aqui -->
-            <div class="mt-12 p-6 bg-sky-50 border border-sky-300 rounded-lg text-slate-700 w-full max-w-6xl mx-auto shadow-sm">
-                <p class="font-bold text-xl text-sky-900 mb-2 text-center uppercase">Importante!</p>
+            <div class="mt-12 p-6 bg-sky-50 border border-sky-300 rounded-lg text-slate-700 w-full max-w-6xl mx-auto shadow-sm"> <!-- Reverted to sky-50, sky-300, slate-700 -->
+                <p class="font-bold text-xl text-sky-900 mb-2 text-center uppercase">Importante!</p> <!-- Reverted to sky-900 -->
                 <p class="text-center">Após a implantação do cartão da Clara em cada loja e a confirmação formal de recebimento, acompanhada do treinamento de uso da plataforma da Clara, o processo de sangria de despesas é descontinuado para as unidades Centauro. Isso ocorre por meio do bloqueio simultâneo do PDV e do fluxo de solicitações de sangrias na intranet, impedindo que a loja realize retiradas de dinheiro em espécie para pagamento de despesas.</p>
             </div>
             <!-- Fim do novo comunicado -->
         </section>
 
         <section id="process" class="mb-20">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">O Ciclo de Vida do Cartão</h2>
-            <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-12">Desde a sua emissão até o monitoramento, o uso do cartão segue um fluxo claro para garantir controle e conformidade.</p>
+            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">O Ciclo de Vida do Cartão</h2> <!-- Reverted to sky-900 -->
+            <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-12">Desde a sua emissão até o monitoramento, o uso do cartão segue um fluxo claro para garantir controle e conformidade.</p>
             <div class="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-0">
-                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full">
+                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full"> <!-- Reverted to sky-500 -->
                     <div class="text-5xl mb-3">1️⃣</div>
                     <h3 class="text-lg font-bold text-slate-900">Emissão e Ativação</h3>
                     <p class="text-sm text-slate-600">O Financeiro emite o cartão. O gerente realiza um treinamento obrigatório e sua participação é validada para ativar o uso.</p>
                 </div>
-                <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div>
-                <div class="text-4xl text-sky-400 font-light block md:hidden my-4 transform rotate-90">→</div>
-                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full">
+                <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div> <!-- Reverted to sky-400 -->
+                <div class="text-4xl text-sky-400 font-light block md:hidden my-4 transform rotate-90">→</div> <!-- Reverted to sky-400 -->
+                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full"> <!-- Reverted to sky-500 -->
                     <div class="text-5xl mb-3">2️⃣</div>
                     <h3 class="text-lg font-bold text-slate-900">Uso e Prestação de Contas Essencial</h3>
                     <p class="text-sm text-slate-600">O cartão da Clara é usado para despesas autorizadas. A **inserção da etiqueta e da nota fiscal/recibo é essencial** para cada compra na plataforma, em até 48h.</p>
                 </div>
-                <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div>
-                 <div class="text-4xl text-sky-400 font-light block md:hidden my-4 transform rotate-90">→</div>
-                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full">
+                <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div> <!-- Reverted to sky-400 -->
+                 <div class="text-4xl text-sky-400 font-light block md:hidden my-4 transform rotate-90">→</div> <!-- Reverted to sky-400 -->
+                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full"> <!-- Reverted to sky-500 -->
                     <div class="text-5xl mb-3">3️⃣</div>
                     <h3 class="text-lg font-bold text-slate-900">Monitoramento e Ação</h3>
                     <p class="text-sm text-slate-600">O Financeiro monitora as transações e aplica bloqueios preventivos em caso de não conformidade.</p>
@@ -142,7 +142,7 @@
         </section>
 
         <section id="rules" class="mb-20">
-            <h2 class="text-3xl font-bold text-center mb-12 text-sky-900">Regras de Ouro: O Que Você Precisa Saber</h2>
+            <h2 class="text-3xl font-bold text-center mb-12 text-sky-900">Regras de Ouro: O Que Você Precisa Saber</h2> <!-- Reverted to sky-900 -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
@@ -179,7 +179,7 @@
         </section>
 
         <section id="consequences" class="mb-20">
-            <h2 class="text-3xl font-bold text-center mb-12 text-sky-900">Monitoramento e Consequências</h2>
+            <h2 class="text-3xl font-bold text-center mb-12 text-sky-900">Monitoramento e Consequências</h2> <!-- Reverted to sky-900 -->
              <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
                     <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Critérios para Bloqueio Preventivo</h3>
@@ -196,8 +196,8 @@
                          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center flex-grow">
                              <!-- Reconhecimento Espontâneo -->
                              <div class="flex flex-col justify-start">
-                                 <h5 class="font-bold text-green-800 text-base">Reconhecimento Espontâneo</h5>
-                                 <div class="w-full h-1 bg-green-300 my-2"></div> <!-- Horizontal line in green -->
+                                 <h5 class="font-bold text-green-800 text-base">Reconhecimento Espontâneo</h5> <!-- Reverted to green-800 -->
+                                 <div class="w-full h-1 bg-green-300 my-2"></div> <!-- Reverted to green-300 -->
                                  <p class="text-xs text-slate-600">Comunicar imediatamente o fato à área Financeira, classificar a transação na plataforma como "Despesa Pessoal - Uso Indevido" na descrição, e providenciar o ressarcimento integral do valor à empresa no prazo máximo de 2 dias úteis a partir da data de comunicação. Após a regularização, a situação será avaliada para determinar a necessidade de orientação formal ao colaborador, como advertência ou outra medida disciplinar, ou revisão da autorização de uso do cartão em caso de reincidência ou gravidade da conduta. A empresa valoriza a transparência e o reconhecimento espontâneo, tratando as medidas corretivas com proporcionalidade.</p>
                              </div>
                              <!-- Não Reconhecimento -->
@@ -209,11 +209,37 @@
                          </div>
                      </div>
                 </div>
+                <!-- Novo tópico de justificativas obrigatórias -->
+                <div class="bg-white rounded-xl shadow-lg p-6 col-span-full"> <!-- col-span-full para ocupar a largura total -->
+                    <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Justificativas Obrigatórias nas Transações</h3>
+                    <p class="text-center text-sm text-slate-600 mb-6">Para toda e qualquer transação efetuada com os cartões, a devida justificativa na plataforma da Clara pelo usuário é essencial para a conformidade e conciliação.</p>
+                    <ul class="space-y-4 text-slate-700">
+                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400"> <!-- Reverted to blue-50/80 and blue-400 -->
+                            <span class="text-2xl mr-4">🏷️</span>
+                            <div>
+                                <strong class="block">Inserir Etiqueta do Tipo de Gasto:</strong> Selecionar a categoria padronizada que identifica o tipo de despesa (Conforme Anexo I da política).
+                            </div>
+                        </li>
+                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400"> <!-- Reverted to blue-50/80 and blue-400 -->
+                            <span class="text-2xl mr-4">📄</span>
+                            <div>
+                                <strong class="block">Anexar Nota Fiscal ou Recibo:</strong> O comprovante fiscal é obrigatório para formalizar legalmente a transação.
+                            </div>
+                        </li>
+                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400"> <!-- Reverted to blue-50/80 and blue-400 -->
+                            <span class="text-2xl mr-4">📝</span>
+                            <div>
+                                <strong class="block">Preencher Campo "Descrição" (ou "Comentário"):</strong> Detalhar objetivamente os itens comprados ou a natureza do gasto.
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                <!-- Fim do novo tópico -->
             </div>
         </section>
 
         <section id="situations" class="mb-20 bg-white rounded-xl shadow-lg p-6">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Uso do Cartão em Situações Específicas</h2>
+            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Uso do Cartão em Situações Específicas</h2> <!-- Reverted to sky-900 -->
             <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Saiba como proceder com o uso do cartão em cenários não usuais, como o afastamento do gerente, para garantir a conformidade.</p>
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-sm text-slate-700">
@@ -250,28 +276,28 @@
         </section>
 
         <section id="support" class="mb-20 bg-white rounded-xl shadow-lg p-6 text-center">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Suporte e Canais de Ajuda</h2>
+            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Suporte e Canais de Ajuda</h2> <!-- Reverted to sky-900 -->
             <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Precisa de ajuda com a plataforma Clara, tem dúvidas sobre funcionalidades ou encontrou algum problema?</p>
             <p class="mb-4 text-slate-700">Acesse a central de ajuda completa da Clara para encontrar respostas e soluções:</p>
-            <a href="https://ajuda.clara.com/hc/pt-br/categories/4413203275155-Funcionalidades-da-Plataforma-Clara" target="_blank" class="inline-block bg-sky-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 shadow-md">
+            <a href="https://ajuda.clara.com/hc/pt-br/categories/4413203275155-Funcionalidades-da-Plataforma-Clara" target="_blank" class="inline-block bg-sky-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 shadow-md"> <!-- Reverted to sky-600 and sky-700 -->
                 https://l1nq.com/47TUr
             </a>
             <p class="text-sm text-slate-500 mt-4">Este link redireciona para a Central de Ajuda da Clara.</p>
         </section>
 
         <section id="document-search" class="mb-20 bg-white rounded-xl shadow-lg p-6">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Pesquisa no Documento da Política</h2>
+            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Pesquisa no Documento da Política</h2> <!-- Reverted to sky-900 -->
             <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Pesquise por qualquer termo diretamente no conteúdo completo da Política de Uso dos Cartões Clara.</p>
             <div class="max-w-4xl mx-auto">
                 <div id="documentSearchArea">
-                    <input type="text" id="documentSearchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-4" placeholder="Digite seu termo de busca (ex: 'fraude', 'prazo')... ">
-                    <button id="documentSearchBtn" class="w-full bg-sky-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 ease-in-out shadow-md">
+                    <input type="text" id="documentSearchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-4" placeholder="Digite seu termo de busca (ex: 'fraude', 'prazo')... "> <!-- Reverted to sky-500 -->
+                    <button id="documentSearchBtn" class="w-full bg-sky-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 ease-in-out shadow-md"> <!-- Reverted to sky-600 and sky-700 -->
                         Buscar no Documento
                     </button>
                     <div id="documentSearchResults" class="mt-6 space-y-4">
                         <p id="searchStatus" class="text-center text-slate-500">Documento da política carregado e pronto para busca.</p>
-                        <div id="searchLoadingIndicator" class="mt-2 text-center text-sky-600 hidden">
-                            <span class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></span>
+                        <div id="searchLoadingIndicator" class="mt-2 text-center text-sky-600 hidden"> <!-- Reverted to sky-600 -->
+                            <span class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></span> <!-- Reverted to sky-600 -->
                             <span class="ml-2">Buscando no documento...</span>
                         </div>
                     </div>
@@ -281,7 +307,7 @@
                     <button id="backToSearchBtn" class="absolute top-4 right-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg text-sm">
                         Voltar à Pesquisa
                     </button>
-                    <h3 class="text-xl font-bold text-sky-900 mb-4">Trecho da Política</h3>
+                    <h3 class="text-xl font-bold text-sky-900 mb-4">Trecho da Política</h3> <!-- Reverted to sky-900 -->
                     <div id="policyTextRendered" class="text-sm text-black max-h-96 overflow-y-auto pr-2">
                         <!-- Policy content will be rendered here with highlights -->
                     </div>
@@ -290,10 +316,10 @@
         </section>
 
         <section id="reference" class="mb-16">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Consulta Rápida de Despesas</h2>
+            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Consulta Rápida de Despesas</h2> <!-- Reverted to sky-900 -->
             <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Não tem certeza se um gasto é permitido? Pesquise aqui na lista oficial de categorias autorizadas.</p>
             <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg">
-                <input type="text" id="searchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-6" placeholder="Pesquisar por tipo de gasto (ex: limpeza, frete, marketing)...">
+                <input type="text" id="searchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-6" placeholder="Pesquisar por tipo de gasto (ex: limpeza, frete, marketing)..."> <!-- Reverted to sky-500 -->
                 <div id="expenseTable" class="space-y-3">
                     <!-- Conteúdo será carregado dinamicamente via JavaScript após a pesquisa -->
                     <p class="text-center text-slate-500">Digite para pesquisar categorias de despesas.</p>
@@ -355,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 callbacks: { title: tooltipTitleCallback },
                 titleFont: { family: 'Inter', weight: 'bold' },
                 bodyFont: { family: 'Inter' },
-                backgroundColor: '#0f172a',
+                backgroundColor: '#0f172a', /* Reverted to dark slate for tooltip background */
                 padding: 12,
                 cornerRadius: 4
             }
@@ -371,7 +397,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 datasets: [{
                     label: 'Prazo Máximo para Regularizar (horas)',
                     data: [24, 48, 72],
-                    backgroundColor: ['#ef4444', '#f97316', '#0ea5e9'],
+                    backgroundColor: ['#ef4444', '#f97316', '#0ea5e9'], /* Reverted to red, orange, sky blue */
                     borderRadius: 4
                 }]
             },
@@ -380,10 +406,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 scales: {
                     y: {
                         beginAtZero: true,
-                        title: { display: true, text: 'Prazo para Regularização (horas)', font: { family: 'Inter', size: 12 }, color: '#475569' },
-                        ticks: { color: '#64748b' }
+                        title: { display: true, text: 'Prazo para Regularização (horas)', font: { family: 'Inter', size: 12 }, color: '#475569' }, /* Reverted to slate-600 */
+                        ticks: { color: '#64748b' } /* Reverted to slate-500 */
                     },
-                    x: { ticks: { color: '#64748b' } }
+                    x: { ticks: { color: '#64748b' } } /* Reverted to slate-500 */
                 },
                 plugins: { ...sharedChartOptions.plugins, legend: { display: false } }
             }
@@ -448,7 +474,7 @@ document.addEventListener('DOMContentLoaded', function () {
         data.forEach(item => {
             const row = `
                 <div class="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-                    <p class="font-bold text-sky-800">${item.label}</p>
+                    <p class="font-bold text-sky-900">${item.label}</p> <!-- Reverted to sky-900 -->
                     <p class="text-sm text-slate-600">${item.examples}</p>
                 </div>
             `;
