@@ -3,428 +3,526 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Guia Interativo: Política de Cartão da Clara</title>
+    <title>Guia Interativo: Política de Cartões Clara</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
-    <!-- Chosen Palette: Corporate Clarity -->
-    <!-- Application Structure Plan: The SPA is designed as a user-friendly, thematic journey. It starts with a high-impact "Before vs. After" comparison to show value. It then presents a high-level process flowchart ("O Ciclo de Vida"). A central "Rules Dashboard" uses a table for allowed expenses and an icon-driven list for forbidden ones, facilitating quick understanding. The critical expense reporting process gets its own detailed flowchart section. Consequences are visualized with a bar chart for blocking criteria, making complex rules easy to grasp. A new section covers specific use cases for card usage during manager absences. A dedicated "Suporte" section is added for external help resources. A new "Pesquisa no Documento" section allows direct content search within the policy document. The app concludes with a practical, searchable table of all allowed expense categories from Annex I, acting as a quick-reference tool. This structure prioritizes user task-flow and comprehension over the report's linear chapter format. -->
-    <!-- Visualization & Content Choices:
-        - Report Info: Before vs. After (Cash vs. Card). Goal: Inform. Justification=Directly compares the old vs. new system for immediate impact.
-        - Report Info: Card Lifecycle. Goal: Organize. Justification=Best method to illustrate sequential processes like card lifecycle and reporting.
-        - Report Info: Allowed Expense Categories. Goal: Compare/Inform. Justification=Provides clear, structured details for each category instead of a general proportion.
-        - Report Info: Blocking Criteria. Goal: Compare. Justification=Intuitively compares urgency levels based on transaction value.
-        - Report Info: Usage in Specific Situations (Absences). Goal: Organize/Inform. Justification=Clearly outlines rules and responsibilities for specific scenarios.
-        - Report Info: Support/Help Resources. Goal: Inform. Justification=Provides direct access to external support.
-        - Report Info: Document Search. Goal: Inform/Explore. Justification=Allows direct keyword search within the source document.
-        - Report Info: Annex I Categories. Goal: Inform/Organize. Justification=Provides a practical quick-reference tool for users.
-        All charts use Chart.js with Canvas rendering, and all diagrams are built with pure HTML and Tailwind CSS.
-    -->
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f4f7fa; }
-        .chart-container { position: relative; width: 100%; max-width: 400px; margin-left: auto; margin-right: auto; height: 350px; }
+        .chart-container { position: relative; width: 100%; max-width: 480px; margin-left: auto; margin-right: auto; }
         .flow-step { transition: all 0.3s ease; }
-        .flow-step:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .flow-step:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
         .nav-button { transition: all 0.2s ease-in-out; }
-        .nav-button.active { background-color: #0c4a6e; color: white; } /* Dark Blue */
-        .nav-button:not(.active):hover { background-color: #e0f2fe; } /* Light Sky Blue */
+        .nav-button.active { background-color: #0c4a6e; color: white; }
+        .nav-button:not(.active):hover { background-color: #e0f2fe; }
         section { scroll-margin-top: 80px; }
         .search-result-item:hover {
             cursor: default;
-            background-color: #e0f2fe; /* light sky blue on hover */
-            border-color: #93c5fd; /* blue-300 */
+            background-color: #e0f2fe;
+            border-color: #93c5fd;
         }
         .policy-content-highlight {
-            background-color: #fee300; /* Yellow highlight for search terms in full document */
+            background-color: #fee300;
             padding: 1px 0;
             border-radius: 2px;
         }
-        .policy-section-anchor {
-            display: block;
-            visibility: hidden;
-            height: 0;
-            margin-top: -80px; /* Offset for sticky header */
-            padding-top: 80px; /* Counteract margin-top for content below */
-            pointer-events: none; /* Make it not clickable */
+        #policyTextRendered p,
+        #policyTextRendered h4,
+        #policyTextRendered h5 {
+            color: #000000;
         }
-        /* All text in the policy display should be black */
-        #policyTextRendered p, #policyTextRendered h4, #policyTextRendered h5 {
-            color: #000000; 
-        }
-        /* Titles and subtitles should be bold and black (no specific background color) */
         .policy-title {
-            color: #000000; /* Black */
-            font-weight: bold; /* Bold */
-            /* Removed background-color, padding, border-radius */
-            display: inline; /* To not break line if not needed */
+            color: #000000;
+            font-weight: bold;
+            display: inline;
         }
-        /* Background for the displayed policy section after search should be white */
         #fullPolicyContentDisplay {
-            background-color: #FFFFFF; /* White background */
+            background-color: #FFFFFF;
         }
     </style>
 </head>
 <body class="text-slate-800">
 
-    <header class="bg-white shadow-md sticky top-0 z-50">
-        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-            <h1 class="text-xl md:text-2xl font-bold text-sky-900">Guia Interativo | Política de Cartões Clara</h1> <!-- Reverted to sky-900 -->
-            <nav id="navbar" class="hidden md:flex space-x-2">
-                <button data-target="intro" class="nav-button active text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Início</button>
-                <button data-target="process" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Processo</button>
-                <button data-target="rules" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Regras</button>
-                <button data-target="consequences" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Consequências</button>
-                <button data-target="situations" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Situações Específicas</button>
-                <button data-target="support" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Suporte</button>
-                <button data-target="document-search" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Pesquisa Documento</button>
-                <button data-target="reference" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Consulta Rápida</button>
-            </nav>
+<header class="bg-white shadow-md sticky top-0 z-50">
+    <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+        <h1 class="text-xl md:text-2xl font-bold text-sky-900">Guia Interativo | Política de Cartões Clara</h1>
+        <nav id="navbar" class="hidden md:flex flex-wrap gap-2">
+            <button data-target="intro" class="nav-button active text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Início</button>
+            <button data-target="process" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Processo</button>
+            <button data-target="rules" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Regras</button>
+            <button data-target="consequences" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Consequências</button>
+            <button data-target="situations" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Situações</button>
+            <button data-target="support" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Suporte</button>
+            <button data-target="document-search" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Pesquisa</button>
+            <button data-target="reference" class="nav-button text-sm font-semibold text-slate-700 px-3 py-2 rounded-md">Consulta Rápida</button>
+        </nav>
+    </div>
+</header>
+
+<main class="container mx-auto p-4 md:p-8">
+
+    <!-- INTRO -->
+    <section id="intro" class="mb-20 text-center">
+        <h2 class="text-4xl font-extrabold text-sky-900 mb-4">A Evolução da Gestão de Despesas</h2>
+        <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-12">
+            Substituímos o processo de "sangria de caixa" por uma solução digital, ágil e rastreável. Entenda a mudança e o porquê disso proteger você e a loja.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+            <div class="bg-rose-100/50 border-2 border-rose-200 rounded-xl p-6 shadow-sm">
+                <h3 class="text-2xl font-bold text-rose-800 mb-4">❌ Antes: Sangria de Caixa</h3>
+                <ul class="text-left space-y-3 text-rose-900">
+                    <li class="flex items-start">
+                        <span class="text-xl mr-3">⚠️</span>
+                        <div>
+                            <strong class="block">Risco Operacional Alto:</strong>
+                            Dinheiro físico em loja, sujeito a perda, roubo e erro.
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-xl mr-3">🐌</span>
+                        <div>
+                            <strong class="block">Processos Manuais:</strong>
+                            Aprovação, retirada, conferência, conciliação — tudo lento.
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-xl mr-3">📉</span>
+                        <div>
+                            <strong class="block">Baixa Visibilidade Financeira:</strong>
+                            Difícil rastrear quem gastou, com o quê e por quê.
+                        </div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="bg-sky-100/50 border-2 border-sky-200 rounded-xl p-6 shadow-sm">
+                <h3 class="text-2xl font-bold text-sky-800 mb-4">✅ Agora: Cartão Clara</h3>
+                <ul class="text-left space-y-3 text-sky-900">
+                    <li class="flex items-start">
+                        <span class="text-xl mr-3">🛡️</span>
+                        <div>
+                            <strong class="block">Segurança e Controle:</strong>
+                            Nada de dinheiro vivo. Tudo registrado digitalmente.
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-xl mr-3">⚡️</span>
+                        <div>
+                            <strong class="block">Agilidade:</strong>
+                            Compra direta na necessidade da loja, dentro das categorias liberadas.
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-xl mr-3">📊</span>
+                        <div>
+                            <strong class="block">Transparência Total:</strong>
+                            É possível saber o que foi gasto, por quem, quando e por qual motivo.
+                        </div>
+                    </li>
+                </ul>
+            </div>
         </div>
-    </header>
 
-    <main class="container mx-auto p-4 md:p-8">
+        <!-- Comunicado oficial -->
+        <div class="mt-12 p-6 bg-sky-50 border border-sky-300 rounded-lg text-slate-700 w-full max-w-6xl mx-auto shadow-sm">
+            <p class="font-bold text-xl text-sky-900 mb-2 text-center uppercase">Importante!</p>
+            <p class="text-center">
+                Após a implantação do cartão da Clara em cada loja, com confirmação formal de recebimento e treinamento de uso da plataforma,
+                o processo de sangria de despesas é descontinuado. Nas unidades Centauro, o PDV e o fluxo de sangrias na intranet são bloqueados.
+                Qualquer necessidade emergencial de numerário depois disso só pode ocorrer com autorização prévia e formal do Departamento Financeiro.
+            </p>
+        </div>
+    </section>
 
-        <section id="intro" class="mb-20 text-center">
-            <h2 class="text-4xl font-extrabold text-sky-900 mb-4">A Evolução da Gestão de Despesas</h2> <!-- Reverted to sky-900 -->
-            <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-12">Substituímos o arriscado processo de "sangria de caixa" por uma solução digital, ágil e segura. Entenda a mudança.</p>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                <div class="bg-rose-100/50 border-2 border-rose-200 rounded-xl p-6 shadow-sm">
-                    <h3 class="text-2xl font-bold text-rose-800 mb-4">❌ Antes: Sangria de Caixa</h3>
-                    <ul class="text-left space-y-3 text-rose-900">
-                        <li class="flex items-start"><span class="text-xl mr-3">⚠️</span><div><strong class="block">Alto Risco Operacional:</strong> Manuseio de dinheiro em espécie, vulnerável a perdas e roubos.</div></li>
-                        <li class="flex items-start"><span class="text-xl mr-3">🐌</span><div><strong class="block">Processos Manuais e Lentos:</b> Burocracia na solicitação, aprovação e conciliação de despesas.</div></li>
-                        <li class="flex items-start"><span class="text-xl mr-3">📉</span><div><strong class="block">Falta de Visibilidade:</b> Controle financeiro reativo, dificultando o rastreamento de gastos.</div></li>
-                    </ul>
-                </div>
-                <div class="bg-sky-100/50 border-2 border-sky-200 rounded-xl p-6 shadow-sm"> <!-- Reverted to sky-100/50 and sky-200 -->
-                     <h3 class="text-2xl font-bold text-sky-800 mb-4">✅ Agora: Cartão da Clara</h3> <!-- Reverted to sky-800 -->
-                    <ul class="text-left space-y-3 text-sky-900"> <!-- Reverted to sky-900 -->
-                        <li class="flex items-start"><span class="text-xl mr-3">🛡️</span><div><strong class="block">Segurança e Controle:</strong> Transações digitais e limites predefinidos reduzem fraudes e perdas.</div></li>
-                        <li class="flex items-start"><span class="text-xl mr-3">⚡️</span><div><strong class="block">Agilidade e Eficiência:</strong> Autonomia para os gerentes com processos simplificados na plataforma online.</div></li>
-                        <li class="flex items-start"><span class="text-xl mr-3">📊</span><div><strong class="block">Transparência Total:</b> Monitoramento de despesas em tempo real, facilitando a gestão e auditoria.</div></li>
-                    </ul>
+    <!-- PROCESSO -->
+    <section id="process" class="mb-20">
+        <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">O Ciclo de Vida do Cartão</h2>
+        <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-12">
+            O uso do cartão segue etapas claras para garantir controle, segurança e responsabilidade.
+        </p>
+
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-0">
+            <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full">
+                <div class="text-5xl mb-3">1️⃣</div>
+                <h3 class="text-lg font-bold text-slate-900">Emissão e Ativação</h3>
+                <p class="text-sm text-slate-600">
+                    O Financeiro emite o cartão. O gerente faz o treinamento obrigatório. O cartão só é liberado após esse treinamento.
+                </p>
+            </div>
+
+            <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div>
+            <div class="text-4xl text-sky-400 font-light block md:hidden my-4 rotate-90">→</div>
+
+            <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full">
+                <div class="text-5xl mb-3">2️⃣</div>
+                <h3 class="text-lg font-bold text-slate-900">Uso e Prestação de Contas</h3>
+                <p class="text-sm text-slate-600">
+                    Cada compra deve ter etiqueta correta, nota fiscal e descrição lançadas na Clara em até 48 horas.
+                </p>
+            </div>
+
+            <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div>
+            <div class="text-4xl text-sky-400 font-light block md:hidden my-4 rotate-90">→</div>
+
+            <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full">
+                <div class="text-5xl mb-3">3️⃣</div>
+                <h3 class="text-lg font-bold text-slate-900">Monitoramento e Ação</h3>
+                <p class="text-sm text-slate-600">
+                    O Financeiro audita diariamente. Se houver pendências não justificadas no prazo, o cartão pode ser bloqueado preventivamente até regularizar.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- REGRAS -->
+    <section id="rules" class="mb-20">
+        <h2 class="text-3xl font-bold text-center mb-12 text-sky-900">Regras de Ouro: O Que Você Precisa Saber</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+            <!-- Permitido -->
+            <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
+                <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Gastos Permitidos</h3>
+                <p class="text-center text-sm text-slate-600 mb-6">
+                    O cartão deve ser usado exclusivamente para despesas operacionais da loja.
+                    Veja exemplos de categorias liberadas.
+                </p>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-700">
+                        <thead class="text-xs text-slate-900 uppercase bg-slate-100">
+                            <tr>
+                                <th class="py-3 px-6 rounded-tl-lg">Categoria</th>
+                                <th class="py-3 px-6 rounded-tr-lg">Exemplos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableMain"></tbody>
+                    </table>
                 </div>
             </div>
-            <!-- Novo comunicado adicionado aqui -->
-            <div class="mt-12 p-6 bg-sky-50 border border-sky-300 rounded-lg text-slate-700 w-full max-w-6xl mx-auto shadow-sm"> <!-- Reverted to sky-50, sky-300, slate-700 -->
-                <p class="font-bold text-xl text-sky-900 mb-2 text-center uppercase">Importante!</p> <!-- Reverted to sky-900 -->
-                <p class="text-center">Após a implantação do cartão da Clara em cada loja e a confirmação formal de recebimento, acompanhada do treinamento de uso da plataforma da Clara, o processo de sangria de despesas é descontinuado para as unidades Centauro. Isso ocorre por meio do bloqueio simultâneo do PDV e do fluxo de solicitações de sangrias na intranet, impedindo que a loja realize retiradas de dinheiro em espécie para pagamento de despesas.</p>
+
+            <!-- Proibido -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Restrições Críticas</h3>
+                <p class="text-center text-sm text-slate-600 mb-6">
+                    Uso indevido do cartão é falta grave e pode gerar bloqueio imediato e medidas disciplinares.
+                </p>
+                <ul class="space-y-4 text-slate-700">
+                    <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400">
+                        <span class="text-2xl mr-4">🚫</span>
+                        <div>
+                            <strong class="block">Despesas Pessoais:</strong>
+                            Qualquer compra para uso próprio (ex.: roupas, alimentação pessoal, lazer).
+                        </div>
+                    </li>
+                    <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400">
+                        <span class="text-2xl mr-4">🚫</span>
+                        <div>
+                            <strong class="block">Bens Patrimoniais / Infraestrutura:</strong>
+                            Eletrônicos, móveis, eletrodomésticos (geladeira, micro-ondas, cafeteira etc.). Esses itens seguem fluxo de Compras, não cartão.
+                        </div>
+                    </li>
+                    <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400">
+                        <span class="text-2xl mr-4">🚫</span>
+                        <div>
+                            <strong class="block">Saque / Dinheiro Vivo:</strong>
+                            É proibido sacar ou usar numerário da loja para depois “acertar”.
+                            Qualquer exceção deve ter autorização formal prévia do Departamento Financeiro.
+                        </div>
+                    </li>
+                    <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400">
+                        <span class="text-2xl mr-4">🚫</span>
+                        <div>
+                            <strong class="block">Transporte de Pessoas:</strong>
+                            Aplicativos como Uber/99, passagens etc. não são despesas operacionais da loja.
+                        </div>
+                    </li>
+                    <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400">
+                        <span class="text-2xl mr-4">🚫</span>
+                        <div>
+                            <strong class="block">Conflito de Interesses:</strong>
+                            Compra em fornecedor próprio/familiar sem aprovação prévia formal.
+                        </div>
+                    </li>
+                </ul>
             </div>
-            <!-- Fim do novo comunicado -->
-        </section>
+        </div>
+    </section>
 
-        <section id="process" class="mb-20">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">O Ciclo de Vida do Cartão</h2> <!-- Reverted to sky-900 -->
-            <p class="text-lg text-slate-600 max-w-3xl mx-auto mb-12">Desde a sua emissão até o monitoramento, o uso do cartão segue um fluxo claro para garantir controle e conformidade.</p>
-            <div class="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-0">
-                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full"> <!-- Reverted to sky-500 -->
-                    <div class="text-5xl mb-3">1️⃣</div>
-                    <h3 class="text-lg font-bold text-slate-900">Emissão e Ativação</h3>
-                    <p class="text-sm text-slate-600">O Financeiro emite o cartão. O gerente realiza um treinamento obrigatório e sua participação é validada para ativar o uso.</p>
-                </div>
-                <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div> <!-- Reverted to sky-400 -->
-                <div class="text-4xl text-sky-400 font-light block md:hidden my-4 transform rotate-90">→</div> <!-- Reverted to sky-400 -->
-                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full"> <!-- Reverted to sky-500 -->
-                    <div class="text-5xl mb-3">2️⃣</div>
-                    <h3 class="text-lg font-bold text-slate-900">Uso e Prestação de Contas Essencial</h3>
-                    <p class="text-sm text-slate-600">O cartão da Clara é usado para despesas autorizadas. A **inserção da etiqueta e da nota fiscal/recibo é essencial** para cada compra na plataforma, em até 48h.</p>
-                </div>
-                <div class="text-4xl text-sky-400 font-light hidden md:block mx-4">→</div> <!-- Reverted to sky-400 -->
-                 <div class="text-4xl text-sky-400 font-light block md:hidden my-4 transform rotate-90">→</div> <!-- Reverted to sky-400 -->
-                <div class="flow-step text-center p-6 rounded-lg bg-white shadow-md border-t-4 border-sky-500 max-w-xs w-full"> <!-- Reverted to sky-500 -->
-                    <div class="text-5xl mb-3">3️⃣</div>
-                    <h3 class="text-lg font-bold text-slate-900">Monitoramento e Ação</h3>
-                    <p class="text-sm text-slate-600">O Financeiro monitora as transações e aplica bloqueios preventivos em caso de não conformidade.</p>
-                </div>
-            </div>
-        </section>
+    <!-- CONSEQUÊNCIAS -->
+    <section id="consequences" class="mb-20">
+        <h2 class="text-3xl font-bold text-center mb-12 text-sky-900">Monitoramento e Consequências</h2>
 
-        <section id="rules" class="mb-20">
-            <h2 class="text-3xl font-bold text-center mb-12 text-sky-900">Regras de Ouro: O Que Você Precisa Saber</h2> <!-- Reverted to sky-900 -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                
-                <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
-                    <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Gastos Permitidos</h3>
-                    <p class="text-center text-sm text-slate-600 mb-6">O cartão deve ser usado exclusivamente para despesas operacionais da loja. Veja as categorias mais comuns.</p>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm text-slate-700">
-                            <thead class="text-xs text-slate-900 uppercase bg-slate-100">
-                                <tr>
-                                    <th scope="col" class="py-3 px-6 rounded-tl-lg">Categoria</th>
-                                    <th scope="col" class="py-3 px-6 rounded-tr-lg">Exemplos</th>
-                                </tr>
-                            </thead>
-                            <tbody id="expenseTableMain">
-                                <!-- Table rows will be populated by JavaScript -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Restrições Críticas</h3>
-                    <p class="text-center text-sm text-slate-600 mb-6">O uso indevido do cartão é uma falta grave. As seguintes despesas são estritamente proibidas.</p>
-                    <ul class="space-y-4 text-slate-700">
-                        <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400"><span class="text-2xl mr-4">🚫</span><div><strong class="block">Despesas Pessoais:</strong> Qualquer compra para benefício próprio.</div></li>
-                        <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400"><span class="text-2xl mr-4">🚫</span><div><strong class="block">Bens Patrimoniais:</strong> Compra de eletrônicos ou móveis. (Solicitar via Compras).</div></li>
-                        <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400"><span class="text-2xl mr-4">🚫</span><div><strong class="block">Eletrodomésticos:</b> Compra de geladeiras, micro-ondas, bebedouros, etc.</div></li>
-                        <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400"><span class="text-2xl mr-4">🚫</span><div><strong class="block">Saques e Adiantamentos:</b> Retirar dinheiro ou receber adiantamentos.</div></li>
-                        <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400"><span class="text-2xl mr-4">🚫</span><div><strong class="block">Viagens e Transporte Pessoal:</b> Despesas com passagens e apps de mobilidade.</div></li>
-                        <li class="flex items-center p-4 bg-rose-50/80 rounded-lg border-l-4 border-rose-400"><span class="text-2xl mr-4">🚫</span><div><strong class="block">Conflito de Interesses:</strong> Compras em empresas de familiares sem autorização.</div></li>
-                    </ul>
+            <!-- BLOQUEIO PREVENTIVO -->
+            <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
+                <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Bloqueio Preventivo</h3>
+                <p class="text-center text-sm text-slate-600 mb-6">
+                    Se a transação não tiver etiqueta correta, nota fiscal e descrição lançadas na Clara em até 48 horas da compra,
+                    o cartão poderá ser bloqueado preventivamente — independente do valor da compra.
+                    O desbloqueio só ocorre após a regularização.
+                </p>
+                <div class="chart-container flex-grow text-center text-slate-500 text-xs leading-relaxed border border-slate-200 rounded-lg p-4 bg-slate-50">
+                    <p class="font-bold text-sky-900 mb-2 text-base">Regra Única de Bloqueio</p>
+                    <p class="text-slate-700">
+                        • Prazo padrão para justificar: <span class="font-semibold text-slate-900">48 horas</span>.<br>
+                        • Faltou nota / etiqueta / descrição? <span class="font-semibold text-slate-900">Bloqueio preventivo</span> até ajustar.<br>
+                        • Reincidência pode levar à suspensão da elegibilidade da loja e medidas disciplinares conforme Política de Conduta Ética e Integridade do Grupo SBF.
+                    </p>
                 </div>
             </div>
-        </section>
 
-        <section id="consequences" class="mb-20">
-            <h2 class="text-3xl font-bold text-center mb-12 text-sky-900">Monitoramento e Consequências</h2> <!-- Reverted to sky-900 -->
-             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div class="bg-white rounded-xl shadow-lg p-6 flex flex-col">
-                    <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Critérios para Bloqueio Preventivo</h3>
-                    <p class="text-center text-sm text-slate-600 mb-6">A prestação de contas dentro do prazo é crucial. A urgência para regularizar varia com o valor da transação para mitigar riscos.</p>
-                    <div class="chart-container flex-grow">
-                        <canvas id="blockingCriteriaChart"></canvas>
-                    </div>
-                </div>
+            <!-- USO PESSOAL -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Se usar o cartão para gasto pessoal</h3>
+                <p class="text-center text-sm text-slate-600 mb-6">
+                    Existem dois cenários. A diferença é se o portador assume o erro ou não.
+                </p>
 
-                <div class="bg-white rounded-xl shadow-lg p-6">
-                    <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Procedimento em Caso de Uso Pessoal</h3>
-                     <p class="text-center text-sm text-slate-600 mb-6">A transparência é valorizada, mas o uso indevido tem consequências claras. Veja os dois cenários possíveis.</p>
-                     <div class="flex flex-col h-full gap-4 mt-0 mb-8"> <!-- Adjusted margin-bottom for spacing -->
-                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center flex-grow">
-                             <!-- Reconhecimento Espontâneo -->
-                             <div class="flex flex-col justify-start">
-                                 <h5 class="font-bold text-green-800 text-base">Reconhecimento Espontâneo</h5> <!-- Reverted to green-800 -->
-                                 <div class="w-full h-1 bg-green-300 my-2"></div> <!-- Reverted to green-300 -->
-                                 <p class="text-xs text-slate-600">Comunicar imediatamente o fato à área Financeira, classificar a transação na plataforma como "Despesa Pessoal - Uso Indevido" na descrição, e providenciar o ressarcimento integral do valor à empresa no prazo máximo de 2 dias úteis a partir da data de comunicação. Após a regularização, a situação será avaliada para determinar a necessidade de orientação formal ao colaborador, como advertência ou outra medida disciplinar, ou revisão da autorização de uso do cartão em caso de reincidência ou gravidade da conduta. A empresa valoriza a transparência e o reconhecimento espontâneo, tratando as medidas corretivas com proporcionalidade.</p>
-                             </div>
-                             <!-- Não Reconhecimento -->
-                              <div class="flex flex-col justify-start">
-                                 <h5 class="font-bold text-red-800 text-base">Não Reconhecimento</h5>
-                                 <div class="w-full h-1 bg-red-300 my-2"></div> <!-- Horizontal line in red -->
-                                 <p class="text-xs text-slate-600">Caso a despesa pessoal seja identificada pela empresa, mas não reconhecida ou não ressarcida pelo responsável, serão adotadas medidas administrativas e legais cabíveis, incluindo desconto em folha, abertura de procedimento disciplinar e bloqueio definitivo do cartão da Clara.</p>
-                             </div>
-                         </div>
-                     </div>
-                </div>
-                <!-- Novo tópico de justificativas obrigatórias -->
-                <div class="bg-white rounded-xl shadow-lg p-6 col-span-full"> <!-- col-span-full para ocupar a largura total -->
-                    <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Justificativas Obrigatórias nas Transações</h3>
-                    <p class="text-center text-sm text-slate-600 mb-6">Para toda e qualquer transação efetuada com os cartões, a devida justificativa na plataforma da Clara pelo usuário é essencial para a conformidade e conciliação.</p>
-                    <ul class="space-y-4 text-slate-700">
-                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400"> <!-- Reverted to blue-50/80 and blue-400 -->
-                            <span class="text-2xl mr-4">🏷️</span>
-                            <div>
-                                <strong class="block">Inserir Etiqueta do Tipo de Gasto:</strong> Selecionar a categoria padronizada que identifica o tipo de despesa (Conforme Anexo I da política).
-                            </div>
-                        </li>
-                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400"> <!-- Reverted to blue-50/80 and blue-400 -->
-                            <span class="text-2xl mr-4">📄</span>
-                            <div>
-                                <strong class="block">Anexar Nota Fiscal ou Recibo:</strong> O comprovante fiscal é obrigatório para formalizar legalmente a transação.
-                            </div>
-                        </li>
-                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400"> <!-- Reverted to blue-50/80 and blue-400 -->
-                            <span class="text-2xl mr-4">📝</span>
-                            <div>
-                                <strong class="block">Preencher Campo "Descrição" (ou "Comentário"):</strong> Detalhar objetivamente os itens comprados ou a natureza do gasto.
-                            </div>
-                        </li>
-                    </ul>
-                </div>
-                <!-- Fim do novo tópico -->
-            </div>
-        </section>
+                <div class="flex flex-col h-full gap-4 mt-0 mb-8">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-center flex-grow">
 
-        <section id="situations" class="mb-20 bg-white rounded-xl shadow-lg p-6">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Uso do Cartão em Situações Específicas</h2> <!-- Reverted to sky-900 -->
-            <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Saiba como proceder com o uso do cartão em cenários não usuais, como o afastamento do gerente, para garantir a conformidade.</p>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm text-slate-700">
-                    <thead class="text-xs text-slate-900 uppercase bg-slate-100">
-                        <tr>
-                            <th scope="col" class="py-3 px-6 rounded-tl-lg">Situação</th>
-                            <th scope="col" class="py-3 px-6">Pode usar cartão de outra loja?</th>
-                            <th scope="col" class="py-3 px-6">Justificar uso no campo “Descrição”?</th>
-                            <th scope="col" class="py-3 px-6 rounded-tr-lg">Responsável pela prestação de contas</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="bg-white border-b border-slate-100 hover:bg-slate-50">
-                            <td class="py-3 px-6 font-semibold">Gerente em férias ou afastamento temporário</td>
-                            <td class="py-3 px-6">Não. Usa-se o cartão da própria loja.</td>
-                            <td class="py-3 px-6">Não, apenas informar tipo de gasto</td>
-                            <td class="py-3 px-6">Líder ou Supervisor da loja</td>
-                        </tr>
-                        <tr class="bg-white border-b border-slate-100 hover:bg-slate-50">
-                            <td class="py-3 px-6 font-semibold">Gerente desligado, sem novo gerente nomeado</td>
-                            <td class="py-3 px-6">Sim, mediante autorização financeira.</td>
-                            <td class="py-3 px-6">Sim. Indicar loja beneficiada</td>
-                            <td class="py-3 px-6">Gerente temporário</td>
-                        </tr>
-                        <tr class="bg-white hover:bg-slate-50">
-                            <td class="py-3 px-6 font-semibold rounded-bl-lg">Falha técnica no cartão</td>
-                            <td class="py-3 px-6">Não. Usar sangria só com autorização.</td>
-                            <td class="py-3 px-6">Não se aplica</td>
-                            <td class="py-3 px-6 rounded-br-lg">A definir com o financeiro, conforme o caso</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                        <!-- Reconhece e ajusta -->
+                        <div class="flex flex-col justify-start">
+                            <h5 class="font-bold text-green-800 text-base">Reconhecimento espontâneo</h5>
+                            <div class="w-full h-1 bg-green-300 my-2"></div>
+                            <p class="text-xs text-slate-600">
+                                Comunicar imediatamente o Financeiro; classificar a transação como
+                                "Despesa Pessoal - Uso Indevido" na descrição; ressarcir o valor em até 2 dias úteis.
+                                A empresa considera a transparência e aplica medida proporcional.
+                            </p>
+                        </div>
 
-        <section id="support" class="mb-20 bg-white rounded-xl shadow-lg p-6 text-center">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Suporte e Canais de Ajuda</h2> <!-- Reverted to sky-900 -->
-            <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Precisa de ajuda com a plataforma Clara, tem dúvidas sobre funcionalidades ou encontrou algum problema?</p>
-            <p class="mb-4 text-slate-700">Acesse a central de ajuda completa da Clara para encontrar respostas e soluções:</p>
-            <a href="https://ajuda.clara.com/hc/pt-br/categories/4413203275155-Funcionalidades-da-Plataforma-Clara" target="_blank" class="inline-block bg-sky-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 shadow-md"> <!-- Reverted to sky-600 and sky-700 -->
-                https://l1nq.com/47TUr
-            </a>
-            <p class="text-sm text-slate-500 mt-4">Este link redireciona para a Central de Ajuda da Clara.</p>
-        </section>
-
-        <section id="document-search" class="mb-20 bg-white rounded-xl shadow-lg p-6">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Pesquisa no Documento da Política</h2> <!-- Reverted to sky-900 -->
-            <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Pesquise por qualquer termo diretamente no conteúdo completo da Política de Uso dos Cartões Clara.</p>
-            <div class="max-w-4xl mx-auto">
-                <div id="documentSearchArea">
-                    <input type="text" id="documentSearchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-4" placeholder="Digite seu termo de busca (ex: 'fraude', 'prazo')... "> <!-- Reverted to sky-500 -->
-                    <button id="documentSearchBtn" class="w-full bg-sky-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 ease-in-out shadow-md"> <!-- Reverted to sky-600 and sky-700 -->
-                        Buscar no Documento
-                    </button>
-                    <div id="documentSearchResults" class="mt-6 space-y-4">
-                        <p id="searchStatus" class="text-center text-slate-500">Documento da política carregado e pronto para busca.</p>
-                        <div id="searchLoadingIndicator" class="mt-2 text-center text-sky-600 hidden"> <!-- Reverted to sky-600 -->
-                            <span class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></span> <!-- Reverted to sky-600 -->
-                            <span class="ml-2">Buscando no documento...</span>
+                        <!-- Nega ou não ressarce -->
+                        <div class="flex flex-col justify-start">
+                            <h5 class="font-bold text-red-800 text-base">Não reconhece / não ressarce</h5>
+                            <div class="w-full h-1 bg-red-300 my-2"></div>
+                            <p class="text-xs text-slate-600">
+                                Se a loja não reconhece ou não devolve o valor:
+                                a empresa pode aplicar desconto em folha (art. 462 da CLT e contrato de trabalho),
+                                abrir procedimento disciplinar e bloquear definitivamente o cartão.
+                            </p>
                         </div>
                     </div>
                 </div>
 
-                <div id="fullPolicyContentDisplay" class="hidden mt-8 p-4 border border-slate-200 rounded-lg shadow-lg">
-                    <button id="backToSearchBtn" class="absolute top-4 right-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg text-sm">
-                        Voltar à Pesquisa
-                    </button>
-                    <h3 class="text-xl font-bold text-sky-900 mb-4">Trecho da Política</h3> <!-- Reverted to sky-900 -->
-                    <div id="policyTextRendered" class="text-sm text-black max-h-96 overflow-y-auto pr-2">
-                        <!-- Policy content will be rendered here with highlights -->
+                <!-- JUSTIFICATIVA OBRIGATÓRIA -->
+                <div class="bg-white rounded-xl shadow-lg p-6 mt-4 border border-slate-200">
+                    <h3 class="text-xl font-bold text-center text-slate-900 mb-4">Prestação de Contas Obrigatória</h3>
+                    <p class="text-center text-sm text-slate-600 mb-6">
+                        Toda compra precisa ter as três peças abaixo. Se faltar uma delas, já é passível de bloqueio preventivo:
+                    </p>
+                    <ul class="space-y-4 text-slate-700">
+                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400">
+                            <span class="text-2xl mr-4">🏷️</span>
+                            <div>
+                                <strong class="block">Etiqueta correta:</strong>
+                                Selecionar a conta/categoria autorizada (Anexo I).
+                            </div>
+                        </li>
+                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400">
+                            <span class="text-2xl mr-4">📄</span>
+                            <div>
+                                <strong class="block">Nota fiscal / recibo:</strong>
+                                Comprovante fiscal obrigatório.
+                            </div>
+                        </li>
+                        <li class="flex items-start p-4 bg-blue-50/80 rounded-lg border-l-4 border-blue-400">
+                            <span class="text-2xl mr-4">📝</span>
+                            <div>
+                                <strong class="block">Descrição clara:</strong>
+                                O que foi comprado e para qual necessidade operacional.
+                            </div>
+                        </li>
+                    </ul>
+                    <p class="text-[11px] text-center text-slate-500 mt-4">
+                        As notas fiscais e comprovantes físicos devem ser mantidos em loja por no mínimo
+                        <span class="font-semibold text-slate-900">180 dias corridos</span>,
+                        podendo ser solicitados em auditoria.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SITUAÇÕES ESPECIAIS -->
+    <section id="situations" class="mb-20 bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Uso do Cartão em Situações Específicas</h2>
+        <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">
+            Como proceder em cenários fora do dia a dia — ausência de gerente, falha técnica, necessidade emergencial.
+        </p>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-700">
+                <thead class="text-xs text-slate-900 uppercase bg-slate-100">
+                    <tr>
+                        <th class="py-3 px-6 rounded-tl-lg">Situação</th>
+                        <th class="py-3 px-6">Posso usar cartão de outra loja?</th>
+                        <th class="py-3 px-6">Como justificar?</th>
+                        <th class="py-3 px-6 rounded-tr-lg">Responsável</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="bg-white border-b border-slate-100 hover:bg-slate-50">
+                        <td class="py-3 px-6 font-semibold">Gerente em férias / afastamento temporário</td>
+                        <td class="py-3 px-6">Não. Usa-se o cartão regular da própria loja.</td>
+                        <td class="py-3 px-6">Justificar normalmente (etiqueta + descrição), sem citar ausência.</td>
+                        <td class="py-3 px-6">Líder / Supervisor designado</td>
+                    </tr>
+                    <tr class="bg-white border-b border-slate-100 hover:bg-slate-50">
+                        <td class="py-3 px-6 font-semibold">Gerente desligado e ainda sem novo titular</td>
+                        <td class="py-3 px-6">Pode, <strong>mas só com autorização prévia do Financeiro</strong>.</td>
+                        <td class="py-3 px-6">Obrigatório escrever na descrição: “Uso temporário do cartão na loja XXXX”.</td>
+                        <td class="py-3 px-6">Gerente substituto / portador temporário validado</td>
+                    </tr>
+                    <tr class="bg-white hover:bg-slate-50">
+                        <td class="py-3 px-6 font-semibold rounded-bl-lg">Falha técnica no cartão / impossibilidade real de uso</td>
+                        <td class="py-3 px-6">
+                            Não está autorizado sacar ou usar dinheiro do caixa por conta própria.
+                            É obrigatório contatar o Departamento Financeiro antes de qualquer exceção.
+                        </td>
+                        <td class="py-3 px-6">Conforme orientação formal do Financeiro (chamado ServiceNow).</td>
+                        <td class="py-3 px-6 rounded-br-lg">Departamento Financeiro / Contas a Receber</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mt-8 p-4 bg-sky-50 border border-sky-300 rounded-lg text-slate-700 text-sm">
+            <p class="text-sky-900 font-bold uppercase text-center mb-2">Definição de situação emergencial</p>
+            <p class="text-center max-w-4xl mx-auto">
+                É considerada emergencial uma situação em que a loja não consegue operar sem aquele gasto imediato
+                e não há alternativa viável de pagamento via cartão Clara. Toda exceção deve ser previamente aprovada
+                pelo Departamento Financeiro. O retorno à prática rotineira de sangria após implantação do cartão não é permitido.
+            </p>
+        </div>
+    </section>
+
+    <!-- SUPORTE -->
+    <section id="support" class="mb-20 bg-white rounded-xl shadow-lg p-6 text-center">
+        <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Suporte e Canais de Ajuda</h2>
+        <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">
+            Dúvidas sobre a plataforma Clara, transações, contestação ou bloqueio?
+        </p>
+        <p class="mb-4 text-slate-700">
+            Acesse a central de ajuda oficial da Clara (como usar a plataforma, anexar nota, contestar compra):
+        </p>
+        <a href="https://ajuda.clara.com/hc/pt-br/categories/4413203275155-Funcionalidades-da-Plataforma-Clara"
+           target="_blank"
+           class="inline-block bg-sky-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 shadow-md">
+            https://l1nq.com/47TUr
+        </a>
+        <p class="text-sm text-slate-500 mt-4">
+            Em caso de transação não reconhecida: acione também contato@clara.com em até 2 dias úteis.
+        </p>
+        <p class="text-xs text-slate-500 mt-2">
+            Para aumento de limite, liberação de categoria, compra fora da política ou desbloqueio de cartão:
+            abrir chamado no ServiceNow conforme Anexo II.
+        </p>
+    </section>
+
+    <!-- PESQUISA NO DOCUMENTO -->
+    <section id="document-search" class="mb-20 bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Pesquisa no Documento da Política</h2>
+        <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">
+            Busque palavras e encontre trechos da política oficial aprovada.
+        </p>
+
+        <div class="max-w-4xl mx-auto">
+            <div id="documentSearchArea">
+                <input
+                    type="text"
+                    id="documentSearchInput"
+                    class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-4"
+                    placeholder="Digite seu termo de busca (ex: 'bloqueio', 'prazo', 'nota fiscal')... ">
+
+                <button
+                    id="documentSearchBtn"
+                    class="w-full bg-sky-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-sky-700 transition duration-300 ease-in-out shadow-md">
+                    Buscar no Documento
+                </button>
+
+                <div id="documentSearchResults" class="mt-6 space-y-4">
+                    <p id="searchStatus" class="text-center text-slate-500">
+                        Documento da política carregado e pronto para busca.
+                    </p>
+                    <div id="searchLoadingIndicator" class="mt-2 text-center text-sky-600 hidden">
+                        <span class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-sky-600"></span>
+                        <span class="ml-2">Buscando no documento...</span>
                     </div>
                 </div>
             </div>
-        </section>
 
-        <section id="reference" class="mb-16">
-            <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Consulta Rápida de Despesas</h2> <!-- Reverted to sky-900 -->
-            <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">Não tem certeza se um gasto é permitido? Pesquise aqui na lista oficial de categorias autorizadas.</p>
-            <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg">
-                <input type="text" id="searchInput" class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-6" placeholder="Pesquisar por tipo de gasto (ex: limpeza, frete, marketing)..."> <!-- Reverted to sky-500 -->
-                <div id="expenseTable" class="space-y-3">
-                    <!-- Conteúdo será carregado dinamicamente via JavaScript após a pesquisa -->
-                    <p class="text-center text-slate-500">Digite para pesquisar categorias de despesas.</p>
-                </div>
+            <div id="fullPolicyContentDisplay" class="hidden mt-8 p-4 border border-slate-200 rounded-lg shadow-lg relative">
+                <button id="backToSearchBtn"
+                        class="absolute top-4 right-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2 px-4 rounded-lg text-sm">
+                    Voltar à Pesquisa
+                </button>
+                <h3 class="text-xl font-bold text-sky-900 mb-4">Trecho da Política</h3>
+                <div id="policyTextRendered" class="text-sm text-black max-h-96 overflow-y-auto pr-2"></div>
             </div>
-        </section>
-
-    </main>
-
-    <footer class="bg-white mt-16 py-8 border-t border-slate-200">
-        <div class="container mx-auto text-center text-slate-500">
-            <p>&copy; 2025 Grupo SBF. Todos os direitos reservados.</p>
-            <p class="text-xs mt-2">Este guia é um resumo visual da Política de Uso dos Cartões Clara e não substitui a leitura do documento completo.</p>
         </div>
-    </footer>
+    </section>
+
+    <!-- CONSULTA RÁPIDA -->
+    <section id="reference" class="mb-16">
+        <h2 class="text-3xl font-bold text-center mb-4 text-sky-900">Consulta Rápida de Despesas</h2>
+        <p class="text-lg text-center text-slate-600 max-w-3xl mx-auto mb-8">
+            Digite um termo e veja se sua compra é elegível, exemplos práticos e em qual etiqueta lançar.
+        </p>
+
+        <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg">
+            <input
+                type="text"
+                id="searchInput"
+                class="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 mb-6"
+                placeholder="Pesquisar por tipo de gasto (ex: limpeza, frete, marketing, água, lanche, manutenção)...">
+
+            <div id="expenseTable" class="space-y-3">
+                <p class="text-center text-slate-500">Digite para pesquisar categorias de despesas.</p>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<footer class="bg-white mt-16 py-8 border-t border-slate-200">
+    <div class="container mx-auto text-center text-slate-500">
+        <p>&copy; 2025 Grupo SBF. Todos os direitos reservados.</p>
+        <p class="text-xs mt-2">
+            Este guia é um resumo visual da Política de Uso dos Cartões Clara e não substitui a leitura do documento completo aprovado pelas áreas Financeira, Jurídica e de Compliance.
+        </p>
+    </div>
+</footer>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    
-    const wrapLabel = (label) => {
-        const maxLength = 16;
-        if (typeof label !== 'string' || label.length <= maxLength) return label;
-        const words = label.split(' ');
-        const lines = [];
-        let currentLine = '';
-        words.forEach(word => {
-            if ((currentLine + word).length > maxLength) {
-                lines.push(currentLine.trim());
-                currentLine = word + ' ';
-            } else {
-                currentLine += word + ' ';
-            }
-        });
-        lines.push(currentLine.trim());
-        return lines.filter(line => line.length > 0);
-    };
 
-    const tooltipTitleCallback = (tooltipItems) => {
-        const item = tooltipItems[0];
-        if (!item) return '';
-        let label = item.chart.data.labels[item.dataIndex];
-        return Array.isArray(label) ? label.join(' ') : label;
-    };
-    
-    const sharedChartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom',
-                labels: {
-                    font: { family: 'Inter', size: 12 },
-                    boxWidth: 15,
-                    padding: 20,
-                    color: '#475569'
-                }
-            },
-            tooltip: {
-                callbacks: { title: tooltipTitleCallback },
-                titleFont: { family: 'Inter', weight: 'bold' },
-                bodyFont: { family: 'Inter' },
-                backgroundColor: '#0f172a', /* Reverted to dark slate for tooltip background */
-                padding: 12,
-                cornerRadius: 4
-            }
-        },
-    };
-
-    const blockingCriteriaCtx = document.getElementById('blockingCriteriaChart');
-    if (blockingCriteriaCtx) {
-        new Chart(blockingCriteriaCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Acima de R$ 1.000', 'R$ 500 a R$ 1.000', 'Abaixo de R$ 500'].map(wrapLabel),
-                datasets: [{
-                    label: 'Prazo Máximo para Regularizar (horas)',
-                    data: [24, 48, 72],
-                    backgroundColor: ['#ef4444', '#f97316', '#0ea5e9'], /* Reverted to red, orange, sky blue */
-                    borderRadius: 4
-                }]
-            },
-            options: {
-                ...sharedChartOptions,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: { display: true, text: 'Prazo para Regularização (horas)', font: { family: 'Inter', size: 12 }, color: '#475569' }, /* Reverted to slate-600 */
-                        ticks: { color: '#64748b' } /* Reverted to slate-500 */
-                    },
-                    x: { ticks: { color: '#64748b' } } /* Reverted to slate-500 */
-                },
-                plugins: { ...sharedChartOptions.plugins, legend: { display: false } }
-            }
-        });
-    }
-
-    // commonExpenseCategories updated as requested
+    // ---- DADOS BASE DA TABELA "GASTOS PERMITIDOS" (resumo amigável) ----
     const expenseTableMainBody = document.getElementById('expenseTableMain');
     if (expenseTableMainBody) {
         const commonExpenseCategories = [
-            { label: 'Marketing e Publicidade', examples: 'Ações promocionais, brindes, mídia local, banners.' },
-            { label: 'Serviços Gráficos e de Copiadoras', examples: 'Impressão de banners, adesivos promocionais, folders, encadernações.' },
-            { label: 'Água Potável', examples: 'Compra de galões de água mineral, garrafas para abastecimento da equipe ou clientes.' },
-            { label: 'Material de Informática', examples: 'Mouse, teclado, cabos, pendrive.' },
-            { label: 'Lanches de Refeições', examples: 'Coffee break para ações internas, lanches para treinamentos.' }
+            {
+                label: 'Marketing e Publicidade',
+                examples: 'Ações promocionais, brindes de campanha, mídia local, banners, impulsionamento.'
+            },
+            {
+                label: 'Serviços Gráficos e Copiadoras',
+                examples: 'Impressão de adesivos, folders, materiais visuais de loja.'
+            },
+            {
+                label: 'Água Potável',
+                examples: 'Galões e garrafas de água para consumo interno conforme diretrizes.'
+            },
+            {
+                label: 'Material de Informática (baixo valor)',
+                examples: 'Mouse, teclado, cabos, pendrive, fonte simples, roteador simples.'
+            },
+            {
+                label: 'Lanches de Refeições (uso interno)',
+                examples: 'Coffee break para treinamento, ação interna autorizada, visita institucional.'
+            }
         ];
 
         let tableRows = '';
@@ -440,62 +538,123 @@ document.addEventListener('DOMContentLoaded', function () {
         expenseTableMainBody.innerHTML = tableRows;
     }
 
+    // ---- CONSULTA RÁPIDA / BUSCA POR TIPO DE DESPESA ----
     const expenseTable = document.getElementById('expenseTable');
     const searchInput = document.getElementById('searchInput');
 
-    // fullExpenseData now contains all topics from Anexo I for the search functionality
+    // dados detalhados (Anexo I resumido)
     const fullExpenseData = [
-        { sap: '5102505001', label: 'MARKETING_PUBLICIDADE E PROPAGANDA', examples: 'Ações promocionais, compra de brindes para campanha, contratação de mídia local, impulsionamento de redes sociais, banners promocionais.' },
-        { sap: '5103505001', label: 'MATERIAL DE LIMPEZA', examples: 'Detergente, sabão, desinfetante, papel toalha, pano de chão, esponja, rodo, vassoura, álcool, produtos de higiene ambiental.' },
-        { sap: '5103505005', label: 'MATERIAL DE INFORMÁTICA', examples: 'Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (sem controle patrimonial).' },
-        { sap: '5103505006', label: 'MATERIAL DE ESCRITÓRIO', examples: 'Canetas, clips, cadernos, pastas, blocos de anotação, grampeadores, etiquetas, organizadores de mesa.' },
-        { sap: '5103505007', label: 'MATERIAL DE COPA E COZINHA', examples: 'Pratos, copos, talheres, filtros de café, garrafas térmicas, panos de prato, esponjas, potes plásticos (sem elétricos).' },
-        { sap: '5103510001', label: 'MANUTENÇÃO CIVIL', examples: 'Pequenos reparos em paredes, troca de revestimentos, consertos em portas ou fechaduras (exceto chaveiro), troca de vidros, ajustes em prateleiras fixas.' },
-        { sap: '5103510005', label: 'MANUTENÇÃO ELETRICO', examples: 'Troca de tomadas, disjuntores, interruptores, reatores, soquetes, extensões elétricas, pequenos reparos de fiação de baixa tensão.' },
-        { sap: '5103510007', label: 'MANUTENÇÃO EQUIPAMENTOS', examples: 'Reparos em impressoras de etiqueta, máquinas de estampar, computadores (desde que fora de garantia e com baixo valor), ferramentas manuais.' },
-        { sap: '5103510010', label: 'MANUTENÇÃO AR-CONDICIONADO', examples: 'Manutenção corretiva/preventiva simples de ar-condicionado (limpeza de filtro, carga de gás, troca de controle remoto ou peças simples).' },
-        { sap: '5104007003', label: 'TRANSPORTE SERVIÇOS EMERGENCIAS', examples: 'Frete local emergencial, motoboy para transporte de documentos ou itens urgentes entre lojas ou matriz, entrega de materiais críticos.' },
-        { sap: '5104505006', label: 'SERVIÇOS GRÁFICOS E DE COPIADORAS', examples: 'Impressão de banners, adesivos promocionais, folders, encadernações, produção de manuais impressos.' },
-        { sap: '5104610002', label: 'CORREIOS_SEDEX/AR/POSTAGEM', examples: 'Envio de documentos físicos via Sedex, AR, carta registrada, pacotes pequenos, devoluções via Correios.' },
-        { sap: '5105505008', label: 'LANCHES DE REFEIÇÕES', examples: 'Compra de coffee break para ações internas, lanches para treinamentos, premiações, eventos internos autorizados.' },
-        { sap: '5103505007', label: 'AGUA POTÁVEL', examples: 'Compra de galões de água mineral, garrafas para abastecimento da equipe ou clientes em loja (se previsto nas diretrizes operacionais).' },
-        { sap: '5103505006', label: 'BOBINA ECF', examples: 'Compra de bobinas para ECF ou impressoras fiscais (uso obrigatório nas lojas que não têm fornecimento centralizado).' },
-        { sap: '5103510007', label: 'CHAVEIRO EMERGENCIAL', examples: 'Serviços de abertura ou troca de fechadura de cofres, salas administrativas, estoques, vitrines – exclusivamente em situações emergenciais.' },
-        { sap: '5103510007', label: 'MANUTENÇÃO MAQ ESTAMPAR', examples: 'Reparos simples ou ajustes técnicos em máquinas de estampar produtos promocionais nas lojas – sem controle patrimonial e com nota fiscal do prestador.' }
-        /* Removed: { sap: '5104505007', label: 'SERVIÇOS DE LIMPEZA', examples: 'Contratação pontual de diaristas, faxineiras para limpeza extra, empresas terceirizadas em serviços avulsos de limpeza ou desinfecção emergencial.' } */
+        {
+            sap: '5102505001',
+            label: 'MARKETING / PUBLICIDADE / PROPAGANDA',
+            examples: 'Ações promocionais; brindes de campanha; banners; impulsionamento de redes sociais; mídia local.'
+        },
+        {
+            sap: '5103505001',
+            label: 'MATERIAL DE LIMPEZA',
+            examples: 'Detergente, desinfetante, álcool, papel toalha, pano de chão, esponja, vassoura.'
+        },
+        {
+            sap: '5103505005',
+            label: 'MATERIAL DE INFORMÁTICA (BAIXO VALOR)',
+            examples: 'Mouse, teclado, cabos, pendrive, fonte, hub USB, roteador simples (sem controle patrimonial).'
+        },
+        {
+            sap: '5103505006',
+            label: 'MATERIAL DE ESCRITÓRIO',
+            examples: 'Canetas, blocos, etiquetas, grampeador, pastas, organizadores de mesa.'
+        },
+        {
+            sap: '5103505007',
+            label: 'MATERIAL DE COPA E COZINHA (ITENS SIMPLES)',
+            examples: 'Pratos, copos, talheres, filtros de café, garrafa térmica, potes plásticos. (Sem comprar eletrodoméstico.)'
+        },
+        {
+            sap: '5103510001',
+            label: 'MANUTENÇÃO CIVIL',
+            examples: 'Pequenos reparos em parede, porta, vidro, fixação de prateleira. Baixa complexidade.'
+        },
+        {
+            sap: '5103510005',
+            label: 'MANUTENÇÃO ELÉTRICA',
+            examples: 'Troca de tomada, disjuntor, interruptor, ajuste simples de cabeamento de baixa tensão.'
+        },
+        {
+            sap: '5103510007',
+            label: 'MANUTENÇÃO DE EQUIPAMENTOS / CHAVEIRO EMERGENCIAL',
+            examples: 'Reparo de impressora de etiqueta, máquina de estampar, abertura de fechadura em emergência.'
+        },
+        {
+            sap: '5103510010',
+            label: 'MANUTENÇÃO AR-CONDICIONADO',
+            examples: 'Limpeza de filtro, recarga de gás, reparo simples sem troca de equipamento inteiro.'
+        },
+        {
+            sap: '5104007003',
+            label: 'TRANSPORTE SERVIÇOS EMERGENCIAIS',
+            examples: 'Motoboy / frete local para envio urgente de item entre lojas ou matriz. (Não inclui transporte de pessoas/Uber).'
+        },
+        {
+            sap: '5104505006',
+            label: 'SERVIÇOS GRÁFICOS / COPIADORAS',
+            examples: 'Impressão de banners, adesivos, folders, materiais de campanha.'
+        },
+        {
+            sap: '5104610002',
+            label: 'CORREIOS / SEDEX / AR / POSTAGEM',
+            examples: 'Envio de documentos físicos, devolução de materiais, remessa com AR.'
+        },
+        {
+            sap: '5105505008',
+            label: 'LANCHES DE REFEIÇÕES (USO INTERNO)',
+            examples: 'Coffee break para treinamento interno, visita de diretoria, ação de premiação interna. Não é almoço pessoal.'
+        },
+        {
+            sap: 'AGUA POTÁVEL',
+            label: 'ÁGUA POTÁVEL',
+            examples: 'Galões e garrafas de água para consumo interno, conforme diretriz operacional.'
+        },
+        {
+            sap: 'BOBINA ECF',
+            label: 'BOBINA ECF / IMPRESSORA FISCAL',
+            examples: 'Bobinas para ECF ou impressora fiscal quando não há fornecimento centralizado.'
+        }
     ];
 
-    const renderTable = (data) => {
+    function renderTable(data) {
         expenseTable.innerHTML = '';
         if (data.length === 0) {
-            expenseTable.innerHTML = `<p class="text-center text-slate-500">Nenhuma categoria encontrada.</p>`;
+            expenseTable.innerHTML = '<p class="text-center text-slate-500">Nenhuma categoria encontrada.</p>';
             return;
         }
         data.forEach(item => {
             const row = `
                 <div class="p-4 border border-slate-200 rounded-lg bg-slate-50/50">
-                    <p class="font-bold text-sky-900">${item.label}</p> <!-- Reverted to sky-900 -->
+                    <p class="font-bold text-sky-900">${item.label}</p>
+                    <p class="text-[11px] text-slate-500 mb-1">(${item.sap})</p>
                     <p class="text-sm text-slate-600">${item.examples}</p>
                 </div>
             `;
             expenseTable.innerHTML += row;
         });
-    };
-    
+    }
+
     searchInput.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.trim().toLowerCase(); // Use trim() for empty check
+        const searchTerm = e.target.value.trim().toLowerCase();
         if (searchTerm === '') {
-            expenseTable.innerHTML = `<p class="text-center text-slate-500">Digite para pesquisar categorias de despesas.</p>`;
+            expenseTable.innerHTML = '<p class="text-center text-slate-500">Digite para pesquisar categorias de despesas.</p>';
             return;
         }
 
-        const filteredData = fullExpenseData.filter(item => 
-            item.label.toLowerCase().includes(searchTerm) || 
+        const filteredData = fullExpenseData.filter(item =>
+            item.label.toLowerCase().includes(searchTerm) ||
             item.examples.toLowerCase().includes(searchTerm)
         );
+
         renderTable(filteredData);
     });
 
+    // ---- NAVEGAÇÃO COM HIGHLIGHT DA SEÇÃO ATUAL ----
     const navButtons = document.querySelectorAll('.nav-button');
     const sections = document.querySelectorAll('main section');
 
@@ -523,201 +682,199 @@ document.addEventListener('DOMContentLoaded', function () {
         observer.observe(section);
     });
 
-    // Document Search Functionality
+    // ---- PESQUISA NO DOCUMENTO (POLÍTICA COMPLETA EMBUTIDA) ----
     const documentSearchInput = document.getElementById('documentSearchInput');
     const documentSearchBtn = document.getElementById('documentSearchBtn');
     const documentSearchResults = document.getElementById('documentSearchResults');
     const searchStatus = document.getElementById('searchStatus');
     const searchLoadingIndicator = document.getElementById('searchLoadingIndicator');
-    const documentSearchArea = document.getElementById('documentSearchArea'); // Area containing input, button, results
+    const documentSearchArea = document.getElementById('documentSearchArea');
     const fullPolicyContentDisplay = document.getElementById('fullPolicyContentDisplay');
     const policyTextRendered = document.getElementById('policyTextRendered');
     const backToSearchBtn = document.getElementById('backToSearchBtn');
 
-    // Content of POLITICA DE UTILIZAÇÃO_CARTÕES CLARA.docx embedded directly
-    let policyDocumentContent = `Política de Uso dos Cartões Clara nas Lojas
+    // 👇 Aqui está o texto da política consolidada, já com:
+    // - bloqueio preventivo em 48h independente de valor
+    // - prazo de guarda de 180 dias
+    // - definição de situação emergencial
+    // - CLT art. 462 e Política de Conduta Ética
+    // - ServiceNow
+    let policyDocumentContent = `
+Política de Uso dos Cartões Clara nas Lojas
 POLÍTICA INTERNA
 [CONTAS A RECEBER]
 ÚLTIMA ATUALIZAÇÃO: 24/06/2025
+
 SUMÁRIO
- 1. 	 Objetivo	3
-2. 	 Abrangência	4
-3. 	 Melhorias	4
-4. 	 Definições Importantes	6
-5. 	 Limite dos Cartões	9
-6. 	 Prestação de Contas	10
-7. 	 Restrições de Uso	19
-8. 	 Responsabilidades	26
-9. 	 Monitoramento, Auditoria e Fraudes	32
-10. 	 Revisão	35
-Anexo I – Quadro de Etiquetas por Tipo de Gasto 	35
+1. Objetivo
+2. Abrangência
+3. Melhorias
+4. Definições Importantes
+5. Limite dos Cartões
+6. Prestação de Contas
+7. Restrições de Uso
+8. Responsabilidades
+9. Monitoramento, Auditoria e Fraudes
+10. Revisão
+Anexo I – Quadro de Etiquetas por Tipo de Gasto
 
-Objetivo
-Estabelecer os  conceitos, responsabilidades, critérios operacionais e limites  aplicáveis à utilização dos cartões da Clara para despesas operacionais, fornecidos aos gerentes das lojas do Grupo SBF, incluindo as unidades Centauro e Fisia.
-Esta política tem como objetivo principal o  uso adequado, transparente e controlado  dos   cartões no contexto das atividades operacionais das lojas, abrangendo desde a autorização de despesas até a prestação de contas obrigatória.
-As diretrizes aqui descritas visam assegurar a  aderência às normas internas da companhia,  à  legislação vigente  e às boas práticas de governança corporativa, reduzindo riscos financeiros e operacionais.
-A gestão dos cartões é realizada por meio da  plataforma digital da CLARA INSTITUIÇÃO DE PAGAMENTO LTDA ., que centraliza os registros de transações, limites, comprovantes fiscais e relatórios para conciliação e pagamentos.
-O documento ainda define o papel e as obrigações dos portadores dos cartões, da liderança imediata, do departamento financeiro e demais envolvidos, bem como estabelece as medidas corretivas e preventivas aplicáveis em caso de uso indevido ou descumprimento das regras.
-Abrangência
-Esta política aplica-se a todas as lojas do Grupo SBF, Centauro e Fisia, e é de aplicação obrigatória, uma vez que obtenham e utilizem os cartões fornecidos pela empresa. A abrangência desta política se estende aos colaboradores, funcionários e representantes das lojas do Grupo SBF que forem designados como portadores dos cartões para uso no desempenho de suas funções profissionais, enquanto empregados do Grupo SBF, e abarca todas as transações comerciais realizadas com os cartões, afirmando assim uma cobertura abrangente e uniforme em todas as lojas que utilizem esse meio de pagamento. Vale ressaltar que esta política não substitui a  Política de Compras , de forma que as despesas de sangria acontecem em um caráter de exceção e emergencial, respeitando a mesma.
-Melhorias
-O processo de implementação de cartões da Clara visa otimizar e simplificar as operações financeiras das lojas do Grupo SBF, oferecendo maior autonomia e praticidade no dia a dia. Em substituição ao procedimento anterior de sangria de caixa, o uso desses cartões traz diversos benefícios significativos. Em suma, a implementação desse procedimento representa um avanço significativo na gestão financeira das lojas, proporcionando maior segurança, agilidade, controle e eficiência nas operações diárias, sendo eles:
- Redução de Riscos e Segurança Financeira : Os cartões eliminam a necessidade de manipulação de quantias em dinheiro, reduzindo os riscos associados a roubos, fraudes e erros de contagem de caixa. Isso garante maior segurança financeira para as lojas e seus colaboradores, trazendo também maior eficácia na questão da conciliação financeira.
-Facilidade de Controle e Gestão Financeira : Os cartões permitem um maior controle e gestão das despesas, pois todas as transações são registradas eletronicamente e podem ser facilmente acompanhadas e monitoradas por meio de relatórios detalhados na plataforma da Clara. Isso facilita a identificação de gastos desnecessários e o acompanhamento do orçamento disponível para cada loja. 
-Flexibilidade e Adaptabilidade às Necessidades : Os cartões oferecem maior flexibilidade e adaptabilidade às necessidades das lojas do Grupo SBF.
-Melhoria no Fluxo de Caixa e Antecipação de Numerário:  Com o fim das sangrias de despesas, o valor arrecadado nas vendas permanece integralmente no caixa da loja até o envio direto ao banco, sem necessidade de retiradas frequentes para gastos operacionais. Isso contribui para um  menor prazo de recebimento do numerário pela empresa , melhora o controle sobre o caixa físico e otimiza a gestão do fluxo de recursos em cada loja. Antes da implantação do cartão, parte do dinheiro do caixa da loja era retirada antecipadamente (via sangria) para pagar despesas operacionais. Ou seja, esse valor saía do caixa antes de ser contabilizado e enviado à tesouraria central. Com o cartão:
-As despesas operacionais  não são mais pagas com dinheiro do caixa ;
-Todo o valor das vendas  fica retido no caixa até o envio completo do numerário  ao banco;
-Isso faz com que o numerário seja  recebido mais cedo e em sua totalidade  pela empresa, pois  não há retirada antecipada para cobrir despesas .
-Aumenta o volume enviado ao banco (sem perdas ou antecipações);
-Reduz o tempo entre a venda e o recebimento centralizado do valor.
-As categorias de compras que estão liberadas para o uso, podendo sofrer alterações pela área financeira caso seja necessário, são: Alimentação; Bares ou bebidas (não alcoólicas); Comunicação; Comércio digital; Construção e serviços; Lojas de varejo; Lojas especializadas; Materiais de escritório; Produtos têxteis; Publicidade digital; Serviços especiais; Serviços profissionais; Software e hardware.
-Definições Importantes Para fins desta política, adotam-se as seguintes definições essenciais:
-4.1. Comprovante Fiscal:  Documento emitido pelo estabelecimento comercial (nota fiscal ou cupom fiscal) que formaliza legalmente a transação realizada, sendo obrigatório para prestação de contas.
-4.2. Comprovante de Pagamento:  Documento ou evidência que comprove a realização da transação financeira, podendo ser: recibo, print da confirmação de pagamento, e-mail de confirmação ou outro registro equivalente.
-4.3. Etiqueta:  Categoria padronizada que identifica o tipo de gasto realizado, sendo obrigatória sua correta associação a cada transação na plataforma Clara, para fins de conciliação contábil e análise financeira.
-4.4. Bloqueio Preventivo:  Suspensão temporária da utilização do cartão, aplicada em situações de descumprimento das obrigações de prestação de contas, com o objetivo de mitigar riscos financeiros e assegurar a conformidade com esta política.
-4.5. Transação:  Operação financeira realizada com o cartão para pagamento de despesas autorizadas, registrada eletronicamente na plataforma Clara.
-4.6. Prestação de Contas:  Procedimento obrigatório de registro e justificativa de cada transação realizada com o cartão, mediante inserção de etiqueta, comprovante fiscal e descrição, conforme prazos estabelecidos nesta política.
-4.7. Responsável pela Prestação de Contas:  Portador do cartão ou, em caso de afastamento, o líder ou supervisor designado formalmente, incumbido de realizar o correto registro e justificativa das transações.
-4.8. Departamento Financeiro:  Área da empresa responsável pela gestão, acompanhamento e auditoria das transações realizadas com os cartões, bem como pela aplicação de medidas corretivas previstas nesta política.
-4.9. Reincidência:  Nova ocorrência de descumprimento das obrigações de prestação de contas ou das restrições de uso após orientação formal ou aplicação de medida corretiva anterior.
-4.10. Contestação:  Processo formal de questionamento ou disputa de uma transação considerada irregular ou indevida, realizado junto ao suporte da Clara em conformidade com os prazos e procedimentos previstos nesta política.
-4.11. Revisão das Categorias Liberadas:  A área financeira revisará periodicamente as categorias liberadas, podendo fazer ajustes de acordo com as necessidades operacionais, estratégia de controle e eventuais ocorrências de uso indevido.
-4.12. Portador Temporário:  Colaborador que assume o uso do cartão em caráter provisório, durante o afastamento do portador titular, mediante validação formal do departamento financeiro. Suas responsabilidades são as mesmas do portador original, incluindo a prestação de contas e guarda segura do cartão.
-4.13. Sangrias de Caixa:  Procedimento de retirada de numerário do caixa da loja para pagamento de despesas operacionais, agora descontinuado nas unidades que utilizam o cartão, conforme item 3 – Benefícios.
-4.14. Treinamento Obrigatório:  Encontro ou conteúdo disponibilizado pelo financeiro que aborda o uso correto do cartão e da plataforma Clara, sendo condição obrigatória para liberação e ativação do cartão ao portador designado.
-4.15. Service Now:  Sistema interno para abertura de chamados.
-Limite dos Cartões
-Os cartões têm limites predefinidos para despesas mensais, de acordo com a hierarquia e as necessidades operacionais de cada loja, e conforme estabelecido pela política interna da empresa e em conformidade com a legislação aplicável relacionada à gestão financeira corporativa, podendo sofrer alteração para limite diário caso se julgue necessário.
-Cada gerente regional (responsável por seu grupo de lojas) terá acesso às transações e limites de despesas das lojas que gerencia/administra, trazendo assim um controle mais eficaz sobre os gastos. Cada gerente de loja arcará e prestará contas a respeito dos custos da loja que gerencia. 
-O cartão pode ser utilizado  todos os dias da semana , inclusive aos finais de semana e feriados, sem restrição de data, desde que respeitadas as diretrizes de uso desta política.
-Importante destacar que o  limite disponível é mensal e não diário , ou seja, o valor total liberado deve ser utilizado de forma planejada ao longo do mês, para cobrir as despesas operacionais recorrentes da loja. O mesmo será reposto assim que houver o pagamento da fatura no período corrente, porém, pode sofrer alteração para limite diário caso se julgue necessário.
-Os limites de despesas serão revisados regularmente e poderão ser ajustados conforme necessário, levando em consideração as condições econômicas, disponibilização de limite contratual junto à Clara e as metas financeiras da empresa. 
-Todas as solicitações de aumento de limite devem ser efetuadas via abertura de chamado no  Service Now , detalhando a justificativa e a urgência da transação.
-Fica estabelecido que os cartões são destinados exclusivamente para despesas operacionais e não devem ser utilizados para gastos que excedam os limites estabelecidos, salvo em casos de emergência devidamente documentados e autorizados. 
-A utilização de valores acima do limite sem autorização prévia poderá ser considerada uso indevido, conforme item 7 – Restrições de Uso.
-Os portadores dos cartões devem sempre buscar alternativas econômicas e eficientes para as compras, tendo uma otimização dos recursos da empresa.
-Reforçando, em caso de necessidade de despesas excepcionais que ultrapassem os limites predefinidos dos cartões, os portadores devem obter autorização prévia do departamento financeiro de contas a receber através de abertura de chamado via  Service Now .
-Prestação de Contas
-Para toda e qualquer transação efetuada com os cartões, deve ser feita a devida justificativa na plataforma da Clara pelo usuário:
-Inserir etiqueta correspondente ao gasto (Conforme Anexo I)
-Anexar o comprovante fiscal;
-Preencher o campo “Descrição” com o detalhamento do gasto.
-Para cada tipo de gasto há uma conta contábil para o envio da informação e contabilização, o financeiro efetua esse processo através da extração de relatórios na plataforma da Clara, por esse motivo é extremamente importante termos a etiqueta atrelada ao gasto. Diariamente há o acompanhamento de todas as transações na plataforma, para ter total controle dos gastos e verificar se os mesmos estão corretamente lançados, com isso, analisamos:
-Se há nota fiscal/recibo anexado;
-Se o comprovante fiscal anexado condiz com o valor da compra;
-Se a etiqueta está devidamente atrelada;
-Se o custo da compra é condizente.
-O prazo padrão para justificar a compra na plataforma da Clara (caso não tenham feito no momento da compra) após a mesma ter sido efetuada, através da inserção da etiqueta e comprovante fiscal, é de 48 horas. Caso seja identificado pela área financeira que alguma transação está sem as devidas justificativas, enviaremos um e-mail de cobrança para o titular do cartão (gerente da loja) solicitando que as correções sejam efetuadas, se não tivermos resposta no tempo definido, poderemos, sem aviso prévio, seguir com o bloqueio do cartão até que as pendencias sejam sanadas, conforme explanação no item  6.1 .
-Caso uma categoria de gasto não seja encontrada na listagem inicial de etiquetas da plataforma da Clara, a solicitação para criação e inserção de uma nova etiqueta deve ser encaminhada através de abertura de chamado no  Service Now .
-Mesmo após a inserção dos comprovantes na plataforma da Clara, os documentos físicos (notas fiscais, recibos) deverão ser mantidos em arquivo na loja por, no mínimo, 90 dias corridos, podendo ser solicitados para auditoria pela área financeira.
- Critérios de Bloqueio do Cartão
-Transações de valor elevado:  Para transações acima de R$ 1.000,00 sem o devido comprovante fiscal anexado na plataforma no prazo de 24 horas, será efetuado o bloqueio preventivo do cartão da loja, enviaremos a cobrança formal por e-mail já informando sobre isso, e o desbloqueio será feito assim que a situação for regularizada.
-Transações de valor médio:  Para transações entre R$ 500,00 e R$ 1.000,00 sem o comprovante fiscal anexado no prazo de 48 horas da data da compra, será emitido um alerta formal ao gerente da loja, seguindo o fluxo de cobrança por e-mail, com prazo de 48 horas para regularização.   Caso não haja regularização neste prazo, o cartão será previamente bloqueado e será enviada uma nova cobrança por e-mail, o desbloqueio ocorrerá após a regularização da situação.
-Transações de pequeno valor:  Para transações abaixo de R$ 500,00, a ausência de comprovante fiscal será tratada inicialmente com o envio da cobrança por e-mail no prazo de 48 horas da data da compra. Caso não haja regularização neste prazo, será enviada uma nova cobrança por e-mail. Não tendo o retorno dentro de 24 horas, será efetuado o bloqueio preventivo do cartão até que a situação seja regularizada, o desbloqueio será feito assim que a situação for regularizada.
-A reincidência nos descumprimentos pode impactar diretamente a elegibilidade da loja para uso do cartão, conforme também previsto no item 8 – Responsabilidades.
-QUADRO DE PRAZOS PARA PRESTAÇÃO DE CONTAS
+1. Objetivo
+Estabelecer os conceitos, responsabilidades, critérios operacionais e limites aplicáveis à utilização dos cartões da Clara para despesas operacionais das lojas do Grupo SBF.
+Esta política define o uso adequado, transparente e controlado dos cartões, incluindo autorização de despesas, prestação de contas obrigatória e sanções em caso de uso indevido.
+A gestão dos cartões é realizada por meio da plataforma digital da CLARA INSTITUIÇÃO DE PAGAMENTO LTDA., que centraliza transações, limites, comprovantes e relatórios.
+As medidas previstas buscam aderência às normas internas, à legislação vigente e às boas práticas de governança corporativa.
 
-Tipo de Transação,Valor da Transação,Prazo para Regularização,Medida Corretiva
-Transação comum,"Até R$ 500,00",48h + 24h após cobrança,Bloqueio preventivo se não regularizado
-Transação média,"R$ 500,01 a R$ 1.000,00",48h após cobrança,Bloqueio preventivo se não regularizado
-Transação elevada,"Acima de R$ 1.000,00",24h após transação,Bloqueio preventivo imediato
-Marketplaces,Qualquer valor,48h para registro + 48h após recebimento para anexar nota,Bloqueio preventivo se não regularizado
+2. Abrangência
+Esta política aplica-se a todas as lojas do Grupo SBF (incluindo Centauro e Fisia) após ativação do cartão Clara (treinamento + recebimento formal).
+Após a ativação na loja, o processo de sangria de despesas é descontinuado (lojas Centauro têm o PDV e o fluxo de sangria na intranet bloqueados).
+Esta política não substitui a Política de Compras. Gastos patrimoniais, infraestrutura, mobiliário, eletrodomésticos e itens de alto valor seguem fluxo de Compras.
+Em caráter emergencial e excepcional, poderá ser solicitada autorização prévia formal ao Departamento Financeiro para uma despesa sem cartão. Sem essa autorização, retirar dinheiro do caixa para pagar despesa e “acertar depois” é proibido.
 
-Situações excepcionais e devidamente justificadas poderão ser analisadas caso a caso, mediante parecer do titular do cartão.
-Em caso de reincidência frequente ou indícios de má-fé, a empresa poderá aplicar medidas disciplinares adicionais, conforme a política interna de conduta, ou até mesmo proceder à revisão da elegibilidade da loja para utilização do cartão.
-Para casos em que o responsável pelo cartão ou o departamento financeiro identificar que a compra é passível de contestação, deve-se acionar diretamente o suporte da Clara (contato@clara.com) em até 2 dias úteis após a transação, para que eles possam seguir com a análise da compra. Caso constatado a irregularidade, o valor será estornado para a empresa. Esse procedimento poderá ter o cartão previamente bloqueado até que a análise seja finalizada pela operadora.
-Nota de Esclarecimento : O processo de contestação aplica-se a transações não reconhecidas ou irregulares feitas pela loja. Ele é diferente do procedimento para despesas pessoais, em que o portador reconhece o gasto e realiza o ressarcimento à empresa.
-Compras Realizadas em Aplicativos de E-commerce
-Em casos de compras realizadas em aplicativos ou Marketplaces em que a  nota fiscal não é emitida no momento da transação , o responsável deverá, no prazo padrão de até  48 horas :
-Registrar a transação na plataforma com a  etiqueta correspondente;  
-Anexar o  comprovante de pagamento  (recibo da compra, confirmação do pedido ou print do aplicativo que comprove a efetivação da compra).
-Informar no campo de justificativa que a  nota fiscal será anexada posteriormente , assim que recebida.
-Anexação posterior:
-Assim que a nota fiscal for recebida (junto ao produto ou por e-mail), o responsável deverá anexá-la à plataforma no prazo máximo de 48 horas após o recebimento do produto. O não cumprimento desse prazo implicará no bloqueio preventivo do cartão, conforme os critérios gerais desta política.
-Os prazos e regras aqui descritos seguem os mesmos critérios de regularização e bloqueio definidos no item 6 – Prestação de Contas.
-Para manter a conformidade das transações com os critérios operacionais da empresa, consulte também o item 7 – Restrições de Uso, que detalha os tipos de despesas proibidas ou condicionadas à autorização prévia.
-Substituição de uso do cartão
-Conforme descrito no item 3 – Benefícios, a substituição da sangria pelo cartão visa padronizar os processos financeiros e assegura maior controle nas lojas.
-Após  a implantação do cartão em cada loja e a confirmação formal de recebimento, acompanhada do treinamento de uso da plataforma da Clara, o processo de sangria de despesas é descontinuado para as unidades Centauro. Isso ocorre por meio da trava simultânea do PDV e do fluxo de solicitações de sangrias na intranet, impedindo que a loja realize retiradas de dinheiro em espécie para pagamento de despesas.
-Esse bloqueio é aplicado exclusivamente às lojas Centauro. Para as  lojas Fisia não há necessidade de bloqueio no PDV ou na intranet,  pois esse modelo de operação não utiliza sangrias de caixa para despesas operacionais.
-Dessa forma, após a implantação, o cartão passa a ser o único meio autorizado para realização de despesas operacionais. O processo de sangria é considerado encerrado e não deve mais ser utilizado.
-Em situações excepcionais , nas quais a loja não consiga utilizar o cartão (por falha técnica ou outro motivo justificado),  é obrigatório que a equipe da loja comunique previamente o departamento financeiro,  entendendo-se “ previamente”  em casos que souber da necessidade do gasto operacional na loja.  A equipe analisará o caso e, se for realmente necessário, poderá liberar temporariamente o processo de sangria (via PDV e intranet, no caso de lojas Centauro), para que a despesa seja realizada como exceção e devidamente justificada.
-Essa liberação, no entanto, será autorizada somente após uma análise rigorosa, uma vez que, como reforçado durante o treinamento, não é permitida a retomada do processo de sangria como prática após a ativação do cartão na loja.
-Utilização provisória de cartão de outra loja
-Nos casos em que o gerente titular de uma loja estiver ausente (por desligamento) e ainda não houver a emissão de um novo cartão vinculado à nova gestão da unidade, poderá ser autorizada, temporariamente, a utilização do cartão de outra loja, desde que  previamente acordado  com o departamento financeiro.
-Nessa hipótese, torna-se obrigatório que o gerente substituto registre no campo “ Descrição ” da plataforma Clara (no app ou site), de forma clara e objetiva, que aquela despesa se refere a uma loja diferente daquela à qual o cartão está originalmente vinculado. A descrição deve conter expressamente a informação da loja beneficiada, utilizando o seguinte modelo ( Essa exigência reforça os critérios estabelecidos no item 6 – Prestação de Contas, especialmente quanto à descrição clara das despesas na plataforma Clara.): "Uso temporário do cartão na loja XXXX." Esse procedimento é essencial para a correta alocação e identificação das despesas, permitindo que o financeiro realize a reclassificação adequada no momento da conciliação contábil e fechamento da fatura.`;
+3. Melhorias
+A adoção do cartão Clara substitui sangrias em dinheiro e traz:
+• Redução de risco operacional (menos numerário na loja).
+• Controle e visibilidade: todas as transações ficam registradas digitalmente.
+• Agilidade no dia a dia da loja (compra direta dentro de categorias liberadas).
+• Melhoria do fluxo de caixa: o numerário de vendas não é mais retirado antecipadamente para despesas.
+• Padronização de categorias e centros de custo.
+Categorias de compra liberadas (podem ser ajustadas pelo Financeiro): alimentação para eventos internos; água potável; material de escritório; material de limpeza; material de informática de baixo valor; manutenção leve; serviços gráficos e marketing; frete emergencial de itens entre lojas; correios/postagens etc.
+Definição de SITUAÇÃO EMERGENCIAL: situação em que a loja não consegue operar sem aquele gasto imediato e não há alternativa viável de pagamento via cartão Clara. Toda exceção deve ser previamente aprovada pelo Departamento Financeiro. O retorno à prática rotineira de sangria após implantação do cartão não é permitido.
 
-    // Replace all instances of "Cartões Corporativos" with "Cartões Clara"
-    policyDocumentContent = policyDocumentContent.replace(/Cartões Corporativos/g, 'Cartões Clara');
-    // Replace all instances of "cartão corporativo" with "cartão da Clara"
-    policyDocumentContent = policyDocumentContent.replace(/cartão corporativo/g, 'cartão da Clara');
-    // Replace standalone "corporativo" or "corporativos" that are not part of the previously replaced phrases.
-    // This regex looks for ' corporativo' or ' corporativos' preceded by a word boundary and followed by a word boundary or a punctuation mark.
-    policyDocumentContent = policyDocumentContent.concat(' ').replace(/\bcorporativo(s)?\b/g, '').trim(); // Add space to handle end-of-content matches
+4. Definições Importantes
+4.1. Comprovante Fiscal: Nota fiscal ou cupom fiscal oficial da compra, obrigatório.
+4.2. Comprovante de Pagamento: Recibo, comprovante eletrônico, print de confirmação etc.
+4.3. Etiqueta: Categoria padronizada associada à transação na plataforma Clara, necessária para conciliação contábil.
+4.4. Bloqueio Preventivo: Suspensão temporária do cartão quando há descumprimento das obrigações de prestação de contas, com o objetivo de mitigar riscos financeiros e assegurar conformidade (vide item 6 – Prestação de Contas).
+4.5. Prestação de Contas: Lançar etiqueta correta, anexar comprovante fiscal e preencher descrição.
+4.6. Reincidência: Nova ocorrência de descumprimento após orientação formal anterior.
+4.7. Portador Temporário: Colaborador autorizado pelo Departamento Financeiro a usar o cartão em caráter provisório quando o titular estiver ausente (por exemplo, desligamento).
+4.8. ServiceNow: Sistema interno para abertura de chamados (aumento de limite, desbloqueio, compra fora da política etc.).
 
+5. Limite dos Cartões
+Cada cartão possui limite definido pelo Financeiro, podendo ser mensal ou diário conforme necessidade e controle de risco.
+O limite é para despesas operacionais da loja, não uso pessoal.
+Qualquer necessidade de gasto acima do limite deve ser previamente autorizada via abertura de chamado no ServiceNow, informando justificativa e urgência.
+A tentativa de uso acima do limite, sem autorização prévia, pode ser tratada como uso indevido (ver item 7).
 
-    // Helper to escape regex special characters
+6. Prestação de Contas
+Para TODA transação realizada com o cartão Clara, o portador (ou o responsável designado) deve, em até 48 horas após a compra:
+• Inserir a etiqueta correspondente ao tipo de gasto (conforme Anexo I);
+• Anexar o comprovante fiscal;
+• Preencher o campo “Descrição”, explicando de forma objetiva o que foi comprado e para qual necessidade operacional.
+O Departamento Financeiro monitora diariamente as transações para conferir:
+• Se há comprovante fiscal anexado;
+• Se o valor do comprovante fiscal bate com o valor pago;
+• Se a etiqueta lançada corresponde corretamente ao tipo de gasto;
+• Se o gasto faz sentido operacionalmente.
+Documentos físicos (notas/recibos) devem permanecer arquivados em loja por, no mínimo, 180 dias corridos e podem ser solicitados em auditoria.
+Bloqueio Preventivo do Cartão
+Se uma transação permanecer sem justificativa completa (etiqueta, nota fiscal e descrição) dentro do prazo de 48 horas após a compra, o cartão poderá ser bloqueado preventivamente até a regularização, independentemente do valor da transação.
+Em caso de reincidência ou indícios de má-fé, a loja pode ter sua elegibilidade de uso do cartão suspensa temporariamente, sem prejuízo das medidas disciplinares previstas na Política de Conduta Ética e Integridade do Grupo SBF.
+
+Compras em marketplaces / apps
+Se a nota fiscal não estiver disponível na hora da compra:
+1. Registrar a transação na Clara em até 48 horas;
+2. Anexar o comprovante de pagamento (print do pedido, recibo do app etc.);
+3. Indicar na descrição que “Nota fiscal será anexada após recebimento”.
+Assim que a nota fiscal chegar (no produto ou por e-mail), ela deve ser anexada em até 48 horas após o recebimento. Se não regularizar nesse prazo, aplica-se bloqueio preventivo.
+
+Contestação de compra não reconhecida
+Se houver transação não reconhecida pela loja, o responsável deve acionar contato@clara.com em até 2 dias úteis para contestação formal. O cartão pode ficar preventivamente bloqueado até a conclusão da análise da operadora. Isso é diferente de despesa pessoal assumida pelo portador.
+
+Substituição de uso do cartão / sangria
+Após a implantação do cartão e treinamento, a sangria deixa de ser um meio rotineiro de despesa.
+Caso haja falha técnica real no cartão, a loja deve solicitar orientação prévia ao Departamento Financeiro. Se aprovado formalmente, o Financeiro pode autorizar uma exceção pontual (ex.: liberação temporária de sangria). Essa exceção é controlada e não pode virar prática.
+
+Uso temporário de cartão de outra loja
+Se o gerente titular saiu e ainda não foi emitido o novo cartão, pode ser autorizada provisoriamente a utilização do cartão de outra loja, desde que o Departamento Financeiro autorize previamente.
+Nesse caso é obrigatório escrever na descrição da compra: “Uso temporário do cartão na loja XXXX”, para que o Financeiro faça a reclassificação correta depois.
+
+7. Restrições de Uso
+É estritamente proibido:
+• Uso para fins pessoais (ex.: compra de itens próprios, lazer, refeição pessoal).
+• Compra de bens patrimoniais, eletrodomésticos, infraestrutura, mobiliário, eletrônicos etc. Esses itens devem seguir fluxo de Compras.
+• Transporte de pessoas (Uber, 99, passagens etc.).
+• Saques, retirada de numerário do caixa para “acertar depois” ou adiantamento em dinheiro.
+• Qualquer despesa sem vínculo operacional com a loja.
+Em caso de uso pessoal:
+Se o portador reconhecer espontaneamente o erro:
+– Deve comunicar imediatamente o Financeiro;
+– Classificar a transação como “Despesa Pessoal – Uso Indevido”;
+– Ressarcir integralmente em até 2 dias úteis.
+Se a empresa identificar e o portador não reconhecer ou não ressarcir:
+– Poderão ser adotadas medidas administrativas e legais cabíveis, incluindo desconto em folha (conforme previsão do art. 462 da CLT e contrato de trabalho vigente), abertura de procedimento disciplinar e bloqueio definitivo do cartão.
+
+8. Responsabilidades
+Portador do cartão:
+• Usar apenas para fins operacionais;
+• Fazer a prestação de contas dentro do prazo;
+• Guardar o cartão fisicamente em local seguro;
+• Comunicar imediatamente qualquer uso indevido ou transação suspeita.
+Liderança / Supervisor designado:
+• Assumir a prestação de contas em caso de afastamento do gerente titular, quando formalmente designado.
+Departamento Financeiro:
+• Definir limites;
+• Auditar transações;
+• Bloquear e desbloquear cartões;
+• Avaliar reincidência;
+• Validar exceções (aumento de limite, compra fora da política, liberação emergencial).
+
+9. Monitoramento, Auditoria e Fraudes
+O Departamento Financeiro monitora diariamente a plataforma Clara.
+Irregularidades podem resultar em:
+• Bloqueio preventivo;
+• Suspensão temporária da elegibilidade da loja ao cartão;
+• Comunicação formal para orientação e/ou medida disciplinar conforme a Política de Conduta Ética e Integridade do Grupo SBF;
+• Acionamento do Jurídico em caso de suspeita de fraude.
+Os registros de transações, comprovantes e chamados no ServiceNow compõem a trilha de auditoria.
+
+10. Revisão
+Esta política pode ser revisada pelo Financeiro, Jurídico e Compliance.
+Em caso de conflito entre esta política e outra política corporativa (ex.: Política de Compras ou Política de Conduta Ética), prevalecerá a regra mais restritiva e/ou a orientação conjunta do Jurídico e do Compliance.
+Anexos e categorias podem ser atualizados sem necessidade de republicar todo o documento, desde que comunicados oficialmente às lojas.
+    `;
+
+    // utilidades de busca e renderização
     function escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    // Map of common section titles to their desired HTML IDs for anchoring
-    // This needs to be comprehensive for all main sections of the policy that could be targets
+    // índice de seções para referência rápida
     const sectionToIdMap = {
-        'Política de Uso dos Cartões Clara nas Lojas': 'politica-uso', // Added for the main title
-        'POLÍTICA INTERNA': 'politica-interna', // Added for main title
-        '[CONTAS A RECEBER]': 'contas-a-receber',
-        'ÚLTIMA ATUALIZAÇÃO: 24/06/2025': 'ultima-atualizacao',
-        'SUMÁRIO': 'sumario', // Added for main title
-        '1. 	 Objetivo': 'objetivo',
-        '2. 	 Abrangência': 'abrangencia',
-        '3. 	 Melhorias': 'melhorias',
-        '4. 	 Definições Importantes': 'definicoes-importantes',
-        '5. 	 Limite dos Cartões': 'limite-cartoes',
-        '6. 	 Prestação de Contas': 'prestacao-contas',
-        'Critérios de Bloqueio do Cartão': 'criterios-bloqueio',
-        'QUADRO DE PRAZOS PARA PRESTAÇÃO DE CONTAS': 'quadro-prazos',
-        'Situações excepcionais e devidamente justificadas': 'situacoes-excepcionais-justificadas',
-        'Compras Realizadas em Aplicativos de E-commerce': 'compras-e-commerce',
-        'Substituição de uso do cartão': 'substituicao-cartao',
-        'Utilização provisória de cartão de outra loja': 'utilizacao-provisoria',
-        '7. 	 Restrições de Uso': 'restricoes-uso',
-        '8. 	 Responsabilidades': 'responsabilidades',
-        '9. 	 Monitoramento, Auditoria e Fraudes': 'monitoramento-auditoria-fraudes',
-        '10. 	 Revisão': 'revisao',
+        '1. Objetivo': 'objetivo',
+        '2. Abrangência': 'abrangencia',
+        '3. Melhorias': 'melhorias',
+        '4. Definições Importantes': 'definicoes-importantes',
+        '5. Limite dos Cartões': 'limite-cartoes',
+        '6. Prestação de Contas': 'prestacao-contas',
+        '7. Restrições de Uso': 'restricoes-uso',
+        '8. Responsabilidades': 'responsabilidades',
+        '9. Monitoramento, Auditoria e Fraudes': 'monitoramento-auditoria-fraudes',
+        '10. Revisão': 'revisao',
         'Anexo I – Quadro de Etiquetas por Tipo de Gasto': 'anexo-i'
     };
 
     const mainSectionHeadings = Object.keys(sectionToIdMap);
-    let parsedPolicySections = {}; // Global variable to store parsed content with its start/end character indices
+    let parsedPolicySections = {};
 
-    // Function to parse the policy content into structured sections based on headings
     function parsePolicyIntoSections() {
-        parsedPolicySections = {}; // Reset parsed sections for each call (important for updates)
+        parsedPolicySections = {};
+        const detectedHeadings = [];
 
-        const detectedHeadings = []; // Store { title: "...", startIndex: <char_index>, originalLine: "..." }
-
-        // Step 1: Detect all actual heading occurrences and their start indices
         for (const headingText of mainSectionHeadings) {
-            // Create a regex to match the heading text, accounting for potential leading numbers/tabs
             const headingRegex = new RegExp(`^(\\s*\\d+\\.?\\s*|\\s*)${escapeRegExp(headingText)}(\\s*|$)`, 'gmi');
             let match;
             while ((match = headingRegex.exec(policyDocumentContent)) !== null) {
                 detectedHeadings.push({
-                    title: headingText, // Canonical title
+                    title: headingText,
                     startIndex: match.index,
-                    originalLine: match[0].trim() // The exact matched line including numbers/tabs
+                    originalLine: match[0].trim()
                 });
             }
         }
 
-        // Sort detected headings by their appearance in the document
         detectedHeadings.sort((a, b) => a.startIndex - b.startIndex);
 
-        // Step 2: Populate parsedPolicySections with content based on detected headings
-        // Handle content before the first detected heading (preamble)
         if (detectedHeadings.length > 0 && detectedHeadings[0].startIndex > 0) {
             const preambleContent = policyDocumentContent.substring(0, detectedHeadings[0].startIndex).trim();
             if (preambleContent) {
@@ -728,7 +885,6 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
                 };
             }
         } else if (detectedHeadings.length === 0 && policyDocumentContent.trim().length > 0) {
-            // If no headings found, treat entire document as one "Introduction"
             parsedPolicySections['Introdução ao Documento'] = {
                 rawContent: policyDocumentContent.trim(),
                 startCharIndex: 0,
@@ -737,17 +893,13 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
             return;
         }
 
-        // Iterate through detected headings to extract section content
         for (let i = 0; i < detectedHeadings.length; i++) {
             const currentHeading = detectedHeadings[i];
             const nextHeading = detectedHeadings[i + 1];
-            
             const sectionEndIndex = nextHeading ? nextHeading.startIndex : policyDocumentContent.length;
-            
-            // Extract content from current heading's start to the next heading's start (or end of document)
             const rawContent = policyDocumentContent.substring(currentHeading.startIndex, sectionEndIndex);
-            
-            if (rawContent.trim()) { // Ensure there's actual content
+
+            if (rawContent.trim()) {
                 parsedPolicySections[currentHeading.title] = {
                     rawContent: rawContent,
                     startCharIndex: currentHeading.startIndex,
@@ -755,42 +907,33 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
                 };
             }
         }
-        // console.log("Parsed Sections:", parsedPolicySections); // Debugging
     }
 
-    // Function to process policy text and apply formatting (bold titles/subtitles, black text)
     function formatPolicyText(text, queryToHighlight = '') {
-        let processedText = text;
-        processedText = processedText.replace(/\r/g, '').replace(/ {2,}/g, ' ');
-
+        let processedText = text.replace(/\r/g, '').replace(/ {2,}/g, ' ');
         const lines = processedText.split('\n');
+
         let htmlContent = [];
         let currentParagraphLines = [];
 
-        // Regex for specific bolded sub-points within sections
         const specificBoldPointsRegex = new RegExp(
             [
-                'Redução de Riscos e Segurança Financeira', 'Facilidade de Controle e Gestão Financeira',
-                'Flexibilidade e Adaptabilidade às Necessidades', 'Melhoria no Fluxo de Caixa e Antecipação de Numerário',
-                'Comprovante Fiscal', 'Comprovante de Pagamento', 'Etiqueta', 'Bloqueio Preventivo',
-                'Transação', 'Prestação de Contas', 'Responsável pela Prestação de Contas',
-                'Departamento Financeiro', 'Reincidência', 'Contestação', 'Revisão das Categorias Liberadas',
-                'Portador Temporário', 'Sangrias de Caixa', 'Treinamento Obrigatório', 'Service Now',
-                'Critérios de Bloqueio do Cartão',
-                'Transações de valor elevado', 'Transações de valor médio', 'Transações de pequeno valor',
-                'Tipo de Transação,Valor da Transação,Prazo para Regularização,Medida Corretiva',
-                'Marketplaces', 'Situações excepcionais e devidamente justificadas', 'Nota de Esclarecimento',
-                'Anexação posterior', 'Utilização provisória de cartão de outra loja'
+                'Bloqueio Preventivo', 'Prestação de Contas', 'SITUAÇÃO EMERGENCIAL',
+                'Contestação de compra não reconhecida', 'Substituição de uso do cartão',
+                'Uso temporário de cartão de outra loja',
+                'É estritamente proibido', 'Em caso de uso pessoal',
+                'Portador do cartão', 'Departamento Financeiro'
             ].map(escapeRegExp).join('|'),
             'i'
         );
+
         const numberedSubPointRegex = /^(\d+\.\d+\.?)\s/;
 
         lines.forEach(line => {
             const trimmedLine = line.trim();
             if (trimmedLine === '') {
                 if (currentParagraphLines.length > 0) {
-                    htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                    htmlContent.push('<p>' + currentParagraphLines.join(' ').trim() + '</p>');
                     currentParagraphLines = [];
                 }
                 return;
@@ -798,91 +941,84 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
 
             let isFormatted = false;
 
-            // Check for main section titles from the sectionToIdMap
             for (const canonicalTitle of mainSectionHeadings) {
                 const titleRegex = new RegExp(`^(\\s*\\d+\\.?\\s*|\\s*)${escapeRegExp(canonicalTitle)}(\\s*|$)`, 'i');
                 if (trimmedLine.match(titleRegex)) {
                     if (currentParagraphLines.length > 0) {
-                        htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                        htmlContent.push('<p>' + currentParagraphLines.join(' ').trim() + '</p>');
                         currentParagraphLines = [];
                     }
-                    htmlContent.push(`<h4 class="font-bold text-lg mt-6 mb-2 policy-title">${trimmedLine}</h4>`);
+                    htmlContent.push('<h4 class="font-bold text-lg mt-6 mb-2 policy-title">' + trimmedLine + '</h4>');
                     isFormatted = true;
                     break;
                 }
             }
-            
-            // Check for specific bolded sub-points or numbered sub-points if not a main title
-            if (!isFormatted && (specificBoldPointsRegex.test(trimmedLine) || numberedSubPointRegex.test(trimmedLine) || trimmedLine.startsWith('Tipo de Transação,Valor da Transação'))) {
+
+            if (
+                !isFormatted &&
+                (specificBoldPointsRegex.test(trimmedLine) || numberedSubPointRegex.test(trimmedLine))
+            ) {
                 if (currentParagraphLines.length > 0) {
-                    htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                    htmlContent.push('<p>' + currentParagraphLines.join(' ').trim() + '</p>');
                     currentParagraphLines = [];
                 }
                 const firstColonIndex = trimmedLine.indexOf(':');
-                if (firstColonIndex !== -1 && trimmedLine.includes(' :')) {
+                if (firstColonIndex !== -1 && trimmedLine.includes(':')) {
                     const boldPart = trimmedLine.substring(0, firstColonIndex + 1);
                     const normalPart = trimmedLine.substring(firstColonIndex + 1).trim();
-                    htmlContent.push(`<p class="mt-2"><strong class="policy-title">${boldPart}</strong> ${normalPart}</p>`);
+                    htmlContent.push('<p class="mt-2"><strong class="policy-title">' + boldPart + '</strong> ' + normalPart + '</p>');
                 } else {
-                    htmlContent.push(`<p class="mt-2"><strong class="policy-title">${trimmedLine}</strong></p>`);
+                    htmlContent.push('<p class="mt-2"><strong class="policy-title">' + trimmedLine + '</strong></p>');
                 }
                 isFormatted = true;
             }
 
-            // Handle list items starting with '-'
-            if (!isFormatted && trimmedLine.startsWith('- ')) {
+            if (!isFormatted && trimmedLine.startsWith('• ')) {
                 if (currentParagraphLines.length > 0) {
-                    htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+                    htmlContent.push('<p>' + currentParagraphLines.join(' ').trim() + '</p>');
                     currentParagraphLines = [];
                 }
-                htmlContent.push(`<p class="mt-2">${trimmedLine}</p>`);
+                htmlContent.push('<p class="mt-2">' + trimmedLine + '</p>');
                 isFormatted = true;
             }
 
-            // If none of the above, it's regular paragraph text
             if (!isFormatted) {
                 currentParagraphLines.push(trimmedLine);
             }
         });
 
-        // Add any remaining paragraph lines
         if (currentParagraphLines.length > 0) {
-            htmlContent.push(`<p>${currentParagraphLines.join(' ').trim()}</p>`);
+            htmlContent.push('<p>' + currentParagraphLines.join(' ').trim() + '</p>');
         }
-        
+
         let finalHtml = htmlContent.join('');
         if (queryToHighlight) {
             finalHtml = finalHtml.replace(
                 new RegExp(escapeRegExp(queryToHighlight), 'gi'),
-                match => `<span class="policy-content-highlight">${match}</span>`
+                match => '<span class="policy-content-highlight">' + match + '</span>'
             );
         }
         return finalHtml;
     }
 
-    // New function to render a specific section with formatting and highlighting
     function renderSpecificSectionContent(sectionTitle, queryToHighlight) {
         const sectionData = parsedPolicySections[sectionTitle];
         if (!sectionData || !sectionData.rawContent) {
-            return `<p>Conteúdo da seção "${sectionTitle}" não encontrado.</p>`;
+            return '<p>Conteúdo da seção "' + sectionTitle + '" não encontrado.</p>';
         }
         return formatPolicyText(sectionData.rawContent, queryToHighlight);
     }
 
-    // Parse the policy content into sections when the DOM is ready
     parsePolicyIntoSections();
-
-    // Render the full policy document initially
     policyTextRendered.innerHTML = formatPolicyText(policyDocumentContent);
     document.querySelector('#fullPolicyContentDisplay h3').textContent = 'Documento Completo da Política';
 
-
+    // ---- LÓGICA DE BUSCA NO DOCUMENTO ----
     documentSearchBtn.addEventListener('click', () => {
         const query = documentSearchInput.value.trim();
         if (!query) {
             searchStatus.textContent = 'Por favor, digite um termo para buscar.';
             documentSearchResults.innerHTML = '';
-            // Ensure fullPolicyContentDisplay is hidden and documentSearchArea is shown when search is empty
             fullPolicyContentDisplay.classList.add('hidden');
             documentSearchArea.classList.remove('hidden');
             return;
@@ -898,27 +1034,25 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
         let startIndex = 0;
 
         while ((startIndex = lowerCaseContent.indexOf(lowerCaseQuery, startIndex)) > -1) {
-            let foundSectionTitle = 'Introdução ao Documento'; // Default if no specific section is found
-            
-            // Find the section this match belongs to using the structuredPolicy
+            let foundSectionTitle = 'Introdução ao Documento';
             const sectionsKeys = Object.keys(parsedPolicySections);
+
             for (let i = sectionsKeys.length - 1; i >= 0; i--) {
                 const sectionTitleKey = sectionsKeys[i];
                 const section = parsedPolicySections[sectionTitleKey];
-                
                 if (startIndex >= section.startCharIndex && startIndex < section.endCharIndex) {
                     foundSectionTitle = sectionTitleKey;
                     break;
                 }
             }
 
-            // Get a snippet for display in the search results list (e.g., the sentence containing the match)
             const snippetStart = Math.max(
                 0,
                 policyDocumentContent.lastIndexOf('.', startIndex - 1) + 1,
                 policyDocumentContent.lastIndexOf('\n', startIndex - 1) + 1,
                 policyDocumentContent.lastIndexOf(':', startIndex - 1) + 1
             );
+
             const tempSnippetEnd = policyDocumentContent.indexOf('.', startIndex + query.length);
             const tempNewlineEnd = policyDocumentContent.indexOf('\n', startIndex + query.length);
             const tempColonEnd = policyDocumentContent.indexOf(':', startIndex + query.length);
@@ -928,38 +1062,47 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
             if (tempNewlineEnd !== -1) snippetEndCandidate = Math.min(snippetEndCandidate, tempNewlineEnd);
             if (tempColonEnd !== -1) snippetEndCandidate = Math.min(snippetEndCandidate, tempColonEnd);
 
-            const actualSnippetEnd = (snippetEndCandidate === policyDocumentContent.length) ? policyDocumentContent.length : snippetEndCandidate + 1;
+            const actualSnippetEnd = (snippetEndCandidate === policyDocumentContent.length)
+                ? policyDocumentContent.length
+                : snippetEndCandidate + 1;
 
             let displaySnippet = policyDocumentContent.substring(snippetStart, actualSnippetEnd).trim();
             if (displaySnippet.length < 50 && actualSnippetEnd === policyDocumentContent.length) {
-                 displaySnippet = policyDocumentContent.substring(snippetStart, Math.min(policyDocumentContent.length, snippetStart + 150)).trim();
+                displaySnippet = policyDocumentContent
+                    .substring(snippetStart, Math.min(policyDocumentContent.length, snippetStart + 150))
+                    .trim();
             }
 
-            const highlightedSnippetForDisplay = displaySnippet.replace(new RegExp(escapeRegExp(query), 'gi'), match => `<strong class="bg-yellow-200 px-1 rounded">${match}</strong>`);
-            
+            const highlightedSnippetForDisplay = displaySnippet.replace(
+                new RegExp(escapeRegExp(query), 'gi'),
+                match => '<strong class="bg-yellow-200 px-1 rounded">' + match + '</strong>'
+            );
+
             results.push({
                 snippetForDisplay: highlightedSnippetForDisplay,
                 sectionTitle: foundSectionTitle,
-                originalQuery: query,
+                originalQuery: query
             });
-            
+
             startIndex += query.length;
         }
 
         searchLoadingIndicator.classList.add('hidden');
+
         if (results.length > 0) {
             searchStatus.textContent = `Encontrado ${results.length} resultado(s) para "${query}":`;
-            results.forEach((result, index) => {
+            results.forEach(result => {
                 const resultDiv = document.createElement('div');
                 resultDiv.className = 'p-3 border border-slate-200 rounded-lg bg-slate-50 search-result-item';
-                // Removed click event listener: // resultDiv.addEventListener('click', function() { ... });
-                resultDiv.innerHTML = `<p class="text-sm text-slate-700"><strong>${result.sectionTitle}:</strong> ${result.snippetForDisplay}</p>`;
+                resultDiv.innerHTML = `
+                    <p class="text-sm text-slate-700">
+                        <strong>${result.sectionTitle}:</strong> ${result.snippetForDisplay}
+                    </p>`;
                 documentSearchResults.appendChild(resultDiv);
             });
-            // When search results are displayed, the fullPolicyContentDisplay should be hidden
+
             fullPolicyContentDisplay.classList.add('hidden');
             documentSearchArea.classList.remove('hidden');
-
         } else {
             searchStatus.textContent = `Nenhum resultado encontrado para "${query}".`;
             fullPolicyContentDisplay.classList.add('hidden');
@@ -967,41 +1110,36 @@ Nessa hipótese, torna-se obrigatório que o gerente substituto registre no camp
         }
     });
 
-    // Back to Search button functionality (this button should always be visible IF fullPolicyContentDisplay is visible)
+    // botão "Voltar à Pesquisa"
     backToSearchBtn.addEventListener('click', () => {
         fullPolicyContentDisplay.classList.add('hidden');
         documentSearchArea.classList.remove('hidden');
         documentSearchResults.innerHTML = '';
         documentSearchInput.value = '';
         searchStatus.textContent = 'Documento da política carregado e pronto para busca.';
-        // Reset the display to the full policy document when returning from a specific section view
         policyTextRendered.innerHTML = formatPolicyText(policyDocumentContent);
         document.querySelector('#fullPolicyContentDisplay h3').textContent = 'Documento Completo da Política';
     });
 
-    // Initial state setup for the "Pesquisa no Documento" section
-    // Ensure the "Voltar à Pesquisa" button is only visible when fullPolicyContentDisplay is active
+    // mostra/esconde botão voltar
     const observerForButtonVisibility = new MutationObserver(mutations => {
         mutations.forEach(mutation => {
             if (mutation.attributeName === 'class') {
                 if (fullPolicyContentDisplay.classList.contains('hidden')) {
                     backToSearchBtn.style.display = 'none';
                 } else {
-                    backToSearchBtn.style.display = 'inline-block'; // Or 'block' depending on desired layout
+                    backToSearchBtn.style.display = 'inline-block';
                 }
             }
         });
     });
     observerForButtonVisibility.observe(fullPolicyContentDisplay, { attributes: true });
 
-    // Initial check for button visibility on load
     if (fullPolicyContentDisplay.classList.contains('hidden')) {
         backToSearchBtn.style.display = 'none';
     } else {
         backToSearchBtn.style.display = 'inline-block';
     }
-
-
 });
 </script>
 
