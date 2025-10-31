@@ -961,14 +961,14 @@ function enviarMensagem() {
     const pergunta = userInput.value.trim();
     if (!pergunta) return;
 
-    // render user
+    // renderiza a mensagem do usuário no chat
     renderUserMessage(pergunta);
 
-    // gerar resposta
+    // gera a resposta do bot
     const resposta = gerarRespostaDoBot(pergunta);
     renderBotMessage(resposta);
 
-    // limpar input
+    // limpa e foca de novo
     userInput.value = "";
     userInput.focus();
 }
@@ -983,3 +983,4 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
