@@ -152,22 +152,31 @@
         <!-- Janela de chat -->
         <section id="chatWindow" class="flex-1 overflow-y-auto px-5 py-4 space-y-4 text-[15px] leading-relaxed bg-slate-50/40 min-h-[360px]">
             <!-- Mensagem inicial da Clara -->
-            <div class="flex items-start gap-3">
-                <div class="w-9 h-9 rounded-xl bot-avatar flex items-center justify-center font-bold text-sm shadow-md flex-shrink-0">
-                    C
-                </div>
-                <div class="bot-bubble px-4 py-3 max-w-[80%]">
-                    <p class="font-semibold text-slate-800">
-                        Olá! 👋 Eu sou o agente do Grupo SBF.
-                    </p>
-                    <p class="text-slate-700 text-sm mt-1">
-                        Pergunte se um gasto pode no cartão, como justificar, prazos, bloqueio,
-                        etiquetas, aumento de limite, emergência, etc.
-                    </p>
-                    <p class="text-[11px] text-slate-500 italic mt-3">
-                    </p>
-                </div>
-            </div>
+            <!-- Mensagem inicial da Clara -->
+<div class="flex items-start gap-3">
+    <!-- Avatar do robô -->
+    <img
+        src="Gemini_Generated_Image_nzni5znzni5znzni.png"
+        alt="Assistente Clara (robô)"
+        class="h-14 w-auto object-contain flex-shrink-0"
+    />
+    <!-- Mensagem -->
+    <div class="bot-bubble px-4 py-3 max-w-[80%]">
+        <p class="font-semibold text-slate-800 text-base">
+            Olá! 👋 Eu sou o agente do <strong>Grupo SBF</strong>.
+        </p>
+        <p class="text-slate-700 text-sm mt-1">
+            Pergunte sobre o uso do cartão <b>Clara</b> nas lojas.
+            <br>• “Posso comprar micro-ondas?”
+            <br>• “Uber pode?”
+            <br>• “Travou o cartão, faço o quê?”
+        </p>
+        <p class="text-[11px] text-slate-400 italic mt-3">
+            Minhas respostas seguem a <strong>Política de Uso dos Cartões Clara</strong>.
+            Em conflito, vale sempre o documento oficial da empresa.
+        </p>
+    </div>
+</div>
         </section>
 
         <!-- Input -->
@@ -890,7 +899,7 @@ Uso pessoal precisa ser ressarcido em 2 dias úteis. Se não regularizar, pode b
     const avatar = document.createElement("img");
     avatar.src = "Gemini_Generated_Image_nzni5znzni5znzni.png"; // 👈 nome do seu arquivo
     avatar.alt = "Assistente Clara (robô)";
-    avatar.className = "h-10 w-auto object-contain flex-shrink-0";
+    avatar.className = "h-12 w-auto object-contain flex-shrink-0";
 
     const bubble = document.createElement("div");
     bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
@@ -961,6 +970,7 @@ Uso pessoal precisa ser ressarcido em 2 dias úteis. Se não regularizar, pode b
         }, 400);
     });
 </script>
+
 
 
 
