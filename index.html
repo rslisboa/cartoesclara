@@ -33,7 +33,17 @@
     .policy-link { color:#005E27; font-weight:600; text-decoration:underline; }
 
     .input-shell { background-color:#fff;border:1px solid rgba(0,0,0,.12);border-radius:.75rem;display:flex;align-items:flex-start;gap:.75rem;padding:.75rem 1rem;box-shadow:0 10px 15px -3px rgba(0,0,0,.08); }
-    .input-shell textarea { flex:1 1 auto;resize:none;min-height:48px;max-height:120px;font-size:.9rem;line-height:1.4;color:#1e293b;outline:none;border:none; }
+    .input-shell textarea {
+    flex:1 1 auto;
+    resize:none;
+    min-height:80px;      /* antes era 48px */
+    max-height:200px;     /* antes era 120px */
+    font-size:1rem;       /* um pouquinho maior */
+    line-height:1.5;
+    color:#1e293b;
+    outline:none;
+    border:none;
+}
     .input-shell button { background-color:#005E27;color:#fff;border:none;border-radius:.5rem;font-size:.8rem;font-weight:600;padding:.6rem .9rem;line-height:1.2;white-space:nowrap;cursor:pointer; }
 
     /* scrollbars mais discretos */
@@ -829,6 +839,20 @@ const chatWindow = document.getElementById("chatWindow");
 const chatForm = document.getElementById("chatForm");
 const userInput = document.getElementById("userInput");
 
+// Enviar com Enter, e Shift+Enter = quebra de linha
+userInput.addEventListener("keydown", function (e) {
+    // Se apertou Enter...
+    if (e.key === "Enter") {
+        // ... segurando Shift => vira só quebra de linha normal
+        if (e.shiftKey) {
+            return; // deixa o Enter+Shift funcionar como quebra de linha
+        }
+        // ... sem Shift => envia
+        e.preventDefault(); // impede pular linha
+        enviarMensagem();
+    }
+});
+
 function renderUserMessage(text) {
     const wrapper = document.createElement("div");
     wrapper.className = "flex items-start justify-end gap-3";
@@ -872,22 +896,31 @@ function renderBotMessage(text) {
 // 📤 Envio do formulário
 // =====================================================
 
-chatForm.addEventListener("submit", function (e) {
-    e.preventDefault();
+function enviarMensagem() {
     const pergunta = userInput.value.trim();
     if (!pergunta) return;
 
+    // render user
     renderUserMessage(pergunta);
 
+    // gerar resposta
     const resposta = gerarRespostaDoBot(pergunta);
     renderBotMessage(resposta);
 
+    // limpar input
     userInput.value = "";
     userInput.focus();
+}
+
+// envio pelo botão / submit do form
+chatForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    enviarMensagem();
 });
 
 </script>
 
 </body>
 </html>
+
 
