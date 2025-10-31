@@ -883,27 +883,30 @@ Uso pessoal precisa ser ressarcido em 2 dias úteis. Se não regularizar, pode b
 
     // render da Clara (aceita HTML:)
     function renderBotMessage(text) {
-        const wrapper = document.createElement("div");
-        wrapper.className = "flex items-start gap-3";
+    const wrapper = document.createElement("div");
+    wrapper.className = "flex items-start gap-3";
 
-        const avatar = document.createElement("div");
-        avatar.className = "w-9 h-9 rounded-xl bot-avatar flex items-center justify-center font-bold text-sm shadow-md flex-shrink-0";
-        avatar.innerText = "C";
+    // substitui o quadrado "C" por imagem do robô
+    const avatar = document.createElement("img");
+    avatar.src = "Gemini_Generated_Image_nzni5znzni5znzni.png"; // 👈 nome do seu arquivo
+    avatar.alt = "Assistente Clara (robô)";
+    avatar.className = "h-10 w-auto object-contain flex-shrink-0";
 
-        const bubble = document.createElement("div");
-        bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
+    const bubble = document.createElement("div");
+    bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
 
-        if (text.startsWith("HTML:")) {
-            bubble.innerHTML = text.replace(/^HTML:/, "").trim();
-        } else {
-            bubble.innerText = text;
-        }
-
-        wrapper.appendChild(avatar);
-        wrapper.appendChild(bubble);
-
-        chatWindow.appendChild(wrapper);
+    if (text.startsWith("HTML:")) {
+        bubble.innerHTML = text.replace(/^HTML:/, "").trim();
+    } else {
+        bubble.innerText = text;
     }
+
+    // ordem: imagem do robô à esquerda, depois a fala
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(bubble);
+
+    chatWindow.appendChild(wrapper);
+}
 
     // -----------------------
     // PIPELINE DE RESPOSTA
@@ -958,6 +961,7 @@ Uso pessoal precisa ser ressarcido em 2 dias úteis. Se não regularizar, pode b
         }, 400);
     });
 </script>
+
 
 
 
