@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Uso do Cartão Clara na Loja</title>
+    <title>Assistente Clara | Uso do Cartão na Loja</title>
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -16,6 +16,10 @@
     />
 
     <style>
+        :root {
+            --brand-main: #005E27; /* verde escuro */
+        }
+
         body {
             font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
             background-color: #f8fafc;
@@ -23,7 +27,7 @@
 
         /* bolhas */
         .user-bubble {
-            background-color: #0ea5e9; /* sky-500 */
+            background-color: var(--brand-main);
             color: #fff;
             border-radius: 1rem;
             border-bottom-right-radius: 0.25rem;
@@ -39,8 +43,25 @@
 
         /* avatar Clara */
         .bot-avatar {
-            background-color: #0ea5e9;
+            background-color: var(--brand-main);
             color: #fff;
+        }
+
+        /* botão enviar */
+        .send-button {
+            background-color: var(--brand-main);
+        }
+        .send-button:hover {
+            filter: brightness(1.1);
+        }
+
+        /* focus do input */
+        .user-input:focus {
+            --tw-ring-color: var(--brand-main);
+            --tw-ring-offset-shadow: 0 0 #0000;
+            --tw-ring-shadow: 0 0 #0000;
+            outline: 2px solid var(--brand-main);
+            border-color: var(--brand-main);
         }
 
         /* "digitando..." */
@@ -82,9 +103,9 @@
             border-radius: 9999px;
         }
 
-        /* estilinho pra link dentro da resposta do bot */
+        /* links clicáveis nas respostas */
         .bot-link {
-            color: #0ea5e9;
+            color: var(--brand-main);
             font-weight: 600;
             text-decoration: underline;
             word-break: break-all;
@@ -94,31 +115,27 @@
 <body class="text-slate-800 flex items-center justify-center min-h-screen p-4">
 
     <main class="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-200 flex flex-col max-h-[90vh]">
-        <!-- Header -->
-        <header class="px-5 py-4 border-b border-slate-200 flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div class="flex items-start gap-3">
+        <!-- Header (centrado agora) -->
+        <header class="px-5 py-6 border-b border-slate-200 text-center">
+            <div class="flex flex-col items-center gap-3">
                 <div class="w-12 h-12 rounded-xl bot-avatar flex items-center justify-center font-bold text-lg shadow-md">
                     C
                 </div>
                 <div class="leading-tight">
-                    <p class="font-semibold text-slate-800 text-base md:text-lg align-items: center">
-                        Agente Clara | Grupo SBF
+                    <p class="font-semibold text-slate-800 text-base md:text-lg">
+                        Assistente Clara | Grupo SBF
                     </p>
-                    <p class="text-[12px] text-slate-500">
+                    <p class="text-[13px] text-slate-600 mt-2">
                         Pergunte sobre o uso do cartão Clara nas lojas.
                     </p>
-                    <p class="text-[11px] text-slate-400 italic mt-1">
+                    <p class="text-[12px] text-slate-500 mt-1">
                         Ex: "Posso comprar micro-ondas?" • "Uber pode?" • "Travou o cartão, faço o quê?"
                     </p>
+                    <p class="text-[11px] text-slate-400 italic mt-3">
+                        Minhas respostas seguem a Política de Uso dos Cartões Clara.
+                        Em conflito, vale sempre o documento oficial da empresa.
+                    </p>
                 </div>
-            </div>
-
-            <div class="text-[11px] text-slate-500 leading-snug md:text-right">
-                <p class="font-semibold text-slate-700">Prazo de prestação de contas:</p>
-                <p>Até 48h pra anexar nota fiscal, escolher etiqueta e descrever o gasto.</p>
-                <p class="text-[10px] text-slate-400 mt-1">
-                    Falha na prestação no prazo pode bloquear o cartão preventivamente.
-                </p>
             </div>
         </header>
 
@@ -137,13 +154,13 @@
                     <p class="text-slate-700 text-sm mt-1">
                         Me pergunta coisas tipo:
                         <br>• "Posso pagar Uber?"
-                        <br>• "Deu bloqueio, o que eu faço?"
-                        <br>• "Como justificar a compra na Clara?"
-                        <br>• "Como abro chamado no ServiceNow?"
+                        <br>• "Como justificar a compra?"
+                        <br>• "Meu cartão bloqueou, e agora?"
+                        <br>• "Qual etiqueta usar pra água?"
                         <br>• "Me manda a política em PDF."
                     </p>
                     <p class="text-[11px] text-slate-400 italic mt-3">
-                        Minhas respostas seguem a Política de Uso dos Cartões Clara. Em conflito, vale sempre o documento oficial da empresa.
+                        Se eu pedir ServiceNow, é porque precisa abrir chamado formal pra Financeiro / Contas a Receber.
                     </p>
                 </div>
             </div>
@@ -155,12 +172,12 @@
                 <input
                     id="userInput"
                     type="text"
-                    class="flex-1 text-[15px] border border-slate-300 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
-                    placeholder="Escreve sua dúvida (ex: Como justificar a transação?)"
+                    class="user-input flex-1 text-[15px] border border-slate-300 rounded-xl px-3 py-3 outline-none focus:ring-2 focus:ring-[var(--brand-main)] focus:border-[var(--brand-main)]"
+                    placeholder="Escreve sua dúvida (ex: Qual etiqueta pra água?)"
                     autocomplete="off"
                 />
                 <button
-                    class="bg-sky-500 hover:bg-sky-600 text-white font-semibold text-sm rounded-xl px-4 py-3 shadow-md transition"
+                    class="send-button text-white font-semibold text-sm rounded-xl px-4 py-3 shadow-md transition"
                     type="submit"
                 >
                     Enviar
@@ -168,6 +185,7 @@
             </form>
 
             <div class="text-[11px] text-slate-500 text-center leading-snug">
+                Uso pessoal = proibido. Se acontecer, informe o Financeiro, marque como “Despesa Pessoal – Uso Indevido” e ressarça em até 2 dias úteis.
             </div>
         </section>
     </main>
@@ -178,6 +196,60 @@
         //
         const SERVICE_NOW_URL = "https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"; 
         const POLITICA_PDF_URL = "https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing";
+
+        // Guardar contexto da última intenção respondida
+        let ultimaIntencaoRespondida = null;
+
+
+        //
+        // MAPA DE ETIQUETAS (simplificado baseado no Anexo I)
+        // chave -> { etiqueta, exemploDescricao }
+        //
+        const mapaEtiquetas = [
+            {
+                termos: ["agua","água","galão","galao","garrafa de agua","garrafa de água","agua potavel","água potável","beber água","hidratacao"],
+                etiqueta: "ÁGUA POTÁVEL",
+                exemploDescricao: "Compra de galões de água mineral / abastecimento loja"
+            },
+            {
+                termos: ["lanche","cafe","café","coffee break","salgado","refrigerante","treinamento","visita","vm","diretoria","regional","lanchinho","alimento equipe"],
+                etiqueta: "LANCHES DE REFEIÇÕES",
+                exemploDescricao: "Coffee break para treinamento interno / ação VM autorizada"
+            },
+            {
+                termos: ["chaveiro","fechadura","abrir porta","abrir cofre","troca de fechadura","cofre"],
+                etiqueta: "CHAVEIRO EMERGENCIAL",
+                exemploDescricao: "Serviço emergencial de chaveiro para estoque/cofre/vitrine"
+            },
+            {
+                termos: ["motoboy","frete","entrega urgente","courier","transportar peça","levar peça","pegar peça","buscar peça","envio urgente","sedex","correios","postagem"],
+                etiqueta: "TRANSPORTE / SERVIÇO EMERGENCIAL",
+                exemploDescricao: "Motoboy/frete emergencial entre lojas / envio urgente de documento"
+            },
+            {
+                termos: ["material de limpeza","detergente","desinfetante","papel toalha","limpeza loja","higiene"],
+                etiqueta: "MATERIAL DE LIMPEZA",
+                exemploDescricao: "Materiais de higiene e limpeza da loja"
+            },
+            {
+                termos: ["tomada","troca de tomada","interruptor","disjuntor","extensao","ar condicionado","ar-condicionado","manutenção ar","manutencao ar","reparo ar"],
+                etiqueta: "MANUTENÇÃO (ELÉTRICA / AR)",
+                exemploDescricao: "Pequeno reparo elétrico / ajuste simples de ar condicionado"
+            },
+            {
+                termos: ["impressao","banner","adesivo","flyer","grafica","serviço gráfico","grafico","plotagem","adesivagem"],
+                etiqueta: "SERVIÇOS GRÁFICOS / DIVULGAÇÃO",
+                exemploDescricao: "Impressão de banner/adesivo promocional autorizado"
+            }
+        ];
+
+        function descobrirEtiqueta(msgNorm) {
+            for (const item of mapaEtiquetas) {
+                const bateu = item.termos.some(t => msgNorm.includes(normalize(t)));
+                if (bateu) return item;
+            }
+            return null;
+        }
 
 
         //
@@ -196,11 +268,13 @@
             ],
             alimentosEquipe: [
                 "lanche","cafe","café","refeição","refeicao","almoço","almoco","pizza","refrigerante",
-                "água","agua","coffee break","lanche do time","lanche da equipe",
+                "água","agua","galão","galao","garrafa de agua","garrafa de água",
+                "coffee break","lanche do time","lanche da equipe",
                 "time vm","vm","treinamento","treinamento interno","visita diretor","visita regional"
             ],
             transporte: [
-                "uber","99","app de transporte","corrida","taxi","táxi","viagem","passagem","passagens"
+                "uber","99","app de transporte","corrida","taxi","táxi","taxi99","taxi 99",
+                "viagem","passagem","passagens"
             ],
             manutencaoLoja: [
                 "chaveiro","fechadura","troca de tomada","tomada","manutenção ar",
@@ -210,17 +284,17 @@
             bloqueio: [
                 "bloqueou","bloqueio","bloqueada","cartão bloqueado","cartao bloqueado",
                 "desbloquear","desbloqueia","desbloqueio","como desbloquear",
-                "travou","cartão travou","cartao travou","preventivo"
+                "travou","cartão travou","cartao travou","preventivo","meu cartão travou","meu cartao travou"
             ],
             prazo: [
                 "48h","48 horas","prazo","quanto tempo","deadline",
-                "prestar contas","prestação de contas","prestacao de contas","quando preciso lançar","ate quando lanço"
+                "quando preciso lançar","ate quando lanço","até quando lanço"
             ],
             justificar: [
                 "como justificar","justificar compra","justificar transação","justificar a transação",
                 "prestar conta","prestação de contas","prestacao de contas",
                 "o que eu coloco na descrição","o que tenho que anexar","o que precisa lançar na clara",
-                "o que tenho que lançar"
+                "o que tenho que lançar","como lanço","como lançar","como justifico"
             ],
             emergencial: [
                 "emergência","emergencia","urgente","sangria",
@@ -255,15 +329,21 @@
             ]
         };
 
+        // intenção específica pra etiqueta
+        const termosEtiquetaDireta = [
+            "qual etiqueta","que etiqueta","etiqueta usar","etiqueta devo usar","etiqueta pra","etiqueta para",
+            "qual conta","qual categoria","qual classificação","qual classificacao"
+        ];
+
 
         //
-        // RESPOSTAS POR INTENÇÃO
+        // RESPOSTAS PRINCIPAIS
         //
         function respostaEletronicos() {
             return (
 `Não, esse tipo de compra não pode ser feito com o cartão Clara. 😬
 
-Itens como videogame (PS5), TV, rádio, caixa de som, notebook etc. são considerados eletrônico / bem patrimonial da empresa. Isso segue fluxo de Compras, não cartão da loja.
+Eletrônicos (TV, notebook, som, etc.) são bens patrimoniais / equipamento e precisam seguir fluxo de Compras, não o cartão da loja.
 
 Caminho certo:
 → Solicitar via Compras / ServiceNow, não passar direto no cartão Clara.`
@@ -272,31 +352,14 @@ Caminho certo:
 
         function respostaEletrodomesticos() {
             return (
-`Micro-ondas, geladeira, frigobar, cafeteira, bebedouro... também não entram no cartão Clara.
+`Micro-ondas, geladeira, frigobar, cafeteira, bebedouro... não entram no cartão Clara.
 
-Esses itens são infraestrutura/equipamento fixo de loja e precisam seguir o fluxo de Compras.
+São itens de infraestrutura fixa da loja, então entram pelo fluxo de Compras, não pelo cartão.
 
-⚠ Se já passou no cartão sem querer:
+Se já passou no cartão:
 1. avisa o Financeiro,
 2. classifica na plataforma como "Despesa Pessoal – Uso Indevido",
-3. faz o ressarcimento em até 2 dias úteis.`
-            );
-        }
-
-        function respostaAlimentosEquipe() {
-            return (
-`Depende 👇
-
-✔ Pode:
-Lanche / água / café / coffee break para treinamento interno autorizado, ação oficial na loja (VM, regional, diretoria) ou evento operacional aprovado.
-
-❌ Não pode:
-Almoço pessoal, pipoca no cinema, comida de lazer.
-
-Quando pode, tem que lançar assim:
-• Anexa a nota fiscal
-• Usa a etiqueta correta
-• Descreve: "Coffee break treinamento VM loja 1234".`
+3. ressarce em até 2 dias úteis.`
             );
         }
 
@@ -307,25 +370,113 @@ Quando pode, tem que lançar assim:
 Isso não é despesa operacional direta da loja.
 
 Se já pagou com o cartão:
-→ avisa Financeiro
-→ ressarce o valor.`
+→ avisa Financeiro,
+→ marca a transação como "Despesa Pessoal – Uso Indevido",
+→ devolve o valor em até 2 dias úteis.`
+            );
+        }
+
+        function respostaTransporteFollowup() {
+            return (
+`Como ressarcir um Uber que você já passou no cartão:
+
+1. Entra na plataforma Clara e edita aquela transação.
+2. Na descrição, deixa claro que foi uso pessoal.
+3. Classifica como "Despesa Pessoal – Uso Indevido".
+4. Avisa o Financeiro.
+5. Faz o reembolso do valor pra empresa (prazo máximo: 2 dias úteis).
+
+Se você NÃO ressarcir:
+→ a empresa pode descontar em folha (art. 462 CLT)
+→ e o cartão pode ser bloqueado pra você.`
+            );
+        }
+
+        function respostaAlimentosEquipe() {
+            return (
+`Depende 👇
+
+✔ Pode:
+Água / lanche / coffee break para treinamento interno autorizado, ação oficial de VM, visita regional/diretoria ou evento operacional aprovado.
+
+❌ Não pode:
+Almoço pessoal, lazer (pipoca no cinema, etc.).
+
+Quando pode, você lança:
+• Nota fiscal anexada
+• Etiqueta correta (ex.: "ÁGUA POTÁVEL" ou "LANCHES DE REFEIÇÕES")
+• Descrição clara: "Coffee break treinamento VM loja 1234".`
+            );
+        }
+
+        function respostaAlimentosEquipeFollowupAgua(msgNorm) {
+            const etiquetaInfo = descobrirEtiqueta(msgNorm);
+            if (etiquetaInfo) {
+                return (
+`Para esse tipo de gasto use a etiqueta: "${etiquetaInfo.etiqueta}".
+
+Descrição recomendada:
+"${etiquetaInfo.exemploDescricao}"
+
+Obrigatório:
+• Anexar a nota fiscal/recibo
+• Lançar em até 48h na plataforma Clara
+• Manter o comprovante físico guardado na loja por 180 dias`
+                );
+            }
+
+            // fallback se não achou etiqueta específica
+            return (
+`Água para consumo interno da equipe/loja normalmente entra como despesa operacional da loja.
+
+Registre na Clara:
+• Etiqueta relacionada a água potável / consumo interno
+• Anexe a nota fiscal
+• Descreva algo como "Galão de água para abastecimento loja XXXX"`
+
             );
         }
 
         function respostaManutencao() {
             return (
-`Esses gastos normalmente PODEM ir no cartão Clara, porque são operacionais da loja. 💡
+`Esse tipo de gasto normalmente PODE ir no cartão Clara porque é custo operacional direto da loja. 💡
 
-Exemplos aceitáveis:
-• chaveiro emergencial (trocar fechadura de estoque/cofre/vitrine),
+Exemplos aceitos:
+• chaveiro emergencial (abrir/trocar fechadura de estoque/cofre/vitrine),
 • troca de tomada simples,
-• reparo leve de ar-condicionado,
-• motoboy / frete urgente pra levar item crítico entre lojas.
+• ajuste leve de ar-condicionado,
+• motoboy / frete urgente entre lojas.
 
-Mas sempre:
-- Nota fiscal anexada,
-- Etiqueta correta,
-- Descrição clara: "Chaveiro emergencial - troca fechadura estoque loja 1234".`
+Mas SEMPRE:
+- Anexa a nota fiscal,
+- Usa a etiqueta certa (ex.: "CHAVEIRO EMERGENCIAL", "MANUTENÇÃO (ELÉTRICA / AR)", "TRANSPORTE / SERVIÇO EMERGENCIAL"),
+- Descreve claramente: "Chaveiro emergencial - troca fechadura estoque loja 1234".`
+            );
+        }
+
+        function respostaManutencaoFollowup(msgNorm) {
+            const etiquetaInfo = descobrirEtiqueta(msgNorm);
+            if (etiquetaInfo) {
+                return (
+`Usa a etiqueta: "${etiquetaInfo.etiqueta}"
+
+Descrição:
+"${etiquetaInfo.exemploDescricao}"
+
+Passos obrigatórios:
+1. Anexar nota fiscal / recibo
+2. Lançar em até 48h
+3. Descrever o que aconteceu e onde ("troca de fechadura estoque loja 1234")`
+                );
+            }
+
+            return (
+`Para manutenção emergencial de loja:
+1. Anexa a nota fiscal
+2. Usa etiqueta de manutenção / serviço emergencial
+3. Explica na descrição o que foi feito e em qual área da loja
+
+Se for algo grande (equipamento patrimonial), não usa o cartão: aciona Compras.`
             );
         }
 
@@ -333,22 +484,37 @@ Mas sempre:
             return (
 `Isso é bloqueio preventivo. 🔒
 
-O cartão pode travar se a compra não foi prestada conta no prazo de 48h.
+O cartão pode travar se a compra NÃO foi justificada dentro do prazo.
 
-Prestar conta = anexar nota fiscal/recibo + escolher etiqueta correta + descrever o motivo da compra.
+"Justificar" = anexar nota fiscal/recibo + escolher a etiqueta correta + escrever a descrição objetiva.
 
-Pra resolver:
-1. Corrige tudo na plataforma Clara (nota, etiqueta, descrição),
-2. Abre chamado no ServiceNow para o Financeiro / Contas a Receber pedindo desbloqueio.
+Como desbloquear:
+1. Corrige tudo na plataforma Clara.
+2. Abre chamado no ServiceNow para Financeiro / Contas a Receber pedindo desbloqueio.
 
-No chamado escreve:
+Mensagem sugerida no chamado:
 "Cartão bloqueado preventivamente. Prestação de contas regularizada. Solicito desbloqueio."
 
-Link: ${SERVICE_NOW_URL}
+Link:
+${SERVICE_NOW_URL}
 
-Importante:
+Obs:
 → Pode bloquear independente do valor.
-→ Se repetir demais, a loja pode perder o direito do cartão.`
+→ Reincidência pode fazer a loja perder o cartão.`
+            );
+        }
+
+        function respostaBloqueioFollowup() {
+            return (
+`Resumo do passo a passo pra desbloquear:
+
+1. Vai na transação que gerou o problema.
+2. Sobe a nota fiscal ou recibo.
+3. Escolhe a etiqueta certa.
+4. Escreve a descrição do gasto (ex.: "Chaveiro emergencial - troca fechadura estoque 1234").
+5. Depois abre chamado no ServiceNow informando que já regularizou e precisa do desbloqueio preventivo.
+
+Sem esse chamado o Financeiro não libera.`
             );
         }
 
@@ -356,33 +522,48 @@ Importante:
             return (
 `Prazo oficial ⏱
 
-Você tem até 48 horas depois da compra pra:
-• anexar nota fiscal/recibo,
-• escolher a etiqueta certa,
-• escrever a descrição explicando o motivo do gasto.
+Você tem até 48 horas depois da compra para:
+1. anexar a nota fiscal/recibo,
+2. escolher a etiqueta correta,
+3. escrever a descrição do gasto.
 
-Se passar disso, o cartão pode ser bloqueado preventivamente até você regularizar.`
+Se isso não estiver feito, o cartão pode ser bloqueado preventivamente até regularizar.`
             );
         }
 
-        // NOVA: explicação de "como justificar"
         function respostaJustificar() {
             return (
-`Pra justificar / prestar contas de uma compra na Clara você precisa fazer 3 coisas dentro de até 48h depois da compra:
+`Pra justificar / prestar contas de uma compra na Clara você precisa fazer 3 coisas em até 48h depois da compra:
 
 1. Anexar o comprovante fiscal
-   - nota fiscal ou recibo da compra.
+   - nota fiscal ou recibo.
 
 2. Escolher a etiqueta certa
-   - é a categoria do gasto (Marketing, Material de Limpeza, Chaveiro Emergencial, etc.).
-   - se a etiqueta não existir, você pede criação abrindo chamado no ServiceNow.
+   - é a categoria da despesa (ex.: "ÁGUA POTÁVEL", "CHAVEIRO EMERGENCIAL", "TRANSPORTE / SERVIÇO EMERGENCIAL").
+   - Se a etiqueta não existir ainda, você pede criação via chamado no ServiceNow.
 
 3. Preencher a descrição
-   - escrever em texto curto o motivo da compra.
+   - escrever rapidamente o que é e o motivo.
    - exemplo bom: "Chaveiro emergencial - troca fechadura estoque loja 1234".
    - exemplo ruim: "serviço".
 
-Se isso não estiver completo no prazo, o cartão pode ser bloqueado preventivamente até regularizar.`
+Se não justificar, seu cartão pode ser bloqueado preventivamente até acertar.`
+            );
+        }
+
+        function respostaJustificarFollowup() {
+            return (
+`Modo turbo pra justificar certo:
+
+• Nota fiscal anexada (foto ou PDF legível)
+• Etiqueta coerente com o gasto
+  - água → "ÁGUA POTÁVEL"
+  - lanche/coffee break autorizado → "LANCHES DE REFEIÇÕES"
+  - motoboy urgente → "TRANSPORTE / SERVIÇO EMERGENCIAL"
+  - chaveiro → "CHAVEIRO EMERGENCIAL"
+• Descrição clara: "Coffee break treinamento VM loja 1234"
+
+Isso evita bloqueio e reduz cobrança por e-mail.`
             );
         }
 
@@ -391,51 +572,51 @@ Se isso não estiver completo no prazo, o cartão pode ser bloqueado preventivam
 `"Emergência" NÃO é "acabou o limite". 😅
 
 É emergência real quando:
-1. a loja não consegue operar sem aquele gasto AGORA
+1. a loja não consegue operar sem aquele gasto AGORA,
 E
-2. não tem como usar o cartão Clara (ex.: pane técnica).
+2. não dá pra usar o cartão Clara (ex.: falha técnica).
 
 O que fazer:
-→ Antes de pagar de outro jeito ou tirar dinheiro do caixa,
+→ Antes de tirar dinheiro do caixa ou improvisar,
    abre chamado no ServiceNow pedindo autorização excepcional do Financeiro.
 
-No chamado escreve:
-"Solicitação de exceção emergencial para despesa operacional imediata. Motivo: (explicar o risco operacional)".
+Mensagem no chamado:
+"Solicitação de exceção emergencial para despesa operacional imediata. Motivo: ____."
 
-Sem autorização PRÉVIA, não pode tirar dinheiro do caixa e resolver depois.`
+Sem autorização PRÉVIA, não pode tirar dinheiro do caixa e 'depois eu acerto'.`
             );
         }
 
         function respostaPessoal() {
             return (
-`Uso pessoal do cartão é proibido. Mas dá pra corrigir se você avisar na hora.
+`Uso pessoal do cartão é proibido.
 
-Passo a passo:
+Como corrigir:
 1. avisa o Financeiro,
-2. marca na plataforma como "Despesa Pessoal – Uso Indevido",
+2. marca a transação na Clara como "Despesa Pessoal – Uso Indevido",
 3. devolve o valor em até 2 dias úteis.
 
-Se você não ressarcir:
-• pode ter desconto em folha (art. 462 CLT),
+Se não ressarcir:
+• pode ter desconto em folha,
 • pode gerar medida disciplinar,
-• e o cartão pode ser bloqueado definitivamente.`
+• e o cartão pode ser bloqueado definitivamente pra você.`
             );
         }
 
         function respostaOutraLoja() {
             return (
-`Usar cartão de outra loja só pode em cenário bem específico:
+`Usar cartão de outra loja só é permitido em cenário bem específico:
 
-• O gerente titular saiu e ainda não criaram um cartão novo pra loja,
-• O Financeiro autorizou esse uso temporário,
-• Você está cobrindo essa gestão.
+• gerente titular saiu e ainda não criaram cartão novo pra loja,
+• Financeiro autorizou esse uso temporário,
+• você está cobrindo formalmente.
 
 Obrigatório:
 Na descrição da compra você escreve:
 "Uso temporário do cartão na loja XXXX".
 
-Mudança de gerente / troca de responsável pelo cartão também precisa ser formalizada:
-→ abre chamado no ServiceNow pra atualizar o responsável oficial e manter controle/auditoria.`
+Mudança de gerente / troca de responsável precisa ser formalizada:
+→ abre chamado no ServiceNow pra atualizar quem responde pelo cartão.`
             );
         }
 
@@ -443,44 +624,42 @@ Mudança de gerente / troca de responsável pelo cartão também precisa ser for
             return (
 `Mesmo depois de subir a nota fiscal/recibo na plataforma Clara, a loja precisa guardar o documento físico original.
 
-Prazo: manter guardado por 180 dias corridos. 🗂
-Auditoria pode pedir o papel original.`
+Prazo: manter guardado por 180 dias corridos.
+A área financeira pode pedir esse comprovante físico em auditoria.`
             );
         }
 
-        // ServiceNow geral (o que pode abrir)
         function respostaServiceNowGeral() {
             return (
-`Esses são os casos que precisam de chamado no ServiceNow 👇
+`Casos que exigem chamado no ServiceNow 👇
 
-• Desbloqueio do cartão Clara
-  → Tipo: Financeiro / Contas a Receber
+• Desbloqueio do cartão
+  → Financeiro / Contas a Receber
   → Mensagem: "Cartão bloqueado preventivamente. Prestação de contas regularizada. Solicito desbloqueio."
 
 • Aumento de limite
-  → Tipo: Financeiro
+  → Financeiro
   → Mensagem: "Solicitação de aumento de limite para despesas operacionais da loja XXXX. Justificativa: ____."
 
-• Troca de gerente / mudança de responsável pelo cartão entre lojas
-  → Tipo: Cadastro / Financeiro
+• Troca de gerente / mudança de responsável pelo cartão
+  → Cadastro / Financeiro
   → Mensagem: "Atualização de responsável pelo cartão Clara: gerente anterior desligado / novo responsável assumindo a loja XXXX."
 
-• Criar nova etiqueta/categoria de gasto que não existe na Clara
-  → Tipo: Financeiro / Contábil
-  → Mensagem: "Solicitar inclusão de etiqueta para despesa operacional (descrever o gasto)."
+• Criar nova etiqueta/categoria de gasto
+  → Financeiro / Contábil
+  → Mensagem: "Solicitar inclusão de etiqueta para despesa operacional da loja. Descrição: ____."
 
-• Situação emergencial real em que não dá pra usar o cartão e a loja precisa pagar algo essencial pra operar
-  → Tipo: Financeiro
+• Emergência real (não consigo operar sem isso AGORA e o cartão não funciona)
+  → Financeiro
   → Mensagem: "Solicitação de exceção emergencial para despesa operacional imediata."
 
-Link para abrir chamado:
+Link:
 ${SERVICE_NOW_URL}
 
-Sempre abre chamado ANTES de improvisar (ex.: tirar dinheiro do caixa).`
+Abra o chamado ANTES de improvisar tipo 'pegar dinheiro do caixa'.`
             );
         }
 
-        // ServiceNow contextual
         function respostaServiceNowContextual(msgNorm) {
             if (
                 msgNorm.includes("desbloque") ||
@@ -490,18 +669,7 @@ Sempre abre chamado ANTES de improvisar (ex.: tirar dinheiro do caixa).`
                 msgNorm.includes("cartao bloqueado") ||
                 msgNorm.includes("como desbloquear")
             ) {
-                return (
-`Seu cartão travou? 🔒
-
-1. Corrige na Clara o que faltou: nota fiscal anexada, etiqueta certa e descrição clara.
-2. Depois abre chamado no ServiceNow para o Financeiro / Contas a Receber.
-
-Escreve no chamado:
-"Cartão bloqueado preventivamente. Prestação de contas regularizada. Solicito desbloqueio."
-
-Link:
-${SERVICE_NOW_URL}`
-                );
+                return respostaBloqueio();
             }
 
             if (
@@ -510,11 +678,11 @@ ${SERVICE_NOW_URL}`
                 msgNorm.includes("nova categoria")
             ) {
                 return (
-`Quer usar uma categoria de gasto que ainda não existe na Clara?
+`Quer usar uma categoria/etiqueta que não existe na Clara?
 
 → Abre chamado no ServiceNow para Financeiro / Contábil pedindo criação de etiqueta.
 
-No chamado coloca:
+Mensagem sugerida:
 "Solicitar inclusão de etiqueta para despesa operacional da loja. Descrição: ____."
 
 Link:
@@ -537,7 +705,7 @@ ${SERVICE_NOW_URL}`
 Mensagem sugerida:
 "Atualização de responsável pelo cartão Clara: gerente anterior desligado / novo responsável assumindo a loja XXXX."
 
-Isso garante controle, auditoria e quem presta contas.
+Isso garante controle e auditoria.
 
 Link:
 ${SERVICE_NOW_URL}`
@@ -557,10 +725,10 @@ ${SERVICE_NOW_URL}`
 Mensagem sugerida:
 "Solicitação de aumento de limite para despesas operacionais da loja XXXX. Justificativa: ____."
 
-Lembrando: limite é pra despesa operacional da loja, não uso pessoal.
-
 Link:
-${SERVICE_NOW_URL}`
+${SERVICE_NOW_URL}
+
+Lembrando: limite é pra despesa operacional, não uso pessoal.`
                 );
             }
 
@@ -573,12 +741,9 @@ ${SERVICE_NOW_URL}`
                 msgNorm.includes("pegar dinheiro do caixa")
             ) {
                 return (
-`Situação emergencial REAL é quando:
-1. a loja não consegue operar sem aquele gasto agora
-e
-2. não dá pra usar o cartão Clara.
+`Emergência real = loja não consegue operar sem o gasto AGORA e o cartão Clara não resolve.
 
-Antes de pagar de outro jeito:
+Antes de tirar dinheiro do caixa:
 → Abre chamado no ServiceNow pedindo autorização excepcional do Financeiro.
 
 Mensagem sugerida:
@@ -587,17 +752,16 @@ Mensagem sugerida:
 Link:
 ${SERVICE_NOW_URL}
 
-Sem autorização PRÉVIA, não pode tirar dinheiro do caixa e 'resolver depois'.`
+Sem autorização PRÉVIA, não pode usar caixa físico.`
                 );
             }
 
             return respostaServiceNowGeral();
         }
 
-        // Politica PDF com link clicável
         function respostaPoliticaPDF() {
             return (
-`HTML:<p>Segue a <strong>Política de Uso dos Cartões Clara</strong> (versão oficial mais recente disponível):<br>
+`HTML:<p>Segue a <strong>Política de Uso dos Cartões Clara</strong> (documento oficial atual):<br>
 <a class="bot-link" href="${POLITICA_PDF_URL}" target="_blank" rel="noopener noreferrer">${POLITICA_PDF_URL}</a>
 </p>
 <p class="mt-2 text-[13px] text-slate-500">
@@ -606,17 +770,63 @@ O documento traz: categorias permitidas, prazo de 48h pra prestação de contas,
             );
         }
 
-        // fallback
+        function respostaEtiquetaEspecifica(msgNorm) {
+            // tenta achar etiqueta via palavras
+            const et = descobrirEtiqueta(msgNorm);
+            if (et) {
+                return (
+`Para esse tipo de gasto, use a etiqueta: "${et.etiqueta}".
+
+Descrição recomendada:
+"${et.exemploDescricao}"
+
+Regras:
+• Anexe a nota fiscal / recibo na Clara
+• Lance em até 48h após a compra
+• Guarde o comprovante físico na loja por 180 dias
+
+Se a etiqueta não existir na Clara ainda:
+→ abra chamado no ServiceNow pedindo criação dessa etiqueta.`
+                );
+            }
+
+            // fallback se não achou nenhuma etiqueta mapeada
+            return (
+`Você deve usar a etiqueta que melhor descreve o tipo de gasto operacional da loja.
+
+Exemplos comuns:
+• Água → "ÁGUA POTÁVEL"
+• Coffee break / lanche autorizado → "LANCHES DE REFEIÇÕES"
+• Motoboy urgente → "TRANSPORTE / SERVIÇO EMERGENCIAL"
+• Chaveiro emergencial → "CHAVEIRO EMERGENCIAL"
+
+Se você não encontrar a etiqueta certa na Clara:
+→ abre chamado no ServiceNow pedindo criação de etiqueta específica.`
+            );
+        }
+
         function respostaGenerica() {
             return (
-`Vamos checar rapidinho 👇
+`Pra saber se pode usar o cartão Clara, olha isso:
 
-1. A compra é pra operação da LOJA ou é algo pessoal?
-2. Você tem/terá nota fiscal?
-3. Você consegue anexar nota + escolher etiqueta + escrever o motivo em até 48h?
+1. É despesa operacional da loja (necessária pro funcionamento)?
+2. Você tem nota fiscal ou recibo?
+3. Você consegue anexar a nota, escolher etiqueta e descrever o motivo em até 48h?
 
-Se for gasto operacional da loja e você consegue justificar dentro de 48h na Clara, normalmente pode.
-Se for item patrimonial (ex.: TV, PS5) ou pessoal, aí não pode no cartão Clara.`
+Se sim → normalmente pode.
+Se for item patrimonial / infraestrutura grande ou gasto pessoal → não pode no cartão Clara (vai via Compras ou precisa ressarcir).`
+            );
+        }
+
+        function respostaFollowupGenerico() {
+            return (
+`Se você quiser, me fala especificamente:
+• É manutenção emergencial?
+• É alimento/água pro time em ação autorizada?
+• É transporte tipo Uber pessoal?
+• É compra de equipamento físico tipo geladeira?
+
+Assim eu consigo dizer etiqueta e caminho (Clara / Compras / ressarcimento / ServiceNow).`
             );
         }
 
@@ -635,8 +845,30 @@ Se for item patrimonial (ex.: TV, PS5) ou pessoal, aí não pode no cartão Clar
             return arr.some(k => msgNorm.includes(normalize(k)));
         }
 
+        function ehPerguntaFollowupCurta(msgNorm) {
+            // perguntas tipo "como?", "e agora?", "qual etiqueta?", "explica melhor", "e faço o que?"
+            if (msgNorm.length <= 40) {
+                const gatilhos = [
+                    "como", "e agora", "e faço o que", "e faco o que",
+                    "qual etiqueta", "que etiqueta", "qual categoria",
+                    "explica melhor", "me explica", "me ajuda",
+                    "o que eu faço", "o que eu faco", "e depois", "e ai", "e aí"
+                ];
+                return gatilhos.some(g => msgNorm.includes(g));
+            }
+            return false;
+        }
+
         function classificarPergunta(msg) {
             const m = normalize(msg);
+
+            // intenção especial: etiqueta
+            if (
+                termosEtiquetaDireta.some(t => m.includes(normalize(t))) ||
+                descobrirEtiqueta(m) // se ele já mencionou "água", "chaveiro", "motoboy" etc.
+            ) {
+                return "etiqueta";
+            }
 
             if (hit(m, categorias.politicaPdf))   return "politicaPdf";
             if (hit(m, categorias.servicenow))    return "servicenow";
@@ -659,8 +891,26 @@ Se for item patrimonial (ex.: TV, PS5) ou pessoal, aí não pode no cartão Clar
         }
 
         function gerarResposta(msg) {
-            const tipo = classificarPergunta(msg);
             const msgNorm = normalize(msg);
+
+            // 1. follow-up curto?
+            if (ehPerguntaFollowupCurta(msgNorm) && ultimaIntencaoRespondida) {
+                switch (ultimaIntencaoRespondida) {
+                    case "transporte":     return respostaTransporteFollowup();
+                    case "bloqueio":       return respostaBloqueioFollowup();
+                    case "justificar":     return respostaJustificarFollowup();
+                    case "alimentosEquipe":return respostaAlimentosEquipeFollowupAgua(msgNorm);
+                    case "manutencaoLoja": return respostaManutencaoFollowup(msgNorm);
+                    case "etiqueta":       return respostaEtiquetaEspecifica(msgNorm);
+                    default:               return respostaFollowupGenerico();
+                }
+            }
+
+            // 2. pergunta normal
+            const tipo = classificarPergunta(msg);
+
+            // guarda a intenção pra possível follow-up
+            ultimaIntencaoRespondida = tipo;
 
             switch (tipo) {
                 case "eletronicos":      return respostaEletronicos();
@@ -675,10 +925,9 @@ Se for item patrimonial (ex.: TV, PS5) ou pessoal, aí não pode no cartão Clar
                 case "pessoal":          return respostaPessoal();
                 case "outraLoja":        return respostaOutraLoja();
                 case "notaFiscal":       return respostaNotaFiscal();
-
                 case "servicenow":       return respostaServiceNowContextual(msgNorm);
                 case "politicaPdf":      return respostaPoliticaPDF();
-
+                case "etiqueta":         return respostaEtiquetaEspecifica(msgNorm);
                 default:                 return respostaGenerica();
             }
         }
@@ -729,7 +978,7 @@ Se for item patrimonial (ex.: TV, PS5) ou pessoal, aí não pode no cartão Clar
             return wrapper;
         }
 
-        // <-- AQUI A GENTE ATUALIZA: agora aceita HTML
+        // suporta HTML (pra link do PDF)
         function renderBotMessage(text) {
             const wrapper = document.createElement("div");
             wrapper.className = "flex items-start gap-3";
@@ -741,7 +990,6 @@ Se for item patrimonial (ex.: TV, PS5) ou pessoal, aí não pode no cartão Clar
             const bubble = document.createElement("div");
             bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
 
-            // Se a resposta começar com "HTML:", renderiza como HTML
             if (text.startsWith("HTML:")) {
                 bubble.innerHTML = text.replace(/^HTML:/, "").trim();
             } else {
