@@ -1019,6 +1019,8 @@ ServiceNow
 // Renderização das mensagens no chat
 // =====================================================
 const chatWindow = document.getElementById("chatWindow");
+const chatForm = document.getElementById("chatForm");
+const userInput = document.getElementById("userInput");
 
 function scrollToBottom() {
     // pede pro browser rodar depois que ele terminar de desenhar o bubble
@@ -1026,9 +1028,6 @@ function scrollToBottom() {
         chatWindow.scrollTop = chatWindow.scrollHeight;
     });
 }
-
-const chatForm = document.getElementById("chatForm");
-const userInput = document.getElementById("userInput");
 
 function renderUserMessage(text) {
     const wrapper = document.createElement("div");
@@ -1103,6 +1102,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
