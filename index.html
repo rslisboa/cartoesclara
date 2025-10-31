@@ -505,8 +505,8 @@ function avaliarCompraEspecifica(msgNorm) {
     // proibidos / patrimônio / uso pessoal / álcool / transporte pessoal
     const itensPatrimoniaisGrandes = [
         "geladeira","frigobar","microondas","micro-ondas","micro ondas","cafeteira","cafeteira eletrica","cafeteira elétrica",
-        "bebedouro","ar condicionado novo","ar-condicionado novo","tv","televisao","televisão","monitor","console ps5","ps5","playstation",
-        "mesa","mesa escritorio","mesa de escritorio","cadeira","cadeira escritorio","cadeira de escritorio","estacao de trabalho","estação de trabalho",
+        "bebedouro","ar condicionado novo","ar-condicionado novo","tv","televisao","televisão","monitor","console ps5","ps5","playstation", "x-box", "xbox", "dvd", "DVD",
+        "mesa","mesa escritorio","mesa de escritorio","cadeira","cadeira escritorio","cadeira de escritorio","estacao de trabalho","estação de trabalho", "som", "hometheater", "home-theater",
         "movel","móvel","mobilia","mobília","mobiliario","mobiliário","armario","armário","balcao","balcão"
     ];
     for (const termo of itensPatrimoniaisGrandes) {
@@ -549,17 +549,18 @@ function avaliarCompraEspecifica(msgNorm) {
     }
 
     // permitidos via etiqueta clara
-    const etiquetaEncontrada = acharEtiquetaPorMensagem(msgNorm);
-    if (etiquetaEncontrada) {
-        return {
-            status: "pode",
-            mensagemCustom: null,
-            etiqueta: etiquetaEncontrada
-        };
+function acharEtiquetaPorMensagem(msgNorm) {
+    const palavras = msgNorm.split(/\s+/);
+    for (const et of etiquetasOficiais) {
+        for (const termo of et.palavrasChave) {
+            const termoNorm = normalize(termo);
+            // agora compara palavra a palavra, não só pedaço
+            if (palavras.includes(termoNorm)) {
+                return et;
+            }
+        }
     }
-
-    // não classificado
-    return { status: "desconhecido" };
+    return null;
 }
 
 // =====================================================
@@ -923,6 +924,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
