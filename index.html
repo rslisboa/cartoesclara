@@ -1023,9 +1023,12 @@ const chatForm = document.getElementById("chatForm");
 const userInput = document.getElementById("userInput");
 
 function scrollToBottom() {
-    // pede pro browser rodar depois que ele terminar de desenhar o bubble
     requestAnimationFrame(() => {
         chatWindow.scrollTop = chatWindow.scrollHeight;
+        // garante 100% que desce até o fim
+        setTimeout(() => {
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }, 150);
     });
 }
 
@@ -1102,6 +1105,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
