@@ -40,25 +40,29 @@
         row-gap:1rem;
     }
     .chat-header-left {
-        color:#005E27;
-        max-width:560px;
+        width: 100%;
+        max-width:none;
     }
     .chat-header-left h1 {
-        font-size:1rem;
-        font-weight:700;
-        line-height:1.4;
-        color:#005E27;
-        text-transform:none;
-        text-align:left;
-    }
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.4;
+    color: #B5FF20; /* verde claro do texto */
+    text-align: center;
+    border-bottom: 2px solid #005E27; /* linha verde escura */
+    padding-bottom: 0.5rem; /* pequeno espaço entre texto e linha */
+    display: inline-block; /* para que a linha não ocupe a tela toda */
+    margin: 0 auto;
+}
     .chat-header-left p {
         font-size:.8rem;
         line-height:1.4;
         color:#005E27;
         margin-top:.5rem;
-        text-align:left;
+        text-align:center;
     }
     .chat-header-left .examples {
+        text-align: center;
         font-size:.75rem;
         line-height:1.4;
         font-weight:500;
@@ -75,6 +79,7 @@
         color:#005E27;
         margin-top:.75rem;
         font-style:italic;
+        text-align: center;
     }
     .chat-header-avatar {
         display:flex;
@@ -1104,6 +1109,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
