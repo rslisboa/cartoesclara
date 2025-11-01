@@ -659,7 +659,7 @@ function avaliarCompraEspecifica(msgNorm) {
             return {
                 pode: false,
                 tipo: "PATRIMONIAL",
-                resposta: `❌ Não pode usar o cartão Clara. Itens como TV, home theater, geladeira, micro-ondas, mesa, cadeira etc. são considerados patrimônio / infraestrutura. Isso não entra como despesa operacional imediata da loja. Deve seguir o fluxo de Compras / patrimônio, não o cartão Clara.`
+                resposta: `❌ Não pode usar o cartão Clara. Itens como TV, home theater, geladeira, micro-ondas, eletroeletrônicos e eletrodomésticos em geral, mesa, cadeira etc. são considerados patrimônio / infraestrutura. Isso não entra como despesa operacional imediata da loja. Deve seguir o fluxo de Compras / patrimônio, não o cartão Clara.`
             };
         }
     }
@@ -878,7 +878,6 @@ function respGenerica(msgNorm) {
         return `HTML:<p class="text-sm text-slate-700">
 <b>Não pode usar o cartão Clara pra isso.</b><br/>
 ${avaliacao.resposta}<br/><br/>
-Se já caiu no cartão, precisa avisar o Financeiro, marcar como "Despesa Pessoal – Uso Indevido" e ressarcir em até 2 dias úteis. Falta de regularização pode manter o cartão bloqueado.
 </p>`;
     }
 
@@ -1145,6 +1144,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
