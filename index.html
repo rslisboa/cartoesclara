@@ -866,6 +866,59 @@ Reincidência pode fazer a loja perder permissão de uso do cartão.
 </p>`;
 }
 
+function respCatalogoEtiquetas() {
+    return `HTML:<div class="text-sm text-slate-700">
+<p><b>Etiquetas oficiais e quando usar:</b></p>
+
+<p class="mt-2"><b>MATERIAL DE INFORMÁTICA</b><br/>
+Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (baixo valor, sem controle patrimonial).<br/>
+Exemplo de descrição: "Teclado PDV loja 1234".</p>
+
+<p class="mt-2"><b>MATERIAL DE ESCRITÓRIO</b><br/>
+Caneta, pasta, bloco de anotação, grampeador, etiqueta adesiva, organizador de mesa, papelaria básica da operação administrativa da loja.</p>
+
+<p class="mt-2"><b>AGUA POTÁVEL</b><br/>
+Galão de água mineral / garrafas de água para abastecimento da equipe ou uso da loja, quando previsto e autorizado operacionalmente.</p>
+
+<p class="mt-2"><b>LANCHES DE REFEIÇÕES</b><br/>
+Coffee break ou lanche para treinamento interno autorizado, ação oficial da área (VM, regional, diretoria) ou premiação operacional da equipe (não vale refeição pessoal).</p>
+
+<p class="mt-2"><b>TRANSPORTE SERVIÇOS EMERGENCIAS</b><br/>
+Motoboy emergencial / frete local urgente para levar ou buscar material importante entre lojas ou matriz.</p>
+
+<p class="mt-2"><b>CORREIOS_SEDEX/AR/POSTAGEM</b><br/>
+Envio de documentos oficiais da loja via Sedex/AR/postagem. Também serve para devoluções pequenas quando for processo formal.</p>
+
+<p class="mt-2"><b>CHAVEIRO EMERGENCIAL</b><br/>
+Abertura urgente de cofre / estoque / sala administrativa quando houve perda de chave ou travamento, só em situação emergencial.</p>
+
+<p class="mt-2"><b>MANUTENÇÃO CIVIL</b><br/>
+Pequenos reparos estruturais internos de baixa complexidade: ajuste em porta, troca de vidro quebrado, fixar prateleira, ajuste de revestimento etc.</p>
+
+<p class="mt-2"><b>MANUTENÇÃO ELÉTRICA</b><br/>
+Troca de tomada, disjuntor, interruptor, soquete, reator, extensão, pequenos reparos de baixa tensão necessários pro funcionamento da loja.</p>
+
+<p class="mt-2"><b>MANUTENÇÃO AR-CONDICIONADO</b><br/>
+Limpeza de filtro, troca de controle remoto, carga de gás simples, pequenos ajustes que mantenham o ar funcionando.</p>
+
+<p class="mt-2"><b>BOBINA ECF</b><br/>
+Bobina fiscal / bobina de impressora obrigatória pro PDV, quando não há fornecimento centralizado.</p>
+
+<p class="mt-2"><b>SERVIÇOS GRÁFICOS E DE COPIADORAS</b><br/>
+Impressão de banner, adesivo de campanha, plotagem promocional, encadernação de material de comunicação da loja.</p>
+
+<p class="mt-2"><b>MARKETING / PUBLICIDADE E PROPAGANDA</b><br/>
+Ação promocional local autorizada, compra de brindes para campanha, mídia local aprovada, banner promocional, impulsionamento oficial autorizado.</p>
+
+<p class="mt-2"><b>MANUTENÇÃO EQUIPAMENTOS</b><br/>
+Ajustes/reparos em máquinas de estampar, impressoras de etiqueta, computadores fora de garantia e de baixo valor etc. (nada de compra de equipamento grande).</p>
+
+<p class="mt-4">Se você não encontrou nada que encaixa no seu caso, abra chamado no 
+<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>
+pedindo criação ou liberação de etiqueta.</p>
+</div>`;
+}
+
 function respPrestacaoContas() {
     return `HTML:<p class="text-sm text-slate-700">
 Toda compra no cartão Clara precisa ser lançada na plataforma Clara em até 48h:<br/>
@@ -977,8 +1030,7 @@ function respGenerica(msgNorm) {
 • bebida alcoólica;<br/>
 • transporte pessoal (Uber/99 pra deslocamento pessoal);<br/>
 • itens patrimoniais / infraestrutura grande (geladeira, micro-ondas, TV, mesa, cadeira etc.).</p>
-<p class="mt-2">Se você acha que é uma necessidade real da loja mas não tem etiqueta clara na Clara, abra chamado no 
-<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>
+<p class="mt-2">Se você acha que é uma necessidade real da loja mas não tem etiqueta clara na Clara, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>
 informando o caso.</p>
 </div>`;
 }
@@ -1002,6 +1054,35 @@ function gerarRespostaDoBot(msgUsuario) {
     const norm = normalize(msgUsuario);
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
+
+    // 0. Perguntas genéricas tipo "qual etiqueta usar?"
+const perguntaGeralEtiqueta = [
+    "qual etiqueta uso",
+    "qual etiqueta usar",
+    "qual etiqueta eu uso",
+    "que etiqueta uso",
+    "que etiqueta usar",
+    "me fala as etiquetas",
+    "todas as etiquetas",
+    "lista de etiquetas",
+    "quais etiquetas tem",
+    "quais etiquetas existem",
+    "quais sao as etiquetas",
+    "quais são as etiquetas",
+    "me passa as etiquetas",
+    "me passa as tags",
+    "quais tags existem",
+    "categorias de gasto",
+    "categorias de despesas",
+    "categoria de despesa"
+].map(normalize);
+
+for (const frase of perguntaGeralEtiqueta) {
+    if (norm.includes(frase)) {
+        ultimaIntencao = "catalogoEtiquetas";
+        return respCatalogoEtiquetas();
+    }
+}
 
     // LIMITE (checagem explícita por palavra "limite")
     if (norm.includes("limite")) {
@@ -1226,3 +1307,4 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
