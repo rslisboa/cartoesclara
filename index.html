@@ -617,170 +617,210 @@ function detectarIntencaoPergunta(msgNorm) {
 /* =====================================================
    Achar etiqueta por mensagem
    ===================================================== */
+
 function acharEtiquetaPorMensagem(msgNorm) {
+    // palavras que NÃO podem sozinhas disparar uma etiqueta,
+    // porque são genéricas demais e aparecem em qualquer pergunta
+    const stopTerms = [
+        "etiqueta",
+        "qual etiqueta",
+        "que etiqueta",
+        "categoria",
+        "qual categoria",
+        "classificacao",
+        "classificação",
+        "tag",
+        "pode usar",
+        "posso usar",
+        "posso comprar",
+        "pode comprar",
+        "cartao",
+        "cartão",
+        "cartao clara",
+        "cartão clara",
+        "clara",
+        "limite",
+        "ajuda",
+        "duvida",
+        "dúvida"
+    ].map(normalize);
+
+    // vamos quebrar a pergunta do usuário em palavras
     const palavras = msgNorm.split(/\s+/);
+
+    // melhor correspondência encontrada até agora
+    let melhorMatch = null;
+    let melhorForca = 0;
+
     for (const et of etiquetasOficiais) {
-        for (const termo of et.palavrasChave) {
-            const termoNorm = normalize(termo);
-            if (palavras.includes(termoNorm)) {
-                return et;
+        let forcaAtual = 0;
+
+        for (const termoOriginal of et.palavrasChave) {
+            const termoNorm = normalize(termoOriginal);
+
+            // ignora termos genéricos
+            if (stopTerms.includes(termoNorm)) {
+                continue;
             }
+
+            // match exato de palavra (melhor, mais forte)
+            if (palavras.includes(termoNorm)) {
+                forcaAtual += 2;
+            }
+
+            // match por substring (mais fraco, mas ainda conta)
             if (msgNorm.includes(termoNorm)) {
-                return et;
+                forcaAtual += 1;
             }
         }
+
+        // escolhe a etiqueta só se ela teve alguma força (>0)
+        if (forcaAtual > melhorForca) {
+            melhorForca = forcaAtual;
+            melhorMatch = et;
+        }
     }
-    return null;
+
+    // se nenhuma etiqueta teve match específico de verdade, não retorna nada
+    if (melhorForca === 0) {
+        return null;
+    }
+
+    return melhorMatch;
 }
 
 /* =====================================================
    Avaliar compra específica
    ===================================================== */
 function avaliarCompraEspecifica(msgNorm) {
+    // 1. casos claramente proibidos (patrimônio grande, uso pessoal, bebida alcoólica, etc.)
+    const proibidosPatrimonio = [
+        "geladeira", "microondas", "micro-ondas", "tv", "televisao", "televisão",
+        "home theater", "mesa", "cadeira", "friogrifico", "freezer",
+        "ar condicionado", "ar-condicionado", "frigobar",
+        "carro", "carro da loja", "veiculo", "veículo", "moto",
+        "playstation", "ps5", "xbox", "video game", "videogame",
+        "som ambiente", "caixa de som grande", "caixa de som", "soundbar",
+        "projetor", "telão", "tela gigante", "foguete", "foguetes", "foguetinho"
+    ].map(normalize);
 
-    // 1. proibidos/patrimoniais/infraestrutura grande
-    const itensPatrimoniaisGrandes = [
-        "geladeira","frigobar","microondas","micro-ondas","micro ondas",
-        "cafeteira","cafeteira eletrica","cafeteira elétrica","bebedouro",
-        "ar condicionado novo","ar-condicionado novo","arcondicionado novo",
-        "tv","televisao","televisão","monitor","home theater","home-theater",
-        "soundbar","som","caixa de som","caixa de som bluetooth",
-        "fogao","fogão","forno","forno eletrico","forno elétrico",
-        "console ps5","ps5","playstation","xbox","videogame","video game",
-        "mesa","mesa escritorio","mesa de escritorio","mesa grande",
-        "cadeira","cadeira escritorio","cadeira de escritorio",
-        "estacao de trabalho","estação de trabalho",
-        "movel","móvel","mobilia","mobília","mobiliario","mobiliário","armario","armário",
-        "balcao","balcão","balcao de atendimento","balcão de atendimento",
-        "carro","veiculo","veículo","moto","motocicleta","foguete","rocket","carro da loja"
-    ];
-    for (const proib of itensPatrimoniaisGrandes) {
-        if (msgNorm.includes(normalize(proib))) {
+    for (const palavra of proibidosPatrimonio) {
+        if (msgNorm.includes(palavra)) {
             return {
                 pode: false,
-                tipo: "PATRIMONIAL",
-                resposta:
-`❌ Não pode usar o cartão Clara pra isso.
-
-Itens patrimoniais / infraestrutura (ex.: geladeira, micro-ondas, TV, home theater, mesa, cadeira, veículo etc.) não entram como despesa operacional imediata via cartão.
-
-Isso deve seguir fluxo de Compras / patrimônio. Não lançar no cartão Clara.`
+                resposta: `Isso é item patrimonial / infraestrutura de loja ou bem de alto valor. Esses itens NÃO podem ser comprados com o cartão Clara. Eles devem seguir o processo de Compras / aprovação formal, não o cartão da loja.`
             };
         }
     }
 
-    // 2. gasto pessoal / refeição pessoal / lazer pessoal
-    const padroesUsoPessoal = [
-        "meu almoco","meu almoço","meu jantar","minha janta",
-        "meu lanche","minha comida","refeicao pessoal","refeição pessoal",
-        "almoço pessoal","jantar pessoal","lanche pessoal",
-        "uber pra mim","uber pra casa","99 pra mim","taxi pra mim","táxi pra mim",
-        "cinema","pipoca","pipoquinha",
-        "roupa pro meu filho","roupa para meu filho","pro meu filho","para meu filho",
-        "pra mim","para mim","uso pessoal","gasto pessoal","pessoal meu"
-    ];
-    for (const pessoal of padroesUsoPessoal) {
-        if (msgNorm.includes(normalize(pessoal))) {
+    // 2. refeição pessoal explícita ("paguei meu almoço", "meu jantar", etc.)
+    const pessoalAlim = [
+        "meu almoco","meu almoço","meu jantar","meu lanche","paguei meu almoco",
+        "paguei meu almoço","paguei meu jantar","paguei meu lanche","minha comida",
+        "comida pra mim","refeicao pessoal","refeição pessoal","jantar pessoal",
+        "almoco pessoal","almoço pessoal","lanche pessoal"
+    ].map(normalize);
+
+    for (const termo of pessoalAlim) {
+        if (msgNorm.includes(termo)) {
             return {
                 pode: false,
-                tipo: "PESSOAL",
-                resposta:
-`❌ Não pode usar o cartão Clara para gasto pessoal, refeição pessoal, lazer, presente pra família ou transporte pessoal (Uber/99/táxi pessoal).
-
-Se já pagou com o cartão:
-• Avise o Financeiro e abra chamado no ServiceNow (Contas a Receber > Cartão Clara > Gasto Indevido - pessoal);
-• Classifique na Clara como "Despesa Pessoal – Uso Indevido";
-• Ressarça o valor à empresa em até 2 dias úteis.
-
-Se não regularizar, o cartão pode ficar bloqueado preventivamente.`
+                resposta: `Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja. Se já foi pago no cartão, precisa sinalizar como "Despesa Pessoal – Uso Indevido", avisar o Financeiro e ressarcir.`
             };
         }
     }
 
     // 3. bebida alcoólica
-    if (
-        msgNorm.includes("cerveja") ||
-        msgNorm.includes("vinho") ||
-        msgNorm.includes("whisky") ||
-        msgNorm.includes("vodka") ||
-        msgNorm.includes("cachaca") ||
-        msgNorm.includes("cachaça") ||
-        msgNorm.includes("alcool") ||
-        msgNorm.includes("álcool")
-    ) {
-        return {
-            pode: false,
-            tipo: "ALCOOL",
-            resposta:
-`❌ Não pode comprar bebida alcoólica com o cartão Clara. Isso não é despesa operacional da loja.`
-        };
-    }
-
-    // 4. lanche / água / coffee break da equipe (operacional autorizado)
-    const termosLancheOperacional = [
-        "lanche","pao","pão","paozinho","pãezinho",
-        "bolo","salgado","biscoito","biscoitos",
-        "cafe","café","coffee break","refrigerante","refri","suco","suquinho",
-        "agua","água","galão","galao","galão de agua","galão de água",
-        "premiacao","premiação","premiacao equipe","premiação equipe",
-        "treinamento","treinamento interno","acao vm","ação vm","acao regional","ação regional"
-    ];
-    for (const termo of termosLancheOperacional) {
-        if (msgNorm.includes(normalize(termo))) {
+    const alcool = ["cerveja","vodka","vinho","whisky","whiskey","cachaça","cachaca","gin","tequila"].map(normalize);
+    for (const termo of alcool) {
+        if (msgNorm.includes(termo)) {
             return {
-                pode: true,
-                tipo: "LANCHES DE REFEIÇÕES",
-                resposta:
-`✅ Pode usar o cartão Clara SE for para atividade operacional autorizada da loja:
-• treinamento interno oficial,
-• ação aprovada (VM / regional / diretoria),
-• premiação operacional autorizada.
-
-Etiquetas:
-• Água / galão → "AGUA POTÁVEL"
-• Coffee break / lanche autorizado → "LANCHES DE REFEIÇÕES"
-
-Como lançar:
-• anexar nota fiscal em até 48h,
-• escolher a etiqueta correta,
-• descrever: "Coffee break treinamento VM loja 1234".
-
-⚠ Não pode para almoço pessoal / lazer particular.`
+                pode: false,
+                resposta: `Bebida alcoólica não é permitida no cartão Clara. Isso não é considerado despesa operacional autorizada.`
             };
         }
     }
 
-    // 5. itens operacionais mapeáveis (mouse, teclado, motoboy, sedex, chaveiro, etc.)
-    const etiquetaDetectada = acharEtiquetaPorMensagem(msgNorm);
-    if (etiquetaDetectada) {
-        return {
-            pode: true,
-            tipo: etiquetaDetectada.nome,
-            resposta:
-`✅ Pode usar o cartão Clara, porque é uma despesa operacional da loja.
-
-Etiqueta: "${etiquetaDetectada.nome}"
-
-O que cobre: ${etiquetaDetectada.descricao}${etiquetaDetectada.observacaoUso ? ` (${etiquetaDetectada.observacaoUso})` : ""}
-
-Como lançar (até 48h):
-• anexar nota fiscal/recibo,
-• selecionar "${etiquetaDetectada.nome}",
-• descrever objetivamente (ex.: "Teclado PDV loja 1234"),
-• guardar o documento físico na loja por pelo menos 180 dias.`
-        };
+    // 4. transporte pessoal (uber pra você ir pra casa, etc.)
+    const transportePessoal = ["uber","99","taxi","táxi","taxí","cabify"].map(normalize);
+    for (const termo of transportePessoal) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: false,
+                resposta: `Uber / 99 / táxi para deslocamento pessoal não pode no cartão Clara. Não é gasto operacional direto da loja.`
+            };
+        }
     }
 
-    // 6. fallback seguro
+    // 5. alimentação/equipe/ação autorizada (coffee break, água pra equipe, lanche de treinamento)
+    // aqui PODE, mas só se for claramente pra equipe/treinamento/ação oficial
+    const palavrasTime = [
+        "coffee break","lanche pra equipe","lanche para equipe","lanche equipe",
+        "lanche time","lanche pro time","lanche para o time",
+        "treinamento","premiacao","premiação","acao oficial","ação oficial",
+        "acao vm","ação vm","acao regional","ação regional",
+        "agua pra equipe","água pra equipe","galão de agua","galão de água",
+        "galão","galão de agua","salgadinho pra treinamento","bolo pra treinamento",
+        "suco pra treinamento","suco para treinamento","lanche treinamento"
+    ].map(normalize);
+
+    for (const termo of palavrasTime) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: true,
+                etiquetaValida: {
+                    nome: "LANCHES DE REFEIÇÕES / ÁGUA POTÁVEL",
+                    desc: "Coffee break autorizado, água/lanche para equipe em treinamento interno aprovado, ação oficial da loja (VM, regional, diretoria) ou premiação operacional.",
+                    exemploDescricao: "Coffee break treinamento VM loja 1234"
+                },
+                resposta: `Pode usar o cartão Clara se for ação autorizada (treinamento interno, VM, regional, diretoria, premiação operacional). Precisa lançar na Clara em até 48h com nota fiscal, etiqueta correta e descrição objetiva.`
+            };
+        }
+    }
+
+    // 6. periféricos / pequenos itens operacionais (mouse, teclado, cabo USB, pendrive etc.)
+    const perifOperacional = [
+        "mouse","teclado","cabo usb","usb","pendrive","fonte de notebook",
+        "hub usb","roteador","teclado pdv","teclado do pdv","teclado caixa","bobina ecf","bobina fiscal"
+    ].map(normalize);
+
+    for (const termo of perifOperacional) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: true,
+                etiquetaValida: {
+                    nome: "MATERIAL DE INFORMÁTICA",
+                    desc: "Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (sem controle patrimonial).",
+                    exemploDescricao: "Teclado PDV loja 1234"
+                },
+                resposta: `Esse tipo de material (ex.: mouse, teclado, cabo) é considerado suprimento operacional de baixo valor para a loja e pode ser pago no cartão Clara, desde que classificado corretamente e lançado em até 48h.`
+            };
+        }
+    }
+
+    // 7. chaveiro emergencial, motoboy, sedex
+    const servicoEmerg = [
+        "chaveiro","abrir cofre","abrir estoque","perdi a chave","motoboy","sedex","correios","envio de documento","postar documento","postar nota","mandar documento","enviar documento"
+    ].map(normalize);
+
+    for (const termo of servicoEmerg) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: true,
+                etiquetaValida: {
+                    nome: "TRANSPORTE SERVIÇOS EMERGENCIAS / CORREIOS_SEDEX/AR/POSTAGEM / CHAVEIRO EMERGENCIAL",
+                    desc: "Motoboy emergencial, envio urgente de documentos (Sedex/AR/postagem oficial), chaveiro emergencial para abrir estoque/cofre.",
+                    exemploDescricao: "Motoboy urgente documentação loja 1234"
+                },
+                resposta: `Serviços emergenciais (motoboy urgente, Sedex de documento oficial, chaveiro emergencial pra abrir estoque/cofre) podem usar o cartão Clara, desde que sejam necessidade imediata da operação e sejam justificados na Clara dentro de 48h.`
+            };
+        }
+    }
+
+    // 8. Se não classificou em nada específico:
     return {
         pode: null,
-        tipo: "NAO_MAPEADO",
-        resposta:
-`Não encontrei isso como gasto operacional autorizado dentro das categorias padrão (água/equipe autorizada, coffee break autorizado, material de informática de baixo valor, material de escritório/limpeza, motoboy emergencial, chaveiro emergencial, manutenção simples elétrica/ar-condicionado/civil de baixo valor, bobina fiscal, envio Correios/Sedex da loja).
-
-Se for algo pessoal, bebida alcoólica ou item patrimonial / infraestrutura (TV, mesa, geladeira, carro etc.), não pode no cartão Clara.
-
-Se você acredita que é gasto operacional legítimo da loja mas não tem etiqueta adequada, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a> pedindo orientação/criação de etiqueta.`
+        resposta: `Não ficou claro se isso é uma despesa operacional imediata da loja ou algo pessoal/patrimonial.`
     };
 }
 
@@ -906,55 +946,40 @@ let ultimaIntencao = null;
 function respGenerica(msgNorm) {
     const avaliacao = avaliarCompraEspecifica(msgNorm);
 
-    // proibido
+    // CASO 1: claramente proibido
     if (avaliacao.pode === false) {
         return `HTML:<div class="text-sm text-slate-700">
 <p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
-<p class="mt-1">${avaliacao.resposta}</p>
-</div>`;
-    }
-
-    // permitido (operacional claro)
-    if (avaliacao.pode === true) {
-        return `HTML:<div class="text-sm text-slate-700">
 <p>${avaliacao.resposta}</p>
 </div>`;
     }
 
-    // desconhecido / não mapeado
+    // CASO 2: claramente permitido E tem etiqueta coerente
+    if (avaliacao.pode === true && avaliacao.etiquetaValida) {
+        const et = avaliacao.etiquetaValida;
+        return `HTML:<div class="text-sm text-slate-700">
+<p><b>✅ Pode usar o cartão Clara (despesa operacional autorizada).</b></p>
+<p>Use a etiqueta: "<b>${et.nome}</b>".</p>
+<p class="mt-1">${et.desc}</p>
+<p class="mt-2"><b>Como lançar na Clara (até 48h):</b><br/>
+• Anexar a nota fiscal/recibo;<br/>
+• Selecionar "${et.nome}";<br/>
+• Descrever objetivamente o gasto (ex.: "${et.exemploDescricao}");<br/>
+• Guardar o documento físico na loja pelo prazo indicado pela política.</p>
+</div>`;
+    }
+
+    // CASO 3: não tenho confiança suficiente pra dizer "pode"
     return `HTML:<div class="text-sm text-slate-700">
-<p><b>Não encontrei isso como gasto operacional autorizado na Política de Uso dos Cartões Clara.</b></p>
-
-<p class="mt-2">O cartão só pode ser usado para despesas operacionais da loja, por exemplo:</p>
-<ul class="list-disc ml-4">
-<li>material de escritório (caneta, pasta, bloco etc.);</li>
-<li>material de informática de baixo valor (mouse, teclado, cabo, pendrive etc.);</li>
-<li>água potável / coffee break autorizado para treinamento interno oficial, ação aprovada (VM / regional / diretoria) ou premiação operacional autorizada;</li>
-<li>motoboy / Sedex emergencial ligado à operação da loja;</li>
-<li>chaveiro emergencial (abrir estoque/cofre etc.);</li>
-<li>manutenção simples elétrica / civil / ar-condicionado de baixo valor (troca de tomada, limpeza de filtro);</li>
-<li>bobina fiscal / bobina de ECF, se a loja é responsável por isso;</li>
-<li>Correios/Sedex quando for envio operacional da loja.</li>
-</ul>
-
-<p class="mt-2"><b>Não pode usar o cartão Clara para:</b></p>
-<ul class="list-disc ml-4">
-<li>gasto pessoal (almoço/jantar pessoal, lanche pessoal etc.);</li>
-<li>bebida alcoólica;</li>
-<li>transporte pessoal tipo Uber / 99 / táxi pessoal;</li>
-<li>bens patrimoniais / infraestrutura grande (geladeira, micro-ondas, TV, home theater, PS5, carro, móveis grandes);</li>
-<li>qualquer compra sem vínculo direto e imediato com a operação da loja.</li>
-</ul>
-
-<p class="mt-2">Se isso já foi pago no cartão:</p>
-<ul class="list-disc ml-4">
-<li>avisar o Financeiro;</li>
-<li>classificar na Clara como "Despesa Pessoal – Uso Indevido";</li>
-<li>ressarcir o valor em até 2 dias úteis para evitar bloqueio preventivo do cartão.</li>
-</ul>
-
-<p class="mt-2">Se você acredita que é um gasto operacional legítimo mas não existe etiqueta adequada, abra chamado no 
-<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a> pedindo orientação/criação de etiqueta específica.</p>
+<p>Pra usar o cartão Clara, o gasto precisa ser <b>necessário pra operação da loja</b (ex.: chaveiro emergencial, motoboy urgente, material de limpeza, periférico de PDV, bobina fiscal, água/coffee break autorizado pra treinamento interno ou ação oficial).</p>
+<p class="mt-2">O que <b>não pode</b> no cartão Clara:<br/>
+• gasto pessoal (refeição pessoal, compra pra uso próprio etc.);<br/>
+• bebida alcoólica;<br/>
+• transporte pessoal (Uber/99 pra deslocamento pessoal);<br/>
+• itens patrimoniais / infraestrutura grande (geladeira, micro-ondas, TV, mesa, cadeira etc.).</p>
+<p class="mt-2">Se você acha que é uma necessidade real da loja mas não tem etiqueta clara na Clara, abra chamado no 
+<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>
+informando o caso.</p>
 </div>`;
 }
 
@@ -1201,4 +1226,3 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
-
