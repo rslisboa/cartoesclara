@@ -24,6 +24,8 @@
         flex-direction:column;
         height:90vh;
     }
+
+    /* HEADER */
     .chat-header-area {
         background-color:#FFFFFF;
         border-top-left-radius:1rem;
@@ -33,76 +35,53 @@
     }
     .chat-header-inner {
         display:flex;
-        flex-direction:row;
         align-items:flex-start;
         justify-content:space-between;
-        flex-wrap:wrap;
-        row-gap:1rem;
+        position:relative;
+    }
+    .chat-header-left {
+        width:100%;
+        text-align:center;
+        color:#005E27;
+    }
+    .chat-header-left h1 {
+        font-size:1.5rem;
+        font-weight:800;
+        color:#005E27;
+        margin-bottom:0.5rem;
+        background-color:#005E27;       /* fundo verde escuro */
+        color:#B5FF20;                   /* texto verde claro */
+        padding:.5rem .75rem;
+        border-radius:.5rem;
+        display:inline-block;
+        text-align:center;
+    }
+    .chat-header-left p,
+    .chat-header-left .examples,
+    .chat-header-left .policy-note {
+        color:#1e293b;
+        text-align:center;
+        margin-top:0.5rem;
+    }
+    .chat-header-avatar {
+        position:absolute;
+        top:0.5rem;
+        right:1rem;
+    }
+    .chat-header-avatar img {
+        height:72px;
+        width:auto;
+        object-fit:contain;
+        filter:none; /* sem sombra */
     }
 
-    .chat-header-area {
-    background-color: #FFFFFF; /* fundo branco */
-    border-top-left-radius: 1rem;
-    border-top-right-radius: 1rem;
-    border-bottom: 1px solid rgba(0,0,0,.08);
-    padding: 1rem 1.25rem;
-}
-
-.chat-header-inner {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    position: relative;
-}
-
-.chat-header-left {
-    width: 100%;
-    text-align: center;
-    color: #005E27; /* texto verde escuro */
-}
-
-.chat-header-left h1 {
-    font-size: 1.5rem;
-    font-weight: 800;
-    color: #005E27; /* texto verde escuro */
-    margin-bottom: 0.5rem;
-}
-
-.chat-header-left p,
-.chat-header-left .examples,
-.chat-header-left .policy-note {
-    color: #1e293b;
-    text-align: center;
-    margin-top: 0.5rem;
-}
-
-.chat-header-avatar {
-    position: absolute;
-    top: 0.5rem;
-    right: 1rem;
-}
-
-.chat-header-avatar img {
-    height: 72px;
-    width: auto;
-    object-fit: contain;
-    filter: none; /* remove sombra */
-}
-
+    /* BODY */
     .chat-body {
         flex:1 1 auto;
         overflow-y:auto;
         padding:1rem 1.25rem;
         background-color:#fff;
     }
-    .chat-footer {
-        border-top:1px solid rgba(0,0,0,.08);
-        padding:1rem 1.25rem;
-        background-color:#f8fafc;
-        border-bottom-left-radius:1rem;
-        border-bottom-right-radius:1rem;
-    }
-
     .chat-window {
         display:flex;
         flex-direction:column;
@@ -112,6 +91,7 @@
         color:#1e293b;
     }
 
+    /* BUBBLES */
     .bot-bubble {
         background-color:#f1f5f9;
         border:1px solid rgba(0,0,0,.05);
@@ -138,6 +118,15 @@
         text-decoration:underline;
     }
 
+    /* FOOTER / INPUT */
+    .chat-footer {
+        border-top:1px solid rgba(0,0,0,.08);
+        padding:1rem 1.25rem;
+        background-color:#f8fafc;
+        border-bottom-left-radius:1rem;
+        border-bottom-right-radius:1rem;
+    }
+
     .input-shell {
         background-color:#fff;
         border:1px solid rgba(0,0,0,.12);
@@ -151,7 +140,7 @@
     .input-shell textarea {
         flex:1 1 auto;
         resize:none;
-        min-height:40px;     /* caixa de digitação pequena */
+        min-height:40px;    /* caixa de digitação menor */
         max-height:120px;
         font-size:0.9rem;
         line-height:1.4;
@@ -173,12 +162,12 @@
         cursor:pointer;
     }
 
-    /* scrollbars mais discretos */
+    /* scrollbar do histórico */
     .chat-body::-webkit-scrollbar { width:6px; }
     .chat-body::-webkit-scrollbar-track { background:transparent; }
     .chat-body::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
 
-    /* links dentro da resposta HTML do bot */
+    /* links que aparecem nas respostas HTML do bot */
     .bot-bubble a {
         color:#005E27;
         font-weight:600;
@@ -208,12 +197,19 @@
         <div class="chat-header-inner">
             <div class="chat-header-left">
                 <h1>Agente Clara | Grupo SBF</h1>
+
                 <p>Pergunte sobre o uso do cartão Clara nas lojas.</p>
+
                 <div class="examples">
-                </p>
+                </div>
+
+                <div class="policy-note text-[12px] mt-2">
+                </div>
             </div>
+
             <div class="chat-header-avatar">
-                <img src="Gemini_Generated_Image_nzni5znzni5znzni.png" alt="Assistente Clara (robô)" />
+                <img src="Gemini_Generated_Image_nzni5znzni5znzni.png"
+                     alt="Assistente Clara (robô)" />
             </div>
         </div>
     </header>
@@ -231,7 +227,7 @@
                 />
                 <div class="bot-bubble px-4 py-3 max-w-[80%] text-sm text-slate-700">
                     <p class="font-semibold text-slate-800 text-base">
-                        Olá! 👋 Eu sou o agente do <b>Grupo SBF</b>.
+                        Olá! 👋 Eu sou o Agente do <b>Grupo SBF</b>.
                     </p>
                     <p class="text-slate-700 text-sm mt-1">
                         Pode me perguntar direto, tipo:<br/>
@@ -245,7 +241,9 @@
                     </p>
                     <p class="text-[11px] text-slate-500 italic mt-2">
                         Quer o documento oficial completo?
-                        <a class="policy-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer">
+                        <a class="policy-link"
+                           href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing"
+                           target="_blank" rel="noopener noreferrer">
                             Segue a Política de Uso dos Cartões Clara
                         </a>.
                     </p>
@@ -268,9 +266,9 @@
 </div>
 
 <script>
-// =====================================================
-// POLÍTICA (resumo orientador)
-// =====================================================
+/* =====================================================
+   POLÍTICA (resumo orientador)
+   ===================================================== */
 const POLITICA_COMPLETA = `
 1. O cartão Clara é o meio oficial para despesas operacionais das lojas.
 2. Toda compra tem que ser justificada na plataforma Clara em até 48h:
@@ -293,11 +291,9 @@ const POLITICA_COMPLETA = `
 10. Sangria de caixa deixa de existir depois que a loja recebe o cartão Clara, só pode ser liberada como exceção com autorização financeira prévia.
 `;
 
-// =====================================================
-// Etiquetas oficiais padronizadas
-// Cada item agora tem sempre as mesmas chaves:
-// nome, palavrasChave, descricao, observacaoUso
-// =====================================================
+/* =====================================================
+   Etiquetas oficiais padronizadas
+   ===================================================== */
 const etiquetasOficiais = [
     {
         nome: "AGUA POTÁVEL",
@@ -445,9 +441,9 @@ const etiquetasOficiais = [
     }
 ];
 
-// =====================================================
-// Normalização
-// =====================================================
+/* =====================================================
+   Normalização
+   ===================================================== */
 function normalize(str) {
     return str
         .toLowerCase()
@@ -457,9 +453,9 @@ function normalize(str) {
         .trim();
 }
 
-// =====================================================
-// Intenção
-// =====================================================
+/* =====================================================
+   Intenção
+   ===================================================== */
 function detectarIntencaoPergunta(msgNorm) {
 
     // fora de escopo
@@ -475,8 +471,10 @@ function detectarIntencaoPergunta(msgNorm) {
         }
     }
 
-    // etiqueta direta
-    if (msgNorm.includes("etiqueta") || msgNorm.includes("qual etiqueta") || msgNorm.includes("que etiqueta")) {
+    // etiqueta
+    if (msgNorm.includes("etiqueta") ||
+        msgNorm.includes("qual etiqueta") ||
+        msgNorm.includes("que etiqueta")) {
         return "etiqueta";
     }
 
@@ -616,10 +614,9 @@ function detectarIntencaoPergunta(msgNorm) {
     return "generica";
 }
 
-// =====================================================
-// Achar etiqueta mais aderente
-// (ajustada: procura termo inteiro dentro da mensagem normalizada)
-// =====================================================
+/* =====================================================
+   Achar etiqueta por mensagem
+   ===================================================== */
 function acharEtiquetaPorMensagem(msgNorm) {
     const palavras = msgNorm.split(/\s+/);
     for (const et of etiquetasOficiais) {
@@ -628,7 +625,6 @@ function acharEtiquetaPorMensagem(msgNorm) {
             if (palavras.includes(termoNorm)) {
                 return et;
             }
-            // também tenta includes simples pra termos compostos tipo "coffee break"
             if (msgNorm.includes(termoNorm)) {
                 return et;
             }
@@ -637,13 +633,12 @@ function acharEtiquetaPorMensagem(msgNorm) {
     return null;
 }
 
-// =====================================================
-// Avaliar compra específica
-// =====================================================
-
+/* =====================================================
+   Avaliar compra específica
+   ===================================================== */
 function avaliarCompraEspecifica(msgNorm) {
 
-    // 1. Itens claramente proibidos / patrimoniais / infraestrutura / coisa absurda tipo carro
+    // 1. proibidos/patrimoniais/infraestrutura grande
     const itensPatrimoniaisGrandes = [
         "geladeira","frigobar","microondas","micro-ondas","micro ondas",
         "cafeteira","cafeteira eletrica","cafeteira elétrica","bebedouro",
@@ -674,8 +669,7 @@ Isso deve seguir fluxo de Compras / patrimônio. Não lançar no cartão Clara.`
         }
     }
 
-    // 2. Uso pessoal / lazer pessoal / refeição pessoal
-    // Se o texto sugere gasto pra você mesmo, família, lazer etc.
+    // 2. gasto pessoal / refeição pessoal / lazer pessoal
     const padroesUsoPessoal = [
         "meu almoco","meu almoço","meu jantar","minha janta",
         "meu lanche","minha comida","refeicao pessoal","refeição pessoal",
@@ -692,11 +686,18 @@ Isso deve seguir fluxo de Compras / patrimônio. Não lançar no cartão Clara.`
                 tipo: "PESSOAL",
                 resposta:
 `❌ Não pode usar o cartão Clara para gasto pessoal, refeição pessoal, lazer, presente pra família ou transporte pessoal (Uber/99/táxi pessoal).
+
+Se já pagou com o cartão:
+• Avise o Financeiro e abra chamado no ServiceNow (Contas a Receber > Cartão Clara > Gasto Indevido - pessoal);
+• Classifique na Clara como "Despesa Pessoal – Uso Indevido";
+• Ressarça o valor à empresa em até 2 dias úteis.
+
+Se não regularizar, o cartão pode ficar bloqueado preventivamente.`
             };
         }
     }
 
-    // 3. Bebida alcoólica
+    // 3. bebida alcoólica
     if (
         msgNorm.includes("cerveja") ||
         msgNorm.includes("vinho") ||
@@ -715,8 +716,7 @@ Isso deve seguir fluxo de Compras / patrimônio. Não lançar no cartão Clara.`
         };
     }
 
-    // 4. Lanche / água / coffee break da equipe (operacional autorizado)
-    // Aqui entram pão, suco, refrigerante, bolo etc.
+    // 4. lanche / água / coffee break da equipe (operacional autorizado)
     const termosLancheOperacional = [
         "lanche","pao","pão","paozinho","pãezinho",
         "bolo","salgado","biscoito","biscoitos",
@@ -732,13 +732,13 @@ Isso deve seguir fluxo de Compras / patrimônio. Não lançar no cartão Clara.`
                 tipo: "LANCHES DE REFEIÇÕES",
                 resposta:
 `✅ Pode usar o cartão Clara SE for para atividade operacional autorizada da loja:
-• treinamento oficial interno,
+• treinamento interno oficial,
 • ação aprovada (VM / regional / diretoria),
 • premiação operacional autorizada.
 
-Etiqueta:
+Etiquetas:
 • Água / galão → "AGUA POTÁVEL"
-• Lanche / coffee break autorizado → "LANCHES DE REFEIÇÕES"
+• Coffee break / lanche autorizado → "LANCHES DE REFEIÇÕES"
 
 Como lançar:
 • anexar nota fiscal em até 48h,
@@ -750,7 +750,7 @@ Como lançar:
         }
     }
 
-    // 5. Itens operacionais que têm etiqueta direta (mouse, teclado, motoboy, sedex, chaveiro etc.)
+    // 5. itens operacionais mapeáveis (mouse, teclado, motoboy, sedex, chaveiro, etc.)
     const etiquetaDetectada = acharEtiquetaPorMensagem(msgNorm);
     if (etiquetaDetectada) {
         return {
@@ -771,7 +771,7 @@ Como lançar (até 48h):
         };
     }
 
-    // 6. Se não reconheci, devolve seguro e NÃO inventa etiqueta tipo "CORREIOS"
+    // 6. fallback seguro
     return {
         pode: null,
         tipo: "NAO_MAPEADO",
@@ -784,9 +784,9 @@ Se você acredita que é gasto operacional legítimo da loja mas não tem etique
     };
 }
 
-// =====================================================
-// Respostas por intenção
-// =====================================================
+/* =====================================================
+   Respostas por intenção
+   ===================================================== */
 function respostaForaEscopo() {
     return `HTML:<p class="text-sm text-slate-700">
 Sou um agente especializado na Política de Uso dos Cartões Clara nas lojas. Não consigo responder esse tipo de assunto.
@@ -798,6 +798,7 @@ function respEtiquetaDireta(et) {
 <p><b>Etiqueta correta:</b> "${et.nome}".</p>
 <p class="mt-1"><b>O que cobre:</b> ${et.descricao}</p>
 ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i></p>` : ""}
+
 <p class="mt-2">
 Lançar na Clara em até 48h:<br/>
 1. Anexar nota fiscal/recibo (foto legível);<br/>
@@ -815,8 +816,8 @@ function respLimite() {
 function respBloqueio() {
     return `HTML:<p class="text-sm text-slate-700">
 Bloqueio preventivo acontece quando tem compra sem justificar na Clara dentro do prazo (até 48h):<br/>
-• faltou nota fiscal/recibo,<br/>
-• não colocou etiqueta correta,<br/>
+• faltou nota fiscal/recibo;<br/>
+• não colocou etiqueta correta;<br/>
 • descrição não explica o uso operacional.<br/><br/>
 Passos pra desbloquear:<br/>
 1. Regulariza a transação na plataforma (anexa nota, escolhe etiqueta certa, descreve o motivo real).<br/>
@@ -853,8 +854,8 @@ function respTransportePessoal() {
     return `HTML:<p class="text-sm text-slate-700">
 Uber / 99 / táxi pra deslocamento pessoal não pode ser pago com o cartão Clara. Isso não é gasto operacional direto da loja.<br/><br/>
 Se já usou:<br/>
-• comunicar o Financeiro imediatamente,<br/>
-• classificar como "Despesa Pessoal – Uso Indevido" na plataforma,<br/>
+• comunicar o Financeiro imediatamente;<br/>
+• classificar como "Despesa Pessoal – Uso Indevido" na plataforma;<br/>
 • ressarcir o valor à empresa em até 2 dias úteis.<br/><br/>
 Falta de regularização pode gerar bloqueio e até desconto em folha.
 </p>`;
@@ -869,7 +870,7 @@ Troca de gerente / mudança de loja segue assim:<br/><br/>
      "Uso temporário do cartão na loja 1234".<br/>
    • Isso garante que o custo vá pra loja certa no fechamento.<br/><br/>
 2. Se é só férias/afastamento curto do gerente:<br/>
-   • o cartão da própria loja continua sendo usado pelo líder/supervisor autorizado,<br/>
+   • o cartão da própria loja continua sendo usado pelo líder/supervisor autorizado;<br/>
    • não é pra circular cartão entre lojas sem autorização financeira.<br/><br/>
 Se tiver caso especial, fale com o Financeiro e, se preciso, abra chamado no
 <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
@@ -896,12 +897,16 @@ Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal). Se a compra 
 </p>`;
 }
 
-// fallback contextual
+/* =====================================================
+   Fallback / resposta genérica com política
+   ===================================================== */
+
+let ultimaIntencao = null;
 
 function respGenerica(msgNorm) {
     const avaliacao = avaliarCompraEspecifica(msgNorm);
 
-    // CASO 1: claramente proibido (pode === false)
+    // proibido
     if (avaliacao.pode === false) {
         return `HTML:<div class="text-sm text-slate-700">
 <p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
@@ -909,19 +914,14 @@ function respGenerica(msgNorm) {
 </div>`;
     }
 
-    // CASO 2: claramente permitido (pode === true)
-    // Aqui a gente NÃO coloca mais aquele prefixo fixo "Pode usar o cartão Clara..."
-    // porque esse prefixo era o que estava aparecendo errado em cenários indevidos.
+    // permitido (operacional claro)
     if (avaliacao.pode === true) {
         return `HTML:<div class="text-sm text-slate-700">
 <p>${avaliacao.resposta}</p>
 </div>`;
     }
 
-    // CASO 3: não foi possível classificar (pode === null)
-    // Este é o fallback SEGURO. Aqui a resposta explica política,
-    // fala que provavelmente NÃO é permitido se não for claramente operacional,
-    // e não inventa etiqueta tipo "CORREIOS" pra qualquer coisa.
+    // desconhecido / não mapeado
     return `HTML:<div class="text-sm text-slate-700">
 <p><b>Não encontrei isso como gasto operacional autorizado na Política de Uso dos Cartões Clara.</b></p>
 
@@ -931,9 +931,9 @@ function respGenerica(msgNorm) {
 <li>material de informática de baixo valor (mouse, teclado, cabo, pendrive etc.);</li>
 <li>água potável / coffee break autorizado para treinamento interno oficial, ação aprovada (VM / regional / diretoria) ou premiação operacional autorizada;</li>
 <li>motoboy / Sedex emergencial ligado à operação da loja;</li>
-<li>chaveiro emergencial (abrir estoque/cofre/estoque trancado etc.);</li>
-<li>manutenção simples elétrica / civil / ar-condicionado de baixo valor (troca de tomada, ajuste pequeno, limpeza de filtro);</li>
-<li>bobina fiscal / bobina de ECF se a loja é responsável por isso;</li>
+<li>chaveiro emergencial (abrir estoque/cofre etc.);</li>
+<li>manutenção simples elétrica / civil / ar-condicionado de baixo valor (troca de tomada, limpeza de filtro);</li>
+<li>bobina fiscal / bobina de ECF, se a loja é responsável por isso;</li>
 <li>Correios/Sedex quando for envio operacional da loja.</li>
 </ul>
 
@@ -942,7 +942,7 @@ function respGenerica(msgNorm) {
 <li>gasto pessoal (almoço/jantar pessoal, lanche pessoal etc.);</li>
 <li>bebida alcoólica;</li>
 <li>transporte pessoal tipo Uber / 99 / táxi pessoal;</li>
-<li>bens patrimoniais / eletrônicos / infraestrutura grande (geladeira, micro-ondas, TV, home theater, PS5, carro, móveis grandes);</li>
+<li>bens patrimoniais / infraestrutura grande (geladeira, micro-ondas, TV, home theater, PS5, carro, móveis grandes);</li>
 <li>qualquer compra sem vínculo direto e imediato com a operação da loja.</li>
 </ul>
 
@@ -970,97 +970,71 @@ function respFollowup(msgNorm) {
     return respGenerica(msgNorm);
 }
 
-// =====================================================
-// Motor principal de resposta
-// =====================================================
+/* =====================================================
+   Motor principal de resposta
+   ===================================================== */
 function gerarRespostaDoBot(msgUsuario) {
     const norm = normalize(msgUsuario);
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
 
-    // 1. ASSUNTOS SOBRE LIMITE (aumento de limite, limite insuficiente, limite acabou etc.)
-    // Mantemos apenas UMA checagem de "limite" aqui em cima, para não ter duplicado.
+    // LIMITE (checagem explícita por palavra "limite")
     if (norm.includes("limite")) {
         ultimaIntencao = "limite";
-        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
+        return respLimite();
     }
 
-    // 2. USO PESSOAL / ALIMENTAÇÃO PESSOAL
-    // Aqui vamos ampliar os padrões pra pegar janta, almoço, lanche pessoal etc.
+    // GASTO PESSOAL / ALIMENTAÇÃO PESSOAL
     const padroesGastoPessoalAlimentacao = [
-        "paguei meu almoco",
-        "paguei meu almoço",
-        "paguei meu jantar",
-        "paguei meu lanche",
-        "paguei meu café",
-        "paguei meu cafe",
-        "paguei meu pastel",
-        "paguei minha refeicao",
-        "paguei minha refeição",
-        "paguei minha comida",
-        "paguei minha janta",
+        "paguei meu almoco","paguei meu almoço","paguei meu jantar",
+        "paguei meu lanche","paguei meu café","paguei meu cafe",
+        "paguei meu pastel","paguei minha refeicao","paguei minha refeição",
+        "paguei minha comida","paguei minha janta",
 
-        "meu almoço",
-        "meu almoco",
-        "meu jantar",
-        "minha janta",
-        "meu lanche",
-        "meu lanche com o cartao",
-        "meu lanche com o cartão",
+        "meu almoço","meu almoco","meu jantar","minha janta",
+        "meu lanche","meu lanche com o cartao","meu lanche com o cartão",
         "minha comida",
 
-        "almoco pessoal",
-        "almoço pessoal",
-        "jantar pessoal",
-        "lanche pessoal",
-        "refeição pessoal",
-        "refeicao pessoal",
+        "almoco pessoal","almoço pessoal","jantar pessoal",
+        "lanche pessoal","refeição pessoal","refeicao pessoal",
 
-        // variações tipo "almocei com o cartão", "jantei com o cartão"
-        "almocei com o cartao",
-        "almocei com o cartão",
-        "jantei com o cartao",
-        "jantei com o cartão",
-        "comi com o cartao",
-        "comi com o cartão"
+        "almocei com o cartao","almocei com o cartão",
+        "jantei com o cartao","jantei com o cartão",
+        "comi com o cartao","comi com o cartão"
     ];
 
     const isGastoPessoalAlimentacao = padroesGastoPessoalAlimentacao.some(p => norm.includes(p));
-
     if (isGastoPessoalAlimentacao) {
         ultimaIntencao = "gasto_pessoal_alimentacao";
-        return `⛔ Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja.
+        return `HTML:<div class="text-sm text-slate-700">
+<p>⛔ Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja.</p>
 
-Se já foi pago com o cartão:
-• Avise o Financeiro e abra chamado no ServiceNow (Contas a Receber > Cartão Clara > Gasto Indevido - pessoal);
-• Classifique na Clara como "Despesa Pessoal – Uso Indevido";
-• Ressarça o valor à empresa.
+<p class="mt-2">Se já foi pago com o cartão:</p>
+<ul class="list-disc ml-4">
+<li>Avise o Financeiro e abra chamado no ServiceNow (Contas a Receber &gt; Cartão Clara &gt; Gasto Indevido - pessoal);</li>
+<li>Classifique na Clara como "Despesa Pessoal – Uso Indevido";</li>
+<li>Ressarça o valor à empresa em até 2 dias úteis.</li>
+</ul>
 
-Se não regularizar, o cartão pode ficar bloqueado preventivamente.`;
+<p class="mt-2">Se não regularizar, o cartão pode ficar bloqueado preventivamente.</p>
+</div>`;
     }
 
-    // 3. Agora seguimos com a sua intenção principal detectada por detectarIntencaoPergunta()
+    // Escolhe resposta por intenção
     switch (intencao) {
 
         case "foraEscopo":
-            // Perguntas tipo futebol, política nacional, matemática etc.
             ultimaIntencao = "foraEscopo";
             resposta = respostaForaEscopo();
             break;
 
-        case "etiqueta":
-            // Usuário perguntou algo tipo "qual etiqueta usar pra mouse?" ou "que etiqueta pra água?"
+        case "etiqueta": {
             ultimaIntencao = "etiqueta";
-            {
-                const et = acharEtiquetaPorMensagem(norm);
-
-                if (et) {
-                    // Se achamos uma etiqueta válida mapeada, vamos responder com a etiqueta
-                    resposta = respEtiquetaDireta(et);
-                } else {
-                    // 🔒 ESTE É O PONTO QUE EVITA A RESPOSTA 'CORREIOS' PRA TUDO
-                    // Em vez de chutar uma etiqueta qualquer, devolvemos uma resposta segura.
-                    resposta = `HTML:<p class="text-sm text-slate-700">
+            const et = acharEtiquetaPorMensagem(norm);
+            if (et) {
+                resposta = respEtiquetaDireta(et);
+            } else {
+                resposta = `HTML:<p class="text-sm text-slate-700">
 Não encontrei uma etiqueta clara para isso dentro das categorias operacionais autorizadas.
 
 O cartão Clara só pode ser usado para despesas operacionais da loja (por ex.: material de escritório, material de informática de baixo valor como mouse/teclado/cabo, água potável para a equipe, coffee break autorizado para ação de loja, motoboy emergencial, chaveiro emergencial, manutenção simples elétrica/ar-condicionado, bobina fiscal, Correios/Sedex da loja etc.).
@@ -1068,60 +1042,51 @@ O cartão Clara só pode ser usado para despesas operacionais da loja (por ex.: 
 Se for gasto pessoal, bebida alcoólica, item patrimonial/infraestrutura (geladeira, TV, home theater, carro, móvel grande), transporte pessoal tipo Uber, ou qualquer compra que não seja diretamente ligada à operação imediata da loja — não pode no cartão Clara.
 
 Se você acredita que é um gasto operacional legítimo mas não existe etiqueta correspondente, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a> solicitando criação de etiqueta.</p>`;
-                }
             }
             break;
+        }
 
         case "limite":
-            // Você já trata "limite" logo no começo. Este case aqui vira só um fallback.
             ultimaIntencao = "limite";
-            resposta = respLimite ? respLimite() : 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• qual gasto precisa fazer,<br>• urgência,<br>• por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
+            resposta = respLimite();
             break;
 
         case "bloqueio":
-            // "cartão bloqueou", "travou", "como desbloquear"
             ultimaIntencao = "bloqueio";
             resposta = respBloqueio();
             break;
 
         case "prestacao":
-            // "como justificar a transação?", "como lançar nota?", "quanto tempo eu tenho?"
             ultimaIntencao = "prestacao";
             resposta = respPrestacaoContas();
             break;
 
         case "alimentoTime":
-            // "posso comprar lanche pro time?", "coffee break pra VM?"
             ultimaIntencao = "alimentoTime";
             resposta = respAlimentoTime();
             break;
 
         case "transportePessoal":
-            // "Uber pode?", "99 pode?", "táxi pra mim pode?"
             ultimaIntencao = "transportePessoal";
             resposta = respTransportePessoal();
             break;
 
         case "trocaGerente":
-            // "vou mudar de loja", "gerente desligou", "posso usar cartão de outra loja?"
             ultimaIntencao = "trocaGerente";
             resposta = respTrocaGerente();
             break;
 
         case "sangria":
-            // "posso fazer sangria ainda?", "acabou a sangria?"
             ultimaIntencao = "sangria";
             resposta = respSangria();
             break;
 
         case "fraudeContestacao":
-            // "compra que não reconheço", "fraude no cartão"
             ultimaIntencao = "fraudeContestacao";
             resposta = respFraudeContestacao();
             break;
 
         case "podeNaoPode":
-            // perguntas tipo "posso comprar geladeira?", "posso comprar carro?", "posso comprar limão?"
             ultimaIntencao = "generica";
             resposta = respGenerica(norm);
             break;
@@ -1136,20 +1101,17 @@ Se você acredita que é um gasto operacional legítimo mas não existe etiqueta
     return resposta;
 }
 
-<script>
-// =====================================================
-// Renderização das mensagens no chat
-// =====================================================
+/* =====================================================
+   === RENDERIZAÇÃO / CHAT UI ===
+   ===================================================== */
 
-// pega todos os elementos de interface UMA VEZ
 const chatWindow = document.getElementById("chatWindow");
 const chatForm   = document.getElementById("chatForm");
 const userInput  = document.getElementById("userInput");
-const sendBtn    = document.getElementById("sendBtn"); // <- esse é o botão "Enviar" do footer
+const sendBtn    = document.getElementById("sendBtn");
 
-// força o scroll da janela de conversa pro final
+/* faz o scroll descer sempre pro fim do chat */
 function scrollToBottom() {
-    // faz duas tentativas (imediata e depois de 150ms) pra garantir que rolou mesmo
     requestAnimationFrame(() => {
         chatWindow.scrollTop = chatWindow.scrollHeight;
         setTimeout(() => {
@@ -1158,7 +1120,7 @@ function scrollToBottom() {
     });
 }
 
-// desenha a bolha do USUÁRIO
+/* mensagem do usuário */
 function renderUserMessage(text) {
     const wrapper = document.createElement("div");
     wrapper.className = "flex items-start justify-end gap-3";
@@ -1172,12 +1134,11 @@ function renderUserMessage(text) {
     scrollToBottom();
 }
 
-// desenha a bolha do BOT
+/* mensagem do bot */
 function renderBotMessage(text) {
     const wrapper = document.createElement("div");
     wrapper.className = "flex items-start gap-3";
 
-    // avatar do robô do lado esquerdo
     const avatar = document.createElement("img");
     avatar.src = "Gemini_Generated_Image_nzni5znzni5znzni.png";
     avatar.alt = "Assistente Clara (robô)";
@@ -1186,7 +1147,6 @@ function renderBotMessage(text) {
     const bubble = document.createElement("div");
     bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
 
-    // Suporte a resposta em HTML (usamos prefixo "HTML:" nas respostas formatadas)
     if (typeof text === "string" && text.startsWith("HTML:")) {
         bubble.innerHTML = text.replace(/^HTML:/, "").trim();
     } else {
@@ -1199,54 +1159,45 @@ function renderBotMessage(text) {
     scrollToBottom();
 }
 
-// =====================================================
-// Função principal de envio
-// =====================================================
-
+/* envia a pergunta, pega resposta, renderiza */
 function enviarMensagem() {
     const pergunta = userInput.value.trim();
     if (!pergunta) return;
 
-    // 1. renderiza pergunta do usuário
     renderUserMessage(pergunta);
 
-    // 2. gera a resposta baseada na política
     const resposta = gerarRespostaDoBot(pergunta);
 
-    // 3. renderiza resposta do bot
     renderBotMessage(resposta);
 
-    // 4. limpa campo e volta foco
     userInput.value = "";
     userInput.focus();
 
     scrollToBottom();
 }
 
-// =====================================================
-// Listeners (Enter, botão, submit)
-// =====================================================
+/* LISTENERS */
 
-// ENTER SEM SHIFT → envia
-// SHIFT+ENTER → quebra linha normal
+/* Enter sem Shift = enviar. Shift+Enter = quebra linha */
 userInput.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();  // impede quebra de linha
+        e.preventDefault();
         enviarMensagem();
     }
 });
 
-// Clique no botão "Enviar"
+/* clique no botão Enviar */
 sendBtn.addEventListener("click", function (e) {
     e.preventDefault();
     enviarMensagem();
 });
 
-// Submit do <form> (mobile, etc.)
+/* submit do form (mobile etc.) */
 chatForm.addEventListener("submit", function (e) {
     e.preventDefault();
     enviarMensagem();
 });
 </script>
+
 </body>
 </html>
