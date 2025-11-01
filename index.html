@@ -1196,60 +1196,103 @@ function renderBotMessage(text) {
 // =====================================================
 
 <script>
-// pega os elementos do DOM UMA VEZ
+// já existem acima no código:
+const chatWindowEl = document.getElementById("chatWindow");
+const chatForm = document.getElementById("chatForm");
 const userInput = document.getElementById("userInput");
-const sendButton = document.getElementById("sendButton");
-const chatForm  = document.getElementById("chatForm"); // se existir <form id="chatForm">
+const sendBtn = document.getElementById("sendBtn");
 
-// envia a mensagem: renderiza usuário, gera resposta, renderiza bot
+// função pra rolar o container pro final SEMPRE
+function scrollToBottomHard() {
+    // chatWindowEl é o container que tem todas as mensagens
+    requestAnimationFrame(() => {
+        chatWindowEl.scrollTop = chatWindowEl.scrollHeight;
+        setTimeout(() => {
+            chatWindowEl.scrollTop = chatWindowEl.scrollHeight;
+        }, 100);
+    });
+}
+
+// sobrescreve renderUserMessage pra garantir scroll
+function renderUserMessage(text) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "flex items-start justify-end gap-3";
+
+    const bubble = document.createElement("div");
+    bubble.className = "user-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-white";
+    bubble.innerText = text;
+
+    wrapper.appendChild(bubble);
+    chatWindowEl.appendChild(wrapper);
+
+    scrollToBottomHard();
+}
+
+// sobrescreve renderBotMessage pra garantir scroll
+function renderBotMessage(text) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "flex items-start gap-3";
+
+    const avatar = document.createElement("img");
+    avatar.src = "Gemini_Generated_Image_nzni5znzni5znzni.png";
+    avatar.alt = "Assistente Clara (robô)";
+    avatar.className = "h-14 w-auto object-contain flex-shrink-0";
+
+    const bubble = document.createElement("div");
+    bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
+
+    if (typeof text === "string" && text.startsWith("HTML:")) {
+        bubble.innerHTML = text.replace(/^HTML:/, "").trim();
+    } else {
+        bubble.innerText = text;
+    }
+
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(bubble);
+    chatWindowEl.appendChild(wrapper);
+
+    scrollToBottomHard();
+}
+
+// envia a mensagem: pega texto do usuário, gera resposta do bot
 function enviarMensagem() {
     const pergunta = userInput.value.trim();
     if (!pergunta) return;
 
+    // mostra a fala do usuário
     renderUserMessage(pergunta);
 
+    // gera resposta do bot
     const resposta = gerarRespostaDoBot(pergunta);
     renderBotMessage(resposta);
 
-    // limpa campo e foca de novo
+    // limpa campo e devolve foco
     userInput.value = "";
     userInput.focus();
 
-    // rolar pro final do chat depois de responder
-    scrollChatToBottom();
+    scrollToBottomHard();
 }
 
-// garante que o chat role sempre pro final
-function scrollChatToBottom() {
-    const chatBox = document.getElementById("chatMessages"); // <- esse deve ser o container da conversa
-    if (chatBox) {
-        chatBox.scrollTop = chatBox.scrollHeight;
-    }
-}
-
-// ENTER (sem Shift) ENVIA
+// ===== Evento: Enter =====
+// Enter SEM Shift envia. Shift+Enter quebra linha normal.
 userInput.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault(); // não quebra linha
+        e.preventDefault(); // não deixa pular linha
         enviarMensagem();
     }
 });
 
-// CLIQUE NO BOTÃO "ENVIAR"
-if (sendButton) {
-    sendButton.addEventListener("click", function (e) {
-        e.preventDefault();
-        enviarMensagem();
-    });
-}
+// ===== Evento: clique no botão Enviar =====
+sendBtn.addEventListener("click", function (e) {
+    e.preventDefault();
+    enviarMensagem();
+});
 
-// SUBMIT DO FORM (se existir <form id="chatForm"> envolvendo input+botão)
-if (chatForm) {
-    chatForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        enviarMensagem();
-    });
-}
+// ===== Evento: submit do form (caso aperte Enter dentro do form no mobile etc.) =====
+chatForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    enviarMensagem();
+});
 </script>
 </body>
 </html>
