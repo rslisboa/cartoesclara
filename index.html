@@ -899,42 +899,42 @@ Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal). Se a compra 
 // fallback contextual
 
 function respGenerica(msgNorm) {
-    // 1. Primeiro tentamos mapear a pergunta para uma etiqueta oficial
-    const et = acharEtiquetaPorMensagem(msgNorm);
+    const avaliacao = avaliarCompraEspecifica(msgNorm);
 
-    if (et) {
-        // Se achamos uma etiqueta clara (ex.: mouse -> MATERIAL DE INFORMÁTICA),
-        // usamos a resposta específica que você já tem no código.
-        if (typeof respEtiquetaDireta === "function") {
-            return respEtiquetaDireta(et);
-        }
-
-        // fallback no caso improvável de respEtiquetaDireta não existir
+    // CASO 1: claramente proibido (pode === false)
+    if (avaliacao.pode === false) {
         return `HTML:<div class="text-sm text-slate-700">
-<p><b>Pode usar o cartão Clara se for despesa operacional da loja dentro dessa finalidade:</b></p>
-<p class="mt-1"><b>Etiqueta:</b> ${et.nomeEtiqueta || et.etiqueta}</p>
-<p>${et.descricaoUso || ""}</p>
-<p class="mt-2">Lançamento correto na Clara (até 48h):<br/>
-• Anexar nota fiscal/recibo;<br/>
-• Selecionar a etiqueta;<br/>
-• Descrever de forma objetiva o uso (ex.: "Teclado PDV loja 1234").<br/>
-• Guardar o documento físico pelo prazo definido.</p>
+<p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
+<p class="mt-1">${avaliacao.resposta}</p>
 </div>`;
     }
 
-    // 2. Se NÃO achou etiqueta correspondente → resposta segura
+    // CASO 2: claramente permitido (pode === true)
+    // Aqui a gente NÃO coloca mais aquele prefixo fixo "Pode usar o cartão Clara..."
+    // porque esse prefixo era o que estava aparecendo errado em cenários indevidos.
+    if (avaliacao.pode === true) {
+        return `HTML:<div class="text-sm text-slate-700">
+<p>${avaliacao.resposta}</p>
+</div>`;
+    }
+
+    // CASO 3: não foi possível classificar (pode === null)
+    // Este é o fallback SEGURO. Aqui a resposta explica política,
+    // fala que provavelmente NÃO é permitido se não for claramente operacional,
+    // e não inventa etiqueta tipo "CORREIOS" pra qualquer coisa.
     return `HTML:<div class="text-sm text-slate-700">
-<p><b>Não encontrei essa despesa como permitida na Política de Uso dos Cartões Clara.</b></p>
+<p><b>Não encontrei isso como gasto operacional autorizado na Política de Uso dos Cartões Clara.</b></p>
 
 <p class="mt-2">O cartão só pode ser usado para despesas operacionais da loja, por exemplo:</p>
 <ul class="list-disc ml-4">
-<li>material de escritório (caneta, pasta, bloco, etc.);</li>
+<li>material de escritório (caneta, pasta, bloco etc.);</li>
 <li>material de informática de baixo valor (mouse, teclado, cabo, pendrive etc.);</li>
-<li>água potável / coffee break autorizado para treinamento interno oficial ou ação aprovada pela liderança;</li>
+<li>água potável / coffee break autorizado para treinamento interno oficial, ação aprovada (VM / regional / diretoria) ou premiação operacional autorizada;</li>
 <li>motoboy / Sedex emergencial ligado à operação da loja;</li>
-<li>chaveiro emergencial (abrir estoque/cofre etc.);</li>
-<li>manutenção simples elétrica / civil / ar-condicionado de baixo valor já prevista (troca de tomada, ajuste pequeno, limpeza de filtro);</li>
-<li>bobina fiscal / bobina de ECF quando a loja é responsável por isso.</li>
+<li>chaveiro emergencial (abrir estoque/cofre/estoque trancado etc.);</li>
+<li>manutenção simples elétrica / civil / ar-condicionado de baixo valor (troca de tomada, ajuste pequeno, limpeza de filtro);</li>
+<li>bobina fiscal / bobina de ECF se a loja é responsável por isso;</li>
+<li>Correios/Sedex quando for envio operacional da loja.</li>
 </ul>
 
 <p class="mt-2"><b>Não pode usar o cartão Clara para:</b></p>
@@ -946,18 +946,17 @@ function respGenerica(msgNorm) {
 <li>qualquer compra sem vínculo direto e imediato com a operação da loja.</li>
 </ul>
 
-<p class="mt-2">Se algo assim já foi pago no cartão:</p>
+<p class="mt-2">Se isso já foi pago no cartão:</p>
 <ul class="list-disc ml-4">
 <li>avisar o Financeiro;</li>
 <li>classificar na Clara como "Despesa Pessoal – Uso Indevido";</li>
-<li>ressarcir o valor à empresa em até 2 dias úteis, para evitar bloqueio preventivo do cartão.</li>
+<li>ressarcir o valor em até 2 dias úteis para evitar bloqueio preventivo do cartão.</li>
 </ul>
 
 <p class="mt-2">Se você acredita que é um gasto operacional legítimo mas não existe etiqueta adequada, abra chamado no 
-<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a> solicitando criação de etiqueta específica.</p>
+<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a> pedindo orientação/criação de etiqueta específica.</p>
 </div>`;
 }
-
 
 function respFollowup(msgNorm) {
     if (ultimaIntencao === "limite") return respLimite();
@@ -1228,6 +1227,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
