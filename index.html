@@ -1223,26 +1223,42 @@ chatForm.addEventListener("submit", function (e) {
     e.preventDefault();
     enviarMensagem();
 });
-</script>
 
+// === Correção de envio com ENTER e clique no botão ===
+const userInput = document.getElementById("userInput");
+const sendButton = document.getElementById("sendButton");
+
+function enviarMensagemHandler() {
+    const texto = userInput.value.trim();
+    if (texto === "") return;
+
+    if (typeof enviarMensagem === "function") {
+        enviarMensagem();
+    }
+
+    setTimeout(() => {
+        userInput.value = "";
+    }, 100);
+}
+
+userInput.addEventListener("keydown", function (event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        enviarMensagemHandler();
+    }
+});
+
+sendButton.addEventListener("click", function (e) {
+    e.preventDefault();
+    enviarMensagemHandler();
+});
+
+</script>
 </body>
 </html>
 
 
+</script>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+</body>
+</html>
