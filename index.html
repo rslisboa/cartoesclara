@@ -1064,11 +1064,33 @@ function respFollowup(msgNorm) {
    ===================================================== */
 function gerarRespostaDoBot(msgUsuario) {
     const norm = normalize(msgUsuario);
-
-function gerarRespostaDoBot(msgUsuario) {
-    const norm = normalize(msgUsuario);
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
+
+    // 🎯 Detecta fim de conversa / agradecimento
+    const frasesEncerramento = [
+        "ok", "okay", "okey", "certo", "blz", "beleza", "OK"
+        "entendi", "entendido", "tudo certo", "td certo", "tds certo",
+        "tá bom", "ta bom", "tá ótimo", "ta otimo", "tá otimo", "entendi", "entendido"
+        "show", "show de bola", "valeu", "obrigado", "obrigada", "Obrigado", "Obrigada", "OBRIGADO", "OBRIGADA",
+        "agradecido", "agradecida", "tranquilo", "de boa", "suave",
+        "pode deixar", "certinho", "maravilha", "perfeito", "jóia", "joia"
+    ].map(normalize);
+
+    // se a mensagem contém só uma dessas palavras curtas
+    for (const frase of frasesEncerramento) {
+        if (norm === frase || norm.startsWith(frase + " ") || norm.endsWith(" " + frase)) {
+            const respostasEncerramento = [
+                "Que bom que consegui ajudar! 🤗 Pode me chamar sempre que precisar.",
+                "Show! Fico feliz em ajudar 😄",
+                "Perfeito 👌 qualquer dúvida, é só chamar de novo!",
+                "Valeu! Até a próxima 🚀",
+                "Beleza 😎 tô por aqui se precisar de novo."
+            ];
+            const random = Math.floor(Math.random() * respostasEncerramento.length);
+            return `HTML:<p class="text-sm text-slate-700">${respostasEncerramento[random]}</p>`;
+        }
+    }
 
     // 0. PEDIR A POLÍTICA / PDF / DOCUMENTO OFICIAL
     const frasesPolitica = [
@@ -1371,5 +1393,3 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
-
-
