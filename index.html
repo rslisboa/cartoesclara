@@ -866,6 +866,18 @@ Reincidência pode fazer a loja perder permissão de uso do cartão.
 </p>`;
 }
 
+function respPoliticaOficial() {
+    return `HTML:<div class="text-sm text-slate-700">
+<p>Seguem as regras oficiais de referência da empresa.</p>
+<p>
+<a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer">
+<strong>Política de Uso dos Cartões Clara (documento oficial)</strong>
+</a>.
+</p>
+<p>Use sempre esse documento como fonte final.</p>
+</div>`;
+}
+
 function respCatalogoEtiquetas() {
     return `HTML:<div class="text-sm text-slate-700">
 <p><b>Etiquetas oficiais e quando usar:</b></p>
@@ -1052,6 +1064,58 @@ function respFollowup(msgNorm) {
    ===================================================== */
 function gerarRespostaDoBot(msgUsuario) {
     const norm = normalize(msgUsuario);
+
+function gerarRespostaDoBot(msgUsuario) {
+    const norm = normalize(msgUsuario);
+    const intencao = detectarIntencaoPergunta(norm);
+    let resposta;
+
+    // 0. PEDIR A POLÍTICA / PDF / DOCUMENTO OFICIAL
+    const frasesPolitica = [
+        "me manda a politica",
+        "me manda a política",
+        "manda a politica",
+        "manda a política",
+        "politica de uso",
+        "política de uso",
+        "politica do cartao",
+        "politica do cartão",
+        "politica do cartao clara",
+        "politica do cartão clara",
+        "politica dos cartões",
+        "politica dos cartoes",
+        "politica completa",
+        "política completa",
+        "documento oficial",
+        "pdf da politica",
+        "pdf da política",
+        "posso ver a politica",
+        "quero a politica",
+        "quero a política",
+        "me envia a politica",
+        "me envia a política",
+        "envia a politica da clara",
+        "envia a política da clara",
+        "pode me enviar a politica",
+        "pode me enviar a política",
+        "política de uso dos cartões clara",
+        "politica de uso dos cartoes clara"
+    ].map(normalize);
+
+    for (const frase of frasesPolitica) {
+        if (norm.includes(frase)) {
+            ultimaIntencao = "politicaOficial";
+            return respPoliticaOficial();
+        }
+    }
+
+    // ...aqui continua o resto da função (limite, gasto pessoal etc.)
+    // 1. BLOCO: PERGUNTAS/ASSUNTOS SOBRE LIMITE
+    if (norm.includes("limite")) {
+        ultimaIntencao = "limite";
+        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• qual gasto precisa fazer,<br>• urgência,<br>• por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
+    }
+    
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
 
@@ -1307,4 +1371,5 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
