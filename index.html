@@ -923,14 +923,9 @@ function gerarRespostaDoBot(msgUsuario) {
     let resposta;
 
      // 🎯 INTENÇÃO: LIMITE DO CARTÃO
-    if (norm.includes("limite")) {
-        return `Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a> explicando:
-• Qual gasto precisa fazer,
-• Urgência,
-• Por que o limite atual não atende.
-
-A aprovação ou ajuste de limite é feita pelo Financeiro.`;
-    }
+if (norm.includes("limite")) {
+    return `HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.`;
+}
 
     switch (intencao) {
         case "foraEscopo":
@@ -1100,6 +1095,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
