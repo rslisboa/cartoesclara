@@ -930,6 +930,16 @@ function gerarRespostaDoBot(msgUsuario) {
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
 
+     // 🎯 INTENÇÃO: LIMITE DO CARTÃO
+    if (norm.includes("limite")) {
+        return `Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a> explicando:
+• qual gasto precisa fazer,
+• urgência,
+• por que o limite atual não atende.
+
+A aprovação ou ajuste de limite é feita pelo Financeiro.`;
+    }
+
     switch (intencao) {
         case "foraEscopo":
             ultimaIntencao = "foraEscopo";
@@ -1098,6 +1108,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
