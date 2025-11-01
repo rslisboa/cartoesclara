@@ -1136,26 +1136,29 @@ Se você acredita que é um gasto operacional legítimo mas não existe etiqueta
     return resposta;
 }
 
+<script>
 // =====================================================
 // Renderização das mensagens no chat
 // =====================================================
 
+// pega todos os elementos de interface UMA VEZ
 const chatWindow = document.getElementById("chatWindow");
 const chatForm   = document.getElementById("chatForm");
 const userInput  = document.getElementById("userInput");
-const sendBtn    = document.getElementById("sendBtn"); // <-- ID correto do botão
+const sendBtn    = document.getElementById("sendBtn"); // <- esse é o botão "Enviar" do footer
 
-// rola o chat pro final sempre que chega msg nova
+// força o scroll da janela de conversa pro final
 function scrollToBottom() {
+    // faz duas tentativas (imediata e depois de 150ms) pra garantir que rolou mesmo
     requestAnimationFrame(() => {
         chatWindow.scrollTop = chatWindow.scrollHeight;
         setTimeout(() => {
             chatWindow.scrollTop = chatWindow.scrollHeight;
-        }, 100);
+        }, 150);
     });
 }
 
-// monta a bolha do usuário
+// desenha a bolha do USUÁRIO
 function renderUserMessage(text) {
     const wrapper = document.createElement("div");
     wrapper.className = "flex items-start justify-end gap-3";
@@ -1169,11 +1172,12 @@ function renderUserMessage(text) {
     scrollToBottom();
 }
 
-// monta a bolha do bot
+// desenha a bolha do BOT
 function renderBotMessage(text) {
     const wrapper = document.createElement("div");
     wrapper.className = "flex items-start gap-3";
 
+    // avatar do robô do lado esquerdo
     const avatar = document.createElement("img");
     avatar.src = "Gemini_Generated_Image_nzni5znzni5znzni.png";
     avatar.alt = "Assistente Clara (robô)";
@@ -1182,7 +1186,8 @@ function renderBotMessage(text) {
     const bubble = document.createElement("div");
     bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
 
-    if (text.startsWith("HTML:")) {
+    // Suporte a resposta em HTML (usamos prefixo "HTML:" nas respostas formatadas)
+    if (typeof text === "string" && text.startsWith("HTML:")) {
         bubble.innerHTML = text.replace(/^HTML:/, "").trim();
     } else {
         bubble.innerText = text;
@@ -1195,53 +1200,53 @@ function renderBotMessage(text) {
 }
 
 // =====================================================
-// Enviar mensagem (fluxo principal)
+// Função principal de envio
 // =====================================================
 
 function enviarMensagem() {
     const pergunta = userInput.value.trim();
     if (!pergunta) return;
 
-    // mostra msg do usuário
+    // 1. renderiza pergunta do usuário
     renderUserMessage(pergunta);
 
-    // gera resposta do bot
+    // 2. gera a resposta baseada na política
     const resposta = gerarRespostaDoBot(pergunta);
+
+    // 3. renderiza resposta do bot
     renderBotMessage(resposta);
 
-    // limpa campo + foco + scroll
+    // 4. limpa campo e volta foco
     userInput.value = "";
     userInput.focus();
+
     scrollToBottom();
 }
 
 // =====================================================
-// Listeners
+// Listeners (Enter, botão, submit)
 // =====================================================
 
-// 1. Tecla Enter manda a mensagem
-//    Shift+Enter só quebra linha dentro do textarea
-if (userInput) {
-    userInput.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();    // não cria nova linha
-            enviarMensagem();      // manda a pergunta
-        }
-    });
-}
-
-// 2. Clique no botão "Enviar"
-if (sendBtn) {
-    sendBtn.addEventListener("click", function (e) {
-        e.preventDefault(); // não deixa o <form> recarregar a página
+// ENTER SEM SHIFT → envia
+// SHIFT+ENTER → quebra linha normal
+userInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();  // impede quebra de linha
         enviarMensagem();
-    });
-}
+    }
+});
 
-// 3. Submit do formulário (ex: apertar botão com o foco no textarea)
-if (chatForm) {
-    chatForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        enviarMensagem();
-    });
-}
+// Clique no botão "Enviar"
+sendBtn.addEventListener("click", function (e) {
+    e.preventDefault();
+    enviarMensagem();
+});
+
+// Submit do <form> (mobile, etc.)
+chatForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    enviarMensagem();
+});
+</script>
+</body>
+</html>
