@@ -870,36 +870,67 @@ Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal). Se a compra 
 }
 
 // fallback contextual
+
 function respGenerica(msgNorm) {
-    const avaliacao = avaliarCompraEspecifica(msgNorm);
+    // 1. Primeiro tentamos mapear a pergunta para uma etiqueta oficial
+    const et = acharEtiquetaPorMensagem(msgNorm);
 
-    // se é claramente proibido
-    if (avaliacao.pode === false) {
-        return `HTML:<p class="text-sm text-slate-700">
-<b>Não pode usar o cartão Clara pra isso.</b><br/>
-${avaliacao.resposta}<br/><br/>
-</p>`;
-    }
+    if (et) {
+        // Se achamos uma etiqueta clara (ex.: mouse -> MATERIAL DE INFORMÁTICA),
+        // usamos a resposta específica que você já tem no código.
+        if (typeof respEtiquetaDireta === "function") {
+            return respEtiquetaDireta(et);
+        }
 
-    // se é claramente permitido e temos etiqueta
-    if (avaliacao.pode === true) {
+        // fallback no caso improvável de respEtiquetaDireta não existir
         return `HTML:<div class="text-sm text-slate-700">
-<p><b>Pode usar o cartão Clara (despesa operacional autorizada).</b></p>
-<p class="mt-1">${avaliacao.resposta}</p>
+<p><b>Pode usar o cartão Clara se for despesa operacional da loja dentro dessa finalidade:</b></p>
+<p class="mt-1"><b>Etiqueta:</b> ${et.nomeEtiqueta || et.etiqueta}</p>
+<p>${et.descricaoUso || ""}</p>
+<p class="mt-2">Lançamento correto na Clara (até 48h):<br/>
+• Anexar nota fiscal/recibo;<br/>
+• Selecionar a etiqueta;<br/>
+• Descrever de forma objetiva o uso (ex.: "Teclado PDV loja 1234").<br/>
+• Guardar o documento físico pelo prazo definido.</p>
 </div>`;
     }
 
-    // não deu pra classificar com precisão
-    return `HTML:<p class="text-sm text-slate-700">
-Para poder usar o cartão Clara, o gasto precisa ser algo operacional imediato da loja (chaveiro emergencial, motoboy urgente, material de limpeza, periférico de PDV, bobina fiscal etc.) e você precisa lançar na Clara em até 48h (nota fiscal, etiqueta correta e descrição objetiva).<br/><br/>
-Não pode ser gasto pessoal, bebida alcoólica, Uber pessoal ou item patrimonial/infraestrutura (geladeira, micro-ondas, TV, mesa, cadeira etc.). Isso segue Compras ou precisa ressarcir.
-</p>`;
+    // 2. Se NÃO achou etiqueta correspondente → resposta segura
+    return `HTML:<div class="text-sm text-slate-700">
+<p><b>Não encontrei essa despesa como permitida na Política de Uso dos Cartões Clara.</b></p>
+
+<p class="mt-2">O cartão só pode ser usado para despesas operacionais da loja, por exemplo:</p>
+<ul class="list-disc ml-4">
+<li>material de escritório (caneta, pasta, bloco, etc.);</li>
+<li>material de informática de baixo valor (mouse, teclado, cabo, pendrive etc.);</li>
+<li>água potável / coffee break autorizado para treinamento interno oficial ou ação aprovada pela liderança;</li>
+<li>motoboy / Sedex emergencial ligado à operação da loja;</li>
+<li>chaveiro emergencial (abrir estoque/cofre etc.);</li>
+<li>manutenção simples elétrica / civil / ar-condicionado de baixo valor já prevista (troca de tomada, ajuste pequeno, limpeza de filtro);</li>
+<li>bobina fiscal / bobina de ECF quando a loja é responsável por isso.</li>
+</ul>
+
+<p class="mt-2"><b>Não pode usar o cartão Clara para:</b></p>
+<ul class="list-disc ml-4">
+<li>gasto pessoal (almoço/jantar pessoal, lanche pessoal etc.);</li>
+<li>bebida alcoólica;</li>
+<li>transporte pessoal tipo Uber / 99 / táxi pessoal;</li>
+<li>bens patrimoniais / eletrônicos / infraestrutura grande (geladeira, micro-ondas, TV, home theater, PS5, carro, móveis grandes);</li>
+<li>qualquer compra sem vínculo direto e imediato com a operação da loja.</li>
+</ul>
+
+<p class="mt-2">Se algo assim já foi pago no cartão:</p>
+<ul class="list-disc ml-4">
+<li>avisar o Financeiro;</li>
+<li>classificar na Clara como "Despesa Pessoal – Uso Indevido";</li>
+<li>ressarcir o valor à empresa em até 2 dias úteis, para evitar bloqueio preventivo do cartão.</li>
+</ul>
+
+<p class="mt-2">Se você acredita que é um gasto operacional legítimo mas não existe etiqueta adequada, abra chamado no 
+<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a> solicitando criação de etiqueta específica.</p>
+</div>`;
 }
 
-// =====================================================
-// Follow-up inteligente
-// =====================================================
-let ultimaIntencao = null;
 
 function respFollowup(msgNorm) {
     if (ultimaIntencao === "limite") return respLimite();
@@ -921,15 +952,15 @@ function gerarRespostaDoBot(msgUsuario) {
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
 
-    // 1. BLOCO: PERGUNTAS/ASSUNTOS SOBRE LIMITE
-    // Se perguntar sobre limite, aumento de limite, limite insuficiente etc.
+    // 1. ASSUNTOS SOBRE LIMITE (aumento de limite, limite insuficiente, limite acabou etc.)
+    // Mantemos apenas UMA checagem de "limite" aqui em cima, para não ter duplicado.
     if (norm.includes("limite")) {
         ultimaIntencao = "limite";
         return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• qual gasto precisa fazer,<br>• urgência,<br>• por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
     }
 
-    // 2. BLOCO: USO PESSOAL (alimentação pessoal, jantar, lanche etc.)
-    // Se o texto mostra que a pessoa pagou comida pra ela mesma / refeição própria
+    // 2. USO PESSOAL / ALIMENTAÇÃO PESSOAL
+    // Aqui vamos ampliar os padrões pra pegar janta, almoço, lanche pessoal etc.
     const padroesGastoPessoalAlimentacao = [
         "paguei meu almoco",
         "paguei meu almoço",
@@ -937,23 +968,35 @@ function gerarRespostaDoBot(msgUsuario) {
         "paguei meu lanche",
         "paguei meu café",
         "paguei meu cafe",
+        "paguei meu pastel",
+        "paguei minha refeicao",
+        "paguei minha refeição",
+        "paguei minha comida",
+        "paguei minha janta",
+
         "meu almoço",
         "meu almoco",
         "meu jantar",
         "minha janta",
-        "meu pastel",
         "meu lanche",
-        "meu cafe",
-        "meu café",
+        "meu lanche com o cartao",
+        "meu lanche com o cartão",
+        "minha comida",
+
         "almoco pessoal",
         "almoço pessoal",
         "jantar pessoal",
         "lanche pessoal",
-        "comida pra mim",
-        "comida para mim",
-        "minha comida",
         "refeição pessoal",
-        "refeicao pessoal"
+        "refeicao pessoal",
+
+        // variações tipo "almocei com o cartão", "jantei com o cartão"
+        "almocei com o cartao",
+        "almocei com o cartão",
+        "jantei com o cartao",
+        "jantei com o cartão",
+        "comi com o cartao",
+        "comi com o cartão"
     ];
 
     const isGastoPessoalAlimentacao = padroesGastoPessoalAlimentacao.some(p => norm.includes(p));
@@ -963,83 +1006,96 @@ function gerarRespostaDoBot(msgUsuario) {
         return `⛔ Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja.
 
 Se já foi pago com o cartão:
-
-• Avise o Financeiro e encaminhe chamado via ServiceNow, caminho: Contas a Receber > Cartão Clara > Gasto Indevido (pessoal).
+• Avise o Financeiro e abra chamado no ServiceNow (Contas a Receber > Cartão Clara > Gasto Indevido - pessoal);
 • Classifique na Clara como "Despesa Pessoal – Uso Indevido";
 • Ressarça o valor à empresa.
 
 Se não regularizar, o cartão pode ficar bloqueado preventivamente.`;
     }
 
-     // 🎯 INTENÇÃO: LIMITE DO CARTÃO
-if (norm.includes("limite")) {
-    return `HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.`;
-}
-
+    // 3. Agora seguimos com a sua intenção principal detectada por detectarIntencaoPergunta()
     switch (intencao) {
+
         case "foraEscopo":
+            // Perguntas tipo futebol, política nacional, matemática etc.
             ultimaIntencao = "foraEscopo";
             resposta = respostaForaEscopo();
             break;
 
         case "etiqueta":
+            // Usuário perguntou algo tipo "qual etiqueta usar pra mouse?" ou "que etiqueta pra água?"
             ultimaIntencao = "etiqueta";
             {
                 const et = acharEtiquetaPorMensagem(norm);
+
                 if (et) {
+                    // Se achamos uma etiqueta válida mapeada, vamos responder com a etiqueta
                     resposta = respEtiquetaDireta(et);
                 } else {
+                    // 🔒 ESTE É O PONTO QUE EVITA A RESPOSTA 'CORREIOS' PRA TUDO
+                    // Em vez de chutar uma etiqueta qualquer, devolvemos uma resposta segura.
                     resposta = `HTML:<p class="text-sm text-slate-700">
-Não achei uma etiqueta óbvia só pelo texto. Se realmente não existir nenhuma etiqueta adequada na Clara para esse gasto operacional, você deve abrir um chamado solicitando criação de etiqueta no
-<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
-ServiceNow
-</a>.
-</p>`;
+Não encontrei uma etiqueta clara para isso dentro das categorias operacionais autorizadas.
+
+O cartão Clara só pode ser usado para despesas operacionais da loja (por ex.: material de escritório, material de informática de baixo valor como mouse/teclado/cabo, água potável para a equipe, coffee break autorizado para ação de loja, motoboy emergencial, chaveiro emergencial, manutenção simples elétrica/ar-condicionado, bobina fiscal, Correios/Sedex da loja etc.).
+
+Se for gasto pessoal, bebida alcoólica, item patrimonial/infraestrutura (geladeira, TV, home theater, carro, móvel grande), transporte pessoal tipo Uber, ou qualquer compra que não seja diretamente ligada à operação imediata da loja — não pode no cartão Clara.
+
+Se você acredita que é um gasto operacional legítimo mas não existe etiqueta correspondente, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a> solicitando criação de etiqueta.</p>`;
                 }
             }
             break;
 
         case "limite":
+            // Você já trata "limite" logo no começo. Este case aqui vira só um fallback.
             ultimaIntencao = "limite";
-            resposta = respLimite();
+            resposta = respLimite ? respLimite() : 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• qual gasto precisa fazer,<br>• urgência,<br>• por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
             break;
 
         case "bloqueio":
+            // "cartão bloqueou", "travou", "como desbloquear"
             ultimaIntencao = "bloqueio";
             resposta = respBloqueio();
             break;
 
         case "prestacao":
+            // "como justificar a transação?", "como lançar nota?", "quanto tempo eu tenho?"
             ultimaIntencao = "prestacao";
             resposta = respPrestacaoContas();
             break;
 
         case "alimentoTime":
+            // "posso comprar lanche pro time?", "coffee break pra VM?"
             ultimaIntencao = "alimentoTime";
             resposta = respAlimentoTime();
             break;
 
         case "transportePessoal":
+            // "Uber pode?", "99 pode?", "táxi pra mim pode?"
             ultimaIntencao = "transportePessoal";
             resposta = respTransportePessoal();
             break;
 
         case "trocaGerente":
+            // "vou mudar de loja", "gerente desligou", "posso usar cartão de outra loja?"
             ultimaIntencao = "trocaGerente";
             resposta = respTrocaGerente();
             break;
 
         case "sangria":
+            // "posso fazer sangria ainda?", "acabou a sangria?"
             ultimaIntencao = "sangria";
             resposta = respSangria();
             break;
 
         case "fraudeContestacao":
+            // "compra que não reconheço", "fraude no cartão"
             ultimaIntencao = "fraudeContestacao";
             resposta = respFraudeContestacao();
             break;
 
         case "podeNaoPode":
+            // perguntas tipo "posso comprar geladeira?", "posso comprar carro?", "posso comprar limão?"
             ultimaIntencao = "generica";
             resposta = respGenerica(norm);
             break;
@@ -1053,6 +1109,7 @@ ServiceNow
 
     return resposta;
 }
+
 
 // =====================================================
 // Renderização das mensagens no chat
@@ -1144,6 +1201,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
