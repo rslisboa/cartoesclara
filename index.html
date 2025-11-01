@@ -39,59 +39,55 @@
         flex-wrap:wrap;
         row-gap:1rem;
     }
-    .chat-header-left {
-        width: 100%;
-        max-width:none;
-    }
-    .chat-header-left h1 {
-    font-size: 1rem;
-    font-weight: 700;
-    line-height: 1.4;
-    color: #B5FF20; /* verde claro do texto */
-    text-align: center;
-    border-bottom: 2px solid #005E27; /* linha verde escura */
-    padding-bottom: 0.5rem; /* pequeno espaço entre texto e linha */
-    display: inline-block; /* para que a linha não ocupe a tela toda */
-    margin: 0 auto;
+
+    .chat-header-area {
+    background-color: #005E27; /* fundo verde escuro */
+    border-top-left-radius: 1rem;
+    border-top-right-radius: 1rem;
+    border-bottom: 1px solid rgba(0,0,0,.08);
+    padding: 1rem 1.25rem;
 }
-    .chat-header-left p {
-        font-size:.8rem;
-        line-height:1.4;
-        color:#005E27;
-        margin-top:.5rem;
-        text-align:center;
-    }
-    .chat-header-left .examples {
-        text-align: center;
-        font-size:.75rem;
-        line-height:1.4;
-        font-weight:500;
-        background-color:rgba(0,0,0,0.05);
-        color:#005E27;
-        display:inline-block;
-        padding:.5rem .75rem;
-        border-radius:.5rem;
-        margin-top:.75rem;
-    }
-    .chat-header-left .policy-note {
-        font-size:.7rem;
-        line-height:1.4;
-        color:#005E27;
-        margin-top:.75rem;
-        font-style:italic;
-        text-align: center;
-    }
-    .chat-header-avatar {
-        display:flex;
-        align-items:flex-start;
-        justify-content:flex-end;
-        min-width:96px;
-    }
-    .chat-header-avatar img {
-        height:84px;
-        width:auto;
-        object-fit:contain;
-    }
+
+.chat-header-inner {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    position: relative;
+}
+
+.chat-header-left {
+    width: 100%;
+    text-align: center;
+    color: #B5FF20; /* texto verde claro */
+}
+
+.chat-header-left h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #B5FF20; /* texto verde claro */
+    margin-bottom: 0.5rem;
+}
+
+.chat-header-left p,
+.chat-header-left .examples,
+.chat-header-left .policy-note {
+    color: #1e293b;
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+.chat-header-avatar {
+    position: absolute;
+    top: 0.5rem;
+    right: 1rem;
+}
+
+.chat-header-avatar img {
+    height: 72px;
+    width: auto;
+    object-fit: contain;
+    filter: none; /* remove sombra */
+}
 
     .chat-body {
         flex:1 1 auto;
@@ -1109,3 +1105,4 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
