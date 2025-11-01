@@ -922,6 +922,30 @@ function gerarRespostaDoBot(msgUsuario) {
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
 
+    // 🚫 Detecta gasto pessoal de alimentação
+    if (
+        norm.includes("almoco") ||
+        norm.includes("almoço") ||
+        norm.includes("meu lanche") ||
+        norm.includes("paguei meu almoco") ||
+        norm.includes("paguei meu almoço") ||
+        norm.includes("paguei meu almoço com o cartao") ||
+        norm.includes("paguei meu almoco com o cartao") ||
+        norm.includes("paguei meu almoço com o cartão") ||
+        norm.includes("paguei meu almoco com o cartão") ||
+        norm.includes("comida pra mim")
+    ) {
+        return `⛔ Almoço pessoal não pode ser pago com o cartão Clara.
+Esse é um gasto pessoal, não é uma despesa operacional da loja.
+
+Se já foi pago no cartão:
+• avise o Financeiro;
+• classifique na Clara como "Despesa Pessoal – Uso Indevido";
+• ressarça o valor à empresa em até 2 dias úteis.
+
+O cartão pode ser bloqueado se não regularizar.`;
+    }
+
      // 🎯 INTENÇÃO: LIMITE DO CARTÃO
 if (norm.includes("limite")) {
     return `HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.`;
@@ -1095,6 +1119,7 @@ chatForm.addEventListener("submit", function (e) {
 
 </body>
 </html>
+
 
 
 
