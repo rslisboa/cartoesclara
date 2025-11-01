@@ -1136,24 +1136,26 @@ Se você acredita que é um gasto operacional legítimo mas não existe etiqueta
     return resposta;
 }
 
-
 // =====================================================
 // Renderização das mensagens no chat
 // =====================================================
-const chatWindow = document.getElementById("chatWindow");
-const chatForm = document.getElementById("chatForm");
-const userInput = document.getElementById("userInput");
 
+const chatWindow = document.getElementById("chatWindow");
+const chatForm   = document.getElementById("chatForm");
+const userInput  = document.getElementById("userInput");
+const sendBtn    = document.getElementById("sendBtn"); // <-- ID correto do botão
+
+// rola o chat pro final sempre que chega msg nova
 function scrollToBottom() {
     requestAnimationFrame(() => {
         chatWindow.scrollTop = chatWindow.scrollHeight;
-        // garante 100% que desce até o fim
         setTimeout(() => {
             chatWindow.scrollTop = chatWindow.scrollHeight;
-        }, 150);
+        }, 100);
     });
 }
 
+// monta a bolha do usuário
 function renderUserMessage(text) {
     const wrapper = document.createElement("div");
     wrapper.className = "flex items-start justify-end gap-3";
@@ -1167,6 +1169,7 @@ function renderUserMessage(text) {
     scrollToBottom();
 }
 
+// monta a bolha do bot
 function renderBotMessage(text) {
     const wrapper = document.createElement("div");
     wrapper.className = "flex items-start gap-3";
@@ -1192,107 +1195,53 @@ function renderBotMessage(text) {
 }
 
 // =====================================================
-// Envio de mensagem
+// Enviar mensagem (fluxo principal)
 // =====================================================
 
-<script>
-// já existem acima no código:
-const chatWindowEl = document.getElementById("chatWindow");
-const chatForm = document.getElementById("chatForm");
-const userInput = document.getElementById("userInput");
-const sendBtn = document.getElementById("sendBtn");
-
-// função pra rolar o container pro final SEMPRE
-function scrollToBottomHard() {
-    // chatWindowEl é o container que tem todas as mensagens
-    requestAnimationFrame(() => {
-        chatWindowEl.scrollTop = chatWindowEl.scrollHeight;
-        setTimeout(() => {
-            chatWindowEl.scrollTop = chatWindowEl.scrollHeight;
-        }, 100);
-    });
-}
-
-// sobrescreve renderUserMessage pra garantir scroll
-function renderUserMessage(text) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "flex items-start justify-end gap-3";
-
-    const bubble = document.createElement("div");
-    bubble.className = "user-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-white";
-    bubble.innerText = text;
-
-    wrapper.appendChild(bubble);
-    chatWindowEl.appendChild(wrapper);
-
-    scrollToBottomHard();
-}
-
-// sobrescreve renderBotMessage pra garantir scroll
-function renderBotMessage(text) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "flex items-start gap-3";
-
-    const avatar = document.createElement("img");
-    avatar.src = "Gemini_Generated_Image_nzni5znzni5znzni.png";
-    avatar.alt = "Assistente Clara (robô)";
-    avatar.className = "h-14 w-auto object-contain flex-shrink-0";
-
-    const bubble = document.createElement("div");
-    bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
-
-    if (typeof text === "string" && text.startsWith("HTML:")) {
-        bubble.innerHTML = text.replace(/^HTML:/, "").trim();
-    } else {
-        bubble.innerText = text;
-    }
-
-    wrapper.appendChild(avatar);
-    wrapper.appendChild(bubble);
-    chatWindowEl.appendChild(wrapper);
-
-    scrollToBottomHard();
-}
-
-// envia a mensagem: pega texto do usuário, gera resposta do bot
 function enviarMensagem() {
     const pergunta = userInput.value.trim();
     if (!pergunta) return;
 
-    // mostra a fala do usuário
+    // mostra msg do usuário
     renderUserMessage(pergunta);
 
     // gera resposta do bot
     const resposta = gerarRespostaDoBot(pergunta);
     renderBotMessage(resposta);
 
-    // limpa campo e devolve foco
+    // limpa campo + foco + scroll
     userInput.value = "";
     userInput.focus();
-
-    scrollToBottomHard();
+    scrollToBottom();
 }
 
-// ===== Evento: Enter =====
-// Enter SEM Shift envia. Shift+Enter quebra linha normal.
-userInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault(); // não deixa pular linha
+// =====================================================
+// Listeners
+// =====================================================
+
+// 1. Tecla Enter manda a mensagem
+//    Shift+Enter só quebra linha dentro do textarea
+if (userInput) {
+    userInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();    // não cria nova linha
+            enviarMensagem();      // manda a pergunta
+        }
+    });
+}
+
+// 2. Clique no botão "Enviar"
+if (sendBtn) {
+    sendBtn.addEventListener("click", function (e) {
+        e.preventDefault(); // não deixa o <form> recarregar a página
         enviarMensagem();
-    }
-});
+    });
+}
 
-// ===== Evento: clique no botão Enviar =====
-sendBtn.addEventListener("click", function (e) {
-    e.preventDefault();
-    enviarMensagem();
-});
-
-// ===== Evento: submit do form (caso aperte Enter dentro do form no mobile etc.) =====
-chatForm.addEventListener("submit", function (e) {
-    e.preventDefault();
-    enviarMensagem();
-});
-</script>
-</body>
-</html>
+// 3. Submit do formulário (ex: apertar botão com o foco no textarea)
+if (chatForm) {
+    chatForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        enviarMensagem();
+    });
+}
