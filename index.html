@@ -557,8 +557,11 @@ function detectarIntencaoPergunta(msgNorm) {
     // uber / transporte pessoal
     if (
         msgNorm.includes("uber") ||
+        msgNorm.includes("Uber") ||
         msgNorm.includes("99") ||
         msgNorm.includes("taxi") ||
+        msgNorm.includes("Taxi") ||
+        msgNorm.includes("Táxi") ||
         msgNorm.includes("táxi") ||
         msgNorm.includes("app de transporte")
     ) {
@@ -568,10 +571,15 @@ function detectarIntencaoPergunta(msgNorm) {
     // troca de gerente / transferência de loja
     if (
         msgNorm.includes("mudar de loja") ||
+        msgNorm.includes("troca de loja") ||
         msgNorm.includes("trocar de loja") ||
+        msgNorm.includes("mudança de loja") ||
+        msgNorm.includes("mudanca de loja") ||
         msgNorm.includes("vou mudar de loja") ||
         msgNorm.includes("fui transferido") ||
         msgNorm.includes("transferido de loja") ||
+        msgNorm.includes("transferencia de loja") ||
+        msgNorm.includes("transferência de loja") ||
         msgNorm.includes("gerente desligado") ||
         msgNorm.includes("sem gerente") ||
         msgNorm.includes("gerente saiu") ||
@@ -587,6 +595,9 @@ function detectarIntencaoPergunta(msgNorm) {
     // sangria
     if (
         msgNorm.includes("sangria") ||
+        msgNorm.includes("sangrias") ||
+        msgNorm.includes("Sangria") ||
+        msgNorm.includes("Sangrias") ||
         msgNorm.includes("fazer sangria") ||
         msgNorm.includes("puxar dinheiro do caixa") ||
         msgNorm.includes("retirar dinheiro do caixa")
@@ -1851,4 +1862,3 @@ chatForm.addEventListener("submit", function (e) {
 </script>
 </body>
 </html>
-
