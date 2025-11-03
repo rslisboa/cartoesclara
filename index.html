@@ -1070,9 +1070,9 @@ function gerarRespostaDoBot(msgUsuario) {
 
     // 🎯 Detecta fim de conversa / agradecimento
     const frasesEncerramento = [
-        "ok", "okay", "okey", "certo", "blz", "beleza", "OK"
+        "ok", "okay", "okey", "certo", "blz", "beleza", "OK",
         "entendi", "entendido", "tudo certo", "td certo", "tds certo",
-        "tá bom", "ta bom", "tá ótimo", "ta otimo", "tá otimo", "entendi", "entendido"
+        "tá bom", "ta bom", "tá ótimo", "ta otimo", "tá otimo", "entendi", "entendido",
         "show", "show de bola", "valeu", "obrigado", "obrigada", "Obrigado", "Obrigada", "OBRIGADO", "OBRIGADA",
         "agradecido", "agradecida", "tranquilo", "de boa", "suave",
         "pode deixar", "certinho", "maravilha", "perfeito", "jóia", "joia"
@@ -1138,9 +1138,7 @@ function gerarRespostaDoBot(msgUsuario) {
         ultimaIntencao = "limite";
         return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• qual gasto precisa fazer,<br>• urgência,<br>• por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
     }
-    
-    const intencao = detectarIntencaoPergunta(norm);
-    let resposta;
+
 
     // 0. Perguntas genéricas tipo "qual etiqueta usar?"
 const perguntaGeralEtiqueta = [
@@ -1385,15 +1383,14 @@ sendBtn.addEventListener("click", function (e) {
     enviarMensagem();
 });
 
-/* submit do form (mobile etc.) */
+// submit do form (mobile etc.)
 chatForm.addEventListener("submit", function (e) {
     e.preventDefault();
     enviarMensagem();
 });
-</script>
 
+// ⬇⬇⬇ ADICIONE ESTA LINHA LOGO AQUI
+}); // fecha o document.addEventListener("DOMContentLoaded", () => { ... )
+</script>
 </body>
 </html>
-
-}); // fecha o listener
-</script>
