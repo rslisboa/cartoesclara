@@ -1023,112 +1023,126 @@ function consultarPendenciasLoja(lojaCodigo) {
     }
 
     const loja = (lojaCodigo || "").toString().replace(/\D/g, "");
-
     if (!loja) {
         renderBotMessage(
-            'HTML:<p class="text-sm text-slate-700">Não entendi o número da loja. Me envie só o código numérico, por exemplo: <b>1234</b>.</p>'
+            'HTML:<p class="text-sm text-slate-700">Não entendi o número da loja. Me envie só o código numérico, por exemplo: <b>0171</b>.</p>'
         );
         return;
     }
 
-    fetch(`${URL_API_PENDENCIAS}?loja=${encodeURIComponent(loja)}`)
-        .then(resp => {
-            // Se vier 403, 404, 500 etc
-            if (!resp.ok) {
-                console.error("HTTP não OK ao chamar API de pendências:", resp.status, resp.statusText);
-                throw new Error("HTTP " + resp.status);
-            }
-            // Lê como texto pra conseguirmos ver qualquer HTML de erro
-            return resp.text();
-        })
-        .then(text => {
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (e) {
-                console.error("Resposta não é JSON válido. Conteúdo bruto:", text);
-                throw new Error("Resposta da API não está em formato JSON.");
-            }
+    renderBotMessage(
+        `HTML:<p class="text-sm text-slate-700">Beleza! Vou consultar as pendências Clara da loja <b>${loja}</b>…</p>`
+    );
 
+    fetch(`${URL_API_PENDENCIAS}?mode=json&loja=${encodeURIComponent(loja)}`)
+        .then(r => r.json())
+        .then(data => {
             if (!data.ok) {
                 renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700">
-Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>
-Detalhe: ${data.error || "erro desconhecido"}
-</p>`
+                    `HTML:<p class="text-sm text-slate-700">Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>Detalhe: ${data.error || "erro desconhecido"}</p>`
                 );
+                aguardandoLojaPendencias = false;
+                aguardandoEmailPendencias = false;
+                lojaPendenciasAtual = "";
                 return;
             }
 
             if (!data.rows || data.rows.length === 0) {
                 renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700">
-Não encontrei pendências para a sua loja <b>${loja}</b>.
-</p>`
+                    `HTML:<p class="text-sm text-slate-700">Não encontrei pendências Clara para a loja <b>${loja}</b> na última data de cobrança.</p>`
                 );
+                aguardandoLojaPendencias = false;
+                aguardandoEmailPendencias = false;
+                lojaPendenciasAtual = "";
                 return;
             }
 
-            const header = data.header || ["Col B", "Col C", "Col D", "Col E", "Col F", "Col G"];
-            const rows = data.rows;
-            const ultimaData = data.ultimaData || "";
-            const textoData = ultimaData
-                ? ` na data de cobrança <b>${ultimaData}</b>`
-                : "";
+            // Achou pendências: guarda loja e pede o e-mail
+            lojaPendenciasAtual = loja;
+            aguardandoLojaPendencias = false;
+            aguardandoEmailPendencias = true;
 
-            let htmlTabela = `
-                <div class="text-sm text-slate-700">
-                    <p>Encontrei as seguintes pendências para a loja <b>${loja}</b>${textoData}:</p>
-                    <div class="mt-2 overflow-x-auto">
-                        <table class="min-w-full text-xs border border-slate-200">
-                            <thead class="bg-slate-100">
-                                <tr>
-                                    <th class="border px-2 py-1">${header[0] || "Col B"}</th>
-                                    <th class="border px-2 py-1">${header[1] || "Col C"}</th>
-                                    <th class="border px-2 py-1">${header[2] || "Col D"}</th>
-                                    <th class="border px-2 py-1">${header[3] || "Col E"}</th>
-                                    <th class="border px-2 py-1">${header[4] || "Col F"}</th>
-                                    <th class="border px-2 py-1">${header[5] || "Col G"}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-            `;
-
-            rows.forEach(cols => {
-                htmlTabela += `
-                    <tr>
-                        <td class="border px-2 py-1">${cols[0] || ""}</td>
-                        <td class="border px-2 py-1">${cols[1] || ""}</td>
-                        <td class="border px-2 py-1">${cols[2] || ""}</td>
-                        <td class="border px-2 py-1">${cols[3] || ""}</td>
-                        <td class="border px-2 py-1">${cols[4] || ""}</td>
-                        <td class="border px-2 py-1">${cols[5] || ""}</td>
-                    </tr>
-                `;
-            });
-
-            htmlTabela += `
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-
-            renderBotMessage("HTML:" + htmlTabela);
+            renderBotMessage(
+                `HTML:<p class="text-sm text-slate-700">
+Encontrei pendências Clara para a loja <b>${loja}</b> (data de cobrança <b>${data.ultimaData || "-"}</b>).<br/>
+Me envia agora o seu e-mail corporativo para eu mandar o resumo (ex.: <b>nome.sobrenome@gruposbf.com.br</b>).
+</p>`
+            );
         })
         .catch(err => {
             console.error("Erro ao chamar API de pendências:", err);
             renderBotMessage(
                 'HTML:<p class="text-sm text-slate-700">Tive um erro ao tentar consultar as pendências dessa loja. Tente novamente mais tarde.</p>'
             );
+            aguardandoLojaPendencias = false;
+            aguardandoEmailPendencias = false;
+            lojaPendenciasAtual = "";
         });
 }
 
+function enviarPendenciasPorEmail(emailTexto) {
+    if (!URL_API_PENDENCIAS || !lojaPendenciasAtual) {
+        renderBotMessage(
+            'HTML:<p class="text-sm text-slate-700">Não tenho os dados da loja carregados. Tente pedir novamente para consultar as pendências da sua loja.</p>'
+        );
+        aguardandoEmailPendencias = false;
+        return;
+    }
+
+    const email = emailTexto.trim();
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!regexEmail.test(email)) {
+        renderBotMessage(
+            'HTML:<p class="text-sm text-slate-700">Esse e-mail parece inválido. Me envia no formato: <b>nome.sobrenome@gruposbf.com.br</b>.</p>'
+        );
+        return;
+    }
+
+    renderBotMessage(
+        `HTML:<p class="text-sm text-slate-700">Perfeito! Vou enviar o resumo das pendências Clara da loja <b>${lojaPendenciasAtual}</b> para <b>${email}</b>…</p>`
+    );
+
+    fetch(
+        `${URL_API_PENDENCIAS}?mode=email&loja=${encodeURIComponent(
+            lojaPendenciasAtual
+        )}&email=${encodeURIComponent(email)}`
+    )
+        .then(r => r.json())
+        .then(data => {
+            if (!data.ok) {
+                renderBotMessage(
+                    `HTML:<p class="text-sm text-slate-700">Tentei enviar o e-mail, mas deu erro: ${data.error || "erro desconhecido"}.</p>`
+                );
+            } else {
+                renderBotMessage(
+                    'HTML:<p class="text-sm text-slate-700">E-mail enviado com sucesso! ✅<br/>Verifique sua caixa de entrada (e eventualmente o lixo eletrônico).</p>'
+                );
+            }
+            aguardandoEmailPendencias = false;
+            lojaPendenciasAtual = "";
+        })
+        .catch(err => {
+            console.error("Erro ao enviar e-mail de pendências:", err);
+            renderBotMessage(
+                'HTML:<p class="text-sm text-slate-700">Tive um erro ao tentar enviar o e-mail com as pendências. Tente novamente mais tarde.</p>'
+            );
+            aguardandoEmailPendencias = false;
+            lojaPendenciasAtual = "";
+        });
+}
+
+    
 /* =====================================================
    Fallback / resposta genérica com política
    ===================================================== */
 
 let ultimaIntencao = null;
+
+// ===== Fluxo de consulta de pendências Clara (planilha) =====
+let aguardandoLojaPendencias = false;
+let aguardandoEmailPendencias = false;
+let lojaPendenciasAtual = "";
 
 function respGenerica(msgNorm) {
     const avaliacao = avaliarCompraEspecifica(msgNorm);
@@ -1188,6 +1202,26 @@ function gerarRespostaDoBot(msgUsuario) {
     const norm = normalize(msgUsuario);
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
+
+    // 🔁 FLUXO ESPECIAL: consulta de pendências Clara (planilha) + envio por e-mail
+    if (aguardandoLojaPendencias) {
+        // Usuário deve ter mandado o código da loja agora
+        const loja = norm.replace(/\D/g, "");
+        if (!loja) {
+            return 'HTML:<p class="text-sm text-slate-700">Não entendi o código da loja. Me envie só os números, por exemplo: <b>0171</b>.</p>';
+        }
+
+        // chama a API em modo JSON e, dentro dela, vamos trocar o estado para "aguardandoEmailPendencias"
+        consultarPendenciasLoja(loja);
+        // aqui já devolvo uma mensagem curtinha (consultarPendenciasLoja também manda mensagem)
+        return ''; // já estamos respondendo via renderBotMessage dentro da função
+    }
+
+    if (aguardandoEmailPendencias) {
+        // Usuário deve estar mandando o e-mail agora
+        enviarPendenciasPorEmail(msgUsuario);
+        return ''; // a função enviarPendenciasPorEmail cuida das mensagens
+    }
 
         // Se estamos aguardando o número da loja para consultar pendências
     if (modoConsultaPendencias === "aguardando_loja") {
@@ -1437,6 +1471,31 @@ for (const frase of perguntaGeralEtiqueta) {
 
 <p class="mt-2">Se não regularizar, o cartão pode ficar bloqueado preventivamente.</p>
 </div>`;
+    }
+
+        // 🎯 Gatilho para iniciar fluxo de consulta de pendências Clara
+    const termosPendencias = [
+        "pendencia clara",
+        "pendências clara",
+        "pendencias clara",
+        "ver pendencias",
+        "ver pendências",
+        "pendencias",
+        "pendências",
+        "consultar pendencias",
+        "consultar pendências",
+        "pendencia do cartao",
+        "pendência do cartão",
+        "bloqueio por pendencia",
+        "bloqueio por pendência"
+    ].map(normalize);
+
+    if (termosPendencias.some(t => norm.includes(t))) {
+        aguardandoLojaPendencias = true;
+        aguardandoEmailPendencias = false;
+        lojaPendenciasAtual = "";
+
+        return 'HTML:<p class="text-sm text-slate-700">Consigo consultar as pendências Clara da sua loja e te mandar por e-mail. Me informa o código da loja (somente números), por exemplo: <b>0171</b>.</p>';
     }
 
     // Escolhe resposta por intenção
@@ -1790,6 +1849,3 @@ chatForm.addEventListener("submit", function (e) {
 </script>
 </body>
 </html>
-
-
-
