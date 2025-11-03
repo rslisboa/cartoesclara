@@ -1045,7 +1045,7 @@ function consultarPendenciasLoja(lojaCodigo) {
 
             if (!data.rows || data.rows.length === 0) {
                 renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700">Não encontrei pendências na aba <b>CLARA_PEND</b> para a loja <b>${loja}</b>.</p>`
+                    `HTML:<p class="text-sm text-slate-700">Não encontrei pendências para a sua loja <b>${loja}</b>.</p>`
                 );
                 return;
             }
@@ -1055,7 +1055,7 @@ function consultarPendenciasLoja(lojaCodigo) {
 
             let htmlTabela = `
                 <div class="text-sm text-slate-700">
-                    <p>Encontrei as seguintes pendências para a loja <b>${loja}</b> na aba <b>CLARA_PEND</b>:</p>
+                    <p>Encontrei as seguintes pendências para a loja <b>${loja}</b>:</p>
                     <div class="mt-2 overflow-x-auto">
                         <table class="min-w-full text-xs border border-slate-200">
                             <thead class="bg-slate-100">
@@ -1183,7 +1183,7 @@ Não entendi o número da loja. Me manda só o código numérico, por exemplo: <
         consultarPendenciasLoja(loja);
 
         return `HTML:<p class="text-sm text-slate-700">
-Beleza, vou consultar as pendências da loja <b>${loja}</b> na aba <b>CLARA_PEND</b> e te mostro aqui embaixo 👇
+Beleza, vou consultar as pendências da loja <b>${loja}</b> e te mostro aqui embaixo 👇
         </p>`;
     }
 
@@ -1616,7 +1616,7 @@ solicitando criação ou ajuste de etiqueta.
     modoConsultaPendencias = "aguardando_loja";
     resposta = `HTML:<div class="text-sm text-slate-700">
 ${respBloqueio().replace(/^HTML:/, "").trim()}
-<p class="mt-3"><b>Se quiser, me informe o número da sua loja</b> (ex.: 1234) que eu consulto na aba <b>CLARA_PEND</b> da planilha se há transações pendentes de justificativa.</p>
+<p class="mt-3"><b>Se quiser, me informe o número da sua loja</b> (ex.: 1234) que eu consulto se há transações pendentes de justificativas.</p>
 </div>`;
     break;
 
@@ -1767,3 +1767,4 @@ chatForm.addEventListener("submit", function (e) {
 </script>
 </body>
 </html>
+
