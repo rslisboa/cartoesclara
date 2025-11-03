@@ -1225,13 +1225,13 @@ function gerarRespostaDoBot(msgUsuario) {
         // chama a API em modo JSON e, dentro dela, vamos trocar o estado para "aguardandoEmailPendencias"
         consultarPendenciasLoja(loja);
         // aqui já devolvo uma mensagem curtinha (consultarPendenciasLoja também manda mensagem)
-        return ''; // já estamos respondendo via renderBotMessage dentro da função
+        return null; // já estamos respondendo via renderBotMessage dentro da função
     }
 
     if (aguardandoEmailPendencias) {
         // Usuário deve estar mandando o e-mail agora
         enviarPendenciasPorEmail(msgUsuario);
-        return ''; // a função enviarPendenciasPorEmail cuida das mensagens
+        return null; // a função enviarPendenciasPorEmail cuida das mensagens
     }
 
         // Se estamos aguardando o número da loja para consultar pendências
