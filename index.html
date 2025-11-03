@@ -1034,22 +1034,45 @@ function consultarPendenciasLoja(lojaCodigo) {
     }
 
     fetch(`${URL_API_PENDENCIAS}?loja=${encodeURIComponent(loja)}`)
-        .then(resp => resp.json())
-        .then(data => {
+        .then(resp => {
+            // Se a resposta for 403, 404, 500 etc, já trata como erro
+            if (!resp.ok) {
+                throw new Error("HTTP " + resp.status);
+            }
+            // Lemos como texto primeiro para ter mais controle sobre o parse
+            return resp.text();
+        })
+        .then(text => {
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                console.error("Resposta não é JSON válido. Conteúdo bruto:", text);
+                throw new Error("Resposta da API não está em formato JSON.");
+            }
+
+            // Se a API respondeu ok:false
             if (!data.ok) {
                 renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700">Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>Detalhe: ${data.error || "erro desconhecido"}</p>`
+                    `HTML:<p class="text-sm text-slate-700">
+Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>
+Detalhe: ${data.error || "erro desconhecido"}
+</p>`
                 );
                 return;
             }
 
+            // ok:true, mas sem linhas para essa loja
             if (!data.rows || data.rows.length === 0) {
                 renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700">Não encontrei pendências para a sua loja <b>${loja}</b>.</p>`
+                    `HTML:<p class="text-sm text-slate-700">
+Não encontrei pendências para a sua loja <b>${loja}</b>.
+</p>`
                 );
                 return;
             }
 
+            // ok:true e com linhas
             const header = data.header || ["Col B", "Col C", "Col D", "Col E", "Col F", "Col G"];
             const rows = data.rows;
 
@@ -1767,4 +1790,3 @@ chatForm.addEventListener("submit", function (e) {
 </script>
 </body>
 </html>
-
