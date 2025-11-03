@@ -1219,22 +1219,55 @@ for (const frase of perguntaGeralEtiqueta) {
             resposta = respostaForaEscopo();
             break;
 
-        case "etiqueta": {
-            ultimaIntencao = "etiqueta";
-            const et = acharEtiquetaPorMensagem(norm);
-            if (et) {
-                resposta = respEtiquetaDireta(et);
-            } else {
-                resposta = `HTML:<p class="text-sm text-slate-700">
-Não encontrei uma etiqueta clara para isso dentro das categorias operacionais autorizadas.
+        case "etiqueta":
+    ultimaIntencao = "etiqueta";
+    (function () {
+        // Frases genéricas do tipo "qual etiqueta devo usar?"
+        const perguntasGeraisEtiqueta = [
+            "qual etiqueta devo usar",
+            "qual etiqueta usar",
+            "qual etiqueta eu uso",
+            "que etiqueta devo usar",
+            "que etiqueta usar",
+            "me fala as etiquetas",
+            "quais etiquetas existem",
+            "quais sao as etiquetas",
+            "quais são as etiquetas",
+            "todas as etiquetas",
+            "lista de etiquetas",
+            "categorias de gasto",
+            "categorias de despesas",
+            "categoria de despesa"
+        ].map(normalize);
 
-O cartão Clara só pode ser usado para despesas operacionais da loja (por ex.: material de escritório, material de informática de baixo valor como mouse/teclado/cabo, água potável para a equipe, coffee break autorizado para ação de loja, motoboy emergencial, chaveiro emergencial, manutenção simples elétrica/ar-condicionado, bobina fiscal, Correios/Sedex da loja etc.).
+        const isPerguntaGeral = perguntasGeraisEtiqueta.some(f => norm.includes(f));
 
-Se for gasto pessoal, bebida alcoólica, item patrimonial/infraestrutura (geladeira, TV, home theater, carro, móvel grande), transporte pessoal tipo Uber, ou qualquer compra que não seja diretamente ligada à operação imediata da loja — não pode no cartão Clara.
+        const et = acharEtiquetaPorMensagem(norm);
 
-Se você acredita que é um gasto operacional legítimo mas não existe etiqueta correspondente, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a> solicitando criação de etiqueta.</p>`;
-            }
-            break;
+        // 👉 Caso 1: Pergunta genérica de etiqueta, sem item específico
+        if (!et && isPerguntaGeral) {
+            resposta = respCatalogoEtiquetas();
+            return;
+        }
+
+        // 👉 Caso 2: Achamos uma etiqueta específica (mouse, água, motoboy etc.)
+        if (et) {
+            resposta = respEtiquetaDireta(et);
+            return;
+        }
+
+        // 👉 Caso 3: Nem é genérica, nem achou etiqueta -> fallback padrão
+        resposta = `HTML:<p class="text-sm text-slate-700">
+Não consegui identificar uma etiqueta específica só com esse texto.<br/>
+Se o gasto for operacional e não existir etiqueta adequada na lista da Clara, abra chamado no
+<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
+<strong>ServiceNow</strong>
+</a>
+solicitando criação ou ajuste de etiqueta.
+</p>`;
+    })();
+    break;
+
         }
 
         case "limite":
@@ -1394,3 +1427,4 @@ chatForm.addEventListener("submit", function (e) {
 </script>
 </body>
 </html>
+
