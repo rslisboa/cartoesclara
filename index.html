@@ -1073,26 +1073,32 @@ Não encontrei pendências para a sua loja <b>${loja}</b>.
             }
 
             // ok:true e com linhas
-            const header = data.header || ["Col B", "Col C", "Col D", "Col E", "Col F", "Col G"];
-            const rows = data.rows;
+const header = data.header || ["Col B", "Col C", "Col D", "Col E", "Col F", "Col G"];
+const rows = data.rows;
 
-            let htmlTabela = `
-                <div class="text-sm text-slate-700">
-                    <p>Encontrei as seguintes pendências para a loja <b>${loja}</b>:</p>
-                    <div class="mt-2 overflow-x-auto">
-                        <table class="min-w-full text-xs border border-slate-200">
-                            <thead class="bg-slate-100">
-                                <tr>
-                                    <th class="border px-2 py-1">${header[0] || "Col B"}</th>
-                                    <th class="border px-2 py-1">${header[1] || "Col C"}</th>
-                                    <th class="border px-2 py-1">${header[2] || "Col D"}</th>
-                                    <th class="border px-2 py-1">${header[3] || "Col E"}</th>
-                                    <th class="border px-2 py-1">${header[4] || "Col F"}</th>
-                                    <th class="border px-2 py-1">${header[5] || "Col G"}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-            `;
+// 👇 pega a data mais recente vinda da API (pode vir vazio)
+const ultimaData = data.ultimaData || "";
+const textoData = ultimaData
+    ? ` na data de cobrança <b>${ultimaData}</b>`
+    : "";
+
+let htmlTabela = `
+    <div class="text-sm text-slate-700">
+        <p>Encontrei as seguintes pendências para a loja <b>${loja}</b>${textoData}:</p>
+        <div class="mt-2 overflow-x-auto">
+            <table class="min-w-full text-xs border border-slate-200">
+                <thead class="bg-slate-100">
+                    <tr>
+                        <th class="border px-2 py-1">${header[0] || "Col B"}</th>
+                        <th class="border px-2 py-1">${header[1] || "Col C"}</th>
+                        <th class="border px-2 py-1">${header[2] || "Col D"}</th>
+                        <th class="border px-2 py-1">${header[3] || "Col E"}</th>
+                        <th class="border px-2 py-1">${header[4] || "Col F"}</th>
+                        <th class="border px-2 py-1">${header[5] || "Col G"}</th>
+                    </tr>
+                </thead>
+                <tbody>
+`;
 
             rows.forEach(cols => {
                 htmlTabela += `
@@ -1790,4 +1796,5 @@ chatForm.addEventListener("submit", function (e) {
 </script>
 </body>
 </html>
+
 
