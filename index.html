@@ -1246,11 +1246,11 @@ Beleza, vou consultar as pendências da loja <b>${loja}</b> e te mostro aqui emb
 
     // 🎯 Detecta fim de conversa / agradecimento
     const frasesEncerramento = [
-        "ok", "okay", "okey", "certo", "blz", "beleza", "OK",
+        "ok", "okay", "okey", "certo", "blz", "beleza", "bl", "OK", "Ok", "oK",
         "entendi", "entendido", "tudo certo", "td certo", "tds certo",
         "tá bom", "ta bom", "tá ótimo", "ta otimo", "tá otimo", "entendi", "entendido",
-        "show", "show de bola", "valeu", "obrigado", "obrigada", "Obrigado", "Obrigada", "OBRIGADO", "OBRIGADA",
-        "agradecido", "agradecida", "tranquilo", "de boa", "suave",
+        "show", "show de bola", "valeu", "vlw", "obrigado", "obrigada", "Obrigado", "Obrigada", "OBRIGADO", "OBRIGADA",
+        "agradecido", "agradecida", "tranquilo", "de boa", "suave", "tks", "thaks",
         "pode deixar", "certinho", "maravilha", "perfeito", "jóia", "joia"
     ].map(normalize);
 
@@ -1262,7 +1262,9 @@ Beleza, vou consultar as pendências da loja <b>${loja}</b> e te mostro aqui emb
                 "Show! Fico feliz em ajudar 😄",
                 "Perfeito 👌 qualquer dúvida, é só chamar de novo!",
                 "Valeu! Até a próxima 🚀",
-                "Beleza 😎 tô por aqui se precisar de novo."
+                "Beleza 😎 tô por aqui se precisar de novo.",
+                "Tá bom, qualquer coisa, é só chamar!",
+                "#jogamosentrosados",
             ];
             const random = Math.floor(Math.random() * respostasEncerramento.length);
             return `HTML:<p class="text-sm text-slate-700">${respostasEncerramento[random]}</p>`;
@@ -1849,3 +1851,4 @@ chatForm.addEventListener("submit", function (e) {
 </script>
 </body>
 </html>
+
