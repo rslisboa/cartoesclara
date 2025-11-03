@@ -267,6 +267,19 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+
+// =====================
+// CONSULTA BLOQUEIO / PENDÊNCIAS VIA APPS SCRIPT
+// =====================
+
+// URL do Web App publicado no Apps Script
+const URL_API_PENDENCIAS = "https://script.google.com/a/macros/gruposbf.com.br/s/AKfycbwl2JNiUq2sz2Yhds3Dh76DRFBZ_zqnqMt8AKo0dYhAWgLD-BmdPcFBuI0T4rzrlZTWdA/exec";
+
+// estado para saber se o bot está aguardando o número da loja
+let modoConsultaPendencias = null;
+let lojaUltimaConsulta = null;
+
+
 /* =====================================================
    POLÍTICA (resumo orientador)
    ===================================================== */
@@ -1003,6 +1016,91 @@ Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal). Se a compra 
 </p>`;
 }
 
+function consultarPendenciasLoja(lojaCodigo) {
+    if (!URL_API_PENDENCIAS) {
+        renderBotMessage(
+            'HTML:<p class="text-sm text-slate-700">Não tenho uma URL configurada para consultar a planilha de pendências no momento.</p>'
+        );
+        return;
+    }
+
+    const loja = (lojaCodigo || "").toString().replace(/\D/g, "");
+
+    if (!loja) {
+        renderBotMessage(
+            'HTML:<p class="text-sm text-slate-700">Não entendi o número da loja. Me envie só o código numérico, por exemplo: <b>1234</b>.</p>'
+        );
+        return;
+    }
+
+    fetch(`${URL_API_PENDENCIAS}?loja=${encodeURIComponent(loja)}`)
+        .then(resp => resp.json())
+        .then(data => {
+            if (!data.ok) {
+                renderBotMessage(
+                    `HTML:<p class="text-sm text-slate-700">Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>Detalhe: ${data.error || "erro desconhecido"}</p>`
+                );
+                return;
+            }
+
+            if (!data.rows || data.rows.length === 0) {
+                renderBotMessage(
+                    `HTML:<p class="text-sm text-slate-700">Não encontrei pendências na aba <b>CLARA_PEND</b> para a loja <b>${loja}</b>.</p>`
+                );
+                return;
+            }
+
+            const header = data.header || ["Col B", "Col C", "Col D", "Col E", "Col F", "Col G"];
+            const rows = data.rows;
+
+            let htmlTabela = `
+                <div class="text-sm text-slate-700">
+                    <p>Encontrei as seguintes pendências para a loja <b>${loja}</b> na aba <b>CLARA_PEND</b>:</p>
+                    <div class="mt-2 overflow-x-auto">
+                        <table class="min-w-full text-xs border border-slate-200">
+                            <thead class="bg-slate-100">
+                                <tr>
+                                    <th class="border px-2 py-1">${header[0] || "Col B"}</th>
+                                    <th class="border px-2 py-1">${header[1] || "Col C"}</th>
+                                    <th class="border px-2 py-1">${header[2] || "Col D"}</th>
+                                    <th class="border px-2 py-1">${header[3] || "Col E"}</th>
+                                    <th class="border px-2 py-1">${header[4] || "Col F"}</th>
+                                    <th class="border px-2 py-1">${header[5] || "Col G"}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            rows.forEach(cols => {
+                htmlTabela += `
+                    <tr>
+                        <td class="border px-2 py-1">${cols[0] || ""}</td>
+                        <td class="border px-2 py-1">${cols[1] || ""}</td>
+                        <td class="border px-2 py-1">${cols[2] || ""}</td>
+                        <td class="border px-2 py-1">${cols[3] || ""}</td>
+                        <td class="border px-2 py-1">${cols[4] || ""}</td>
+                        <td class="border px-2 py-1">${cols[5] || ""}</td>
+                    </tr>
+                `;
+            });
+
+            htmlTabela += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            renderBotMessage("HTML:" + htmlTabela);
+        })
+        .catch(err => {
+            console.error("Erro ao chamar API de pendências:", err);
+            renderBotMessage(
+                'HTML:<p class="text-sm text-slate-700">Tive um erro ao tentar consultar as pendências dessa loja. Tente novamente mais tarde.</p>'
+            );
+        });
+}
+
 /* =====================================================
    Fallback / resposta genérica com política
    ===================================================== */
@@ -1067,6 +1165,27 @@ function gerarRespostaDoBot(msgUsuario) {
     const norm = normalize(msgUsuario);
     const intencao = detectarIntencaoPergunta(norm);
     let resposta;
+
+        // Se estamos aguardando o número da loja para consultar pendências
+    if (modoConsultaPendencias === "aguardando_loja") {
+        const match = msgUsuario.match(/\d{3,6}/); // captura algo tipo 123, 1234, 12345...
+        if (!match) {
+            return `HTML:<p class="text-sm text-slate-700">
+Não entendi o número da loja. Me manda só o código numérico, por exemplo: <b>1234</b>.
+            </p>`;
+        }
+
+        const loja = match[0];
+        modoConsultaPendencias = null;
+        lojaUltimaConsulta = loja;
+
+        // Chama API assíncrona (Apps Script)
+        consultarPendenciasLoja(loja);
+
+        return `HTML:<p class="text-sm text-slate-700">
+Beleza, vou consultar as pendências da loja <b>${loja}</b> na aba <b>CLARA_PEND</b> e te mostro aqui embaixo 👇
+        </p>`;
+    }
 
     // 🎯 Detecta fim de conversa / agradecimento
     const frasesEncerramento = [
@@ -1493,9 +1612,13 @@ solicitando criação ou ajuste de etiqueta.
             break;
 
         case "bloqueio":
-            ultimaIntencao = "bloqueio";
-            resposta = respBloqueio();
-            break;
+    ultimaIntencao = "bloqueio";
+    modoConsultaPendencias = "aguardando_loja";
+    resposta = `HTML:<div class="text-sm text-slate-700">
+${respBloqueio().replace(/^HTML:/, "").trim()}
+<p class="mt-3"><b>Se quiser, me informe o número da sua loja</b> (ex.: 1234) que eu consulto na aba <b>CLARA_PEND</b> da planilha se há transações pendentes de justificativa.</p>
+</div>`;
+    break;
 
         case "prestacao":
             ultimaIntencao = "prestacao";
@@ -1644,7 +1767,3 @@ chatForm.addEventListener("submit", function (e) {
 </script>
 </body>
 </html>
-
-
-
-
