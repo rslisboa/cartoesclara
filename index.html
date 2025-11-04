@@ -514,7 +514,7 @@ const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/d
         "quais são as etiquetas","quais etiquetas posso usar",
         "quais etiquetas devo usar","quais etiquetas usar",
         "categorias de gasto","categorias de despesas","categoria de despesa",
-        "categoria de gasto","categoria clara","etiqueta clara"
+        "categoria de gasto","categoria clara","etiqueta clara", "etiqueta", "etiquetas", "categoria"
     ].map(normalize);
 
     /* ==================== NORMALIZAÇÃO / INTENÇÃO ==================== */
@@ -1291,9 +1291,8 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
         "1a via do cartao",
         "1ª via do cartao",
         "1a via do cartão",
-        "1ª via do cartão"
-
-          "quero solicitar um cartao",
+        "1ª via do cartão",
+        "quero solicitar um cartao",
         "quero solicitar um cartão",
         "quero solicitar cartao clara",
         "quero solicitar cartão clara",
@@ -1320,7 +1319,6 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
         "cartao novo",
         "cartão novo",
         "novo cartao",
-        "novo cartão",
         "meu cartao novo",
         "meu cartão novo",
         "preciso de cartao novo",
@@ -1421,7 +1419,7 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
     ].map(normalize);
 
     //  🟢 Novo cartão – iniciar fluxo
-      const gatilhosNovoCartao = [ ... ].map(normalize);
+      
       for (const frase of gatilhosNovoCartao) {
           if (norm.includes(frase)) {
               fluxoNovoCartao = "aguardando_tipo_via";
@@ -1451,13 +1449,13 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
                     resposta = respEtiquetaDireta(et);
                 } else {
                     resposta = `HTML:<p class="text-sm text-slate-700">
-Não consegui identificar uma etiqueta específica só com esse texto.<br/>
-Se o gasto for operacional e não existir etiqueta adequada na lista da Clara, abra chamado no
-<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
-<strong>ServiceNow</strong>
-</a>
-solicitando criação ou ajuste de etiqueta.
-</p>`;
+          Não consegui identificar uma etiqueta específica só com esse texto.<br/>
+          Se o gasto for operacional e não existir etiqueta adequada na lista da Clara, abra chamado no
+          <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
+          <strong>ServiceNow</strong>
+          </a>
+          solicitando criação ou ajuste de etiqueta.
+          </p>`;
                 }
                 break;
             }
@@ -1787,38 +1785,40 @@ Perfeito! Vou enviar o resumo das pendências da loja <b>${lojaPendenciasAtual}<
     }
 
     /* ==================== ENVIO DE MENSAGEM (ENTER / BOTÃO) ==================== */
+function enviarMensagem() {
+  const texto = userInput.value.trim();
+  if (!texto) return;
 
-    function enviarMensagem() {
-        const pergunta = userInput.value.trim();
-        if (!pergunta) return;
+  renderUserMessage(texto);
 
-        renderUserMessage(pergunta);
+  const resposta = gerarRespostaDoBot(texto);
+  if (resposta) renderBotMessage(resposta);
 
-        const resposta = gerarRespostaDoBot(pergunta);
-        if (resposta) {
-            renderBotMessage(resposta);
-        }
+  userInput.value = "";
+  userInput.focus();
+  scrollToBottom();
+}
 
-        userInput.value = "";
-        userInput.focus();
-    }
+// Envio com Enter (sem Shift)
+userInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    enviarMensagem();
+  }
+});
 
-    userInput.addEventListener("keydown", function (e) {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            enviarMensagem();
-        }
-    });
+// Envio com clique no botão
+sendBtn.addEventListener("click", (e) => {
+  e.preventDefault();
+  enviarMensagem();
+});
 
-    sendBtn.addEventListener("click", function (e) {
-        e.preventDefault();
-        enviarMensagem();
-    });
+// Envio via submit do formulário (garantia extra)
+chatForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  enviarMensagem();
+});
 
-    chatForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        enviarMensagem();
-    });
 
 }); // fim DOMContentLoaded
 </script>
