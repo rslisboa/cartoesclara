@@ -253,7 +253,7 @@
     <footer class="chat-footer">
         <form id="chatForm" class="w-full">
             <div class="input-shell">
-                <textarea id="userInput" placeholder="Digite sua dúvida sobre o cartão Clara..."></textarea>
+                <textarea id="userInput" placeholder="Digite aqui..."></textarea>
                 <button type="submit" id="sendBtn">Enviar</button>
             </div>
         </form>
@@ -601,7 +601,7 @@ const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/d
         if (msgNorm.includes("uber") ||
             msgNorm.includes("iber") ||
             msgNorm.includes("99") ||
-            Norm.includes(" 99") ||
+            msgNorm.includes(" 99") ||
             msgNorm.includes("taxi") ||
             msgNorm.includes("táxi") ||
             msgNorm.includes("taxí") ||
@@ -872,7 +872,7 @@ O bloqueio preventivo acontece quando tem alguma compra sem justificar na Clara 
 • descrição não explica o uso operacional.<br/><br/>
 Passos pra desbloquear:<br/>
 1. Regulariza a transação na plataforma (anexa nota, escolher etiqueta certa, descrever o motivo real).<br/>
-2. Encaminhar chamado via ServiceNow para desbloqueio.<br/><br/>
+2. Encaminhar chamado via <b>ServiceNow</b> para desbloqueio, caminho: <b>Contas a Receber > Cartão Clara > Solicitação de Desbloqueio</b>.<br/><br/>
 Reincidência pode fazer a loja perder permissão de uso do cartão.
 </p>`;
     }
@@ -1021,8 +1021,7 @@ Para solicitar a <b>primeira via</b> do cartão Clara, siga estes passos:
        target="_blank" rel="noopener noreferrer"><b>Formulário de Solicitação de Cartão Clara</b></a>.
   </li>
   <li class="mt-1">
-    Depois de preencher o formulário, envie um e-mail para o Financeiro informando que já preencheu,<br/>
-    para que o cartão seja emitido:<br/>
+    Depois de preencher o formulário, envie um e-mail para o Financeiro informando que já preencheu,<br/>para que o cartão seja emitido:<br/>
     <b>contasareceber@gruposbf.com.br</b>
   </li>
 </ol>
@@ -1054,39 +1053,70 @@ Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clar
 }
 
     function respGenerica(msgNorm) {
-        const avaliacao = avaliarCompraEspecifica(msgNorm);
+  const avaliacao = avaliarCompraEspecifica(msgNorm);
 
-        if (avaliacao.pode === false) {
-            return `HTML:<div class="text-sm text-slate-700">
+  if (avaliacao.pode === false) {
+    return `HTML:<div class="text-sm text-slate-700">
 <p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
 <p>${avaliacao.resposta}</p>
 </div>`;
-        }
+  }
 
-        if (avaliacao.pode === true && avaliacao.etiquetaValida) {
-            const et = avaliacao.etiquetaValida;
-            return `HTML:<div class="text-sm text-slate-700">
+  if (avaliacao.pode === true && avaliacao.etiquetaValida) {
+    const et = avaliacao.etiquetaValida;
+    return `HTML:<div class="text-sm text-slate-700">
 <p><b>✅ Pode usar o cartão Clara (despesa operacional autorizada).</b></p>
 <p>Use a etiqueta: "<b>${et.nome}</b>".</p>
 <p class="mt-1">${et.desc}</p>
-<p class="mt-2"><b>Como lançar na Clara (até 48h):</b><br/>
-• Anexar a nota fiscal/recibo;<br/>
-• Selecionar "${et.nome}";<br/>
-• Descrever objetivamente o gasto (ex.: "${et.exemploDescricao}");<br/>
-• Guardar o documento físico na loja pelo prazo indicado pela política.</p>
 </div>`;
-        }
+  }
 
-        return `HTML:<div class="text-sm text-slate-700">
+  // Pergunta genérica tipo "o que posso comprar?"
+  if (
+    msgNorm.includes("o que posso comprar") ||
+    msgNorm.includes("oque comprar") ||
+    msgNorm.includes("o que comprar") ||
+    msgNorm.includes("o que posso comprar") ||
+    msgNorm.includes("posso comprar o que") ||
+    msgNorm.includes("o que posso usar") ||
+    msgNorm.includes("quais compras") ||
+    msgNorm.includes("o que é permitido") ||
+    msgNorm.includes("o que nao posso") ||
+    msgNorm.includes("o que nao posso comprar") ||
+    msgNorm.includes("o que nao comprar") ||
+    msgNorm.includes("não comprar") ||
+    msgNorm.includes("nao comprar") ||
+    msgNorm.includes("o que não posso")
+  ) {
+    return `HTML:<div class="text-sm text-slate-700">
+<p><b>O que pode no cartão Clara:</b></p>
+<ul class="list-disc ml-4 mt-1">
+<li>Material de escritório e limpeza;</li>
+<li>Suprimentos de informática (mouse, teclado, cabos, bobina fiscal etc.);</li>
+<li>Água e lanche apenas para ações autorizadas (treinamento, VM, regional);</li>
+<li>Serviços emergenciais (motoboy urgente, chaveiro, Sedex de documento);</li>
+<li>Pequenas manutenções (elétrica, civil, ar-condicionado, equipamentos).</li>
+</ul>
+<p class="mt-2"><b>O que não pode:</b></p>
+<ul class="list-disc ml-4">
+<li>Despesas pessoais (refeição, Uber pessoal etc.);</li>
+<li>Bebidas alcoólicas;</li>
+<li>Itens patrimoniais (TV, micro-ondas, mesa, cadeira etc.);</li>
+<li>Qualquer compra não justificada na Clara em até 48h.</li>
+</ul>
+</div>`;
+  }
+
+  // fallback padrão
+  return `HTML:<div class="text-sm text-slate-700">
 <p>Pra usar o cartão Clara, o gasto precisa ser <b>necessário pra operação da loja</b> (ex.: chaveiro emergencial, motoboy urgente, material de limpeza, periférico de PDV, bobina fiscal, água/coffee break autorizado pra treinamento interno ou ação oficial).</p>
 <p class="mt-2">O que <b>não pode</b> no cartão Clara:<br/>
 • gasto pessoal (refeição pessoal, compra pra uso próprio etc.);<br/>
 • bebida alcoólica;<br/>
 • transporte pessoal (Uber/99 pra deslocamento pessoal);<br/>
 • itens patrimoniais / infraestrutura grande (geladeira, micro-ondas, TV, mesa, cadeira etc.).</p>
-<p class="mt-2">Se você acha que é uma necessidade real da loja, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a> informando o caso.</p>
 </div>`;
-    }
+}
 
     /* ==================== CONSULTA PENDÊNCIAS (Apps Script) ==================== */
 
@@ -1123,7 +1153,7 @@ Detalhe: ${erro}
 
                 let tabela = `
               <div class="text-sm text-slate-700">
-              <p>Encontrei as seguintes pendências Clara da loja <b>${res.loja}</b> (data de cobrança <b>${res.ultimaData}</b>). Caso a pendencia já tenha sido regularizada e o seu cartão ainda estiver bloqueado, solicite o desbloqueio através de abertura de chamado no ServiceNow, caminho: <b>Contas a Receber > Cartão Clara > Solicitação de Desbloqueio</b>.</p>
+              <p>Encontrei abaixo as últimas pendências Clara da loja <b>${res.loja}</b> (data de cobrança <b>${res.ultimaData}</b>). Caso a pendencia já tenha sido regularizada e o seu cartão ainda estiver bloqueado, solicite o desbloqueio através de abertura de chamado no ServiceNow, caminho: <b>Contas a Receber > Cartão Clara > Solicitação de Desbloqueio</b>.</p>
               <div class="mt-2 overflow-x-auto">
               <table class="min-w-full text-xs border border-slate-200">
               <thead class="bg-slate-100">
@@ -1432,6 +1462,53 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
           }
       }
 
+      // 🟣 Fluxo direto para SEGUNDA VIA (usuário já digita "segunda via" etc.)
+const gatilhosSegundaViaDireta = [
+    "segunda via",
+    "2 via",
+    "2a via",
+    "2ª via",
+    "reemitir cartao",
+    "reemitir cartão",
+    "reemisao cartao",
+    "reemissão cartão",
+    "reemitir meu cartao",
+    "reemitir meu cartão",
+    "perdi o cartao",
+    "perdi o cartão",
+    "roubaram meu cartao",
+    "roubaram meu cartão",
+    "roubo de cartão",
+    "perda de cartão",
+    "perca de cartão",
+    "cartao quebrado",
+    "cartão quebrado",
+    "cartao danificado",
+    "cartão danificado"
+].map(normalize);
+
+if (gatilhosSegundaViaDireta.some(fr => norm.includes(fr))) {
+    fluxoNovoCartao = null;
+    aguardandoLojaPendencias = false;
+    aguardandoEmailPendencias = false;
+
+    return `HTML:<div class="text-sm text-slate-700">
+          <p><b>Segunda via de cartão Clara:</b></p>
+          <p class="mt-1">
+          Para segunda via (perda, roubo ou cartão danificado) siga o fluxo previsto na política:
+          </p>
+          <ul class="list-disc ml-4 mt-1">
+          <li>Congele o cartão imediatamente na plataforma Clara;</li>
+          <li>Comunique o Financeiro;</li>
+          <li>Abra chamado no <b>ServiceNow</b> em <b>Contas a Receber &gt; Cartão Clara &gt; Segunda via</b>;</li>
+          <li>Descreva o motivo (perda, roubo, dano etc.).</li>
+          </ul>
+          <p class="mt-2">
+          A partir daí o Financeiro conduz a reemissão dentro dos prazos da operadora.
+          </p>
+          </div>`;
+          }
+
         switch (intencao) {
             case "foraEscopo":
                 ultimaIntencao = "foraEscopo";
@@ -1515,6 +1592,21 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
 
     function gerarRespostaDoBot(msgUsuario) {
         const norm = normalize(msgUsuario);
+
+        // 🧹 Zera fluxos antigos se o usuário mudou de assunto
+        const palavrasDeMudancaAssunto = [
+          "cartao", "cartão", "etiqueta", "categoria", "politica", "sangria", 
+          "bloqueio", "novo", "pendencia", "comprar", "limite", "uber", "agua", "água", "lanche"
+        ].map(normalize);
+
+        if (aguardandoEmailPendencias || aguardandoLojaPendencias || fluxoNovoCartao) {
+          const mudouDeAssunto = palavrasDeMudancaAssunto.some(p => norm.includes(p));
+          if (mudouDeAssunto) {
+            aguardandoEmailPendencias = false;
+            aguardandoLojaPendencias = false;
+            fluxoNovoCartao = null;
+          }
+        }
 
             // 🎯 DETECTA SAUDAÇÕES INICIAIS
     const saudacoes = [
@@ -1707,7 +1799,7 @@ O prazo de entrega do cartão é de até <b>7 dias úteis</b>.
             "bloqueio por pendencia","bloqueio por pendência",
             "pendencia do cartao","pendência do cartão",
             "loja bloqueada clara","cartão bloqueado por pendencia",
-            "cobrança clara","transações pendentes clara", "pendencia", "pendência", "pendencias", "pendências",
+            "cobrança clara","transações pendentes clara", "pendencia", "pendência", "pedecia", "pendencias", "pendecias", "pendências",
             "email de pendencia clara","pendencias","pendências"
         ].map(normalize);
 
@@ -1741,7 +1833,7 @@ Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
             consultarPendenciasNoServidor(loja);
 
             return `HTML:<p class="text-sm text-slate-700">
-Beleza! Vou consultar as pendências Clara da loja <b>${loja}</b> e já te mostro aqui no chat.</p>`;
+                Beleza! Vou consultar as pendências Clara da loja <b>${loja}</b> e já te mostro aqui no chat.</p>`;
         }
 
         // 3.2) já mostrou tabela, aguardando "sim"/"não" para envio de e-mail
@@ -1766,26 +1858,51 @@ Beleza! Vou consultar as pendências Clara da loja <b>${loja}</b> e já te mostr
 
         // 3.3) aguardando e-mail
         if (aguardandoEmailPendencias) {
-            const email = msgUsuario.trim();
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                return 'HTML:<p class="text-sm text-slate-700">Esse e-mail parece inválido. Me envia no formato: <b>nome.sobrenome@gruposbf.com.br</b>.</p>';
-            }
+    const textoOriginal = msgUsuario.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-            aguardandoEmailPendencias = false;
-
-            chamarEnvioPendenciasPorEmail(lojaPendenciasAtual, email);
-
-            return `HTML:<p class="text-sm text-slate-700">
-Perfeito! Vou enviar o resumo das pendências da loja <b>${lojaPendenciasAtual}</b> para o e-mail <b>${email}</b>.</p>`;
-        }
-
-        // 4) Se nada de fluxo especial, cai na lógica normal da política
-        return gerarRespostaPolitica(msgUsuario);
+    // 1) Se parece e-mail → segue fluxo normal
+    if (emailRegex.test(textoOriginal)) {
+        enviarPendenciasPorEmail(textoOriginal);
+        aguardandoEmailPendencias = false;
+        lojaPendenciasAtual = "";
+        return null; // quem manda as mensagens é a própria enviarPendenciasPorEmail
     }
 
+    // 2) Se NÃO parece e-mail, checo se parece outro assunto
+    const palavrasDeMudancaAssunto = [
+        "cartao","cartão","etiqueta","categoria","politica","política","sangria",
+        "bloqueio","limite","uber","agua","água","lanche","novo cartao","novo cartão",
+        "segunda via","1 via","primeira via","fraude","contestacao","prestacao","prestação"
+    ].map(normalize);
+
+    const norm = normalize(msgUsuario);
+    const pareceOutroAssunto = palavrasDeMudancaAssunto.some(p => norm.includes(p));
+
+          if (pareceOutroAssunto) {
+              // 🧹 zera fluxo de pendências e segue com o novo assunto
+              aguardandoEmailPendencias = false;
+              lojaPendenciasAtual = "";
+
+              // Aviso amigável pro usuário
+              return `HTML:<div class="text-sm text-slate-700">
+      <p>Beleza, vamos mudar de assunto então 😉</p>
+      <p class="mt-1">Se depois você quiser voltar a ver as pendências da loja, é só me pedir de novo, por exemplo: <b>"consultar pendências Clara"</b>.</p>
+      </div>`;
+              // 👉 Depois dessa resposta, a próxima mensagem já cai no fluxo normal
+          }
+
+          // 3) Nem parece e-mail, nem parece outro assunto → insiste de leve no e-mail
+          return `HTML:<p class="text-sm text-slate-700">
+      Isso ainda não parece um e-mail válido 😉<br/>
+      Se você quiser continuar com o resumo das pendências, me envia no formato: <b>nome.sobrenome@gruposbf.com.br</b>.<br/><br/>
+      Se preferir mudar de assunto, pode me perguntar outra coisa diretamente (ex.: "sangria", "novo cartão", "limite", "etiqueta", etc.).
+      </p>`;
+      }
+
+
     /* ==================== ENVIO DE MENSAGEM (ENTER / BOTÃO) ==================== */
-function enviarMensagem() {
+    function enviarMensagem() {
   const texto = userInput.value.trim();
   if (!texto) return;
 
