@@ -275,6 +275,8 @@ const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/d
     let aguardandoConfirmacaoEnvioEmail = false;
     let aguardandoEmailPendencias = false;
     let lojaPendenciasAtual = "";
+    let aguardandoConfirmacaoEmailPendencias = false;
+
     // ===== Fluxo de pedido de novo cartão (1ª ou 2ª via) =====
     let fluxoNovoCartao = null; 
     // valores possíveis: null ou "aguardando_tipo_via"
@@ -1009,6 +1011,18 @@ Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal). Se a compra 
 </p>`;
     }
 
+    function respTermoResponsabilidade() {
+    return `HTML:<div class="text-sm text-slate-700">
+        <p>
+        O <b>Termo de Responsabilidade de uso do cartão da Clara</b> deve ser preenchido para que a loja possa utilizar o cartão. Esse termo traz também o aceite para a Política de uso do cartão.
+        </p>
+        <p class="mt-2">
+        Preencha <a class="service-link" href="https://docs.google.com/forms/d/e/1FAIpQLSdnQWYFWp-udS9V039avJlXb4x1VnlDC6us5dSCrLkgngAxpg/alreadyresponded"target="_blank" rel="noopener noreferrer"><b>este formulário</b></a>. Após preencher você receberá o termo anexado ao e-mail, onde deve <b>imprimir, assinar e nos enviar</b>. Após isso, o uso do cartão estará liberado.
+        </p>
+        </div>`;
+        }
+
+
     function respNovoCartaoPrimeiraVia() {
     return `HTML:<div class="text-sm text-slate-700">
 <p><b>Primeira via de cartão Clara (novo cartão)</b></p>
@@ -1127,9 +1141,9 @@ Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clar
                     const erro = (res && res.error) ? res.error : "erro desconhecido";
                     renderBotMessage(
                         `HTML:<p class="text-sm text-slate-700">
-Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>
-Detalhe: ${erro}
-</p>`
+                Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>
+                Detalhe: ${erro}
+                </p>`
                     );
                     aguardandoConfirmacaoEnvioEmail = false;
                     aguardandoEmailPendencias = false;
@@ -1176,6 +1190,9 @@ Detalhe: ${erro}
                 tabela += `</tbody></table></div></div>`;
 
                 renderBotMessage("HTML:" + tabela);
+
+                // ⬇⬇⬇ ADICIONE AQUI — logo depois da renderização da tabela
+                aguardandoConfirmacaoEmailPendencias = true;
 
                 renderBotMessage(
                     'HTML:<p class="text-sm text-slate-700 mt-2">Quer que eu envie esse resumo por e-mail também? (responda "sim" ou "não")</p>'
@@ -1593,6 +1610,33 @@ if (gatilhosSegundaViaDireta.some(fr => norm.includes(fr))) {
     function gerarRespostaDoBot(msgUsuario) {
         const norm = normalize(msgUsuario);
 
+
+        // 🔹 Termo de responsabilidade
+const frasesTermo = [
+  "termo de responsabilidade",
+  "termo responsabilidade",
+  "termo de responsabilidade do cartao",
+  "termo de responsabilidade do cartão",
+  "termo do cartao",
+  "termo do cartão",
+  "termo de uso do cartao",
+  "termo de uso do cartão",
+  "termo clara",
+  "termo",
+  "termo do cartao clara",
+  "termo do cartão clara",
+  "termo de aceite",
+  "termo de aceite do cartao",
+  "termo de aceite do cartão",
+  "assinar termo do cartao",
+  "assinar termo da clara",
+  "termo de responsabilidade clara"
+].map(normalize);
+
+if (frasesTermo.some(f => norm.includes(f))) {
+    return respTermoResponsabilidade();
+}
+
         // 🧹 Zera fluxos antigos se o usuário mudou de assunto
         const palavrasDeMudancaAssunto = [
           "cartao", "cartão", "etiqueta", "categoria", "politica", "sangria", 
@@ -1862,7 +1906,7 @@ if (aguardandoLojaPendencias) {
         );
 
         // chama a função que realmente consulta a planilha
-        consultarPendenciasLoja(soDigitos);
+        consultarPendenciasNoServidor(soDigitos);
         return null;
     }
 
@@ -1880,7 +1924,7 @@ Se quiser tratar de outro assunto, é só me perguntar diretamente. 😉
 
     // 1) Se parece e-mail → segue fluxo normal
     if (emailRegex.test(textoOriginal)) {
-        enviarPendenciasPorEmail(textoOriginal);
+        echamarEnvioPendenciasPorEmail(lojaPendenciasAtual, textoOriginal);
         aguardandoEmailPendencias = false;
         lojaPendenciasAtual = "";
         return null; // quem manda as mensagens é a própria enviarPendenciasPorEmail
@@ -1916,10 +1960,12 @@ Se quiser tratar de outro assunto, é só me perguntar diretamente. 😉
       Se preferir mudar de assunto, pode me perguntar outra coisa diretamente (ex.: "sangria", "novo cartão", "limite", "etiqueta", etc.).
       </p>`;
       }
+    }
 
 
     /* ==================== ENVIO DE MENSAGEM (ENTER / BOTÃO) ==================== */
-    function enviarMensagem() {
+
+  function enviarMensagem() {
   const texto = userInput.value.trim();
   if (!texto) return;
 
