@@ -47,10 +47,9 @@
     .chat-header-left h1 {
         font-size:1.5rem;
         font-weight:800;
-        color:#005E27;
+        background-color:#005E27;
+        color:#B5FF20;
         margin-bottom:0.5rem;
-        background-color:#005E27;       /* fundo verde escuro */
-        color:#B5FF20;                   /* texto verde claro */
         padding:.5rem .75rem;
         border-radius:.5rem;
         display:inline-block;
@@ -69,7 +68,7 @@
         right:1rem;
     }
     .chat-header-avatar img {
-        height:72px;
+        height:78px;
         width:auto;
         object-fit:contain;
         filter:none; /* sem sombra */
@@ -167,7 +166,7 @@
     .chat-body::-webkit-scrollbar-track { background:transparent; }
     .chat-body::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
 
-    /* links que aparecem nas respostas HTML do bot */
+    /* links nas respostas do bot */
     .bot-bubble a {
         color:#005E27;
         font-weight:600;
@@ -200,15 +199,12 @@
 
                 <p>Pergunte sobre o uso do cartão Clara nas lojas.</p>
 
-                <div class="examples">
-                </div>
-
-                <div class="policy-note text-[12px] mt-2">
-                </div>
+                <div class="examples"></div>
+                <div class="policy-note text-[12px] mt-2"></div>
             </div>
 
             <div class="chat-header-avatar">
-                <img src="Gemini_Generated_Image_nzni5znzni5znzni.png"
+                <img src= "https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png"
                      alt="Assistente Clara (robô)" />
             </div>
         </div>
@@ -221,9 +217,9 @@
             <!-- Mensagem inicial do bot -->
             <div class="flex items-start gap-3">
                 <img
-                    src="Gemini_Generated_Image_nzni5znzni5znzni.png"
+                    src = "https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png";
                     alt="Assistente Clara (robô)"
-                    class="h-14 w-auto object-contain flex-shrink-0"
+                    class="h-16 w-auto object-contain flex-shrink-0"
                 />
                 <div class="bot-bubble px-4 py-3 max-w-[80%] text-sm text-slate-700">
                     <p class="font-semibold text-slate-800 text-base">
@@ -268,618 +264,606 @@
 <script>
 document.addEventListener("DOMContentLoaded", () => {
 
-// =====================
-// CONSULTA BLOQUEIO / PENDÊNCIAS VIA APPS SCRIPT
-// =====================
-
-// URL do Web App publicado no Apps Script
-const URL_API_PENDENCIAS = "https://script.google.com/a/macros/gruposbf.com.br/s/AKfycbwl2JNiUq2sz2Yhds3Dh76DRFBZ_zqnqMt8AKo0dYhAWgLD-BmdPcFBuI0T4rzrlZTWdA/exec";
-
-// estado para saber se o bot está aguardando o número da loja
-let modoConsultaPendencias = null;
-let lojaUltimaConsulta = null;
+const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png";
 
 
-/* =====================================================
-   POLÍTICA (resumo orientador)
-   ===================================================== */
-const POLITICA_COMPLETA = `
+
+    /* ================= ESTADOS GLOBAIS ================= */
+
+    // fluxo de pendências / e-mail
+    let aguardandoLojaPendencias = false;
+    let aguardandoConfirmacaoEnvioEmail = false;
+    let aguardandoEmailPendencias = false;
+    let lojaPendenciasAtual = "";
+    // ===== Fluxo de pedido de novo cartão (1ª ou 2ª via) =====
+    let fluxoNovoCartao = null; 
+    // valores possíveis: null ou "aguardando_tipo_via"
+    let ultimaPendenciaResumo = null; // { loja, data }
+
+    // última intenção de política (follow-up)
+    let ultimaIntencao = null;
+
+    /* ================= REFERÊNCIAS DO CHAT ================= */
+
+    const chatWindow = document.getElementById("chatWindow");
+    const chatForm   = document.getElementById("chatForm");
+    const userInput  = document.getElementById("userInput");
+    const sendBtn    = document.getElementById("sendBtn");
+
+    /* ================= FUNÇÕES UTILITÁRIAS UI ================= */
+
+    function scrollToBottom() {
+        requestAnimationFrame(() => {
+            const body = document.querySelector(".chat-body");
+            if (body) {
+                body.scrollTop = body.scrollHeight;
+                setTimeout(() => {
+                    body.scrollTop = body.scrollHeight;
+                }, 150);
+            }
+        });
+    }
+
+    function renderUserMessage(text) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "flex items-start justify-end gap-3";
+
+        const bubble = document.createElement("div");
+        bubble.className = "user-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-white";
+        bubble.innerText = text;
+
+        wrapper.appendChild(bubble);
+        chatWindow.appendChild(wrapper);
+        scrollToBottom();
+    }
+
+    function renderBotMessage(text) {
+        if (!text) return;
+        const wrapper = document.createElement("div");
+        wrapper.className = "flex items-start gap-3";
+
+        const avatar = document.createElement("img");
+        avatar.src = "https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png";
+        avatar.alt = "Assistente Clara (robô)";
+        avatar.className = "h-16 w-auto object-contain flex-shrink-0";
+
+        const bubble = document.createElement("div");
+        bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
+
+        if (typeof text === "string" && text.startsWith("HTML:")) {
+            bubble.innerHTML = text.replace(/^HTML:/, "").trim();
+        } else {
+            bubble.innerText = text;
+        }
+
+        wrapper.appendChild(avatar);
+        wrapper.appendChild(bubble);
+        chatWindow.appendChild(wrapper);
+        scrollToBottom();
+    }
+
+    /* ==================== REGRAS / ETIQUETAS ==================== */
+
+    const POLITICA_COMPLETA = `
 1. O cartão Clara é o meio oficial para despesas operacionais das lojas.
-2. Toda compra tem que ser justificada na plataforma Clara em até 48h:
-   - etiqueta correta,
-   - nota fiscal/recibo anexado,
-   - descrição objetiva.
+2. Toda compra tem que ser justificada na Clara em até 48h: etiqueta correta, nota fiscal/recibo anexado, descrição objetiva.
 3. Despesa pessoal (roupa pro filho, almoço pessoal, Uber pessoal, cinema, bebida alcoólica etc.) é proibida.
-   - Se acontecer, avisar Financeiro, classificar como "Despesa Pessoal – Uso Indevido" e ressarcir em até 2 dias úteis.
-4. Itens patrimoniais/infraestrutura (geladeira, micro-ondas, cafeteira elétrica, TV, home theater, mesa, cadeira etc.) não entram no cartão Clara. Isso segue fluxo de Compras / patrimônio.
-5. Lanches/água podem ser pagos pelo cartão SOMENTE se forem ligados a operação autorizada:
-   - treinamento oficial,
-   - ação aprovada (VM, regional, diretoria),
-   - premiação operacional autorizada.
-   Usa etiqueta correta e descreve o motivo.
-6. Se o gerente saiu e ainda não existe novo gerente, o Financeiro pode autorizar uso temporário do cartão de outra loja.
-   - Cada transação precisa ter descrição tipo: "Uso temporário do cartão na loja 1234".
-7. Aumento de limite: abrir chamado no ServiceNow explicando necessidade operacional e urgência.
-8. Se bloqueou por falta de justificativa, precisa regularizar (nota, etiqueta, descrição) para avaliar desbloqueio.
-9. Contestação de compra não reconhecida deve ser aberta em até 2 dias úteis via suporte da Clara, com envolvimento do Financeiro.
-10. Sangria de caixa deixa de existir depois que a loja recebe o cartão Clara, só pode ser liberada como exceção com autorização financeira prévia.
+4. Itens patrimoniais/infraestrutura (geladeira, micro-ondas, cafeteira elétrica, TV, home theater, mesa, cadeira etc.) não entram no cartão Clara.
+5. Lanches/água: só se ligados a operação autorizada (treinamento oficial, ação aprovada, premiação operacional).
+6. Troca de gerente / uso temporário de cartão de outra loja: só com autorização Financeiro e descrição correta na Clara.
+7. Aumento de limite: chamado no ServiceNow explicando necessidade operacional e urgência.
+8. Bloqueio por falta de justificativa: regularizar na Clara e acionar Financeiro.
+9. Contestação de compra não reconhecida: acionar Financeiro e suporte Clara em até 2 dias úteis.
+10. Sangria: descontinuada após implantação do cartão, só exceção com autorização prévia do Financeiro.
 `;
 
-/* =====================================================
-   Etiquetas oficiais padronizadas
-   ===================================================== */
-const etiquetasOficiais = [
-    {
-        nome: "AGUA POTÁVEL",
-        palavrasChave: [
-            "agua","água","galão","galao","garrafa de agua","garrafa de água",
-            "galao de agua","garrafa de água","garrafa de agua"
-        ],
-        descricao: "Compra de galões de água mineral ou garrafas para abastecimento da equipe/loja, quando previsto operacionalmente.",
-        observacaoUso: ""
-    },
-    {
-        nome: "LANCHES DE REFEIÇÕES",
-        palavrasChave: [
-            "lanche","lanche equipe","lanche da equipe","coffee break","cafe","café",
-            "pao","pão","bolo","salgado","biscoito","biscoitos","refrigerante",
-            "refris","suco","suco natural","suquinho","lanchinho","kit lanche",
-            "croissant","torta","doces treinamento","premiação","premiacao"
-        ],
-        descricao: "Lanche / coffee break ligado a treinamento interno oficial, ação aprovada (VM, regional, diretoria) ou premiação operacional autorizada.",
-        observacaoUso: "Não cobre almoço pessoal ou lazer particular."
-    },
-    {
-        nome: "MATERIAL DE INFORMÁTICA",
-        palavrasChave: [
-            "mouse","teclado","teclado pdv","cabo usb","cabos","pendrive","pen drive",
-            "roteador","hub usb","fonte notebook","fonte","adaptador","cabo rede"
-        ],
-        descricao: "Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hub USB, cartões de memória de baixo valor.",
-        observacaoUso: "Serve para manter PDV/operação rodando. Não cobre TV, monitor grande, console etc."
-    },
-    {
-        nome: "MATERIAL DE ESCRITÓRIO",
-        palavrasChave: [
-            "caneta","canetas","pasta","pastas","papel","bloco","blocos","caderno",
-            "cadernos","etiqueta adesiva","grampeador","organizador de mesa","clips","clipes"
-        ],
-        descricao: "Canetas, clips, pastas, blocos de anotação, grampeadores, etiquetas, organizadores de mesa.",
-        observacaoUso: ""
-    },
-    {
-        nome: "MATERIAL DE LIMPEZA",
-        palavrasChave: [
-            "detergente","desinfetante","sabonete","pano de chão","pano de chao","pano",
-            "alcool","álcool","papel toalha","vassoura","rodo","limpeza loja"
-        ],
-        descricao: "Detergente, desinfetante, pano de chão, álcool, papel toalha, vassoura, rodo etc. para uso da loja.",
-        observacaoUso: "Materiais para manutenção da limpeza da loja."
-    },
-    {
-        nome: "MATERIAL DE COPA E COZINHA",
-        palavrasChave: [
-            "copo descartavel","copo","talher","talheres","garrafa térmica","garrafa termica",
-            "pano de prato","pano prato","filtro de cafe","filtro de café","pote plastico",
-            "pote plástico","potes"
-        ],
-        descricao: "Pratos, copos, talheres, filtros de café, garrafas térmicas, panos de prato, potes plásticos.",
-        observacaoUso: "NÃO inclui eletrodoméstico (cafeteira elétrica, micro-ondas, etc.)."
-    },
-    {
-        nome: "MANUTENÇÃO ELÉTRICO",
-        palavrasChave: [
-            "tomada","tomadas","disjuntor","disjuntores","interruptor","interruptores",
-            "reator","soquete","soquetes","extensao","extensão","fiação","fiacao",
-            "eletrico","elétrico"
-        ],
-        descricao: "Troca de tomadas, disjuntores, interruptores, pequenos reparos de fiação de baixa tensão.",
-        observacaoUso: "Serviços simples e pontuais, baixo valor, para manter a loja operando."
-    },
-    {
-        nome: "MANUTENÇÃO AR-CONDICIONADO",
-        palavrasChave: [
-            "ar condicionado","ar-condicionado","arcondicionado","limpeza filtro ar",
-            "carga de gas ar","controle remoto ar","manutencao ar","manutenção ar",
-            "controle ar"
-        ],
-        descricao: "Limpeza de filtro, carga de gás, troca de controle remoto ou ajuste simples de ar-condicionado.",
-        observacaoUso: "Compra de um ar-condicionado novo não entra."
-    },
-    {
-        nome: "MANUTENÇÃO CIVIL",
-        palavrasChave: [
-            "parafusar prateleira","arrumar porta","trocar fechadura loja","reparo parede",
-            "trocar vidro","ajuste prateleira fixa","conserto parede","manutenção civil",
-            "manutencao civil"
-        ],
-        descricao: "Pequenos reparos físicos na loja (parede, porta, vidro, prateleira fixa), exceto chaveiro emergencial.",
-        observacaoUso: ""
-    },
-    {
-        nome: "MANUTENÇÃO EQUIPAMENTOS",
-        palavrasChave: [
-            "conserto impressora etiqueta","manutencao impressora","ajuste maquina estampar",
-            "maquina estampar","reparo computador loja","ferramenta manual",
-            "manutenção equipamentos","manutencao equipamentos"
-        ],
-        descricao: "Reparo de impressora de etiqueta, máquina de estampar, computador fora de garantia, ferramenta manual pequena.",
-        observacaoUso: "Equipamento grande/patrimonial não."
-    },
-    {
-        nome: "CHAVEIRO EMERGENCIAL",
-        palavrasChave: [
-            "chaveiro","abrir cofre","abrir estoque","abrir vitrine","trocar segredo",
-            "perdi a chave","sem chave cofre"
-        ],
-        descricao: "Serviço emergencial de chaveiro para abrir cofre, estoque, vitrine.",
-        observacaoUso: "Somente emergência operacional real."
-    },
-    {
-        nome: "TRANSPORTE SERVIÇOS EMERGENCIAS",
-        palavrasChave: [
-            "motoboy","moto boy","moto-boy","frete urgente","entrega urgente",
-            "pegar documento na matriz","levar documento","sedex urgente","courier",
-            "lalamove","lala move","frete local","frete local emergencial"
-        ],
-        descricao: "Frete local emergencial / motoboy para levar/pegar item ou documento crítico entre loja e matriz.",
-        observacaoUso: "Uber / 99 pessoal não entra aqui. Uber pessoal não pode no cartão Clara."
-    },
-    {
-        nome: "CORREIOS_SEDEX/AR/POSTAGEM",
-        palavrasChave: [
-            "sedex","correios","ar","postagem","envio documento",
-            "carta registrada","devolucao correios","devolução correios"
-        ],
-        descricao: "Envio de documentos físicos via Sedex/AR/postagem oficial; devoluções pequenas.",
-        observacaoUso: ""
-    },
-    {
-        nome: "SERVIÇOS GRÁFICOS E DE COPIADORAS",
-        palavrasChave: [
-            "banner","adesivo promocional","adesivo","flyer","folder",
-            "encadernacao","encadernação","material visual loja",
-            "impressao grafica","impressão gráfica"
-        ],
-        descricao: "Impressão de banners, adesivos promocionais, folders, encadernações, material visual da loja.",
-        observacaoUso: ""
-    },
-    {
-        nome: "BOBINA ECF",
-        palavrasChave: [
-            "bobina","bobina ecf","bobina fiscal","bobina impressora fiscal",
-            "ecf","cupom fiscal","bobina pdv","bobina caixa"
-        ],
-        descricao: "Bobina para ECF / impressora fiscal / PDV onde não há fornecimento centralizado.",
-        observacaoUso: ""
-    }
-];
-
-/* =====================================================
-   Normalização
-   ===================================================== */
-function normalize(str) {
-    return str
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-/* =====================================================
-   Intenção
-   ===================================================== */
-function detectarIntencaoPergunta(msgNorm) {
-
-    // fora de escopo
-    const foraEscopoPadroes = [
-        "palmeiras","corinthians","bolsonaro","lula","eleicao","eleição",
-        "presidente","futebol","time joga","campeonato","xing","vai tomar",
-        "conta de matematica","conta de matemática","2+2","raiz quadrada",
-        "piada","xingar","palavrão","palavrao"
+    const etiquetasOficiais = [
+        {
+            nome: "AGUA POTÁVEL",
+            palavrasChave: [
+                "agua","água","galão","galao","garrafa de agua","garrafa de água",
+                "galao de agua","garrafa de agua","garrafa de água"
+            ],
+            descricao: "Compra de galões de água mineral ou garrafas para abastecimento da equipe/loja, quando previsto operacionalmente.",
+            observacaoUso: ""
+        },
+        {
+            nome: "LANCHES DE REFEIÇÕES",
+            palavrasChave: [
+                "lanche","lanche equipe","lanche da equipe","coffee break","cafe","café",
+                "pao","pão","bolo","salgado","biscoito","biscoitos","refrigerante",
+                "refris","suco","suco natural","suquinho","lanchinho","kit lanche",
+                "croissant","torta","doces treinamento","premiação","premiacao"
+            ],
+            descricao: "Lanche / coffee break ligado a treinamento interno oficial, ação aprovada (VM, regional, diretoria) ou premiação operacional autorizada.",
+            observacaoUso: "Não cobre almoço pessoal ou lazer particular."
+        },
+        {
+            nome: "MATERIAL DE INFORMÁTICA",
+            palavrasChave: [
+                "mouse","teclado","teclado pdv","cabo usb","cabos","pendrive","pen drive",
+                "roteador","hub usb","fonte notebook","fonte","adaptador","cabo rede"
+            ],
+            descricao: "Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hub USB, cartões de memória de baixo valor.",
+            observacaoUso: "Serve para manter PDV/operação rodando. Não cobre TV, monitor grande, console etc."
+        },
+        {
+            nome: "MATERIAL DE ESCRITÓRIO",
+            palavrasChave: [
+                "caneta","canetas","pasta","pastas","papel","bloco","blocos","caderno",
+                "cadernos","etiqueta adesiva","grampeador","organizador de mesa","clips","clipes"
+            ],
+            descricao: "Canetas, clips, pastas, blocos de anotação, grampeadores, etiquetas, organizadores de mesa.",
+            observacaoUso: ""
+        },
+        {
+            nome: "MATERIAL DE LIMPEZA",
+            palavrasChave: [
+                "detergente","desinfetante","sabonete","pano de chão","pano de chao","pano",
+                "alcool","álcool","papel toalha","vassoura","rodo","limpeza loja"
+            ],
+            descricao: "Detergente, desinfetante, pano de chão, álcool, papel toalha, vassoura, rodo etc. para uso da loja.",
+            observacaoUso: "Materiais para manutenção da limpeza da loja."
+        },
+        {
+            nome: "MATERIAL DE COPA E COZINHA",
+            palavrasChave: [
+                "copo descartavel","copo","talher","talheres","garrafa térmica","garrafa termica",
+                "pano de prato","pano prato","filtro de cafe","filtro de café","pote plastico",
+                "pote plástico","potes"
+            ],
+            descricao: "Pratos, copos, talheres, filtros de café, garrafas térmicas, panos de prato, potes plásticos.",
+            observacaoUso: "NÃO inclui eletrodoméstico (cafeteira elétrica, micro-ondas, etc.)."
+        },
+        {
+            nome: "MANUTENÇÃO ELÉTRICO",
+            palavrasChave: [
+                "tomada","tomadas","disjuntor","disjuntores","interruptor","interruptores",
+                "reator","soquete","soquetes","extensao","extensão","fiação","fiacao",
+                "eletrico","elétrico"
+            ],
+            descricao: "Troca de tomadas, disjuntores, interruptores, pequenos reparos de fiação de baixa tensão.",
+            observacaoUso: "Serviços simples e pontuais, baixo valor, para manter a loja operando."
+        },
+        {
+            nome: "MANUTENÇÃO AR-CONDICIONADO",
+            palavrasChave: [
+                "ar condicionado","ar-condicionado","arcondicionado","limpeza filtro ar",
+                "carga de gas ar","controle remoto ar","manutencao ar","manutenção ar",
+                "controle ar"
+            ],
+            descricao: "Limpeza de filtro, carga de gás, troca de controle remoto ou ajuste simples de ar-condicionado.",
+            observacaoUso: "Compra de um ar-condicionado novo não entra."
+        },
+        {
+            nome: "MANUTENÇÃO CIVIL",
+            palavrasChave: [
+                "parafusar prateleira","arrumar porta","trocar fechadura loja","reparo parede",
+                "trocar vidro","ajuste prateleira fixa","conserto parede","manutenção civil",
+                "manutencao civil"
+            ],
+            descricao: "Pequenos reparos físicos na loja (parede, porta, vidro, prateleira fixa), exceto chaveiro emergencial.",
+            observacaoUso: ""
+        },
+        {
+            nome: "MANUTENÇÃO EQUIPAMENTOS",
+            palavrasChave: [
+                "conserto impressora etiqueta","manutencao impressora","ajuste maquina estampar",
+                "maquina estampar","reparo computador loja","ferramenta manual",
+                "manutenção equipamentos","manutencao equipamentos"
+            ],
+            descricao: "Reparo de impressora de etiqueta, máquina de estampar, computador fora de garantia, ferramenta manual pequena.",
+            observacaoUso: "Equipamento grande/patrimonial não."
+        },
+        {
+            nome: "CHAVEIRO EMERGENCIAL",
+            palavrasChave: [
+                "chaveiro","abrir cofre","abrir estoque","abrir vitrine","trocar segredo",
+                "perdi a chave","sem chave cofre"
+            ],
+            descricao: "Serviço emergencial de chaveiro para abrir cofre, estoque, vitrine.",
+            observacaoUso: "Somente emergência operacional real."
+        },
+        {
+            nome: "TRANSPORTE SERVIÇOS EMERGENCIAS",
+            palavrasChave: [
+                "motoboy","moto boy","moto-boy","frete urgente","entrega urgente",
+                "pegar documento na matriz","levar documento","sedex urgente","courier",
+                "lalamove","lala move","frete local","frete local emergencial"
+            ],
+            descricao: "Frete local emergencial / motoboy para levar/pegar item ou documento crítico entre loja e matriz.",
+            observacaoUso: "Uber / 99 pessoal não entra aqui. Uber pessoal não pode no cartão Clara."
+        },
+        {
+            nome: "CORREIOS_SEDEX/AR/POSTAGEM",
+            palavrasChave: [
+                "sedex","correios","ar","postagem","envio documento",
+                "carta registrada","devolucao correios","devolução correios"
+            ],
+            descricao: "Envio de documentos físicos via Sedex/AR/postagem oficial; devoluções pequenas.",
+            observacaoUso: ""
+        },
+        {
+            nome: "SERVIÇOS GRÁFICOS E DE COPIADORAS",
+            palavrasChave: [
+                "banner","adesivo promocional","adesivo","flyer","folder",
+                "encadernacao","encadernação","material visual loja",
+                "impressao grafica","impressão gráfica"
+            ],
+            descricao: "Impressão de banners, adesivos promocionais, folders, encadernações, material visual da loja.",
+            observacaoUso: ""
+        },
+        {
+            nome: "BOBINA ECF",
+            palavrasChave: [
+                "bobina","bobina ecf","bobina fiscal","bobina impressora fiscal",
+                "ecf","cupom fiscal","bobina pdv","bobina caixa"
+            ],
+            descricao: "Bobina para ECF / impressora fiscal / PDV onde não há fornecimento centralizado.",
+            observacaoUso: ""
+        }
     ];
-    for (const termo of foraEscopoPadroes) {
-        if (msgNorm.includes(normalize(termo))) {
-            return "foraEscopo";
-        }
-    }
 
-    // etiqueta
-    if (msgNorm.includes("etiqueta") ||
-        msgNorm.includes("qual etiqueta") ||
-        msgNorm.includes("que etiqueta")) {
-        return "etiqueta";
-    }
-
-    // limite
-    if (
-        msgNorm.includes("aumentar limite") ||
-        msgNorm.includes("aumento de limite") ||
-        msgNorm.includes("limite maior") ||
-        msgNorm.includes("limite do cartao") ||
-        msgNorm.includes("limite do cartão") ||
-        msgNorm.includes("limite nao basta") ||
-        msgNorm.includes("limite não basta") ||
-        msgNorm.includes("limite acabou") ||
-        msgNorm.includes("limite estourou")
-    ) {
-        return "limite";
-    }
-
-    // bloqueio
-    if (
-        msgNorm.includes("bloqueou") ||
-        msgNorm.includes("bloqueado") ||
-        msgNorm.includes("desbloquear") ||
-        msgNorm.includes("cartao travou") ||
-        msgNorm.includes("cartão travou") ||
-        msgNorm.includes("travou o cartao") ||
-        msgNorm.includes("travou o cartão") ||
-        msgNorm.includes("bloqueio preventivo")
-    ) {
-        return "bloqueio";
-    }
-
-    // prestação de contas
-    if (
-        msgNorm.includes("como justificar") ||
-        msgNorm.includes("justificar compra") ||
-        msgNorm.includes("prestar contas") ||
-        msgNorm.includes("prestacao de contas") ||
-        msgNorm.includes("prestação de contas") ||
-        msgNorm.includes("colocar nota") ||
-        msgNorm.includes("anexar nota") ||
-        msgNorm.includes("descricao na clara") ||
-        msgNorm.includes("descrição na clara")
-    ) {
-        return "prestacao";
-    }
-
-    // lanche / água / equipe
-    if (
-        msgNorm.includes("lanche") ||
-        msgNorm.includes("lanche pro time") ||
-        msgNorm.includes("lanche para o time") ||
-        msgNorm.includes("cafe pro time") ||
-        msgNorm.includes("café pro time") ||
-        msgNorm.includes("coffee break") ||
-        msgNorm.includes("agua") ||
-        msgNorm.includes("água") ||
-        msgNorm.includes("galão") ||
-        msgNorm.includes("galao") ||
-        msgNorm.includes("premiacao") ||
-        msgNorm.includes("premiação")
-    ) {
-        return "alimentoTime";
-    }
-
-    // uber / transporte pessoal
-    if (
-        msgNorm.includes("uber") ||
-        msgNorm.includes("Uber") ||
-        msgNorm.includes("99") ||
-        msgNorm.includes("taxi") ||
-        msgNorm.includes("Taxi") ||
-        msgNorm.includes("Táxi") ||
-        msgNorm.includes("táxi") ||
-        msgNorm.includes("app de transporte")
-    ) {
-        return "transportePessoal";
-    }
-
-    // troca de gerente / transferência de loja
-    if (
-        msgNorm.includes("mudar de loja") ||
-        msgNorm.includes("troca de loja") ||
-        msgNorm.includes("trocar de loja") ||
-        msgNorm.includes("mudança de loja") ||
-        msgNorm.includes("mudanca de loja") ||
-        msgNorm.includes("vou mudar de loja") ||
-        msgNorm.includes("fui transferido") ||
-        msgNorm.includes("transferido de loja") ||
-        msgNorm.includes("transferencia de loja") ||
-        msgNorm.includes("transferência de loja") ||
-        msgNorm.includes("gerente desligado") ||
-        msgNorm.includes("sem gerente") ||
-        msgNorm.includes("gerente saiu") ||
-        msgNorm.includes("gerente saiu da loja") ||
-        msgNorm.includes("cartao de outra loja") ||
-        msgNorm.includes("cartão de outra loja") ||
-        msgNorm.includes("usar cartao de outra loja") ||
-        msgNorm.includes("usar cartão de outra loja")
-    ) {
-        return "trocaGerente";
-    }
-
-    // sangria
-    if (
-        msgNorm.includes("sangria") ||
-        msgNorm.includes("sangrias") ||
-        msgNorm.includes("Sangria") ||
-        msgNorm.includes("Sangrias") ||
-        msgNorm.includes("fazer sangria") ||
-        msgNorm.includes("puxar dinheiro do caixa") ||
-        msgNorm.includes("retirar dinheiro do caixa")
-    ) {
-        return "sangria";
-    }
-
-    // fraude / contestação
-    if (
-        msgNorm.includes("nao reconheco") ||
-        msgNorm.includes("não reconheço") ||
-        msgNorm.includes("fraude") ||
-        msgNorm.includes("compra indevida") ||
-        msgNorm.includes("compra indevida no cartao") ||
-        msgNorm.includes("compra indevida no cartão") ||
-        msgNorm.includes("contestar compra") ||
-        msgNorm.includes("contestacao") ||
-        msgNorm.includes("contestação")
-    ) {
-        return "fraudeContestacao";
-    }
-
-    // posso comprar...? posso usar...?
-    if (
-        msgNorm.includes("posso comprar") ||
-        msgNorm.includes("posso usar") ||
-        msgNorm.includes("pode usar") ||
-        msgNorm.includes("pode pagar") ||
-        msgNorm.includes("pode gastar") ||
-        msgNorm.includes("pode comprar") ||
-        msgNorm.includes("pode no cartao") ||
-        msgNorm.includes("pode no cartão") ||
-        msgNorm.includes("pode colocar no cartao") ||
-        msgNorm.includes("pode colocar no cartão")
-    ) {
-        return "podeNaoPode";
-    }
-
-    return "generica";
-}
-
-/* =====================================================
-   Achar etiqueta por mensagem
-   ===================================================== */
-
-function acharEtiquetaPorMensagem(msgNorm) {
-    // palavras que NÃO podem sozinhas disparar uma etiqueta,
-    // porque são genéricas demais e aparecem em qualquer pergunta
-    const stopTerms = [
-        "etiqueta",
-        "qual etiqueta",
-        "que etiqueta",
-        "categoria",
-        "qual categoria",
-        "classificacao",
-        "classificação",
-        "tag",
-        "pode usar",
-        "posso usar",
-        "posso comprar",
-        "pode comprar",
-        "cartao",
-        "cartão",
-        "cartao clara",
-        "cartão clara",
-        "clara",
-        "limite",
-        "ajuda",
-        "duvida",
-        "dúvida"
+    const perguntasGeraisEtiqueta = [
+        "qual etiqueta devo usar","qual etiqueta usar","qual etiqueta eu uso",
+        "que etiqueta devo usar","que etiqueta usar","que etiqueta eu uso",
+        "me fala as etiquetas","me diz as etiquetas","me mostra as etiquetas",
+        "me envia as etiquetas","me passa as etiquetas",
+        "todas as etiquetas","lista de etiquetas","listagem de etiquetas",
+        "quais etiquetas existem","quais etiquetas tem","quais sao as etiquetas",
+        "quais são as etiquetas","quais etiquetas posso usar",
+        "quais etiquetas devo usar","quais etiquetas usar",
+        "categorias de gasto","categorias de despesas","categoria de despesa",
+        "categoria de gasto","categoria clara","etiqueta clara"
     ].map(normalize);
 
-    // vamos quebrar a pergunta do usuário em palavras
-    const palavras = msgNorm.split(/\s+/);
+    /* ==================== NORMALIZAÇÃO / INTENÇÃO ==================== */
 
-    // melhor correspondência encontrada até agora
-    let melhorMatch = null;
-    let melhorForca = 0;
+    function normalize(str) {
+        return str
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
 
-    for (const et of etiquetasOficiais) {
-        let forcaAtual = 0;
-
-        for (const termoOriginal of et.palavrasChave) {
-            const termoNorm = normalize(termoOriginal);
-
-            // ignora termos genéricos
-            if (stopTerms.includes(termoNorm)) {
-                continue;
-            }
-
-            // match exato de palavra (melhor, mais forte)
-            if (palavras.includes(termoNorm)) {
-                forcaAtual += 2;
-            }
-
-            // match por substring (mais fraco, mas ainda conta)
-            if (msgNorm.includes(termoNorm)) {
-                forcaAtual += 1;
+    function detectarIntencaoPergunta(msgNorm) {
+        const foraEscopoPadroes = [
+            "palmeiras","corinthians","bolsonaro","lula","eleicao","eleição",
+            "presidente","futebol","time joga","campeonato","xing","vai tomar",
+            "conta de matematica","conta de matemática","2+2","raiz quadrada",
+            "piada","xingar","palavrão","palavrao"
+        ];
+        for (const termo of foraEscopoPadroes) {
+            if (msgNorm.includes(normalize(termo))) {
+                return "foraEscopo";
             }
         }
 
-        // escolhe a etiqueta só se ela teve alguma força (>0)
-        if (forcaAtual > melhorForca) {
-            melhorForca = forcaAtual;
-            melhorMatch = et;
+        if (msgNorm.includes("etiqueta") ||
+            msgNorm.includes("qual etiqueta") ||
+            msgNorm.includes("que etiqueta")) {
+            return "etiqueta";
         }
-    }
 
-    // se nenhuma etiqueta teve match específico de verdade, não retorna nada
-    if (melhorForca === 0) {
-        return null;
-    }
-
-    return melhorMatch;
-}
-
-/* =====================================================
-   Avaliar compra específica
-   ===================================================== */
-function avaliarCompraEspecifica(msgNorm) {
-    // 1. casos claramente proibidos (patrimônio grande, uso pessoal, bebida alcoólica, etc.)
-    const proibidosPatrimonio = [
-        "geladeira", "microondas", "micro-ondas", "tv", "televisao", "televisão",
-        "home theater", "mesa", "cadeira", "friogrifico", "freezer",
-        "ar condicionado", "ar-condicionado", "frigobar",
-        "carro", "carro da loja", "veiculo", "veículo", "moto",
-        "playstation", "ps5", "xbox", "video game", "videogame",
-        "som ambiente", "caixa de som grande", "caixa de som", "soundbar",
-        "projetor", "telão", "tela gigante", "foguete", "foguetes", "foguetinho"
-    ].map(normalize);
-
-    for (const palavra of proibidosPatrimonio) {
-        if (msgNorm.includes(palavra)) {
-            return {
-                pode: false,
-                resposta: `Isso é item patrimonial / infraestrutura de loja ou bem de alto valor. Esses itens NÃO podem ser comprados com o cartão Clara. Eles devem seguir o processo de Compras / aprovação formal, não o cartão da loja.`
-            };
+        if (msgNorm.includes("aumentar limite") ||
+            msgNorm.includes("aumento de limite") ||
+            msgNorm.includes("limite maior") ||
+            msgNorm.includes("limite do cartao") ||
+            msgNorm.includes("limite do cartão") ||
+            msgNorm.includes("limite nao basta") ||
+            msgNorm.includes("limite não basta") ||
+            msgNorm.includes("limite acabou") ||
+            msgNorm.includes("limite estourou") ||
+            msgNorm.includes("limite")) {
+            return "limite";
         }
-    }
 
-    // 2. refeição pessoal explícita ("paguei meu almoço", "meu jantar", etc.)
-    const pessoalAlim = [
-        "meu almoco","meu almoço","meu jantar","meu lanche","paguei meu almoco",
-        "paguei meu almoço","paguei meu jantar","paguei meu lanche","minha comida",
-        "comida pra mim","refeicao pessoal","refeição pessoal","jantar pessoal",
-        "almoco pessoal","almoço pessoal","lanche pessoal"
-    ].map(normalize);
-
-    for (const termo of pessoalAlim) {
-        if (msgNorm.includes(termo)) {
-            return {
-                pode: false,
-                resposta: `Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja. Se já foi pago no cartão, precisa sinalizar como "Despesa Pessoal – Uso Indevido", avisar o Financeiro e ressarcir.`
-            };
+        if (msgNorm.includes("bloqueou") ||
+            msgNorm.includes("bloqueado") ||
+            msgNorm.includes("desbloquear") ||
+            msgNorm.includes("cartao travou") ||
+            msgNorm.includes("cartão travou") ||
+            msgNorm.includes("travou o cartao") ||
+            msgNorm.includes("travou o cartão") ||
+            msgNorm.includes("bloqueio preventivo")) {
+            return "bloqueio";
         }
-    }
 
-    // 3. bebida alcoólica
-    const alcool = ["cerveja","vodka","vinho","whisky","whiskey","cachaça","cachaca","gin","tequila"].map(normalize);
-    for (const termo of alcool) {
-        if (msgNorm.includes(termo)) {
-            return {
-                pode: false,
-                resposta: `Bebida alcoólica não é permitida no cartão Clara. Isso não é considerado despesa operacional autorizada.`
-            };
+        if (msgNorm.includes("como justificar") ||
+            msgNorm.includes("justificar compra") ||
+            msgNorm.includes("prestar contas") ||
+            msgNorm.includes("prestacao de contas") ||
+            msgNorm.includes("prestação de contas") ||
+            msgNorm.includes("colocar nota") ||
+            msgNorm.includes("anexar nota") ||
+            msgNorm.includes("descricao na clara") ||
+            msgNorm.includes("descrição na clara")) {
+            return "prestacao";
         }
-    }
 
-    // 4. transporte pessoal (uber pra você ir pra casa, etc.)
-    const transportePessoal = ["uber","99","taxi","táxi","taxí","cabify"].map(normalize);
-    for (const termo of transportePessoal) {
-        if (msgNorm.includes(termo)) {
-            return {
-                pode: false,
-                resposta: `Uber / 99 / táxi para deslocamento pessoal não pode no cartão Clara. Não é gasto operacional direto da loja.`
-            };
+        if (msgNorm.includes("lanche") ||
+            msgNorm.includes("lanche pro time") ||
+            msgNorm.includes("lanche para o time") ||
+            msgNorm.includes("cafe pro time") ||
+            msgNorm.includes("café pro time") ||
+            msgNorm.includes("coffee break") ||
+            msgNorm.includes("agua") ||
+            msgNorm.includes("água") ||
+            msgNorm.includes("galão") ||
+            msgNorm.includes("galao") ||
+            msgNorm.includes("premiacao") ||
+            msgNorm.includes("premiação")) {
+            return "alimentoTime";
         }
-    }
 
-    // 5. alimentação/equipe/ação autorizada (coffee break, água pra equipe, lanche de treinamento)
-    // aqui PODE, mas só se for claramente pra equipe/treinamento/ação oficial
-    const palavrasTime = [
-        "coffee break","lanche pra equipe","lanche para equipe","lanche equipe",
-        "lanche time","lanche pro time","lanche para o time",
-        "treinamento","premiacao","premiação","acao oficial","ação oficial",
-        "acao vm","ação vm","acao regional","ação regional",
-        "agua pra equipe","água pra equipe","galão de agua","galão de água",
-        "galão","galão de agua","salgadinho pra treinamento","bolo pra treinamento",
-        "suco pra treinamento","suco para treinamento","lanche treinamento"
-    ].map(normalize);
-
-    for (const termo of palavrasTime) {
-        if (msgNorm.includes(termo)) {
-            return {
-                pode: true,
-                etiquetaValida: {
-                    nome: "LANCHES DE REFEIÇÕES / ÁGUA POTÁVEL",
-                    desc: "Coffee break autorizado, água/lanche para equipe em treinamento interno aprovado, ação oficial da loja (VM, regional, diretoria) ou premiação operacional.",
-                    exemploDescricao: "Coffee break treinamento VM loja 1234"
-                },
-                resposta: `Pode usar o cartão Clara se for ação autorizada (treinamento interno, VM, regional, diretoria, premiação operacional). Precisa lançar na Clara em até 48h com nota fiscal, etiqueta correta e descrição objetiva.`
-            };
+        if (msgNorm.includes("uber") ||
+            msgNorm.includes(" 99") ||
+            msgNorm.includes("taxi") ||
+            msgNorm.includes("táxi") ||
+            msgNorm.includes("taxí") ||
+            msgNorm.includes("cabify") ||
+            msgNorm.includes("app de transporte")) {
+            return "transportePessoal";
         }
-    }
 
-    // 6. periféricos / pequenos itens operacionais (mouse, teclado, cabo USB, pendrive etc.)
-    const perifOperacional = [
-        "mouse","teclado","cabo usb","usb","pendrive","fonte de notebook",
-        "hub usb","roteador","teclado pdv","teclado do pdv","teclado caixa","bobina ecf","bobina fiscal"
-    ].map(normalize);
-
-    for (const termo of perifOperacional) {
-        if (msgNorm.includes(termo)) {
-            return {
-                pode: true,
-                etiquetaValida: {
-                    nome: "MATERIAL DE INFORMÁTICA",
-                    desc: "Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (sem controle patrimonial).",
-                    exemploDescricao: "Teclado PDV loja 1234"
-                },
-                resposta: `Esse tipo de material (ex.: mouse, teclado, cabo) é considerado suprimento operacional de baixo valor para a loja e pode ser pago no cartão Clara, desde que classificado corretamente e lançado em até 48h.`
-            };
+        if (msgNorm.includes("mudar de loja") ||
+            msgNorm.includes("troca de loja") ||
+            msgNorm.includes("trocar de loja") ||
+            msgNorm.includes("mudança de loja") ||
+            msgNorm.includes("mudanca de loja") ||
+            msgNorm.includes("vou mudar de loja") ||
+            msgNorm.includes("fui transferido") ||
+            msgNorm.includes("transferido de loja") ||
+            msgNorm.includes("transferencia de loja") ||
+            msgNorm.includes("transferência de loja") ||
+            msgNorm.includes("gerente desligado") ||
+            msgNorm.includes("sem gerente") ||
+            msgNorm.includes("gerente saiu") ||
+            msgNorm.includes("gerente saiu da loja") ||
+            msgNorm.includes("cartao de outra loja") ||
+            msgNorm.includes("cartão de outra loja") ||
+            msgNorm.includes("usar cartao de outra loja") ||
+            msgNorm.includes("usar cartão de outra loja")) {
+            return "trocaGerente";
         }
-    }
 
-    // 7. chaveiro emergencial, motoboy, sedex
-    const servicoEmerg = [
-        "chaveiro","abrir cofre","abrir estoque","perdi a chave","motoboy","sedex","correios","envio de documento","postar documento","postar nota","mandar documento","enviar documento"
-    ].map(normalize);
-
-    for (const termo of servicoEmerg) {
-        if (msgNorm.includes(termo)) {
-            return {
-                pode: true,
-                etiquetaValida: {
-                    nome: "TRANSPORTE SERVIÇOS EMERGENCIAS / CORREIOS_SEDEX/AR/POSTAGEM / CHAVEIRO EMERGENCIAL",
-                    desc: "Motoboy emergencial, envio urgente de documentos (Sedex/AR/postagem oficial), chaveiro emergencial para abrir estoque/cofre.",
-                    exemploDescricao: "Motoboy urgente documentação loja 1234"
-                },
-                resposta: `Serviços emergenciais (motoboy urgente, Sedex de documento oficial, chaveiro emergencial pra abrir estoque/cofre) podem usar o cartão Clara, desde que sejam necessidade imediata da operação e sejam justificados na Clara dentro de 48h.`
-            };
+        if (msgNorm.includes("sangria") ||
+            msgNorm.includes("sangrias") ||
+            msgNorm.includes("fazer sangria") ||
+            msgNorm.includes("puxar dinheiro do caixa") ||
+            msgNorm.includes("retirar dinheiro do caixa")) {
+            return "sangria";
         }
+
+        if (msgNorm.includes("nao reconheco") ||
+            msgNorm.includes("não reconheço") ||
+            msgNorm.includes("fraude") ||
+            msgNorm.includes("compra indevida") ||
+            msgNorm.includes("contestar compra") ||
+            msgNorm.includes("contestacao") ||
+            msgNorm.includes("contestação")) {
+            return "fraudeContestacao";
+        }
+
+        if (msgNorm.includes("posso comprar") ||
+            msgNorm.includes("posso usar") ||
+            msgNorm.includes("pode usar") ||
+            msgNorm.includes("pode pagar") ||
+            msgNorm.includes("pode gastar") ||
+            msgNorm.includes("pode comprar") ||
+            msgNorm.includes("pode no cartao") ||
+            msgNorm.includes("pode no cartão") ||
+            msgNorm.includes("pode colocar no cartao") ||
+            msgNorm.includes("pode colocar no cartão")) {
+            return "podeNaoPode";
+        }
+
+        return "generica";
     }
 
-    // 8. Se não classificou em nada específico:
-    return {
-        pode: null,
-        resposta: `Não ficou claro se isso é uma despesa operacional imediata da loja ou algo pessoal/patrimonial.`
-    };
-}
+    /* ==================== ETIQUETA POR MENSAGEM ==================== */
 
-/* =====================================================
-   Respostas por intenção
-   ===================================================== */
-function respostaForaEscopo() {
-    return `HTML:<p class="text-sm text-slate-700">
+    function acharEtiquetaPorMensagem(msgNorm) {
+        const stopTerms = [
+            "etiqueta","qual etiqueta","que etiqueta","categoria","qual categoria",
+            "classificacao","classificação","tag","pode usar","posso usar",
+            "posso comprar","pode comprar","cartao","cartão","cartao clara",
+            "cartão clara","clara","limite","ajuda","duvida","dúvida"
+        ].map(normalize);
+
+        const palavras = msgNorm.split(/\s+/);
+
+        let melhorMatch = null;
+        let melhorForca = 0;
+
+        for (const et of etiquetasOficiais) {
+            let forcaAtual = 0;
+
+            for (const termoOriginal of et.palavrasChave) {
+                const termoNorm = normalize(termoOriginal);
+                if (stopTerms.includes(termoNorm)) continue;
+
+                if (palavras.includes(termoNorm)) {
+                    forcaAtual += 2;
+                }
+                if (msgNorm.includes(termoNorm)) {
+                    forcaAtual += 1;
+                }
+            }
+
+            if (forcaAtual > melhorForca) {
+                melhorForca = forcaAtual;
+                melhorMatch = et;
+            }
+        }
+
+        if (melhorForca === 0) return null;
+        return melhorMatch;
+    }
+
+    /* ==================== AVALIAR COMPRA ESPECÍFICA ==================== */
+
+    function avaliarCompraEspecifica(msgNorm) {
+        const proibidosPatrimonio = [
+            "geladeira","microondas","micro-ondas","tv","televisao","televisão",
+            "home theater","mesa","cadeira","friogrifico","freezer",
+            "ar condicionado","ar-condicionado","frigobar",
+            "carro","veiculo","veículo","moto",
+            "playstation","ps5","xbox","video game","videogame",
+            "som ambiente","caixa de som grande","caixa de som","soundbar",
+            "projetor","telão","tela gigante","foguete","foguetes","foguetinho"
+        ].map(normalize);
+
+        for (const palavra of proibidosPatrimonio) {
+            if (msgNorm.includes(palavra)) {
+                return {
+                    pode: false,
+                    resposta: `Isso é item patrimonial / infraestrutura de loja ou bem de alto valor. Esses itens NÃO podem ser comprados com o cartão Clara. Eles devem seguir o processo de Compras / aprovação formal, não o cartão da loja.`
+                };
+            }
+        }
+
+        const pessoalAlim = [
+            "paguei meu almoco","paguei meu almoço","paguei meu jantar",
+            "paguei meu lanche","paguei meu café","paguei meu cafe",
+            "paguei meu pastel","paguei minha refeicao","paguei minha refeição",
+            "paguei minha comida","paguei minha janta",
+            "meu almoço","meu almoco","meu jantar","minha janta",
+            "meu lanche","minha comida","almoco pessoal","almoço pessoal",
+            "jantar pessoal","lanche pessoal","refeição pessoal","refeicao pessoal"
+        ].map(normalize);
+
+        for (const termo of pessoalAlim) {
+            if (msgNorm.includes(termo)) {
+                return {
+                    pode: false,
+                    resposta: `Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja. Se já foi pago com o cartão, precisa sinalizar como "Despesa Pessoal – Uso Indevido", avisar o Financeiro e ressarcir em até 2 dias úteis.`
+                };
+            }
+        }
+
+        const alcool = ["cerveja","vodka","vinho","whisky","whiskey","cachaça","cachaca","gin","tequila"].map(normalize);
+        for (const termo of alcool) {
+            if (msgNorm.includes(termo)) {
+                return {
+                    pode: false,
+                    resposta: `Bebida alcoólica não é permitida no cartão Clara. Isso não é considerado despesa operacional autorizada.`
+                };
+            }
+        }
+
+        const transportePessoal = ["uber"," 99","taxi","táxi","taxí","cabify"].map(normalize);
+        for (const termo of transportePessoal) {
+            if (msgNorm.includes(termo)) {
+                return {
+                    pode: false,
+                    resposta: `Uber / 99 / táxi para deslocamento pessoal não pode no cartão Clara. Não é gasto operacional direto da loja.`
+                };
+            }
+        }
+
+        const palavrasTime = [
+            "coffee break","lanche pra equipe","lanche para equipe","lanche equipe",
+            "lanche time","lanche pro time","lanche para o time",
+            "treinamento","premiacao","premiação","acao oficial","ação oficial",
+            "acao vm","ação vm","acao regional","ação regional",
+            "agua pra equipe","água pra equipe","galão de agua","galão de água",
+            "salgadinho pra treinamento","bolo pra treinamento",
+            "suco pra treinamento","suco para treinamento","lanche treinamento"
+        ].map(normalize);
+
+        for (const termo of palavrasTime) {
+            if (msgNorm.includes(termo)) {
+                return {
+                    pode: true,
+                    etiquetaValida: {
+                        nome: "LANCHES DE REFEIÇÕES / AGUA POTÁVEL",
+                        desc: "Coffee break autorizado, água/lanche para equipe em treinamento interno aprovado, ação oficial da loja (VM, regional, diretoria) ou premiação operacional.",
+                        exemploDescricao: "Coffee break treinamento VM loja 1234"
+                    },
+                    resposta: `Pode usar o cartão Clara se for ação autorizada (treinamento interno, VM, regional, diretoria, premiação operacional). Precisa lançar na Clara em até 48h com nota fiscal, etiqueta correta e descrição objetiva.`
+                };
+            }
+        }
+
+        const perifOperacional = [
+            "mouse","teclado","cabo usb","usb","pendrive","fonte de notebook",
+            "hub usb","roteador","teclado pdv","teclado do pdv","teclado caixa",
+            "bobina ecf","bobina fiscal"
+        ].map(normalize);
+
+        for (const termo of perifOperacional) {
+            if (msgNorm.includes(termo)) {
+                return {
+                    pode: true,
+                    etiquetaValida: {
+                        nome: "MATERIAL DE INFORMÁTICA",
+                        desc: "Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (sem controle patrimonial).",
+                        exemploDescricao: "Teclado PDV loja 1234"
+                    },
+                    resposta: `Esse tipo de material (ex.: mouse, teclado, cabo) é considerado suprimento operacional de baixo valor para a loja e pode ser pago no cartão Clara, desde que classificado corretamente e lançado em até 48h.`
+                };
+            }
+        }
+
+        const servicoEmerg = [
+            "chaveiro","abrir cofre","abrir estoque","perdi a chave",
+            "motoboy","sedex","correios","envio de documento","postar documento",
+            "mandar documento","enviar documento"
+        ].map(normalize);
+
+        for (const termo of servicoEmerg) {
+            if (msgNorm.includes(termo)) {
+                return {
+                    pode: true,
+                    etiquetaValida: {
+                        nome: "TRANSPORTE SERVIÇOS EMERGENCIAS / CORREIOS_SEDEX/AR/POSTAGEM / CHAVEIRO EMERGENCIAL",
+                        desc: "Motoboy emergencial, envio urgente de documentos (Sedex/AR/postagem oficial), chaveiro emergencial para abrir estoque/cofre.",
+                        exemploDescricao: "Motoboy urgente documentação loja 1234"
+                    },
+                    resposta: `Serviços emergenciais (motoboy urgente, Sedex de documento oficial, chaveiro emergencial pra abrir estoque/cofre) podem usar o cartão Clara, desde que sejam necessidade imediata da operação e sejam justificados na Clara dentro de 48h.`
+                };
+            }
+        }
+
+        return {
+            pode: null,
+            resposta: `Não ficou claro se isso é uma despesa operacional imediata da loja ou algo pessoal/patrimonial.`
+        };
+    }
+
+    /* ==================== RESPOSTAS PADRÃO ==================== */
+
+    function respostaForaEscopo() {
+        return `HTML:<p class="text-sm text-slate-700">
 Sou um agente especializado na Política de Uso dos Cartões Clara nas lojas. Não consigo responder esse tipo de assunto.
 </p>`;
-}
+    }
 
-function respEtiquetaDireta(et) {
-    return `HTML:<div class="text-sm text-slate-700">
+    function respEtiquetaDireta(et) {
+        return `HTML:<div class="text-sm text-slate-700">
 <p><b>Etiqueta correta:</b> "${et.nome}".</p>
 <p class="mt-1"><b>O que cobre:</b> ${et.descricao}</p>
 ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i></p>` : ""}
 
 <p class="mt-2">
-Lançar na Clara em até 48h:<br/>
+<b>Como lançar na Clara (até 48h):</b><br/>
 1. Anexar nota fiscal/recibo (foto legível);<br/>
 2. Selecionar "${et.nome}";<br/>
 3. Descrever objetivamente o gasto (ex.: "Teclado PDV loja 1234");<br/>
-4. Guardar o documento físico na loja por pelo menos 180 dias.
+4. Guardar o documento físico na loja pelo prazo indicado pela política.
 </p>
 </div>`;
-}
+    }
 
-function respLimite() {
-    return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
-}
+    function respLimite() {
+        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
+    }
 
-function respBloqueio() {
-    return `HTML:<p class="text-sm text-slate-700">
+    function respBloqueio() {
+        return `HTML:<p class="text-sm text-slate-700">
 O bloqueio preventivo acontece quando tem alguma compra sem justificar na Clara dentro do prazo (até 48h):<br/>
 • faltou nota fiscal/recibo;<br/>
 • não colocou etiqueta correta;<br/>
@@ -889,10 +873,10 @@ Passos pra desbloquear:<br/>
 2. Encaminhar chamado via ServiceNow para desbloqueio.<br/><br/>
 Reincidência pode fazer a loja perder permissão de uso do cartão.
 </p>`;
-}
+    }
 
-function respPoliticaOficial() {
-    return `HTML:<div class="text-sm text-slate-700">
+    function respPoliticaOficial() {
+        return `HTML:<div class="text-sm text-slate-700">
 <p>Seguem as regras oficiais de referência da empresa.</p>
 <p>
 <a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer">
@@ -901,10 +885,10 @@ function respPoliticaOficial() {
 </p>
 <p>Use sempre esse documento como fonte final.</p>
 </div>`;
-}
+    }
 
-function respCatalogoEtiquetas() {
-    return `HTML:<div class="text-sm text-slate-700">
+    function respCatalogoEtiquetas() {
+        return `HTML:<div class="text-sm text-slate-700">
 <p><b>Etiquetas oficiais e quando usar:</b></p>
 
 <p class="mt-2"><b>MATERIAL DE INFORMÁTICA</b><br/>
@@ -954,20 +938,20 @@ Ajustes/reparos em máquinas de estampar, impressoras de etiqueta, computadores 
 <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>
 pedindo criação ou liberação de etiqueta.</p>
 </div>`;
-}
+    }
 
-function respPrestacaoContas() {
-    return `HTML:<p class="text-sm text-slate-700">
+    function respPrestacaoContas() {
+        return `HTML:<p class="text-sm text-slate-700">
 Toda compra no cartão Clara precisa ser lançada na plataforma Clara em até 48h:<br/>
 1. Anexar nota fiscal ou recibo;<br/>
 2. Selecionar a etiqueta correta (ex.: "MATERIAL DE INFORMÁTICA", "AGUA POTÁVEL");<br/>
 3. Preencher a descrição objetiva, dizendo o que foi comprado e para quê.<br/><br/>
-Os comprovantes físicos devem ficar guardados na loja por pelo menos 180 dias corridos. Não justificar no prazo => risco de bloqueio preventivo.
+Os comprovantes físicos devem ficar guardados na loja por pelo menos 180 dias corridos. Não justificar no prazo =&gt; risco de bloqueio preventivo.
 </p>`;
-}
+    }
 
-function respAlimentoTime() {
-    return `HTML:<p class="text-sm text-slate-700">
+    function respAlimentoTime() {
+        return `HTML:<p class="text-sm text-slate-700">
 Pode usar o cartão Clara para água / lanche / coffee break se for algo operacional AUTORIZADO, tipo:<br/>
 • treinamento interno oficial,<br/>
 • ação aprovada (VM, regional, diretoria),<br/>
@@ -978,24 +962,23 @@ Etiquetas usadas:<br/>
 • Coffee break autorizado / lanche de treinamento → "LANCHES DE REFEIÇÕES".<br/><br/>
 Sempre anexar nota e descrever, por ex.: "Coffee break treinamento VM loja 1234".
 </p>`;
-}
+    }
 
-function respTransportePessoal() {
-    return `HTML:<p class="text-sm text-slate-700">
-Uber / 99 / táxi pra deslocamento pessoal não pode ser pago com o cartão Clara. Isso não é gasto operacional direto da loja. O procedimento correto é solicitar via aplicativo com a conta corporativa da empresa.<br/>
+    function respTransportePessoal() {
+        return `HTML:<p class="text-sm text-slate-700">
+Uber / 99 / táxi pra deslocamento pessoal não pode ser pago com o cartão Clara. Isso não é gasto operacional direto da loja. O procedimento correto é solicitar via aplicativo com a conta corporativa da empresa.<br/><br/>
 Se já usou de forma pessoal (pagando do próprio bolso) e quer o reembolso:<br/>
-• Solicite o reembolso através da plataforma Vexpenses (é necessário autorização do seu gestor).
-
+• Solicite o reembolso através da plataforma Vexpenses (é necessário autorização do seu gestor).<br/>
 </p>`;
-}
+    }
 
-function respTrocaGerente() {
-    return `HTML:<p class="text-sm text-slate-700">
+    function respTrocaGerente() {
+        return `HTML:<p class="text-sm text-slate-700">
 Troca de gerente / mudança de loja segue assim:<br/><br/>
 1. Se o gerente titular saiu e ainda não tem novo cartão da nova gestão:<br/>
-   • O Financeiro pode autorizar uso TEMPORÁRIO do cartão de outra loja.<br/>
+   • O Financeiro pode autorizar uso TEMPORÁRIO do cartão de outra loja;<br/>
    • Cada compra precisa ter na descrição da Clara algo como:<br/>
-     "Uso temporário do cartão na loja 1234".<br/>
+     "Uso temporário do cartão na loja 1234";<br/>
    • Isso garante que o custo vá pra loja certa no fechamento.<br/><br/>
 2. Se é só férias/afastamento curto do gerente:<br/>
    • o cartão da própria loja continua sendo usado pelo líder/supervisor autorizado;<br/>
@@ -1005,171 +988,83 @@ Se tiver caso especial, fale com o Financeiro e, se preciso, abra chamado no
 ServiceNow
 </a>.
 </p>`;
-}
+    }
 
-function respSangria() {
-    return `HTML:<p class="text-sm text-slate-700">
+    function respSangria() {
+        return `HTML:<p class="text-sm text-slate-700">
 Depois que a loja recebeu o cartão Clara e fez o treinamento, o processo de sangria em dinheiro pra pagar despesa operacional é DESCONTINUADO.<br/><br/>
 Ou seja: a loja não deve mais tirar dinheiro do caixa pra pagar gasto de operação. Tudo vai no cartão Clara, com justificativa na plataforma.<br/><br/>
 Só em caso de exceção real (cartão sem funcionar e gasto urgente da operação) o Financeiro pode liberar temporariamente uma sangria. Isso precisa de autorização prévia e justificativa formal.
 </p>`;
-}
+    }
 
-function respFraudeContestacao() {
-    return `HTML:<p class="text-sm text-slate-700">
+    function respFraudeContestacao() {
+        return `HTML:<p class="text-sm text-slate-700">
 Se apareceu uma compra que você <b>não reconhece</b> no cartão Clara:<br/><br/>
-1. Avise o Financeiro imediatamente.<br/>
-2. Abrir contestação com o suporte da Clara em até 2 dias úteis após a transação.<br/>
+1. Avise o Financeiro imediatamente;<br/>
+2. Abrir contestação com o suporte da Clara em até 2 dias úteis após a transação;<br/>
 3. Durante a análise a operadora pode bloquear o cartão preventivamente.<br/><br/>
 Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal). Se a compra foi pessoal, aí precisa ressarcir em até 2 dias úteis; não é contestação.
 </p>`;
+    }
+
+    function respNovoCartaoPrimeiraVia() {
+    return `HTML:<div class="text-sm text-slate-700">
+<p><b>Primeira via de cartão Clara (novo cartão)</b></p>
+<p class="mt-1">
+Para solicitar a <b>primeira via</b> do cartão Clara, siga estes passos:
+</p>
+<ol class="list-decimal ml-5 mt-1">
+  <li>Preencha o formulário:<br/>
+    <a href="https://docs.google.com/forms/d/1vGAsFHuDQ6y5ydJMuE7W9ThJFjsLma_1I6yw92OLHh4/viewform"
+       target="_blank" rel="noopener noreferrer"><b>Formulário de Solicitação de Cartão Clara</b></a>.
+  </li>
+  <li class="mt-1">
+    Depois de preencher o formulário, envie um e-mail para o Financeiro informando que já preencheu,<br/>
+    para que o cartão seja emitido:<br/>
+    <b>contasareceber@gruposbf.com.br</b>
+  </li>
+</ol>
+<p class="mt-2">
+O prazo de entrega do cartão é de até <b>7 dias úteis</b>, conforme a política interna.
+</p>
+</div>`;
 }
 
-function consultarPendenciasLoja(lojaCodigo) {
-    if (!URL_API_PENDENCIAS) {
-        renderBotMessage(
-            'HTML:<p class="text-sm text-slate-700">Não tenho uma URL configurada para consultar a planilha de pendências no momento.</p>'
-        );
-        return;
-    }
-
-    const loja = (lojaCodigo || "").toString().replace(/\D/g, "");
-    if (!loja) {
-        renderBotMessage(
-            'HTML:<p class="text-sm text-slate-700">Não entendi o número da loja. Me envie só o código numérico, por exemplo: <b>0171</b>.</p>'
-        );
-        return;
-    }
-
-    renderBotMessage(
-        `HTML:<p class="text-sm text-slate-700">Beleza! Vou consultar as pendências Clara da loja <b>${loja}</b>…</p>`
-    );
-
-    fetch(`${URL_API_PENDENCIAS}?mode=json&loja=${encodeURIComponent(loja)}`)
-        .then(r => r.json())
-        .then(data => {
-            if (!data.ok) {
-                renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700">Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>Detalhe: ${data.error || "erro desconhecido"}</p>`
-                );
-                aguardandoLojaPendencias = false;
-                aguardandoEmailPendencias = false;
-                lojaPendenciasAtual = "";
-                return;
-            }
-
-            if (!data.rows || data.rows.length === 0) {
-                renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700">Não encontrei pendências Clara para a loja <b>${loja}</b> na última data de cobrança.</p>`
-                );
-                aguardandoLojaPendencias = false;
-                aguardandoEmailPendencias = false;
-                lojaPendenciasAtual = "";
-                return;
-            }
-
-            // Achou pendências: guarda loja e pede o e-mail
-            lojaPendenciasAtual = loja;
-            aguardandoLojaPendencias = false;
-            aguardandoEmailPendencias = true;
-
-            renderBotMessage(
-                `HTML:<p class="text-sm text-slate-700">
-Encontrei pendências Clara para a loja <b>${loja}</b> (data de cobrança <b>${data.ultimaData || "-"}</b>).<br/>
-Me envia agora o seu e-mail corporativo para eu mandar o resumo (ex.: <b>nome.sobrenome@gruposbf.com.br</b>).
-</p>`
-            );
-        })
-        .catch(err => {
-            console.error("Erro ao chamar API de pendências:", err);
-            renderBotMessage(
-                'HTML:<p class="text-sm text-slate-700">Tive um erro ao tentar consultar as pendências dessa loja. Tente novamente mais tarde.</p>'
-            );
-            aguardandoLojaPendencias = false;
-            aguardandoEmailPendencias = false;
-            lojaPendenciasAtual = "";
-        });
+function respNovoCartaoSegundaVia() {
+    return `HTML:<div class="text-sm text-slate-700">
+<p><b>Segunda via de cartão Clara (cartão já existia)</b></p>
+<p class="mt-1">
+A solicitação de <b>segunda via</b> (perda, roubo, dano ou troca de portador) deve seguir o fluxo previsto na Política de Uso dos Cartões Clara:
+</p>
+<ul class="list-disc ml-5 mt-1">
+  <li>Bloquear imediatamente o cartão antigo na plataforma / app da Clara (se aplicável);</li>
+  <li>Registrar o motivo (perda, roubo, quebra, etc.) conforme orientações internas;</li>
+  <li>Abrir chamado no 
+    <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"
+       target="_blank" rel="noopener noreferrer"><b>ServiceNow</b></a>
+    solicitando a emissão de segunda via do cartão Clara.
+  </li>
+</ul>
+<p class="mt-2">
+Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clara</b> para casos de reemissão/segunda via.
+</p>
+</div>`;
 }
 
-function enviarPendenciasPorEmail(emailTexto) {
-    if (!URL_API_PENDENCIAS || !lojaPendenciasAtual) {
-        renderBotMessage(
-            'HTML:<p class="text-sm text-slate-700">Não tenho os dados da loja carregados. Tente pedir novamente para consultar as pendências da sua loja.</p>'
-        );
-        aguardandoEmailPendencias = false;
-        return;
-    }
+    function respGenerica(msgNorm) {
+        const avaliacao = avaliarCompraEspecifica(msgNorm);
 
-    const email = emailTexto.trim();
-    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!regexEmail.test(email)) {
-        renderBotMessage(
-            'HTML:<p class="text-sm text-slate-700">Esse e-mail parece inválido. Me envia no formato: <b>nome.sobrenome@gruposbf.com.br</b>.</p>'
-        );
-        return;
-    }
-
-    renderBotMessage(
-        `HTML:<p class="text-sm text-slate-700">Perfeito! Vou enviar o resumo das pendências Clara da loja <b>${lojaPendenciasAtual}</b> para <b>${email}</b>…</p>`
-    );
-
-    fetch(
-        `${URL_API_PENDENCIAS}?mode=email&loja=${encodeURIComponent(
-            lojaPendenciasAtual
-        )}&email=${encodeURIComponent(email)}`
-    )
-        .then(r => r.json())
-        .then(data => {
-            if (!data.ok) {
-                renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700">Tentei enviar o e-mail, mas deu erro: ${data.error || "erro desconhecido"}.</p>`
-                );
-            } else {
-                renderBotMessage(
-                    'HTML:<p class="text-sm text-slate-700">E-mail enviado com sucesso! ✅<br/>Verifique sua caixa de entrada (e eventualmente o lixo eletrônico).</p>'
-                );
-            }
-            aguardandoEmailPendencias = false;
-            lojaPendenciasAtual = "";
-        })
-        .catch(err => {
-            console.error("Erro ao enviar e-mail de pendências:", err);
-            renderBotMessage(
-                'HTML:<p class="text-sm text-slate-700">Tive um erro ao tentar enviar o e-mail com as pendências. Tente novamente mais tarde.</p>'
-            );
-            aguardandoEmailPendencias = false;
-            lojaPendenciasAtual = "";
-        });
-}
-
-    
-/* =====================================================
-   Fallback / resposta genérica com política
-   ===================================================== */
-
-let ultimaIntencao = null;
-
-// ===== Fluxo de consulta de pendências Clara (planilha) =====
-let aguardandoLojaPendencias = false;
-let aguardandoEmailPendencias = false;
-let lojaPendenciasAtual = "";
-
-function respGenerica(msgNorm) {
-    const avaliacao = avaliarCompraEspecifica(msgNorm);
-
-    // CASO 1: claramente proibido
-    if (avaliacao.pode === false) {
-        return `HTML:<div class="text-sm text-slate-700">
+        if (avaliacao.pode === false) {
+            return `HTML:<div class="text-sm text-slate-700">
 <p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
 <p>${avaliacao.resposta}</p>
 </div>`;
-    }
+        }
 
-    // CASO 2: claramente permitido E tem etiqueta coerente
-    if (avaliacao.pode === true && avaliacao.etiquetaValida) {
-        const et = avaliacao.etiquetaValida;
-        return `HTML:<div class="text-sm text-slate-700">
+        if (avaliacao.pode === true && avaliacao.etiquetaValida) {
+            const et = avaliacao.etiquetaValida;
+            return `HTML:<div class="text-sm text-slate-700">
 <p><b>✅ Pode usar o cartão Clara (despesa operacional autorizada).</b></p>
 <p>Use a etiqueta: "<b>${et.nome}</b>".</p>
 <p class="mt-1">${et.desc}</p>
@@ -1179,518 +1074,251 @@ function respGenerica(msgNorm) {
 • Descrever objetivamente o gasto (ex.: "${et.exemploDescricao}");<br/>
 • Guardar o documento físico na loja pelo prazo indicado pela política.</p>
 </div>`;
-    }
+        }
 
-    // CASO 3: não tenho confiança suficiente pra dizer "pode"
-    return `HTML:<div class="text-sm text-slate-700">
-<p>Pra usar o cartão Clara, o gasto precisa ser <b>necessário pra operação da loja</b (ex.: chaveiro emergencial, motoboy urgente, material de limpeza, periférico de PDV, bobina fiscal, água/coffee break autorizado pra treinamento interno ou ação oficial).</p>
+        return `HTML:<div class="text-sm text-slate-700">
+<p>Pra usar o cartão Clara, o gasto precisa ser <b>necessário pra operação da loja</b> (ex.: chaveiro emergencial, motoboy urgente, material de limpeza, periférico de PDV, bobina fiscal, água/coffee break autorizado pra treinamento interno ou ação oficial).</p>
 <p class="mt-2">O que <b>não pode</b> no cartão Clara:<br/>
 • gasto pessoal (refeição pessoal, compra pra uso próprio etc.);<br/>
 • bebida alcoólica;<br/>
 • transporte pessoal (Uber/99 pra deslocamento pessoal);<br/>
 • itens patrimoniais / infraestrutura grande (geladeira, micro-ondas, TV, mesa, cadeira etc.).</p>
-<p class="mt-2">Se você acha que é uma necessidade real da loja, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>
-informando o caso.</p>
+<p class="mt-2">Se você acha que é uma necessidade real da loja, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a> informando o caso.</p>
 </div>`;
-}
-
-function respFollowup(msgNorm) {
-    if (ultimaIntencao === "limite") return respLimite();
-    if (ultimaIntencao === "bloqueio") return respBloqueio();
-    if (ultimaIntencao === "prestacao") return respPrestacaoContas();
-    if (ultimaIntencao === "alimentoTime") return respAlimentoTime();
-    if (ultimaIntencao === "transportePessoal") return respTransportePessoal();
-    if (ultimaIntencao === "trocaGerente") return respTrocaGerente();
-    if (ultimaIntencao === "sangria") return respSangria();
-    if (ultimaIntencao === "fraudeContestacao") return respFraudeContestacao();
-    return respGenerica(msgNorm);
-}
-
-/* =====================================================
-   Motor principal de resposta
-   ===================================================== */
-function gerarRespostaDoBot(msgUsuario) {
-    const norm = normalize(msgUsuario);
-    const intencao = detectarIntencaoPergunta(norm);
-    let resposta;
-
-    // 🔁 FLUXO ESPECIAL: consulta de pendências Clara (planilha) + envio por e-mail
-    if (aguardandoLojaPendencias) {
-        // Usuário deve ter mandado o código da loja agora
-        const loja = norm.replace(/\D/g, "");
-        if (!loja) {
-            return 'HTML:<p class="text-sm text-slate-700">Não entendi o código da loja. Me envie só os números, por exemplo: <b>0171</b>.</p>';
-        }
-
-        // chama a API em modo JSON e, dentro dela, vamos trocar o estado para "aguardandoEmailPendencias"
-        consultarPendenciasLoja(loja);
-        // aqui já devolvo uma mensagem curtinha (consultarPendenciasLoja também manda mensagem)
-        return null; // já estamos respondendo via renderBotMessage dentro da função
     }
 
-    if (aguardandoEmailPendencias) {
-        // Usuário deve estar mandando o e-mail agora
-        enviarPendenciasPorEmail(msgUsuario);
-        return null; // a função enviarPendenciasPorEmail cuida das mensagens
+    /* ==================== CONSULTA PENDÊNCIAS (Apps Script) ==================== */
+
+    function consultarPendenciasNoServidor(loja) {
+        google.script.run
+            .withSuccessHandler(function(res) {
+                if (!res || !res.ok) {
+                    const erro = (res && res.error) ? res.error : "erro desconhecido";
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>
+Detalhe: ${erro}
+</p>`
+                    );
+                    aguardandoConfirmacaoEnvioEmail = false;
+                    aguardandoEmailPendencias = false;
+                    lojaPendenciasAtual = "";
+                    return;
+                }
+
+                if (!res.rows || res.rows.length === 0) {
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+                    Não encontrei pendências para a loja <b>${loja}</b> na última data de cobrança. Verifique se o número da loja está correto.
+</p>`
+                    );
+                    aguardandoConfirmacaoEnvioEmail = false;
+                    aguardandoEmailPendencias = false;
+                    lojaPendenciasAtual = "";
+                    return;
+                }
+
+                ultimaPendenciaResumo = { loja: res.loja, data: res.ultimaData };
+
+                let tabela = `
+<div class="text-sm text-slate-700">
+<p>Encontrei as seguintes pendências Clara da loja <b>${res.loja}</b> (data de cobrança <b>${res.ultimaData}</b>):</p>
+<div class="mt-2 overflow-x-auto">
+<table class="min-w-full text-xs border border-slate-200">
+<thead class="bg-slate-100">
+<tr>
+`;
+                const header = res.header || [];
+                header.forEach(h => {
+                    tabela += `<th class="border px-2 py-1">${h}</th>`;
+                });
+                tabela += `</tr></thead><tbody>`;
+
+                res.rows.forEach(linha => {
+                    tabela += `<tr>`;
+                    linha.forEach(col => {
+                        tabela += `<td class="border px-2 py-1">${col !== null && col !== undefined ? col : ""}</td>`;
+                    });
+                    tabela += `</tr>`;
+                });
+
+                tabela += `</tbody></table></div></div>`;
+
+                renderBotMessage("HTML:" + tabela);
+
+                renderBotMessage(
+                    'HTML:<p class="text-sm text-slate-700 mt-2">Quer que eu envie esse resumo por e-mail também? (responda "sim" ou "não")</p>'
+                );
+
+                aguardandoConfirmacaoEnvioEmail = true;
+            })
+            .withFailureHandler(function(err) {
+                console.error("Erro getPendenciasPorLoja:", err);
+                renderBotMessage(
+                    'HTML:<p class="text-sm text-slate-700">Tive um erro ao tentar consultar as pendências dessa loja. Tente novamente mais tarde.</p>'
+                );
+                aguardandoConfirmacaoEnvioEmail = false;
+                aguardandoEmailPendencias = false;
+                lojaPendenciasAtual = "";
+            })
+            .getPendenciasPorLoja(loja);
     }
 
-        // Se estamos aguardando o número da loja para consultar pendências
-    if (modoConsultaPendencias === "aguardando_loja") {
-        const match = msgUsuario.match(/\d{3,6}/); // captura algo tipo 123, 1234, 12345...
-        if (!match) {
-            return `HTML:<p class="text-sm text-slate-700">
-Não entendi o número da loja. Me manda só o código numérico, por exemplo: <b>1234</b>.
-            </p>`;
-        }
-
-        const loja = match[0];
-        modoConsultaPendencias = null;
-        lojaUltimaConsulta = loja;
-
-        // Chama API assíncrona (Apps Script)
-        consultarPendenciasLoja(loja);
-
-        return `HTML:<p class="text-sm text-slate-700">
-Beleza, vou consultar as pendências da loja <b>${loja}</b> e te mostro aqui embaixo 👇
-        </p>`;
+    function chamarEnvioPendenciasPorEmail(loja, email) {
+        google.script.run
+            .withSuccessHandler(function(res) {
+                if (res && res.ok) {
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+Enviei o resumo das pendências da loja <b>${res.loja || loja}</b> para o e-mail <b>${email}</b> (data de cobrança: <b>${res.data || (ultimaPendenciaResumo && ultimaPendenciaResumo.data) || ""}</b>). Não se esqueça de regularizar as justificativas na plataforma da Clara e posteriormente encaminhar chamado para que o cartão seja desbloqueado (caso esteja bloqueado).</p>`
+                    );
+                } else {
+                    const erro = (res && res.error) ? res.error : "erro desconhecido";
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
+                    );
+                }
+            })
+            .withFailureHandler(function(err) {
+                console.error("Erro enviarPendenciasPorEmail:", err);
+                renderBotMessage(
+                    'HTML:<p class="text-sm text-slate-700">Tive um erro ao tentar enviar o e-mail de pendências. Tente novamente mais tarde.</p>'
+                );
+            })
+            .enviarPendenciasPorEmail(loja, email);
     }
 
-    // 🎯 Detecta fim de conversa / agradecimento
-    const frasesEncerramento = [
-        "ok", "okay", "okey", "certo", "blz", "beleza", "bl", "OK", "Ok", "oK",
-        "entendi", "entendido", "tudo certo", "td certo", "tds certo",
-        "tá bom", "ta bom", "tá ótimo", "ta otimo", "tá otimo", "entendi", "entendido",
-        "show", "show de bola", "valeu", "vlw", "obrigado", "obrigada", "Obrigado", "Obrigada", "OBRIGADO", "OBRIGADA",
-        "agradecido", "agradecida", "tranquilo", "de boa", "suave", "tks", "thaks",
-        "pode deixar", "certinho", "maravilha", "perfeito", "jóia", "joia"
-    ].map(normalize);
+    /* ==================== MOTOR DE RESPOSTA DA POLÍTICA ==================== */
 
-    // se a mensagem contém só uma dessas palavras curtas
-    for (const frase of frasesEncerramento) {
-        if (norm === frase || norm.startsWith(frase + " ") || norm.endsWith(" " + frase)) {
-            const respostasEncerramento = [
-                "Que bom que consegui ajudar! 🤗 Pode me chamar sempre que precisar.",
-                "Show! Fico feliz em ajudar 😄",
-                "Perfeito 👌 qualquer dúvida, é só chamar de novo!",
-                "Valeu! Até a próxima 🚀",
-                "Beleza 😎 tô por aqui se precisar de novo.",
-                "Tá bom, qualquer coisa, é só chamar!",
-                "#jogamosentrosados",
-            ];
-            const random = Math.floor(Math.random() * respostasEncerramento.length);
-            return `HTML:<p class="text-sm text-slate-700">${respostasEncerramento[random]}</p>`;
-        }
-    }
+    function gerarRespostaPolitica(msgUsuario) {
+        const norm = normalize(msgUsuario);
+        const intencao = detectarIntencaoPergunta(norm);
+        let resposta;
 
-    // 0. PEDIR A POLÍTICA / PDF / DOCUMENTO OFICIAL
-    const frasesPolitica = [
-// Pedidos diretos de envio
-        "me envia a politica",
-        "me envia a política",
-        "me manda a politica",
-        "me manda a política",
-        "me manda a politica de uso",
-        "me manda a política de uso",
-        "me manda a politica do cartao",
-        "me manda a política do cartão",
-        "me manda a politica do cartao clara",
-        "me manda a política do cartão clara",
-        "me envia a politica do cartao",
-        "me envia a política do cartão",
-        "manda a politica",
-        "manda a política",
-        "manda a politica de uso",
-        "manda a política de uso",
-        "manda a politica do cartao",
-        "manda a política do cartão",
-        "envia a politica",
-        "envia a política",
-        "envia politica de uso",
-        "envia política de uso",
-        "envia a politica do cartao",
-        "envia a política do cartão",
-        "me envia o pdf da politica",
-        "me envia o pdf da política",
-        "manda o pdf da politica",
-        "manda o pdf da política",
-        "me manda o pdf da politica do cartao",
-        "me manda o pdf da política do cartão",
-        "me envia o pdf da politica do cartao",
-        "me envia o pdf da política do cartão",
+        // Gasto pessoal alimentação muito explícito
+        const padroesGastoPessoalAlimentacao = [
+            "paguei meu almoco","paguei meu almoço","paguei meu jantar",
+            "paguei meu lanche","paguei meu café","paguei meu cafe",
+            "paguei meu pastel","paguei minha refeicao","paguei minha refeição",
+            "paguei minha comida","paguei minha janta",
+            "meu almoço","meu almoco","meu jantar","minha janta",
+            "meu lanche","meu lanche com o cartao","meu lanche com o cartão",
+            "minha comida","almoco pessoal","almoço pessoal",
+            "jantar pessoal","lanche pessoal","refeição pessoal","refeicao pessoal",
+            "almocei com o cartao","almocei com o cartão",
+            "jantei com o cartao","jantei com o cartão",
+            "comi com o cartao","comi com o cartão"
+        ].map(normalize);
 
-        // Pedidos de link
-        "me manda o link da politica",
-        "me manda o link da política",
-        "manda o link da politica",
-        "manda o link da política",
-        "manda o link da politica do cartao",
-        "manda o link da política do cartão",
-        "envia o link da politica",
-        "envia o link da política",
-        "me passa o link da politica",
-        "me passa o link da política",
-        "link da politica",
-        "link da política",
-        "link da politica do cartao",
-        "link da política do cartão",
-        "link da politica clara",
-        "link da política clara",
-        "me manda o link do documento da politica",
-        "me manda o link do documento da política",
+        const isGastoPessoalAlimentacao = padroesGastoPessoalAlimentacao.some(p => norm.includes(p));
 
-        // Falar de “política do cartão”
-        "politica do cartao",
-        "política do cartão",
-        "politica do cartao clara",
-        "política do cartão clara",
-        "politica do cartao das lojas",
-        "política do cartão das lojas",
-        "politica de uso do cartao",
-        "política de uso do cartão",
-        "politica de uso do cartao clara",
-        "política de uso do cartão clara",
-        "politica dos cartoes",
-        "política dos cartões",
-        "politica dos cartoes clara",
-        "política dos cartões clara",
-        "politica de cartoes clara",
-        "política de cartões clara",
-
-        // Pedido do documento / pdf / arquivo
-        "me envia o documento da politica",
-        "me envia o documento da política",
-        "me manda o documento da politica",
-        "me manda o documento da política",
-        "documento da politica",
-        "documento da política",
-        "documento oficial da politica",
-        "documento oficial da política",
-        "arquivo da politica",
-        "arquivo da política",
-        "pdf da politica",
-        "pdf da política",
-        "pdf politica cartao",
-        "pdf politica clara",
-        "pdf politica do cartao",
-        "pdf politica do cartão",
-        "manual da politica",
-        "manual da política",
-        "manual do cartao clara",
-        "manual do cartão clara",
-        "manual de uso do cartao",
-        "manual de uso do cartão",
-
-        // Abreviações / erros / versões curtas
-        "politica cartao",
-        "politica clara",
-        "politica clara cartao",
-        "politica cartao clara",
-        "politica em pdf",
-        "politica pdf",
-        "politica de uso dos cartoes",
-        "politica de uso dos cartões",
-        "politica de uso dos cartoes clara",
-        "politica de uso dos cartões clara",
-        "me manda a politica clara",
-        "me envia a politica clara",
-        "manda politica clara",
-        "manda politica do cartao clara",
-        "manda politica do cartao pdf",
-        "manda politica uso cartao",
-        "manda politica cartao clara"
-    ].map(normalize);
-
-    for (const frase of frasesPolitica) {
-        if (norm.includes(frase)) {
-            ultimaIntencao = "politicaOficial";
-            return respPoliticaOficial();
-        }
-    }
-
-    // ...aqui continua o resto da função (limite, gasto pessoal etc.)
-    // 1. BLOCO: PERGUNTAS/ASSUNTOS SOBRE LIMITE
-    if (norm.includes("limite")) {
-        ultimaIntencao = "limite";
-        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
-    }
-
-
-    // 0. Perguntas genéricas tipo "qual etiqueta usar?"
-const perguntaGeralEtiqueta = [
-    "qual etiqueta uso",
-    "qual etiqueta usar",
-    "qual etiqueta eu uso",
-    "que etiqueta uso",
-    "que etiqueta usar",
-    "me fala as etiquetas",
-    "todas as etiquetas",
-    "lista de etiquetas",
-    "quais etiquetas tem",
-    "quais etiquetas existem",
-    "quais sao as etiquetas",
-    "quais são as etiquetas",
-    "me passa as etiquetas",
-    "me passa as tags",
-    "quais tags existem",
-    "categorias de gasto",
-    "categorias de despesas",
-    "categoria de despesa"
-].map(normalize);
-
-for (const frase of perguntaGeralEtiqueta) {
-    if (norm.includes(frase)) {
-        ultimaIntencao = "catalogoEtiquetas";
-        return respCatalogoEtiquetas();
-    }
-}
-
-    // LIMITE (checagem explícita por palavra "limite")
-    if (norm.includes("limite")) {
-        ultimaIntencao = "limite";
-        return respLimite();
-    }
-
-    // GASTO PESSOAL / ALIMENTAÇÃO PESSOAL
-    const padroesGastoPessoalAlimentacao = [
-        "paguei meu almoco","paguei meu almoço","paguei meu jantar",
-        "paguei meu lanche","paguei meu café","paguei meu cafe",
-        "paguei meu pastel","paguei minha refeicao","paguei minha refeição",
-        "paguei minha comida","paguei minha janta",
-
-        "meu almoço","meu almoco","meu jantar","minha janta",
-        "meu lanche","meu lanche com o cartao","meu lanche com o cartão",
-        "minha comida",
-
-        "almoco pessoal","almoço pessoal","jantar pessoal",
-        "lanche pessoal","refeição pessoal","refeicao pessoal",
-
-        "almocei com o cartao","almocei com o cartão",
-        "jantei com o cartao","jantei com o cartão",
-        "comi com o cartao","comi com o cartão"
-    ];
-
-    const isGastoPessoalAlimentacao = padroesGastoPessoalAlimentacao.some(p => norm.includes(p));
-    if (isGastoPessoalAlimentacao) {
-        ultimaIntencao = "gasto_pessoal_alimentacao";
-        return `HTML:<div class="text-sm text-slate-700">
+        if (isGastoPessoalAlimentacao) {
+            ultimaIntencao = "gasto_pessoal_alimentacao";
+            return `HTML:<div class="text-sm text-slate-700">
 <p>⛔ Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja.</p>
-
 <p class="mt-2">Se já foi pago com o cartão:</p>
 <ul class="list-disc ml-4">
 <li>Avise o Financeiro e abra chamado no ServiceNow (Contas a Receber &gt; Cartão Clara &gt; Gasto Indevido - pessoal);</li>
 <li>Classifique na Clara como "Despesa Pessoal – Uso Indevido";</li>
 <li>Ressarça o valor à empresa em até 2 dias úteis.</li>
 </ul>
-
 <p class="mt-2">Se não regularizar, o cartão pode ficar bloqueado preventivamente.</p>
 </div>`;
-    }
+        }
 
-        // 🎯 Gatilho para iniciar fluxo de consulta de pendências Clara
-    const termosPendencias = [
-        "pendencia clara",
-        "pendências clara",
-        "pendencias clara",
-        "ver pendencias",
-        "ver pendências",
-        "pendencias",
-        "pendências",
-        "consultar pendencias",
-        "consultar pendências",
-        "pendencia do cartao",
-        "pendência do cartão",
-        "bloqueio por pendencia",
-        "bloqueio por pendência"
+            // 🎯 Gatilho: usuário falando em solicitar cartão Clara (novo cartão)
+    const gatilhosNovoCartao = [
+        // formas diretas
+        "quero solicitar um cartao",
+        "quero solicitar um cartão",
+        "quero solicitar cartao clara",
+        "quero solicitar cartão clara",
+        "quero pedir um cartao",
+        "quero pedir um cartão",
+        "quero pedir cartao clara",
+        "quero pedir cartão clara",
+        "quero cartao clara",
+        "quero cartão clara",
+        "preciso de um cartao",
+        "preciso de um cartão",
+        "preciso de cartao clara",
+        "preciso de cartão clara",
+        "nao tenho cartao clara ainda",
+        "não tenho cartao clara ainda",
+        "nao tenho cartão clara ainda",
+        "ainda nao tenho cartao clara",
+        "ainda não tenho cartão clara",
+        "como pedir cartao",
+        "como pedir cartão",
+        "como peço cartao",
+        "como peco cartao",
+        "como peço cartão",
+        "como solicitar cartao",
+        "como solicitar cartão",
+        "como conseguir um cartao clara",
+        "como conseguir um cartão clara",
+        "quero receber um cartao clara",
+        "quero receber um cartão clara",
+
+        // promoção / novo gerente
+        "fui promovido e nao tenho cartao",
+        "fui promovido e não tenho cartao",
+        "fui promovido e nao tenho cartão clara",
+        "fui promovido e não tenho cartão clara",
+        "sou novo gerente e nao tenho cartao",
+        "sou novo gerente e não tenho cartao",
+        "sou novo gerente e nao tenho cartão clara",
+        "sou novo gerente e não tenho cartão clara",
+        "assumi a loja e nao tenho cartao",
+        "assumi a loja e não tenho cartão clara",
+
+        // abreviações / erros
+        "quero cartao",
+        "quero um cartao",
+        "quero um cartão",
+        "pedir cartao",
+        "pedir cartão",
+        "solicitar cartao",
+        "solicitar cartão",
+        "primeira via do cartao",
+        "primeira via do cartão",
+        "1a via do cartao",
+        "1ª via do cartao",
+        "1a via do cartão",
+        "1ª via do cartão"
     ].map(normalize);
 
-    if (termosPendencias.some(t => norm.includes(t))) {
-        aguardandoLojaPendencias = true;
-        aguardandoEmailPendencias = false;
-        lojaPendenciasAtual = "";
+    if (gatilhosNovoCartao.some(g => norm.includes(g))) {
+        fluxoNovoCartao = "aguardando_tipo_via";
+        ultimaIntencao = "novoCartao";
 
-        return 'HTML:<p class="text-sm text-slate-700">Consigo consultar as pendências Clara da sua loja e te mandar por e-mail. Me informa o código da loja com 4 digitos (somente números), por exemplo: <b>0123</b>.</p>';
+        return `HTML:<p class="text-sm text-slate-700">
+Entendi, você quer solicitar um cartão Clara 😊<br/><br/>
+Só pra eu te orientar certinho: você está falando de <b>primeira via</b> (nunca teve cartão Clara) ou <b>segunda via</b> (cartão que já existia e precisa ser reemitido)?<br/><br/>
+Me responde por favor:<br/>
+• "É primeira via"<br/>
+• ou "É segunda via".
+</p>`;
     }
 
-    // Escolhe resposta por intenção
-    switch (intencao) {
+        switch (intencao) {
+            case "foraEscopo":
+                ultimaIntencao = "foraEscopo";
+                resposta = respostaForaEscopo();
+                break;
 
-        case "foraEscopo":
-            ultimaIntencao = "foraEscopo";
-            resposta = respostaForaEscopo();
-            break;
+            case "etiqueta": {
+                ultimaIntencao = "etiqueta";
+                const isPerguntaGeral = perguntasGeraisEtiqueta.some(f => norm.includes(f));
+                const et = acharEtiquetaPorMensagem(norm);
 
-        case "etiqueta":
-    ultimaIntencao = "etiqueta";
-    (function () {
-        // Frases genéricas do tipo "qual etiqueta devo usar?"
-    const perguntasGeraisEtiqueta = [
-        // Perguntas diretas
-        "qual etiqueta devo usar",
-        "qual etiqueta usar",
-        "qual etiqueta eu uso",
-        "que etiqueta devo usar",
-        "que etiqueta usar",
-        "que etiqueta eu uso",
-        "me fala as etiquetas",
-        "me diz as etiquetas",
-        "me mostra as etiquetas",
-        "me envia as etiquetas",
-        "me passa as etiquetas",
-        "me passa a etiqueta",
-        "me passa etiqueta",
-        "me diz etiqueta",
-        "me diz qual etiqueta usar",
-        "me diz qual etiqueta devo usar",
-        "me diz etiqueta certa",
-        "me fala etiqueta certa",
-        "me fala qual etiqueta usar",
-        "me fala qual etiqueta devo usar",
-        "me ajuda com etiqueta",
-        "qual etiqueta usar nesse caso",
-        "qual etiqueta usar nesse gasto",
-        "qual etiqueta usar pra isso",
-        "qual etiqueta uso pra isso",
-        "qual etiqueta usar pra compra",
-        "qual etiqueta usar na clara",
-        "qual etiqueta usar na plataforma",
-        "qual etiqueta usar aqui",
-        "me ajuda com etiqueta correta",
-        "me fala etiqueta certa",
-        "etiqueta certa",
-        "etiqueta correta",
-        "etiqueta pra usar",
-        "etiqueta usar",
-        "etiqueta devo usar",
-        "etiqueta correta pra isso",
-        "etiqueta usar nesse gasto",
-        "qual etiqueta colocar",
-        "que etiqueta colocar",
-        "onde coloco etiqueta",
-        "que etiqueta marcar",
-        "qual categoria de despesa",
-        "categoria de despesa",
-        "categorias de despesas",
-        "categorias de gasto",
-        "categoria de gasto",
-        "categoria de despesa usar",
-        "categoria de despesa correta",
-        "categoria correta",
-        "categoria certa",
-        "categoria usar",
-        "categoria devo usar",
-        "categoria eu uso",
-        "qual categoria uso",
-        "qual categoria devo usar",
-        "qual categoria usar",
-        "categoria clara",
-        "etiqueta clara",
-        "etiqueta clara usar",
-    
-        // Pedidos genéricos de listagem
-        "todas as etiquetas",
-        "todas etiquetas",
-        "lista de etiquetas",
-        "listagem de etiquetas",
-        "me envia a lista de etiquetas",
-        "me envia a listagem de etiquetas",
-        "me manda as etiquetas",
-        "me manda a lista de etiquetas",
-        "me manda a listagem de etiquetas",
-        "mostra todas as etiquetas",
-        "me mostra todas etiquetas",
-        "me mostra todas as categorias",
-        "quais etiquetas existem",
-        "quais etiquetas tem",
-        "quais sao as etiquetas",
-        "quais são as etiquetas",
-        "quais etiquetas posso usar",
-        "quais etiquetas devo usar",
-        "quais etiquetas usar",
-        "quais etiquetas existem na clara",
-        "quais categorias de despesa",
-        "quais categorias tem",
-        "quais categorias existem",
-        "quais categorias usar",
-        "quais tags tem",
-        "quais tags usar",
-        "me fala as tags",
-        "me manda as tags",
-        "tags de despesa",
-        "tags de gasto",
-        "tags claras",
-    
-        // Abreviações / erros comuns / variações
-        "etiqueta usar",
-        "etiqueta ussar",
-        "etiqueta uzar",
-        "etiqueta usa",
-        "etiqueta devo usa",
-        "etiqueta devo uzar",
-        "etiqueta coreta",
-        "etiqueta cerra",
-        "etiqueta sertta",
-        "etiqueta cerra usar",
-        "etiqueta serve pra",
-        "etiketa usar",
-        "etiketa devo usar",
-        "etiquetao usar",
-        "etiq usar",
-        "etiq devo usar",
-        "cat gasto",
-        "cat despesa",
-        "categoria usar",
-        "categoria usar pra isso",
-        "categoria uzar",
-        "categ usar",
-        "categ devo usar",
-        "cat usar",
-        "cat devo usar",
-        "qual etiq usar",
-        "qual etiq devo usar",
-        "etiq correta",
-        "etiq certa",
-        "etiq pra usar",
-        "etiq",
-        "cat",
-        "categoria",
-        "categoria certa pra isso",
-        "me ajuda etiqueta",
-        "me ajuda com categoria",
-        "me ajuda categoria",
-        "me ajuda etiq",
-        "qual etiq certa",
-        "qual etiq correta",
-        "qual etiq",
-        "etiqueta qual",
-        "cat desp",
-        "cat gasto certo",
-        "cat correta",
-        "cat correta pra isso",
-        "cat certa pra isso",
-        "me ajuda cat",
-        "me ajuda cat correta",
-        "me ajuda etiq certa",
-        "me ajuda etiq correta"
-].map(normalize);
-
-        const isPerguntaGeral = perguntasGeraisEtiqueta.some(f => norm.includes(f));
-
-        const et = acharEtiquetaPorMensagem(norm);
-
-        // 👉 Caso 1: Pergunta genérica de etiqueta, sem item específico
-        if (!et && isPerguntaGeral) {
-            resposta = respCatalogoEtiquetas();
-            return;
-        }
-
-        // 👉 Caso 2: Achamos uma etiqueta específica (mouse, água, motoboy etc.)
-        if (et) {
-            resposta = respEtiquetaDireta(et);
-            return;
-        }
-
-        // 👉 Caso 3: Nem é genérica, nem achou etiqueta -> fallback padrão
-        resposta = `HTML:<p class="text-sm text-slate-700">
+                if (!et && isPerguntaGeral) {
+                    resposta = respCatalogoEtiquetas();
+                } else if (et) {
+                    resposta = respEtiquetaDireta(et);
+                } else {
+                    resposta = `HTML:<p class="text-sm text-slate-700">
 Não consegui identificar uma etiqueta específica só com esse texto.<br/>
 Se o gasto for operacional e não existir etiqueta adequada na lista da Clara, abra chamado no
 <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
@@ -1698,168 +1326,327 @@ Se o gasto for operacional e não existir etiqueta adequada na lista da Clara, a
 </a>
 solicitando criação ou ajuste de etiqueta.
 </p>`;
-    })();
-    break;
+                }
+                break;
+            }
 
-        case "limite":
-            ultimaIntencao = "limite";
-            resposta = respLimite();
-            break;
+            case "limite":
+                ultimaIntencao = "limite";
+                resposta = respLimite();
+                break;
 
-        case "bloqueio":
-    ultimaIntencao = "bloqueio";
-    modoConsultaPendencias = "aguardando_loja";
-    resposta = `HTML:<div class="text-sm text-slate-700">
-${respBloqueio().replace(/^HTML:/, "").trim()}
-<p class="mt-3"><b>Se quiser, me informe o número da sua loja</b> (ex.: 1234) que eu consulto se há transações pendentes de justificativas.</p>
-</div>`;
-    break;
+            case "bloqueio":
+                ultimaIntencao = "bloqueio";
+                resposta = respBloqueio();
+                break;
 
-        case "prestacao":
-            ultimaIntencao = "prestacao";
-            resposta = respPrestacaoContas();
-            break;
+            case "prestacao":
+                ultimaIntencao = "prestacao";
+                resposta = respPrestacaoContas();
+                break;
 
-        case "alimentoTime":
-            ultimaIntencao = "alimentoTime";
-            resposta = respAlimentoTime();
-            break;
+            case "alimentoTime":
+                ultimaIntencao = "alimentoTime";
+                resposta = respAlimentoTime();
+                break;
 
-        case "transportePessoal":
-            ultimaIntencao = "transportePessoal";
-            resposta = respTransportePessoal();
-            break;
+            case "transportePessoal":
+                ultimaIntencao = "transportePessoal";
+                resposta = respTransportePessoal();
+                break;
 
-        case "trocaGerente":
-            ultimaIntencao = "trocaGerente";
-            resposta = respTrocaGerente();
-            break;
+            case "trocaGerente":
+                ultimaIntencao = "trocaGerente";
+                resposta = respTrocaGerente();
+                break;
 
-        case "sangria":
-            ultimaIntencao = "sangria";
-            resposta = respSangria();
-            break;
+            case "sangria":
+                ultimaIntencao = "sangria";
+                resposta = respSangria();
+                break;
 
-        case "fraudeContestacao":
-            ultimaIntencao = "fraudeContestacao";
-            resposta = respFraudeContestacao();
-            break;
+            case "fraudeContestacao":
+                ultimaIntencao = "fraudeContestacao";
+                resposta = respFraudeContestacao();
+                break;
 
-        case "podeNaoPode":
-            ultimaIntencao = "generica";
-            resposta = respGenerica(norm);
-            break;
+            case "podeNaoPode":
+            case "generica":
+            default:
+                ultimaIntencao = "generica";
+                resposta = respGenerica(norm);
+                break;
+        }
 
-        case "generica":
-        default:
-            ultimaIntencao = "generica";
-            resposta = respGenerica(norm);
-            break;
+        return resposta;
     }
 
-    return resposta;
-}
+    /* ==================== WRAPPER: GERADOR FINAL DE RESPOSTA ==================== */
 
-/* =====================================================
-   === RENDERIZAÇÃO / CHAT UI ===
-   ===================================================== */
+    function gerarRespostaDoBot(msgUsuario) {
+        const norm = normalize(msgUsuario);
 
-const chatWindow = document.getElementById("chatWindow");
-const chatForm   = document.getElementById("chatForm");
-const userInput  = document.getElementById("userInput");
-const sendBtn    = document.getElementById("sendBtn");
+            // 🎯 DETECTA SAUDAÇÕES INICIAIS
+    const saudacoes = [
+        "oi", "olá", "ola", "opa", "eai", "e aí", "iae", "iae vektor", "oi vektor", "OI", "Oi", "oI",
+        "bom dia", "boa tarde", "boa noite", "Bom dia!", "Boa tarde!", "Boa noite!",
+        "salve", "fala", "fala vektor", "fala ai", "fala aê", "e aí vektor", "opa vektor",
+        "tudo bem?", "Tudo bem?", "td bem", "tdb", "como vai", "como vc tá", "como voce ta",
+        "beleza", "tranquilo", "tudo certo", "como está", "como tá", "como vai vektor"
+    ].map(normalize);
 
-/* faz o scroll descer sempre pro fim do chat */
-function scrollToBottom() {
-    requestAnimationFrame(() => {
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-        setTimeout(() => {
-            chatWindow.scrollTop = chatWindow.scrollHeight;
-        }, 150);
+    for (const saud of saudacoes) {
+        if (norm === saud || norm.startsWith(saud + " ") || norm.includes(" " + saud + " ")) {
+            const respostasSaudacao = [
+                "Olá! 😄",
+                "Oi! 👋",
+                "Opa, tudo bem por aí? 😎",
+                "Fala aí! 👋",
+                "E aí, tudo certo? 🙌",
+                "Oi! Que bom te ver por aqui 😁",
+                "Bom te ver por aqui! 👋"
+            ];
+            const complementosAjuda = [
+                "Como posso te ajudar hoje?",
+                "Quer saber algo sobre o cartão Clara?",
+                "O que você quer saber?",
+                "Posso te explicar algo sobre o uso dos cartões?",
+                "Quer que eu te ajude com alguma dúvida?",
+                "Como posso te orientar?",
+                "Qual a sua dúvida?"
+            ];
+
+            const r1 = respostasSaudacao[Math.floor(Math.random() * respostasSaudacao.length)];
+            const r2 = complementosAjuda[Math.floor(Math.random() * complementosAjuda.length)];
+
+            return `HTML:<p class="text-sm text-slate-700">${r1} ${r2}</p>`;
+        }
+    }
+
+        // 🧩 Fluxo em andamento: usuário já falou que quer cartão e agora
+    // estamos perguntando se é 1ª via ou 2ª via
+    if (fluxoNovoCartao === "aguardando_tipo_via") {
+        const ehPrimeira = (
+            norm.includes("primeira via") ||
+            norm.includes("como pedir novo cartão") ||
+            norm.includes("como pedir novo cartao") ||
+            norm.includes("novo cartão") ||
+            orm.includes("novo cartao") ||
+            norm.includes("1 via") ||
+            norm.includes("1a via") ||
+            norm.includes("1ª via") ||
+            norm.includes("primeiro cartao") ||
+            norm.includes("primeiro cartão") ||
+            norm.includes("cartao novo") ||
+            norm.includes("cartão novo") ||
+            norm.includes("nunca tive cartao") ||
+            norm.includes("nunca tive cartão") ||
+            norm.includes("ainda nao tenho cartao") ||
+            norm.includes("ainda não tenho cartão") ||
+            norm.includes("meu primeiro cartao") ||
+            norm.includes("não tenho cartão") ||
+            norm.includes("nao tenho cartao") ||
+            norm.includes("meu primeiro cartão")
+        );
+
+        const ehSegunda = (
+            norm.includes("segunda via") ||
+            norm.includes("2 via") ||
+            norm.includes("2a via") ||
+            norm.includes("2ª via") ||
+            norm.includes("segunda copia") ||
+            norm.includes("segunda cópia") ||
+            norm.includes("segundo cartao") ||
+            norm.includes("segundo cartão") ||
+            norm.includes("perdi o cartao") ||
+            norm.includes("perdi o cartão") ||
+            norm.includes("roubaram meu cartao") ||
+            norm.includes("roubaram meu cartão") ||
+            norm.includes("roubo de cartão") ||
+            norm.includes("perda de cartão") ||
+            rm.includes("perca de cartão") ||
+            norm.includes("cartao quebrado") ||
+            norm.includes("cartão quebrado") ||
+            norm.includes("cartao danificado") ||
+            norm.includes("cartão danificado")
+        );
+
+        if (ehPrimeira) {
+            fluxoNovoCartao = null;
+            ultimaIntencao = "novoCartao_primeira";
+            return respNovoCartaoPrimeiraVia();
+        }
+
+        if (ehSegunda) {
+            fluxoNovoCartao = null;
+            ultimaIntencao = "novoCartao_segunda";
+            return respNovoCartaoSegundaVia();
+        }
+
+        // não consegui entender se é 1ª ou 2ª
+        return `HTML:<p class="text-sm text-slate-700">
+Não entendi se você está falando de <b>primeira via</b> (nunca teve cartão Clara) ou <b>segunda via</b> (cartão que já existia e precisa ser reemitido).<br/><br/>
+Me responde assim, por favor:<br/>
+• "É primeira via"<br/>
+• ou "É segunda via".
+</p>`;
+    }
+
+        // 1) fim de conversa
+        const frasesEncerramento = [
+            "ok","okay","okey","certo","blz","beleza","ok valeu",
+            "entendi","entendido","tudo certo","td certo","tds certo",
+            "tá bom","ta bom","tá ótimo","ta otimo","tá otimo",
+            "show","show de bola","valeu","vlw","obrigado","obrigada",
+            "agradecido","agradecida","tranquilo","de boa","suave",
+            "pode deixar","certinho","maravilha","perfeito","jóia","joia"
+        ].map(normalize);
+
+        for (const frase of frasesEncerramento) {
+            if (norm === frase || norm.startsWith(frase + " ") || norm.endsWith(" " + frase)) {
+                const respostasEncerramento = [
+                    "Que bom que consegui ajudar! 🤗 Pode me chamar sempre que precisar.",
+                    "Show! Fico feliz em ajudar 😄",
+                    "Perfeito 👌 qualquer dúvida, é só chamar de novo!",
+                    "Valeu! Até a próxima 🚀",
+                    "Beleza 😎 tô por aqui se precisar de novo."
+                ];
+                const r = respostasEncerramento[Math.floor(Math.random() * respostasEncerramento.length)];
+                return `HTML:<p class="text-sm text-slate-700">${r}</p>`;
+            }
+        }
+
+        // 2) política PDF / documento oficial
+        const frasesPolitica = [
+            "me envia a politica","me envia a política","me manda a politica","me manda a política",
+            "política de uso","politica de uso do cartao","política de uso do cartão",
+            "politica do cartao","política do cartão","politica do cartao clara","política do cartão clara",
+            "pdf da politica","pdf da política","manual da politica","manual da política",
+            "politica clara","política clara","politica de uso dos cartoes","política de uso dos cartões"
+        ].map(normalize);
+
+        if (frasesPolitica.some(f => norm.includes(f))) {
+            return respPoliticaOficial();
+        }
+
+        // 3) fluxo de pendências – pergunta inicial
+        const termosPendencias = [
+            "pendencia clara","pendências clara","pendencias clara",
+            "bloqueio por pendencia","bloqueio por pendência",
+            "pendencia do cartao","pendência do cartão",
+            "loja bloqueada clara","cartão bloqueado por pendencia",
+            "cobrança clara","transações pendentes clara", "pendencia", "pendência", "pendencias", "pendências",
+            "email de pendencia clara","pendencias","pendências"
+        ].map(normalize);
+
+        if (!aguardandoLojaPendencias &&
+            !aguardandoConfirmacaoEnvioEmail &&
+            !aguardandoEmailPendencias &&
+            termosPendencias.some(t => norm.includes(t))) {
+
+            aguardandoLojaPendencias = true;
+            aguardandoConfirmacaoEnvioEmail = false;
+            aguardandoEmailPendencias = false;
+            lojaPendenciasAtual = "";
+            ultimaPendenciaResumo = null;
+
+            return `HTML:<p class="text-sm text-slate-700">
+Consigo consultar as pendências Clara da sua loja.<br/>
+Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
+</p>`;
+        }
+
+        // 3.1) aguardando código da loja
+        if (aguardandoLojaPendencias) {
+            const loja = norm.replace(/\D/g, "");
+            if (!loja) {
+                return 'HTML:<p class="text-sm text-slate-700">Não entendi o código da loja. Me envie só os números, ex.: <b>0171</b>.</p>';
+            }
+
+            lojaPendenciasAtual = loja;
+            aguardandoLojaPendencias = false;
+
+            consultarPendenciasNoServidor(loja);
+
+            return `HTML:<p class="text-sm text-slate-700">
+Beleza! Vou consultar as pendências Clara da loja <b>${loja}</b> e já te mostro aqui no chat.</p>`;
+        }
+
+        // 3.2) já mostrou tabela, aguardando "sim"/"não" para envio de e-mail
+        if (aguardandoConfirmacaoEnvioEmail) {
+            const sim = ["sim","s","ss","claro","pode","manda","mande","envia","envie"].map(normalize);
+            const nao = ["nao","não","n","nem","agora nao","agora não","depois"].map(normalize);
+
+            if (sim.some(s => norm.startsWith(s))) {
+                aguardandoConfirmacaoEnvioEmail = false;
+                aguardandoEmailPendencias = true;
+                return 'HTML:<p class="text-sm text-slate-700">Fechado! Me informa o seu e-mail corporativo pra eu enviar o resumo das pendências.</p>';
+            }
+
+            if (nao.some(n => norm.startsWith(n))) {
+                aguardandoConfirmacaoEnvioEmail = false;
+                aguardandoEmailPendencias = false;
+                return 'HTML:<p class="text-sm text-slate-700">Tranquilo! Qualquer coisa é só pedir de novo que eu consulto as pendências aqui no chat. 😉</p>';
+            }
+
+            // se o usuário escrever outra coisa, cai na resposta normal da política
+        }
+
+        // 3.3) aguardando e-mail
+        if (aguardandoEmailPendencias) {
+            const email = msgUsuario.trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                return 'HTML:<p class="text-sm text-slate-700">Esse e-mail parece inválido. Me envia no formato: <b>nome.sobrenome@gruposbf.com.br</b>.</p>';
+            }
+
+            aguardandoEmailPendencias = false;
+
+            chamarEnvioPendenciasPorEmail(lojaPendenciasAtual, email);
+
+            return `HTML:<p class="text-sm text-slate-700">
+Perfeito! Vou enviar o resumo das pendências da loja <b>${lojaPendenciasAtual}</b> para o e-mail <b>${email}</b>.</p>`;
+        }
+
+        // 4) Se nada de fluxo especial, cai na lógica normal da política
+        return gerarRespostaPolitica(msgUsuario);
+    }
+
+    /* ==================== ENVIO DE MENSAGEM (ENTER / BOTÃO) ==================== */
+
+    function enviarMensagem() {
+        const pergunta = userInput.value.trim();
+        if (!pergunta) return;
+
+        renderUserMessage(pergunta);
+
+        const resposta = gerarRespostaDoBot(pergunta);
+        if (resposta) {
+            renderBotMessage(resposta);
+        }
+
+        userInput.value = "";
+        userInput.focus();
+    }
+
+    userInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            enviarMensagem();
+        }
     });
-}
 
-/* mensagem do usuário */
-function renderUserMessage(text) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "flex items-start justify-end gap-3";
-
-    const bubble = document.createElement("div");
-    bubble.className = "user-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-white";
-    bubble.innerText = text;
-
-    wrapper.appendChild(bubble);
-    chatWindow.appendChild(wrapper);
-    scrollToBottom();
-}
-
-/* mensagem do bot */
-function renderBotMessage(text) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "flex items-start gap-3";
-
-    const avatar = document.createElement("img");
-    avatar.src = "Gemini_Generated_Image_nzni5znzni5znzni.png";
-    avatar.alt = "Assistente Clara (robô)";
-    avatar.className = "h-14 w-auto object-contain flex-shrink-0";
-
-    const bubble = document.createElement("div");
-    bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
-
-    if (typeof text === "string" && text.startsWith("HTML:")) {
-        bubble.innerHTML = text.replace(/^HTML:/, "").trim();
-    } else {
-        bubble.innerText = text;
-    }
-
-    wrapper.appendChild(avatar);
-    wrapper.appendChild(bubble);
-    chatWindow.appendChild(wrapper);
-    scrollToBottom();
-}
-
-/* envia a pergunta, pega resposta, renderiza */
-function enviarMensagem() {
-    const pergunta = userInput.value.trim();
-    if (!pergunta) return;
-
-    renderUserMessage(pergunta);
-
-    const resposta = gerarRespostaDoBot(pergunta);
-
-    renderBotMessage(resposta);
-
-    userInput.value = "";
-    userInput.focus();
-
-    scrollToBottom();
-}
-
-/* LISTENERS */
-
-/* Enter sem Shift = enviar. Shift+Enter = quebra linha */
-userInput.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" && !e.shiftKey) {
+    sendBtn.addEventListener("click", function (e) {
         e.preventDefault();
         enviarMensagem();
-    }
-});
+    });
 
-/* clique no botão Enviar */
-sendBtn.addEventListener("click", function (e) {
-    e.preventDefault();
-    enviarMensagem();
-});
+    chatForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        enviarMensagem();
+    });
 
-// submit do form (mobile etc.)
-chatForm.addEventListener("submit", function (e) {
-    e.preventDefault();
-    enviarMensagem();
-});
-
-// ⬇⬇⬇ ADICIONE ESTA LINHA LOGO AQUI
-}); // fecha o document.addEventListener("DOMContentLoaded", () => { ... )
+}); // fim DOMContentLoaded
 </script>
 </body>
 </html>
-
