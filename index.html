@@ -599,7 +599,9 @@ const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/d
         }
 
         if (msgNorm.includes("uber") ||
-            msgNorm.includes(" 99") ||
+            msgNorm.includes("iber") ||
+            msgNorm.includes("99") ||
+            Norm.includes(" 99") ||
             msgNorm.includes("taxi") ||
             msgNorm.includes("táxi") ||
             msgNorm.includes("taxí") ||
@@ -983,9 +985,8 @@ Troca de gerente / mudança de loja segue assim:<br/><br/>
 2. Se é só férias/afastamento curto do gerente:<br/>
    • o cartão da própria loja continua sendo usado pelo líder/supervisor autorizado;<br/>
    • não é pra circular cartão entre lojas sem autorização financeira.<br/><br/>
-Se tiver caso especial, fale com o Financeiro e, se preciso, abra chamado no
-<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
-ServiceNow
+Se tiver caso especial, fale com o Financeiro e, se preciso, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
+ServiceNow.
 </a>.
 </p>`;
     }
@@ -1121,13 +1122,13 @@ Detalhe: ${erro}
                 ultimaPendenciaResumo = { loja: res.loja, data: res.ultimaData };
 
                 let tabela = `
-<div class="text-sm text-slate-700">
-<p>Encontrei as seguintes pendências Clara da loja <b>${res.loja}</b> (data de cobrança <b>${res.ultimaData}</b>):</p>
-<div class="mt-2 overflow-x-auto">
-<table class="min-w-full text-xs border border-slate-200">
-<thead class="bg-slate-100">
-<tr>
-`;
+              <div class="text-sm text-slate-700">
+              <p>Encontrei as seguintes pendências Clara da loja <b>${res.loja}</b> (data de cobrança <b>${res.ultimaData}</b>). Caso a pendencia já tenha sido regularizada e o seu cartão ainda estiver bloqueado, solicite o desbloqueio através de abertura de chamado no ServiceNow, caminho: <b>Contas a Receber > Cartão Clara > Solicitação de Desbloqueio</b>.</p>
+              <div class="mt-2 overflow-x-auto">
+              <table class="min-w-full text-xs border border-slate-200">
+              <thead class="bg-slate-100">
+              <tr>
+              `;
                 const header = res.header || [];
                 header.forEach(h => {
                     tabela += `<th class="border px-2 py-1">${h}</th>`;
@@ -1232,6 +1233,10 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
         // formas diretas
         "quero solicitar um cartao",
         "quero solicitar um cartão",
+        "novo cartao",
+        "novo cartão",
+        "cartao novo",
+        "cartão novo",
         "quero solicitar cartao clara",
         "quero solicitar cartão clara",
         "quero pedir um cartao",
@@ -1287,20 +1292,147 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
         "1ª via do cartao",
         "1a via do cartão",
         "1ª via do cartão"
+
+          "quero solicitar um cartao",
+        "quero solicitar um cartão",
+        "quero solicitar cartao clara",
+        "quero solicitar cartão clara",
+        "quero pedir um cartao",
+        "quero pedir um cartão",
+        "preciso solicitar um cartao",
+        "preciso solicitar um cartão",
+        "preciso pedir um cartao",
+        "preciso pedir um cartão",
+        "gostaria de solicitar um cartao",
+        "gostaria de solicitar um cartão",
+        "como solicitar um cartao",
+        "como solicitar um cartão",
+        "como pedir um cartao",
+        "como pedir um cartão",
+        "como faco pra solicitar cartao",
+        "como faço pra solicitar cartão",
+        "como pedir o cartao clara",
+        "como pedir o cartão clara",
+        "quero o cartao clara",
+        "quero o cartão clara",
+
+        // 🟡 Variações informais e curtas
+        "cartao novo",
+        "cartão novo",
+        "novo cartao",
+        "novo cartão",
+        "meu cartao novo",
+        "meu cartão novo",
+        "preciso de cartao novo",
+        "preciso de cartão novo",
+        "vou receber cartao novo",
+        "vou receber cartão novo",
+        "pedi cartao novo",
+        "pedi cartão novo",
+        "cartao da loja nova",
+        "cartão da loja nova",
+        "novo cartao da loja",
+        "novo cartão da loja",
+        "cartao pra loja nova",
+        "cartão pra loja nova",
+        "cartao nova loja",
+        "cartão nova loja",
+        "solicitar novo cartao",
+        "solicitar novo cartão",
+        "solicitar cartao novo",
+        "solicitar cartão novo",
+        "pedir novo cartao",
+        "pedir novo cartão",
+        "preciso do meu cartao",
+        "preciso do meu cartão",
+        "preciso do cartao clara",
+        "preciso do cartão clara",
+        "quero cartao clara",
+        "quero cartão clara",
+        "preciso cartao clara",
+        "preciso cartão clara",
+
+        // 🟠 Com erros ou abreviações comuns
+        "cartao clara novo",
+        "cartao clara nova loja",
+        "cartao cllara",
+        "cartao clra",
+        "cartao carla",
+        "novo cartao cllara",
+        "novo cartao clra",
+        "novo cartao carla",
+        "solicitar cartao cllara",
+        "solicitar cartao clra",
+        "solicitar cartao carla",
+        "pedir cartao cllara",
+        "pedir cartao clra",
+        "pedir cartao carla",
+        "preciso cartao cllara",
+        "preciso cartao clra",
+        "preciso cartao carla",
+
+        // 🔵 Menções genéricas sobre precisar do cartão
+        "preciso de um cartao",
+        "preciso de um cartão",
+        "preciso do cartao",
+        "preciso do cartão",
+        "ainda nao tenho cartao",
+        "ainda não tenho cartão",
+        "nao tenho cartao",
+        "não tenho cartão",
+        "nunca tive cartao",
+        "nunca tive cartão",
+        "sem cartao clara",
+        "sem cartão clara",
+        "estou sem cartao clara",
+        "estou sem cartão clara",
+        "perdi o acesso ao cartao",
+        "perdi o acesso ao cartão",
+        "nao recebi cartao clara",
+        "não recebi cartão clara",
+        "nao recebi meu cartao",
+        "não recebi meu cartão",
+        "nao tenho cartao ainda",
+        "não tenho cartão ainda",
+        "sou novo gerente e nao tenho cartao",
+        "sou novo gerente e não tenho cartão",
+        "fui promovido e nao tenho cartao",
+        "fui promovido e não tenho cartão",
+        "mudei de loja e nao tenho cartao",
+        "mudei de loja e não tenho cartão",
+        "assumi a loja e nao tenho cartao",
+        "assumi a loja e não tenho cartão",
+        "sou novo na loja e nao tenho cartao",
+        "sou novo na loja e não tenho cartão",
+
+        // 🟣 Fala direta sobre “quero novo cartão”
+        "quero novo cartao",
+        "quero novo cartão",
+        "preciso novo cartao",
+        "preciso novo cartão",
+        "solicitar novo cartao clara",
+        "solicitar novo cartão clara",
+        "como solicitar novo cartao",
+        "como solicitar novo cartão",
+        "como pedir novo cartao clara",
+        "como pedir novo cartão clara",
+        "preciso pedir novo cartao clara",
+        "preciso pedir novo cartão clara"
     ].map(normalize);
 
-    if (gatilhosNovoCartao.some(g => norm.includes(g))) {
-        fluxoNovoCartao = "aguardando_tipo_via";
-        ultimaIntencao = "novoCartao";
-
-        return `HTML:<p class="text-sm text-slate-700">
-Entendi, você quer solicitar um cartão Clara 😊<br/><br/>
-Só pra eu te orientar certinho: você está falando de <b>primeira via</b> (nunca teve cartão Clara) ou <b>segunda via</b> (cartão que já existia e precisa ser reemitido)?<br/><br/>
-Me responde por favor:<br/>
-• "É primeira via"<br/>
-• ou "É segunda via".
-</p>`;
-    }
+    //  🟢 Novo cartão – iniciar fluxo
+      const gatilhosNovoCartao = [ ... ].map(normalize);
+      for (const frase of gatilhosNovoCartao) {
+          if (norm.includes(frase)) {
+              fluxoNovoCartao = "aguardando_tipo_via";
+              return `HTML:<p class="text-sm text-slate-700">
+      Só pra eu te orientar certinho: você está falando de <b>primeira via</b> (nunca teve cartão Clara) ou <b>segunda via</b> (cartão que já existia e precisa ser reemitido)?<br/><br/>
+      Responda por favor:<br/>
+      • "É primeira via"<br/>
+      • ou "É segunda via"
+      </p>`;
+          }
+      }
 
         switch (intencao) {
             case "foraEscopo":
@@ -1430,8 +1562,10 @@ solicitando criação ou ajuste de etiqueta.
             norm.includes("primeira via") ||
             norm.includes("como pedir novo cartão") ||
             norm.includes("como pedir novo cartao") ||
+            norm.includes("Quero solicitar um novo cartão") ||
+            norm.includes("Quero solicitar um novo cartao") ||
             norm.includes("novo cartão") ||
-            orm.includes("novo cartao") ||
+            norm.includes("novo cartao") ||
             norm.includes("1 via") ||
             norm.includes("1a via") ||
             norm.includes("1ª via") ||
@@ -1463,8 +1597,9 @@ solicitando criação ou ajuste de etiqueta.
             norm.includes("roubaram meu cartao") ||
             norm.includes("roubaram meu cartão") ||
             norm.includes("roubo de cartão") ||
+            norm.includes("fui roubado") ||
             norm.includes("perda de cartão") ||
-            rm.includes("perca de cartão") ||
+            norm.includes("perca de cartão") ||
             norm.includes("cartao quebrado") ||
             norm.includes("cartão quebrado") ||
             norm.includes("cartao danificado") ||
@@ -1528,6 +1663,45 @@ Me responde assim, por favor:<br/>
         if (frasesPolitica.some(f => norm.includes(f))) {
             return respPoliticaOficial();
         }
+
+            // 🔹 Atalho: usuário já começa falando "primeira via" / "1ª via" etc
+    const termosPrimeiraViaDireta = [
+        "primeira via",
+        "1 via",
+        "1a via",
+        "1ª via",
+        "primeiro cartao",
+        "primeiro cartão",
+        "meu primeiro cartao",
+        "meu primeiro cartão",
+        "nunca tive cartao clara",
+        "nunca tive cartão clara",
+        "quero minha primeira via",
+        "quero 1 via",
+        "pedir primeira via",
+        "solicitar primeira via"
+    ].map(normalize);
+
+    if (termosPrimeiraViaDireta.some(t => norm.includes(t))) {
+        // garante que não fique preso em fluxo antigo
+        fluxoNovoCartao = null;
+
+        return `HTML:<div class="text-sm text-slate-700">
+<p><b>Primeira via de cartão Clara (novo cartão)</b></p>
+<p class="mt-1">
+Para solicitar uma primeira via de cartão você deve preencher este formulário:
+<a class="service-link"
+   href="https://docs.google.com/forms/d/1vGAsFHuDQ6y5ydJMuE7W9ThJFjsLma_1I6yw92OLHh4/viewform"
+   target="_blank" rel="noopener noreferrer"><b>Formulário de solicitação de cartão</b></a>.
+</p>
+<p class="mt-1">
+Depois, envie um e-mail para <b>contasareceber@gruposbf.com.br</b> informando que o formulário foi preenchido, para que o Financeiro providencie a emissão do cartão.
+</p>
+<p class="mt-1">
+O prazo de entrega do cartão é de até <b>7 dias úteis</b>.
+</p>
+</div>`;
+    }
 
         // 3) fluxo de pendências – pergunta inicial
         const termosPendencias = [
