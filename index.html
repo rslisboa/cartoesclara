@@ -1821,40 +1821,57 @@ Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
         }
 
         // 3.1) aguardando código da loja
-        if (aguardandoLojaPendencias) {
-            const loja = norm.replace(/\D/g, "");
-            if (!loja) {
-                return 'HTML:<p class="text-sm text-slate-700">Não entendi o código da loja. Me envie só os números, ex.: <b>0171</b>.</p>';
-            }
+        
+        // 1) Se o bot está aguardando o código da loja
+if (aguardandoLojaPendencias) {
+    const textoOriginal = msgUsuario.trim();
+    const soDigitos = textoOriginal.replace(/\D/g, "");
+    const norm = normalize(msgUsuario);
 
-            lojaPendenciasAtual = loja;
-            aguardandoLojaPendencias = false;
+    // 🧠 Palavras que indicam mudança de assunto
+    const palavrasDeMudancaAssunto = [
+        "cartao","cartão","novo cartao","novo cartão","pendencia","pendência",
+        "limite","bloqueio","etiqueta","categoria","politica","política",
+        "uber","sangria","agua","água","lanche","primeira via","segunda via",
+        "fraude","contestacao","prestacao","prestação"
+    ].map(normalize);
 
-            consultarPendenciasNoServidor(loja);
+    const mudouDeAssunto = palavrasDeMudancaAssunto.some(p => norm.includes(p));
 
-            return `HTML:<p class="text-sm text-slate-700">
-                Beleza! Vou consultar as pendências Clara da loja <b>${loja}</b> e já te mostro aqui no chat.</p>`;
-        }
+    // 1️⃣ Se o usuário mudou de assunto → zera fluxo e informa
+    if (mudouDeAssunto) {
+        aguardandoLojaPendencias = false;
+        aguardandoEmailPendencias = false;
+        lojaPendenciasAtual = "";
+        return `HTML:<div class="text-sm text-slate-700">
+        <p>Beleza 👍 Vamos mudar de assunto então.</p>
+        <p class="mt-1">Se quiser ver as pendências da loja depois, é só dizer: <b>"consultar pendências Clara"</b>.</p>
+        </div>`;
+    }
 
-        // 3.2) já mostrou tabela, aguardando "sim"/"não" para envio de e-mail
-        if (aguardandoConfirmacaoEnvioEmail) {
-            const sim = ["sim","s","ss","claro","pode","manda","mande","envia","envie"].map(normalize);
-            const nao = ["nao","não","n","nem","agora nao","agora não","depois"].map(normalize);
+    // 2️⃣ Se informou um número de loja válido
+        if (soDigitos && soDigitos.length >= 3 && soDigitos.length <= 6) {
+        aguardandoLojaPendencias = false;
+        aguardandoEmailPendencias = false;
+        lojaPendenciasAtual = soDigitos;
 
-            if (sim.some(s => norm.startsWith(s))) {
-                aguardandoConfirmacaoEnvioEmail = false;
-                aguardandoEmailPendencias = true;
-                return 'HTML:<p class="text-sm text-slate-700">Fechado! Me informa o seu e-mail corporativo pra eu enviar o resumo das pendências.</p>';
-            }
+        renderBotMessage(
+            `HTML:<p class="text-sm text-slate-700">
+          Beleza! Vou consultar as pendências Clara da loja <b>${soDigitos}</b> e já te mostro aqui no chat. ⏳
+          </p>`
+        );
 
-            if (nao.some(n => norm.startsWith(n))) {
-                aguardandoConfirmacaoEnvioEmail = false;
-                aguardandoEmailPendencias = false;
-                return 'HTML:<p class="text-sm text-slate-700">Tranquilo! Qualquer coisa é só pedir de novo que eu consulto as pendências aqui no chat. 😉</p>';
-            }
+        // chama a função que realmente consulta a planilha
+        consultarPendenciasLoja(soDigitos);
+        return null;
+    }
 
-            // se o usuário escrever outra coisa, cai na resposta normal da política
-        }
+    // 3️⃣ Caso não seja número nem outro assunto → explica de novo
+    return `HTML:<p class="text-sm text-slate-700">
+Pra eu consultar as pendências, preciso do código numérico da loja (ex.: <b>0171</b>).<br/>
+Se quiser tratar de outro assunto, é só me perguntar diretamente. 😉
+</p>`;
+}
 
         // 3.3) aguardando e-mail
         if (aguardandoEmailPendencias) {
