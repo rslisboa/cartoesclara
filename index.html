@@ -618,20 +618,6 @@ document.addEventListener("DOMContentLoaded", () => {
         "agua","água","lanche","fraude","contestacao","contestação","prestacao","prestação"
     ].map(normalize);
 
-    // 🔁 Se o usuário mudar de assunto no meio de um fluxo (pendências, e-mail etc.), resetar o estado
-    if (aguardandoEmailPendencias || aguardandoLojaPendencias || aguardandoConfirmacaoEmailPendencias) {
-        if (palavrasMudancaAssunto.some(t => norm.includes(t))) {
-            aguardandoEmailPendencias = false;
-            aguardandoLojaPendencias = false;
-            aguardandoConfirmacaoEmailPendencias = false;
-            lojaPendenciasAtual = "";
-
-            // resposta rápida para o usuário
-            renderBotMessage(
-                'HTML:<p class="text-sm text-slate-700">Beleza 👍. Vamos falar sobre outro assunto. Pode me perguntar o que quiser sobre o cartão Clara.</p>'
-            );
-        }
-    }
 
     const gatilhosNovoCartao = [
         "quero solicitar um cartao",
@@ -1060,7 +1046,7 @@ document.addEventListener("DOMContentLoaded", () => {
             msgNorm.includes("compra suspeita") ||
             msgNorm.includes("transacao nao reconhecida") ||
             msgNorm.includes("transação não reconhecida") ||
-            msgNormNorm.includes("cartao clonado") ||
+            msgNorm.includes("cartao clonado") ||
             msgNorm.includes("clonaram meu cartao") ||
             msgNorm.includes("clonaram meu cartão") ||
             msgNorm.includes("roubaram meu cartao") ||
