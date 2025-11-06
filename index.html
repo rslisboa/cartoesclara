@@ -246,21 +246,19 @@
                         </a>.
                     </p>
 
-                              <!-- 👇 bloco novo -->
-                  <p class="text-sm text-slate-700 mt-3">
-                      <? if (userName) { ?>
-                          <b><?= userName ?></b>, como posso te ajudar agora?
-                                  <? } else { ?>
-                        Como posso te ajudar agora?
-                    <? } ?>
-                </p>
-            </div>
-
-                </div>
-            </div>
-
-        </div>
-    </main>
+                              <!-- 👇 bloco novo (OK aqui dentro) -->
+        <p class="text-sm text-slate-700 mt-3">
+          <? if (userName) { ?>
+            <b><?= userName ?></b>, como posso te ajudar agora?
+          <? } else { ?>
+            Como posso te ajudar agora?
+          <? } ?>
+        </p>
+      </div> <!-- fecha .bot-bubble -->
+    </div>   <!-- fecha .flex -->
+    
+  </div>     <!-- fecha #chatWindow -->
+</main>      <!-- fecha .chat-body -->
 
     <!-- FOOTER / INPUT -->
     <footer class="chat-footer">
