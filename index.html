@@ -224,14 +224,15 @@
                 />
                 <div class="bot-bubble px-4 py-3 max-w-[80%] text-sm text-slate-700">
                     <p class="font-semibold text-slate-800 text-base">
-                        Olá! 👋 Eu sou o Vektor, agente do <b>Grupo SBF</b> especializado na Clara.
+                        Olá! 👋 Eu sou o Vektor, agente do <b>Grupo SBF</b> especializado na Clara.<br/>
                     </p>
                     <p class="text-slate-700 text-sm mt-1">
-                        Pode me perguntar direto, tipo:<br/>
-                        • "Posso comprar mouse?"<br/>
-                        • "Como aumento o limite?"<br/>
-                        • "Vou trocar de loja, o que faço com o cartão?"<br/>
-                        • "Qual etiqueta pra água/mineral?"<br/>
+                        Pode me perguntar direto, tipo:<br/><br>
+                        • Posso comprar mouse?<br/>
+                        • Como aumento o limite?<br/>
+                        • Qual a pendência de justificativas da minha loja??<br/>
+                        • Vou trocar de loja, o que faço com o cartão?<br/>
+                        • Qual etiqueta pra água/mineral?<br/>
                     </p>
                     <p class="text-[11px] text-slate-500 italic mt-2">
                         Se o assunto não tiver relação com a Política de Uso dos Cartões da Clara nas lojas eu não estarei apto para responder.
@@ -244,6 +245,17 @@
                             Segue a Política de Uso dos Cartões Clara
                         </a>.
                     </p>
+
+                              <!-- 👇 bloco novo -->
+                  <p class="text-sm text-slate-700 mt-3">
+                      <? if (userName) { ?>
+                          <b><?= userName ?></b>, como posso te ajudar agora?
+                                  <? } else { ?>
+                        Como posso te ajudar agora?
+                    <? } ?>
+                </p>
+            </div>
+
                 </div>
             </div>
 
@@ -1216,6 +1228,11 @@ document.addEventListener("DOMContentLoaded", () => {
             msgNorm.includes("o que você pode responde") ||
             msgNorm.includes("oq vc faz?") ||
             msgNorm.includes("oq vc faz") ||
+            msgNorm.includes("oq vc pode fazer") ||
+            msgNorm.includes("o que vc pode fazer") ||
+            msgNorm.includes("oque vc pode fazer") ||
+            msgNorm.includes("oq você pode fazer") ||
+            msgNorm.includes("oq voce pode fazer") ||
             msgNorm.includes("oq voce faz?") ||
             msgNorm.includes("o que voce faz?") ||
             msgNorm.includes("o que vc faz?") ||
@@ -1461,7 +1478,7 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
     }
 
     function respLimite() {
-        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.';
+        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br><br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende,<br>• Novo limite requerido.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.<br><br>Lembrando que o limite foi definido conforme o histórico de gastos de cada loja, é um valor individual e diferente para cada uma. Assim que ocorre o pagamento da fatura pela área finanecira o limite é reestabelecido no cartão';
     }
 
     function respBloqueio() {
@@ -1650,7 +1667,6 @@ Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal). Se a compra 
         return `HTML:<div class="text-sm text-slate-700">
 <p>
 O <b>Termo de Responsabilidade de uso do cartão da Clara</b> deve ser preenchido para que a loja possa utilizar o cartão. Esse termo traz também o aceite para a Política de uso do cartão.
-</p>
 <p class="mt-2">
 Preencha <a class="service-link" href="https://docs.google.com/forms/d/e/1FAIpQLSdnQWYFWp-udS9V039avJlXb4x1VnlDC6us5dSCrLkgngAxpg/alreadyresponded" target="_blank" rel="noopener noreferrer"><b>este formulário</b></a>. Após preencher você receberá o termo anexado ao e-mail, onde deve <b>imprimir, assinar e nos enviar</b>. Após isso, o uso do cartão estará liberado.
 </p>
@@ -1689,10 +1705,7 @@ A solicitação de <b>segunda via</b> (perda, roubo, dano ou troca de portador) 
 <ul class="list-disc ml-5 mt-1">
   <li>Bloquear imediatamente o cartão antigo na plataforma / app da Clara (se aplicável);</li>
   <li>Registrar o motivo (perda, roubo, quebra, etc.) conforme orientações internas;</li>
-  <li>Abrir chamado no 
-    <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"
-       target="_blank" rel="noopener noreferrer"><b>ServiceNow</b></a>
-    solicitando a emissão de segunda via do cartão Clara.
+  <li>Abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"target="_blank" rel="noopener noreferrer"><b>ServiceNow</b></a>solicitando a emissão de segunda via do cartão Clara.
   </li>
 </ul>
 <p class="mt-2">
@@ -1960,7 +1973,7 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
           • “Posso comprar mouse no cartão Clara?”<br/>
           • “Quais pendências tem na loja 1234?”</p>
 
-          <p class="mt-3 italic text-slate-500">Estou aqui pra facilitar o dia a dia das lojas no uso do cartão Clara. 💚</p>
+          <p class="mt-3 italic text-slate-500">Estou aqui pra facilitar o dia a dia das lojas no uso do cartão Clara. 💜</p>
           </div>`;
             break;
 
@@ -2327,7 +2340,7 @@ Sem problemas, vamos falar de outro assunto então. 😉
           </p>`
                   );
 
-                  consultarPendenciasLoja(lojaNormalizada);
+                  consultarPendenciasNoServidor(lojaNormalizada);
                   return null; // não retorna outro texto (renderBotMessage já enviou)
               }
 
