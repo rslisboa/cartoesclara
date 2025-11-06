@@ -186,6 +186,34 @@
         .chat-footer{border-radius:0;}
     }
 </style>
+
+<style>
+    .typing-indicator {
+      display: inline-flex;
+      gap: 4px;
+      align-items: center;
+      justify-content: center;
+      height: 24px;
+    }
+    .typing-indicator span {
+      width: 6px;
+      height: 6px;
+      background-color: #94a3b8;
+      border-radius: 50%;
+      animation: blink 1.4s infinite both;
+    }
+    .typing-indicator span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .typing-indicator span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    @keyframes blink {
+      0%, 80%, 100% { opacity: 0; }
+      40% { opacity: 1; }
+    }
+  </style>
+
 </head>
 <body class="text-slate-800">
 
@@ -246,35 +274,49 @@
                         </a>.
                     </p>
 
-                              <!-- 👇 bloco novo (OK aqui dentro) -->
-        <p class="text-sm text-slate-700 mt-3">
-          <? if (userName) { ?>
-            <b><?= userName ?></b>, como posso te ajudar agora?
-          <? } else { ?>
-            Como posso te ajudar agora?
-          <? } ?>
-        </p>
-      </div> <!-- fecha .bot-bubble -->
-    </div>   <!-- fecha .flex -->
-    
-  </div>     <!-- fecha #chatWindow -->
-</main>      <!-- fecha .chat-body -->
+                             
+                    </div> <!-- fecha .bot-bubble -->
+                  </div>   <!-- fecha .flex -->
+                  
+                </div>     <!-- fecha #chatWindow -->
+              </main>      <!-- fecha .chat-body -->
 
-    <!-- FOOTER / INPUT -->
-    <footer class="chat-footer">
-        <form id="chatForm" class="w-full">
-            <div class="input-shell">
-                <textarea id="userInput" placeholder="Digite aqui..."></textarea>
-                <button type="submit" id="sendBtn">Enviar</button>
-            </div>
-        </form>
-    </footer>
+                  <!-- FOOTER / INPUT -->
+                  <footer class="chat-footer">
+                      <form id="chatForm" class="w-full">
+                          <div class="input-shell">
+                              <textarea id="userInput" placeholder="Digite aqui..."></textarea>
+                              <button type="submit" id="sendBtn">Enviar</button>
+                          </div>
+                      </form>
+                  </footer>
 
 </div>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
     const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png";
+
+        // Nome vindo do template Apps Script (Code.gs → tmpl.userName)
+    const userName = <?= JSON.stringify(userName || "") ?>;
+    const displayName = userName.replace(/^"+|"+$/g, "").trim();
+
+// 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
+setTimeout(() => {
+    if (displayName) {
+        // Versão com nome
+        renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'><b>" +
+            displayName +
+            "</b>, como posso te ajudar agora?</p>"
+        );
+    } else {
+        // Versão sem nome (fallback)
+        renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Como posso te ajudar agora?</p>"
+        );
+    }
+}, 2000);
 
     /* ========= ESTADOS ========= */
     let estadoPendencias = "nenhum"; // "nenhum" | "aguardando_loja" | "aguardando_confirmacao_email" | "aguardando_email"
@@ -316,31 +358,67 @@ document.addEventListener("DOMContentLoaded", () => {
         scrollToBottom();
     }
 
-    function renderBotMessage(text) {
-        if (!text) return;
+        // 👇 Cole AQUI, logo abaixo de scrollToBottom()
+  // Adiciona indicador de "digitando..."
+  function showTypingIndicator() {
+    const chatWindow = document.getElementById('chatWindow');
+    const typingDiv = document.createElement('div');
+    typingDiv.id = 'typingIndicator';
+    typingDiv.className = 'flex items-start gap-3 mt-3';
+    typingDiv.innerHTML = `
+      <img src="https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png" alt="Vektor" class="w-8 h-8 rounded-full">
+      <div class="bot-bubble px-4 py-3 max-w-[80%]">
+        <div class="typing-indicator">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    `;
+    chatWindow.appendChild(typingDiv);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+  }
 
-        const wrapper = document.createElement("div");
-        wrapper.className = "flex items-start gap-3";
+  function hideTypingIndicator() {
+    const typingDiv = document.getElementById('typingIndicator');
+    if (typingDiv) typingDiv.remove();
+  }
 
-        const avatar = document.createElement("img");
-        avatar.src = ROBOT_IMG_URL;
-        avatar.alt = "Assistente Clara (robô)";
-        avatar.className = "h-16 w-auto object-contain flex-shrink-0";
 
-        const bubble = document.createElement("div");
-        bubble.className = "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
+            async function renderBotMessage(text) {
+          if (!text) return;
 
-        if (typeof text === "string" && text.startsWith("HTML:")) {
+          // 👇 Mostra o indicador de "digitando..."
+          showTypingIndicator();
+
+          // Aguarda 1 segundo (simulando digitação)
+          await new Promise(r => setTimeout(r, 600));
+
+          // Remove o indicador
+          hideTypingIndicator();
+
+          // --- Parte original do seu código ---
+          const wrapper = document.createElement("div");
+          wrapper.className = "flex items-start gap-3";
+
+          const avatar = document.createElement("img");
+          avatar.src = ROBOT_IMG_URL;
+          avatar.alt = "Assistente Clara (robô)";
+          avatar.className = "h-16 w-auto object-contain flex-shrink-0";
+
+          const bubble = document.createElement("div");
+          bubble.className =
+            "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
+
+          if (typeof text === "string" && text.startsWith("HTML:")) {
             bubble.innerHTML = text.replace(/^HTML:/, "").trim();
-        } else {
+          } else {
             bubble.innerText = text;
-        }
+          }
 
-        wrapper.appendChild(avatar);
-        wrapper.appendChild(bubble);
-        chatWindow.appendChild(wrapper);
-        scrollToBottom();
-    }
+          wrapper.appendChild(avatar);
+          wrapper.appendChild(bubble);
+          chatWindow.appendChild(wrapper);
+          scrollToBottom();
+        }
 
     /* ========= NORMALIZAÇÃO ========= */
     function normalize(str) {
@@ -707,16 +785,47 @@ document.addEventListener("DOMContentLoaded", () => {
         "2 via",
         "2a via",
         "2ª via",
+        "segunda via",
+        "segunda bia",
+        "segundavia",
+        "segunda vias",
+        "segundas via",
+        "segundas vias",
         "reemitir cartao",
         "reemitir cartão",
         "reemissao cartao",
+        "reemissao de cartao",
+        "reemissao de cartao",
         "reemissão cartão",
         "reemitir meu cartao",
         "reemitir meu cartão",
         "perdi o cartao",
         "perdi o cartão",
+        "perdi meu cartao",
+        "perdi meu cartão",
+        "perdi o meu cartão",
+        "perdi o meu cartao",
+        "eu perdi o cartão",
+        "eu perdi o cartao",
+        "percas de cartao",
+        "perca de cartão",
+        "perca de cartao",
+        "perda de cartao",
+        "perda de cartão",
+        "solicitar segunda via",
+        "solicitar 2via",
+        "solicitar 2 via",
+        "solicitação de segunda via",
+        "solicitação de 2 via",
         "roubaram meu cartao",
         "roubaram meu cartão",
+        "me roubaram",
+        "mi roubaram",
+        "fui roubado",
+        "cartao furtado",
+        "furto",
+        "cartão furtado",
+        "roubo",
         "roubo de cartão",
         "perda de cartão",
         "perca de cartão",
@@ -1190,6 +1299,11 @@ document.addEventListener("DOMContentLoaded", () => {
             msgNorm.includes("quem é você") ||
             msgNorm.includes("quem e voce") ||
             msgNorm.includes("quem é vc") ||
+            msgNorm.includes("qm é vc") ||
+            msgNorm.includes("qm e vc") ||
+            msgNorm.includes("qm eh vc") ||
+            msgNorm.includes("qm eh voce") ||
+            msgNorm.includes("qm eh você") ||
             msgNorm.includes("quem e vc") ||
             msgNorm.includes("quem é você clara") ||
             msgNorm.includes("quem é o vektor") ||
@@ -1701,11 +1815,9 @@ O prazo de entrega do cartão é de até <b>7 dias úteis</b>, conforme a polít
 A solicitação de <b>segunda via</b> (perda, roubo, dano ou troca de portador) deve seguir o fluxo previsto na Política de Uso dos Cartões Clara:
 </p>
 <ul class="list-disc ml-5 mt-1">
-  <li>Bloquear imediatamente o cartão antigo na plataforma / app da Clara (se aplicável);</li>
+  <li>Bloquear imediatamente o cartão antigo na plataforma / app da Clara através da funcionalidade de <b>"Congelar"</b>;</li>
   <li>Registrar o motivo (perda, roubo, quebra, etc.) conforme orientações internas;</li>
-  <li>Abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"target="_blank" rel="noopener noreferrer"><b>ServiceNow</b></a>solicitando a emissão de segunda via do cartão Clara.
-  </li>
-</ul>
+  <li>Abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"target="_blank" rel="noopener noreferrer"><b>ServiceNow</b></a> solicitando a emissão de segunda via do cartão Clara.
 <p class="mt-2">
 Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clara</b> para casos de reemissão/segunda via.
 </p>
@@ -1919,10 +2031,8 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
             <p>O <b>cartão Clara</b> é o meio oficial de pagamento das despesas operacionais das lojas.</p>
             <p class="mt-1">Com ele, você pode pagar itens de uso diário como materiais de limpeza, escritório, informática, água e lanches para ações internas autorizadas.</p>
             <p class="mt-1">Todas as compras devem ser justificadas na plataforma Clara em até 48 horas, com etiqueta, nota e descrição correta.</p>
-            <p class="mt-1">Quer ver a <b>Política completa de uso</b>? 
-            <a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer">
-            clique aqui
-            </a>.</p>
+            <p class="mt-1">Quer ver a <b>Política completa de uso</b>?<a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer"> Clique aqui.
+            </a></p>
             </div>`;
                 break;
 
@@ -1951,7 +2061,7 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
 
             case "sobreBot":
             resposta = `HTML:<div class="text-sm text-slate-700">
-          <p>Sou o <b>Vektor</b> 🤖 — Agente do <b>Grupo SBF</b> especializado no <b>cartão Clara</b>.</p>
+          <p>Sou o <b>Vektor</b> 🤖 — Agente do <b>Grupo SBF</b> especializado no <b>cartão Clara</b>.
 
           <p class="mt-2">Posso te ajudar com várias coisas, por exemplo:</p>
           <ul class="list-disc ml-5 mt-1">
@@ -1963,8 +2073,7 @@ Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
           <li>Mostrar <b>como solicitar novo cartão</b> (primeira ou segunda via);</li>
           <li>Explicar sobre o <b>Termo de Responsabilidade</b> e onde preencher;</li>
           <li>Responder dúvidas sobre <b>sangria, limite, reembolsos e prestação de contas</b>;</li>
-          <li>E, claro, te direcionar para os canais certos como <b>Financeiro</b> ou <b>ServiceNow</b> quando for preciso.</li>
-          </ul>
+          <li>E, claro, te direcionar para os canais certos como <b>Financeiro</b> ou <b>ServiceNow</b> quando for preciso.
 
           <p class="mt-3">Basta me perguntar de forma natural, tipo:</p>
           <p>• “Qual etiqueta usar para lanche de treinamento?”<br/>
