@@ -301,6 +301,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const userName = <?= JSON.stringify(userName || "") ?>;
     const displayName = userName.replace(/^"+|"+$/g, "").trim();
 
+    // E-mail vindo do Apps Script (Code.gs → template.userEmail)
+    const USER_EMAIL = <?= JSON.stringify(userEmail || "") ?>;
+    const USER_EMAIL_REPLACED = USER_EMAIL.replace(/^"+|"+$/g, "").trim();
+
 // 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
 setTimeout(() => {
     if (displayName) {
@@ -477,10 +481,10 @@ setTimeout(() => {
     nome: "MATERIAL DE ESCRITÓRIO",
     palavrasChave: [
       "caneta", "papel", "pasta", "bloco", "caderno", "etiqueta adesiva", "grampeador", "clips", "clipes", "organizador", "post-it", "marcador", "lápis", "lapis", "borracha", "corretivo", "tesoura", "régua", "regua", "perfurador", "furador de papel", "cola", "fita adesiva", "fita durex", "envelope", "arquivo", "caixa arquivo", "separador de página", "separador de pagina",
-      "carimbo", "tinta carimbo", "calculadora", "agenda", "calendário", "calendario", "prancheta", "suporte de caneta", "porta-treco", "cartucho de tinta", "toner", "porta revista", "revisteiro", "apontador", "dicionário", "dicionario", "impressos", "sulfite", "folha de sulfite", "folha A4", "folhas"
+      "carimbo", "tinta carimbo", "calculadora", "agenda", "calendário", "calendario", "prancheta", "suporte de caneta", "porta-treco", "cartucho de tinta", "toner", "porta revista", "revisteiro", "apontador", "dicionário", "dicionario", "impressos", "sulfite", "folha de sulfite", "folha A4", "folhas", "escada", "escadas"
     ],
     descricao:
-      "Canetas, blocos, papéis, pastas, grampeadores, clipes, etiquetas adesivas, organizadores de mesa.",
+      "Canetas, blocos, papéis, pastas, grampeadores, clipes, etiquetas adesivas, organizadores de mesa etc.",
     observacaoUso: ""
   },
   {
@@ -683,7 +687,7 @@ setTimeout(() => {
     ].map(normalize);
 
     const saudacoes = [
-        "oi","olá","ola","opa","eai","e aí","iae","oi vektor","ola vektor","olá vektor", "bom dia","boa tarde","boa noite",
+        "oi","olá","ola","opa","eai","e aí","iae","oi vektor","ola vektor","olá vektor", "bom dia","boa tarde","boa noite", "bom dia!", "boa tarde!", "boa noite!",
         "salve","fala","fala vektor","e aí vektor","eai vektor","opa vektor", "tudo bem","td bem","tdb","como vai","como vc ta","como voce ta", "beleza","tranquilo","tudo certo", "como vai vc", "como vai você", "como tá", "como ta", "eae", "i ae"
     ].map(normalize);
 
@@ -935,6 +939,8 @@ setTimeout(() => {
             msgNorm.includes("cartão bloqueado") ||
             msgNorm.includes("meu cartao nao funciona") ||
             msgNorm.includes("meu cartão não funciona") ||
+            msgNorm.includes("meu cartão tá bloqueado") ||
+            msgNorm.includes("meu cartao ta bloqueado") ||
             msgNorm.includes("nao consigo usar o cartao") ||
             msgNorm.includes("não consigo usar o cartão") ||
             msgNorm.includes("problema no cartao") ||
@@ -1288,6 +1294,16 @@ setTimeout(() => {
         // BOT: SOBRE O QUE ELE PODE FAZER
         if (
             msgNorm.includes("o que voce faz") ||
+            msgNorm.includes("qual o seu nome") ||
+            msgNorm.includes("qual é o seu nome") ||
+            msgNorm.includes("qual eh o seu nome") ||
+            msgNorm.includes("qual eh seu nome") ||
+            msgNorm.includes("como vc se chama") ||
+            msgNorm.includes("como voce se chama") ||
+            msgNorm.includes("como você se chama") ||
+            msgNorm.includes("como vc chama") ||
+            msgNorm.includes("como voce chama") ||
+            msgNorm.includes("como você chama") ||
             msgNorm.includes("o que você faz") ||
             msgNorm.includes("o que vc faz") ||
             msgNorm.includes("pra que serve") ||
@@ -1582,15 +1598,15 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
 <p class="mt-2">
 <b>Como lançar na Clara (até 48h):</b><br/>
 1. Anexar nota fiscal/recibo (foto legível);<br/>
-2. Selecionar "${et.nome}";<br/>
-3. Descrever objetivamente o gasto (ex.: "Teclado PDV loja 1234");<br/>
+2. Selecionar a etiqueta: "${et.nome}";<br/>
+3. Descrever objetivamente o gasto no campo <b>Comentário</b> (ex.: "Compra de xxxx para ____");<br/>
 4. Guardar o documento físico na loja pelo prazo indicado pela política.
 </p>
 </div>`;
     }
 
     function respLimite() {
-        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br><br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende,<br>• Novo limite requerido.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.<br><br>Lembrando que o limite foi definido conforme o histórico de gastos de cada loja, é um valor individual e diferente para cada uma. Assim que ocorre o pagamento da fatura pela área finanecira o limite é reestabelecido no cartão';
+        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br><br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende,<br>• Novo limite requerido.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.<br><br>Lembrando que o limite foi definido conforme o histórico de gastos de cada loja, é um valor individual e diferente para cada uma. <b>O limite é reestabelecido todo dia 06 de cada mês</b>, fique atento! 😉';
     }
 
     function respBloqueio() {
@@ -1962,13 +1978,13 @@ Não encontrei pendências para a loja <b>${loja}</b> na última data de cobran�
                 if (res && res.ok) {
                     renderBotMessage(
                         `HTML:<p class="text-sm text-slate-700">
-Enviei o resumo das pendências da loja <b>${res.loja || loja}</b> para o e-mail <b>${email}</b> (data de cobrança: <b>${res.data || (ultimaPendenciaResumo && ultimaPendenciaResumo.data) || ""}</b>). Não se esqueça de regularizar as justificativas na plataforma da Clara e posteriormente encaminhar chamado para que o cartão seja desbloqueado (caso esteja bloqueado).</p>`
+          Enviei o resumo das pendências da loja <b>${res.loja || loja}</b> para o e-mail <b>${email}</b> (data de cobrança: <b>${res.data || (ultimaPendenciaResumo && ultimaPendenciaResumo.data) || ""}</b>). Não se esqueça de regularizar as justificativas na plataforma da Clara e posteriormente encaminhar chamado para que o cartão seja desbloqueado (caso esteja bloqueado).</p>`
                     );
                 } else {
                     const erro = (res && res.error) ? res.error : "erro desconhecido";
                     renderBotMessage(
                         `HTML:<p class="text-sm text-slate-700">
-Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
+          Tentei enviar o e-mail de pendências, mas deu problema: ${erro}.</p>`
                     );
                 }
             })
@@ -2262,57 +2278,93 @@ Se quiser tratar de outro assunto, é só me perguntar diretamente. 😉
         }
 
         // 6) Fluxo pendências - aguardando confirmação de envio por e-mail
-        if (estadoPendencias === "aguardando_confirmacao_email") {
-            const ehSim = (
-                norm === "sim" ||
-                norm.startsWith("sim ") ||
-                norm.includes(" sim") ||
-                norm.includes("pode enviar") ||
-                norm.includes("pode mandar") ||
-                norm.includes("manda") ||
-                norm.includes("envia") ||
-                norm.includes("pode sim")
-            );
+if (estadoPendencias === "aguardando_confirmacao_email") {
+    const ehSim = (
+        norm === "sim" ||
+        norm.startsWith("sim ") ||
+        norm.includes(" sim") ||
+        norm.includes("pode enviar") ||
+        norm.includes("pode mandar") ||
+        norm.includes("manda") ||
+        norm.includes("envia") ||
+        norm.includes("pode sim")
+    );
 
-            const ehNao = (
-                norm === "nao" || norm === "não" ||
-                norm.startsWith("nao ") || norm.startsWith("não ") ||
-                norm.includes("nao precisa") || norm.includes("não precisa") ||
-                norm.includes("sem email") || norm.includes("sem e-mail") ||
-                norm.includes("nao manda") || norm.includes("não manda")
-            );
+    const ehNao = (
+        norm === "nao" || norm === "não" ||
+        norm.startsWith("nao ") || norm.startsWith("não ") ||
+        norm.includes("nao precisa") || norm.includes("não precisa") ||
+        norm.includes("sem email") || norm.includes("sem e-mail") ||
+        norm.includes("nao manda") || norm.includes("não manda")
+    );
 
-            const mudouDeAssunto = palavrasMudancaAssunto.some(p => norm.includes(p));
+    const mudouDeAssunto = palavrasMudancaAssunto.some(p => norm.includes(p));
 
-            if (!ehSim && !ehNao && mudouDeAssunto) {
-                estadoPendencias = "nenhum";
-                lojaPendenciasAtual = "";
-                return `HTML:<div class="text-sm text-slate-700">
+    // Usuário mudou de assunto no meio
+    if (!ehSim && !ehNao && mudouDeAssunto) {
+        estadoPendencias = "nenhum";
+        lojaPendenciasAtual = "";
+        return `HTML:<div class="text-sm text-slate-700">
 <p>Tranquilo, vamos falar de outro assunto então. 😉</p>
 <p class="mt-1">Se depois você quiser receber o resumo por e-mail, é só me pedir de novo.</p>
 </div>`;
-            }
+    }
 
-            if (ehNao) {
-                estadoPendencias = "nenhum";
-                lojaPendenciasAtual = "";
-                return `HTML:<p class="text-sm text-slate-700">
+    // Usuário disse que NÃO quer e-mail
+    if (ehNao) {
+        estadoPendencias = "nenhum";
+        lojaPendenciasAtual = "";
+        return `HTML:<p class="text-sm text-slate-700">
 Fechado, não vou enviar por e-mail. Se quiser depois, é só pedir de novo. 👍
 </p>`;
-            }
+    }
 
-            if (ehSim) {
-                estadoPendencias = "aguardando_email";
-                return `HTML:<p class="text-sm text-slate-700">
-Perfeito! Me informa o seu e-mail corporativo (ex.: <b>nome.sobrenome@gruposbf.com.br</b>) para eu enviar o resumo.
-</p>`;
-            }
+    // Usuário disse que SIM quer e-mail
+    if (ehSim) {
+        const loja = lojaPendenciasAtual || (ultimaPendenciaResumo && ultimaPendenciaResumo.loja) || "";
+        const emailSessao = (USER_EMAIL_REPLACED || "").trim();
 
+        if (!loja) {
+            // Por segurança: se por algum motivo a loja sumiu da memória
+            estadoPendencias = "nenhum";
+            lojaPendenciasAtual = "";
             return `HTML:<p class="text-sm text-slate-700">
+Não tenho mais a loja em memória. Me peça de novo pra consultar as pendências, por favor.
+</p>`;
+        }
+
+        // ✅ Se temos e-mail do usuário logado, já envia direto
+        if (emailSessao) {
+            estadoPendencias = "nenhum";
+            lojaPendenciasAtual = "";
+
+            // avisa no chat
+            renderBotMessage(
+                `HTML:<p class="text-sm text-slate-700">
+Perfeito! Vou enviar o resumo das pendências da loja <b>${loja}</b> para <b>${emailSessao}</b>.
+</p>`
+            );
+
+            // chama o Apps Script pra mandar o e-mail
+            chamarEnvioPendenciasPorEmail(loja, emailSessao);
+
+            // já usamos renderBotMessage, então aqui não precisa retornar outro texto
+            return null;
+        }
+
+        // ❌ Se NÃO temos e-mail na sessão, volta para o fluxo antigo (pede e-mail)
+        estadoPendencias = "aguardando_email";
+        return `HTML:<p class="text-sm text-slate-700">
+Perfeito! Me informa o seu e-mail corporativo (ex.: <b>nome.sobrenome@xxxxx.com.br</b>) para eu enviar o resumo.
+</p>`;
+    }
+
+    // Se não entendeu nem sim nem não
+    return `HTML:<p class="text-sm text-slate-700">
 Só pra eu entender: você quer que eu envie por e-mail também?<br/>
 Responda apenas <b>"sim"</b> ou <b>"não"</b>. 🙂
 </p>`;
-        }
+}
 
         // 7) Fluxo pendências - aguardando e-mail
         if (estadoPendencias === "aguardando_email") {
