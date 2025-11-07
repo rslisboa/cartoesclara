@@ -395,7 +395,7 @@ setTimeout(() => {
           showTypingIndicator();
 
           // Aguarda 1 segundo (simulando digitação)
-          await new Promise(r => setTimeout(r, 600));
+          await new Promise(r => setTimeout(r, 800));
 
           // Remove o indicador
           hideTypingIndicator();
@@ -423,6 +423,8 @@ setTimeout(() => {
           wrapper.appendChild(bubble);
           chatWindow.appendChild(wrapper);
           scrollToBottom();
+          // 👇 dispara notificação de nova mensagem do bot
+          notificarNovaMensagem(text);
         }
 
     /* ========= NORMALIZAÇÃO ========= */
@@ -859,6 +861,58 @@ setTimeout(() => {
         "o que nao comprar",
         "o que não comprar"
     ].map(normalize);
+
+
+    // Pede permissão pro navegador mostrar notificações
+            function solicitarPermissaoNotificacao() {
+              if (!("Notification" in window)) {
+                console.log("Navegador não suporta Notification API.");
+                return;
+              }
+
+              if (Notification.permission === "default") {
+                // Só pede se ainda não tiver "granted" nem "denied"
+                Notification.requestPermission().then((result) => {
+                  console.log("Permissão de notificação:", result);
+                });
+              }
+            }
+
+            // Dispara notificação quando chega mensagem nova do bot
+            function notificarNovaMensagem(text) {
+              if (!("Notification" in window)) return;
+              if (Notification.permission !== "granted") return;
+
+              // Opcional: só notificar se o usuário NÃO estiver olhando pro chat
+              if (document.hasFocus()) return;
+
+              let conteudo = "";
+
+              if (typeof text === "string") {
+                // Se vier no formato "HTML:..."
+                if (text.startsWith("HTML:")) {
+                  const semPrefixo = text.replace(/^HTML:/, "");
+                  // remove tags HTML pra não aparecer tudo <p> na notificação
+                  conteudo = semPrefixo.replace(/<[^>]+>/g, " ");
+                } else {
+                  conteudo = text;
+                }
+              }
+
+              conteudo = conteudo.trim();
+              if (!conteudo) return;
+
+              // Limita o tamanho da mensagem na notificação
+              if (conteudo.length > 140) {
+                conteudo = conteudo.slice(0, 137) + "...";
+              }
+
+              new Notification("Vektor - nova resposta", {
+                body: conteudo,
+                icon: ROBOT_IMG_URL // mesma imagem que você usa pro avatar do bot
+              });
+            }
+
 
     /* ========= INTENÇÃO ========= */
 
@@ -1453,222 +1507,215 @@ setTimeout(() => {
         return melhorMatch;
     }
 
-    /* ========= AVALIAÇÃO DE COMPRA ========= */
+                /* ========= AVALIAÇÃO DE COMPRA ========= */
 
-
-        const gruposProibidos = 
-        
+    const gruposProibidos = {
         eletrodomesticos: [
-        "geladeira", "microondas", "micro-ondas", "friogrifico", "freezer", "frigobar", "Geladeira",
-        "Refrigerador", "Fogão", "Cooktop", "Forno", "Máquina de Lavar Louças", "Coifa", "Depurador",
-        "Purificador de Água", "Máquina de Lavar Roupas", "Secadora de Roupas", "Centrífuga", "secadora",
-        "secadora de louças", "lavadora", "lava-roupas", "lava e seca", "lava-louças", "exaustor", "purificador",
-        "bebedouro"
-    ].map(normalize),
+            "geladeira", "microondas", "micro-ondas", "friogrifico", "freezer", "frigobar", "Geladeira",
+            "Refrigerador", "Fogão", "Cooktop", "Forno", "Máquina de Lavar Louças", "Coifa", "Depurador",
+            "Purificador de Água", "Máquina de Lavar Roupas", "Secadora de Roupas", "Centrífuga", "secadora",
+            "secadora de louças", "lavadora", "lava-roupas", "lava e seca", "lava-louças", "exaustor", "purificador",
+            "bebedouro", "forno-microondas"
+        ].map(normalize),
 
-    eletroportateis: [
-        "Liquidificador", "Batedeira", "Processador de Alimentos", "Mixer", "Air Fryer", "airfryer", "airfrier",
-        "Panela Elétrica", "Máquina de Pão", "Máquina de Waffle", "Cafeteira", "Chaleira", "Extrator de Suco",
-        "Torradeira", "Sanduicheira", "Pipoqueira Elétrica", "Abridor de Lata Elétrico", "Abridor de Vinho Elétrico",
-        "ferro", "ferro de passar", "Ferro de Passar Roupa", "Máquina de Costura", "Aspirador de Pó",
-        "Lavadora de Jato de Água", "Limpadora a Vapor", "Secador de Cabelo", "Chapinha", "Prancha",
-        "Barbeador Elétrico", "barbeador", "Escova de Dente Elétrica", "escova de dente", "vaporizador"
-    ].map(normalize),
+        eletroportateis: [
+            "Liquidificador", "Batedeira", "Processador de Alimentos", "Mixer", "Air Fryer", "airfryer", "airfrier",
+            "Panela Elétrica", "Máquina de Pão", "Máquina de Waffle", "Cafeteira", "Chaleira", "Extrator de Suco",
+            "Torradeira", "Sanduicheira", "Pipoqueira Elétrica", "Abridor de Lata Elétrico", "Abridor de Vinho Elétrico",
+            "ferro", "ferro de passar", "Ferro de Passar Roupa", "Máquina de Costura", "Aspirador de Pó",
+            "Lavadora de Jato de Água", "Limpadora a Vapor", "Secador de Cabelo", "Chapinha", "Prancha",
+            "Barbeador Elétrico", "barbeador", "Escova de Dente Elétrica", "escova de dente", "vaporizador"
+        ].map(normalize),
 
-    climatizacao: [
-        "compressor", "ventilador", "ar condicionado", "ar-condicionado", "Ventilador", "Aquecedor Elétrico",
-        "Desumidificador", "compressor de ar"
-    ].map(normalize),
+        climatizacao: [
+            "compressor", "ventilador", "ar condicionado", "ar-condicionado", "Ventilador", "Aquecedor Elétrico",
+            "Desumidificador", "compressor de ar", "aquecedor", "climatizador"
+        ].map(normalize),
 
-    moveisUtensiliosCasa: [
-        "mesa", "cadeira", "sofá", "poltrona", "armário", "cômoda", "estante", "tapete", "persiana", "lustre",
-        "aquario", "aquarios", "churraqueira", "carvão", "churrasco", "cadeira de balanço"
-    ].map(normalize),
+        moveisUtensiliosCasa: [
+            "mesa", "cadeira", "sofá", "poltrona", "armário", "cômoda", "estante", "tapete", "persiana", "lustre",
+            "aquario", "aquarios", "churraqueira", "carvão", "churrasco", "cadeira de balanço"
+        ].map(normalize),
 
-    eletronicos: [
-        "tv", "televisao", "televisão", "home theater", "hometheater", "som ambiente", "caixa de som grande",
-        "caixa de som", "soundbar", "Celulares", "celular", "Smartphones", "Tablets", "Computadores", "computador",
-        "notebook", "Monitores", "Impressoras", "Scanners", "Roteadores", "Modems", "HD", "SSD", "Calculadoras",
-        "Televisores", "calculadora", "Aparelhos de Som", "Caixas de Som", "Fones de Ouvido", "Reprodutores de Mídia",
-        "dvd", "Câmeras Fotográficas Digitais", "Câmeras de Vídeo", "Câmeras de Segurança", "Câmeras de Monitoramento",
-        "Smartwatches", "Pulseiras Fitness", "Controles Remotos", "Carregadores Portáteis", "Power Bank", "powerbank",
-        "power bank", "Lanterna Elétrica", "lanterna", "relógio", "relogios", "relógios", "projetor", "telao",
-        "telão", "tela gigante", "drone", "GoPro", "câmera de ação", "gimbal", "tablet", "smartwatch",
-        "oculos", "óculos", "pen-drive", "pendrive", "gps"
-    ].map(normalize),
+        eletronicos: [
+            "tv", "controle de tv", "controle remoto", "televisao", "televisão", "home theater", "hometheater", "som ambiente", "caixa de som grande", "caixa de som", "soundbar", "Celulares", "celular", "Smartphones", "Tablets", "Computadores", "computador", "notebook", "Monitores", "Impressoras", "Scanners", "Roteadores", "Modems", "HD", "SSD", "Calculadoras",
+            "Televisores", "calculadora", "Aparelhos de Som", "Caixas de Som", "Fones de Ouvido", "Reprodutores de Mídia",
+            "dvd", "Câmeras Fotográficas Digitais", "Câmeras de Vídeo", "Câmeras de Segurança", "Câmeras de Monitoramento",
+            "Smartwatches", "Pulseiras Fitness", "Controles Remotos", "Carregadores Portáteis", "Power Bank", "powerbank",
+            "power bank", "Lanterna Elétrica", "lanterna", "relógio", "relogios", "relógios", "projetor", "telao",
+            "telão", "tela gigante", "drone", "GoPro", "câmera de ação", "gimbal", "tablet", "smartwatch",
+            "oculos", "óculos", "pen-drive", "pendrive", "gps"
+        ].map(normalize),
 
-    games: [
-        "ps5", "xbox", "x-box", "PS5", "ps4", "playstation", "video game", "videogame", "jogos de videogame",
-        "jogo de video game", "jogos de video game", "Consoles de Videogame", "game pass", "ps plus",
-        "xbox live", "recarga de jogo", "moeda de jogo", "skin de jogo", "pacote de expansão", "jogo digital",
-        "joguinho", "e-sports", "jogos online", "software de entretenimento", "ingresso virtual"
-    ].map(normalize),
+        games: [
+            "ps5", "xbox", "x-box", "PS5", "ps4", "playstation", "video game", "videogame", "jogos de videogame",
+            "jogo de video game", "jogos de video game", "Consoles de Videogame", "game pass", "ps plus",
+            "xbox live", "recarga de jogo", "moeda de jogo", "skin de jogo", "pacote de expansão", "jogo digital",
+            "joguinho", "e-sports", "jogos online", "software de entretenimento", "ingresso virtual"
+        ].map(normalize),
 
-    veiculos: [
-        "avião", "caminhão", "carro", "veiculo", "veículo", "moto", "ferrari", "lamborghini", "bicicleta", "lancha",
-        "iate", "jet ski", "barco", "trem", "ônibus", "trator", "máquina agrícola", "patinete elétrico", "patinete",
-        "hoverboard", "caminhonete", "aviao", "aviões"
-    ].map(normalize),
+        veiculos: [
+            "avião", "caminhão", "carro", "veiculo", "veículo", "moto", "ferrari", "lamborghini", "bicicleta", "lancha",
+            "iate", "jet ski", "barco", "trem", "ônibus", "trator", "máquina agrícola", "patinete elétrico", "patinete",
+            "hoverboard", "caminhonete", "aviao", "aviões"
+        ].map(normalize),
 
-    instrumentosMusicais: [
-        "violão", "violao", "violões", "guitarra", "baixo", "violino", "viola", "violoncelo", "contrabaixo", "harpa",
-        "bandolim", "cavaquinho", "ukulele", "banjo", "cravo", "piano", "teclado", "sintetizador", "órgão",
-        "flauta", "flautim", "clarinete", "saxofone", "oboé", "fagote", "trompete", "trombone", "tuba", "trompa",
-        "harmônica", "gaita", "acordeão", "escaleta", "bateria", "tambor", "caixa", "surdo", "pandeiro", "triângulo",
-        "prato", "chimbal", "bumbo", "tímpano", "xilofone", "marimba", "vibrafone", "glockenspiel", "sinos",
-        "caxixi", "agogô", "reco-reco", "cuíca", "berimbau", "atabaque", "conga", "bongô", "maraca", "castanhola",
-        "tamborim", "adufe", "tarol", "repique", "tam-tam", "djembe", "ukulele", "rabeca", "alaúde", "balalaica",
-        "sitar", "koto", "shamisen", "didgeridoo", "ocarina", "eufônio", "sousafone", "celesta", "theremin", "sampler",
-        "sequenciador", "messing", "harpsichord", "clavicórdio", "dulcimer", "rabeca chuleira", "gaita de fole",
-        "violino popular", "xilarmónico", "bombardino", "violone", "fliscorne", "clarim", "daxofone", "estradivário",
-        "figle", "museta", "oficleide", "takuapu", "matraca", "címbalo", "gongo", "prato de bateria", "guitar"
-    ].map(normalize),
+        instrumentosMusicais: [
+            "violão", "violao", "violões", "guitarra", "baixo", "violino", "viola", "violoncelo", "contrabaixo", "harpa",
+            "bandolim", "cavaquinho", "ukulele", "banjo", "cravo", "piano", "teclado", "sintetizador", "órgão",
+            "flauta", "flautim", "clarinete", "saxofone", "oboé", "fagote", "trompete", "trombone", "tuba", "trompa",
+            "harmônica", "gaita", "acordeão", "escaleta", "bateria", "tambor", "caixa", "surdo", "pandeiro", "triângulo",
+            "prato", "chimbal", "bumbo", "tímpano", "xilofone", "marimba", "vibrafone", "glockenspiel", "sinos",
+            "caxixi", "agogô", "reco-reco", "cuíca", "berimbau", "atabaque", "conga", "bongô", "maraca", "castanhola",
+            "tamborim", "adufe", "tarol", "repique", "tam-tam", "djembe", "rabeca", "alaúde", "balalaica",
+            "sitar", "koto", "shamisen", "didgeridoo", "ocarina", "eufônio", "sousafone", "celesta", "theremin", "sampler",
+            "sequenciador", "messing", "harpsichord", "clavicórdio", "dulcimer", "rabeca chuleira", "gaita de fole",
+            "violino popular", "xilarmónico", "bombardino", "violone", "fliscorne", "clarim", "daxofone", "estradivário",
+            "figle", "museta", "oficleide", "takuapu", "matraca", "címbalo", "gongo", "prato de bateria", "guitar"
+        ].map(normalize),
 
-    ferramentas: [
-        "furadeira", "parafusadeira", "serra elétrica", "compressor de ar"
-    ].map(normalize),
+        ferramentas: [
+            "furadeira", "parafusadeira", "serra elétrica", "compressor de ar"
+        ].map(normalize),
 
-    animais: [
-        "animais", "vaca", "mamífero", "mamíferos", "ave", "aves", "pássaro", "pássaros", "inseto", "insetos", "peixe",
-        "peixes", "réptil", "répteis", "anfíbio", "anfíbios", "vertebrado", "vertebrados", "invertebrado", "invertebrados",
-        "felino", "felinos", "canídeo", "canídeos", "roedor", "roedores", "primata", "primatas", "cerval", "cervais",
-        "equino", "equinos", "bovino", "bovinos", "suíno", "suínos", "ovino", "ovinos", "caprino", "caprinos", "cão",
-        "cachorro", "gato", "leão", "tigre", "onça", "lobo", "raposa", "urso", "elefante", "rinoceronte", "hipopótamo",
-        "girafa", "zebra", "macaco", "chimpanzé", "gorila", "orangotango", "morcego", "coelho", "lebre", "esquilo",
-        "rato", "camundongo", "capivara", "porco-espinho", "tatu", "tamanduá", "preguiça", "baleia", "golfinho",
-        "tubarão", "peixe-boi", "foca", "leão-marinho", "sapo", "rã", "perereca", "cobra-cega", "salamandra",
-        "crocodilo", "jacaré", "tartaruga", "cágado", "jabuti", "lagarto", "camaleão", "cobra", "serpente",
-        "papagaio", "arara", "tucano", "coruja", "águia", "falcão", "pardal", "canário", "pintassilgo", "beija-flor",
-        "gaivota", "pinguim", "avestruz", "ema", "pato", "ganso", "cisne", "galinha", "peru", "codorna", "mosquito",
-        "mosca", "formiga", "abelha", "vespa", "borboleta", "mariposa", "besouro", "joaninha", "libélula", "gafanhoto",
-        "barata", "aranha", "escorpião", "carrapato", "siri", "caranguejo", "lagosta", "camarão", "polvo", "lula",
-        "estrela-do-mar", "ouriço-do-mar", "água-viva", "medusa", "coral", "anêmona", "esponja-do-mar", "caracol",
-        "lesma", "ostra", "mexilhão", "verme", "minhoca", "sanguessuga", "centopeia", "lacraia", "peixe-palhaço",
-        "dourado", "salmão", "tilápia", "bacalhau", "sardinha", "atum", "enguia", "arraia", "cavalo-marinho",
-        "sapo-boi", "rã-touro", "hiena", "chacal", "píton", "jibóia", "iguana", "gecko", "periquito", "andorinha",
-        "grilo", "pulga", "ácaro", "cachorros", "gatos", "cães", "ração", "rações", "cão", "gato", "cachorro"
-    ].map(normalize),
+        animais: [
+            "animais", "vaca", "mamífero", "mamíferos", "ave", "aves", "pássaro", "pássaros", "inseto", "insetos", "peixe",
+            "peixes", "réptil", "répteis", "anfíbio", "anfíbios", "vertebrado", "vertebrados", "invertebrado", "invertebrados",
+            "felino", "felinos", "canídeo", "canídeos", "roedor", "roedores", "primata", "primatas", "cerval", "cervais",
+            "equino", "equinos", "bovino", "bovinos", "suíno", "suínos", "ovino", "ovinos", "caprino", "caprinos", "cão",
+            "cachorro", "gato", "leão", "tigre", "onça", "lobo", "raposa", "urso", "elefante", "rinoceronte", "hipopótamo",
+            "girafa", "zebra", "macaco", "chimpanzé", "gorila", "orangotango", "morcego", "coelho", "lebre", "esquilo",
+            "rato", "camundongo", "capivara", "porco-espinho", "tatu", "tamanduá", "preguiça", "baleia", "golfinho",
+            "tubarão", "peixe-boi", "foca", "leão-marinho", "sapo", "rã", "perereca", "cobra-cega", "salamandra",
+            "crocodilo", "jacaré", "tartaruga", "cágado", "jabuti", "lagarto", "camaleão", "cobra", "serpente",
+            "papagaio", "arara", "tucano", "coruja", "águia", "falcão", "pardal", "canário", "pintassilgo", "beija-flor",
+            "gaivota", "pinguim", "avestruz", "ema", "pato", "ganso", "cisne", "galinha", "peru", "codorna", "mosquito",
+            "mosca", "formiga", "abelha", "vespa", "borboleta", "mariposa", "besouro", "joaninha", "libélula", "gafanhoto",
+            "barata", "aranha", "escorpião", "carrapato", "siri", "caranguejo", "lagosta", "camarão", "polvo", "lula",
+            "estrela-do-mar", "ouriço-do-mar", "água-viva", "medusa", "coral", "anêmona", "esponja-do-mar", "caracol",
+            "lesma", "ostra", "mexilhão", "verme", "minhoca", "sanguessuga", "centopeia", "lacraia", "peixe-palhaço",
+            "dourado", "salmão", "tilápia", "bacalhau", "sardinha", "atum", "enguia", "arraia", "cavalo-marinho",
+            "sapo-boi", "rã-touro", "hiena", "chacal", "píton", "jibóia", "iguana", "gecko", "periquito", "andorinha",
+            "grilo", "pulga", "ácaro", "cachorros", "gatos", "cães", "ração", "rações"
+        ].map(normalize),
 
-    armasGuerra: [
-        "tanque", "tanque de guerra", "guerra", "metranca", "metralhadora", "bomba", "C4", "nuclear", "fuzil",
-        "fuzil de assalto", "fuzil semiautomático", "fuzil de precisão", "rifle", "carabina", "submetralhadora",
-        "metralhadora pesada", "metralhadora leve", "pistola", "revólver", "espingarda", "munição", "munições",
-        "cartucho", "bala", "projétil", "granada", "morteiro", "míssil", "mísseis", "bazuca", "lança-foguetes",
-        "canhão", "obuseiro", "torpedo", "mina terrestre", "arma química", "arma biológica", "arma nuclear",
-        "faca tática", "baioneta", "faca de combate", "machado tático", "silenciador", "supressor",
-        "colete balístico", "colete a prova de balas", "capacete militar", "capacete tático", "máscara de gás",
-        "gás lacrimogêneo", "câmera de visão noturna", "óculos tático", "luva tática", "botas militares",
-        "coturno", "farda", "uniforme camuflado", "roupa tática", "coldre", "porta carregador", "bolso modular",
-        "cinto tático", "joelheira tática", "cotoveleira tática", "placa balística", "placas balísticas", "bandoleira",
-        "blindado", "carro de combate", "veículo blindado", "lança mísseis", "porta-aviões", "navio de guerra",
-        "submarino", "drone militar", "veículo aéreo não tripulado", "aeronave de caça", "jato de caça",
-        "bombardeiro", "avião militar", "helicóptero militar", "caminhão militar", "jeep militar", "helicopero",
-        "mochila militar", "mochila tática", "kit primeiros socorros tático", "kit sobrevivência", "cantil",
-        "cantil militar", "saco de dormir militar", "binóculo", "telêmetro", "bússola", "gps tático",
-        "lanterna tática", "apito tático", "marmita militar", "pazinha de trincheira", "B2", "bunker", "missel",
-        "armas"
-    ].map(normalize),
+        armasGuerra: [
+            "tanque", "tanque de guerra", "guerra", "metranca", "metralhadora", "bomba", "C4", "nuclear", "fuzil",
+            "fuzil de assalto", "fuzil semiautomático", "fuzil de precisão", "rifle", "carabina", "submetralhadora",
+            "metralhadora pesada", "metralhadora leve", "pistola", "revólver", "espingarda", "munição", "munições",
+            "cartucho", "bala", "projétil", "granada", "morteiro", "míssil", "mísseis", "bazuca", "lança-foguetes",
+            "canhão", "obuseiro", "torpedo", "mina terrestre", "arma química", "arma biológica", "arma nuclear",
+            "faca tática", "baioneta", "faca de combate", "machado tático", "silenciador", "supressor",
+            "colete balístico", "colete a prova de balas", "capacete militar", "capacete tático", "máscara de gás",
+            "gás lacrimogêneo", "câmera de visão noturna", "óculos tático", "luva tática", "botas militares",
+            "coturno", "farda", "uniforme camuflado", "roupa tática", "coldre", "porta carregador", "bolso modular",
+            "cinto tático", "joelheira tática", "cotoveleira tática", "placa balística", "placas balísticas", "bandoleira",
+            "blindado", "carro de combate", "veículo blindado", "lança mísseis", "porta-aviões", "navio de guerra",
+            "submarino", "drone militar", "veículo aéreo não tripulado", "aeronave de caça", "jato de caça",
+            "bombardeiro", "avião militar", "helicóptero militar", "caminhão militar", "jeep militar", "helicopero",
+            "mochila militar", "mochila tática", "kit primeiros socorros tático", "kit sobrevivência", "cantil",
+            "cantil militar", "saco de dormir militar", "binóculo", "telêmetro", "bússola", "gps tático",
+            "lanterna tática", "apito tático", "marmita militar", "pazinha de trincheira", "B2", "bunker", "missel",
+            "armas"
+        ].map(normalize),
 
-    bensServicosAbstratos: [
-        "diamante", "ouro", "prata", "joia", "bracelete", "colar", "quadro", "escultura", "pintura", "ações",
-        "criptomoeda", "títulos", "bonds", "consulta médica", "terapia", "psicólogo", "exames", "tratamentos",
-        "cirurgia", "plano de saúde", "curso", "faculdade", "mentoria", "aluguel", "imposto", "multa", "reforma",
-        "manutenção", "limpeza", "seguro", "doação", "gorjeta", "champanhe", "champagne", "viagem", "piscina",
-        "piso", "porcelanato", "tijolo", "bloco", "universo", "planeta", "sol", "furacao", "aeroporto", "lua",
-        "parque de diversão", "cinema", "parque", "ingresso", "ingressos", "teatro", "museu", "exposição",
-        "espetáculo", "circense", "ópera", "concerto", "balé", "excursão", "tour guiado", "passeio", "visita guiada",
-        "galeria de arte", "livro", "livros", "revista", "revistas", "e-book", "cd", "dvd", "vinil", "curso de arte",
-        "curso de música", "curso de dança", "assinatura", "streaming", "streaming de vídeo", "streaming de áudio",
-        "netflix", "spotify", "disney+", "globoplay", "prime video", "youtube premium", "youtube", "deezer", "tidal",
-        "hbo max", "telecine play", "bilhete de trem", "bilhete de ônibus", "passagem aérea", "hotel", "aula de teatro", "doação", "doações", "aluguel de carro", "praia", "camping", "pesca", "caça", "boliche", "patinação", "escalada", "kart",
-        "paintball", "tirolesa", "rapel", "trilha", "academia", "yoga", "pilates", "crossfit", "luta", "massagem",
-        "spa", "sauna", "day spa", "clube de campo", "mensalidade clube", "rodízio", "buffet", "restaurante",
-        "bar", "cafeteria", "fast food", "pacote de viagem", "lazer", "entretenimento", "recreação", "hobbies",
-        "compra com milhas", "cartão presente", "gift card", "crédito em plataforma", "recarga de celular",
-        "compra de pontos", "programa de pontos", "sorteio", "rifa", "prédio", "casa", "apartamento",
-        "previdência privada", "previdência", "plano de previdência", "cdi", "cdb", "certificado de depósito bancário",
-        "lci", "lca", "letra de crédito imobiliário", "letra de crédito do agronegócio", "títulos de renda fixa",
-        "fundos de investimento", "cotas de fundos", "lci 180 dias", "investimento via cartão", "aporte via cartão",
-        "cashback investimento", "milhas para investimento", "compra de milhas", "criptomoeda", "criptomoedas",
-        "token de investimento", "nucoin", "cashback", "cash back", "bitcoin", "milhas", "brinquedo", "brinquedos",
-        "veneno", "mata inseto", "isca", "iscas", "cobasi", "arvore", "flores", "planta"
-    ].map(normalize),
+        bensServicosAbstratos: [
+            "diamante", "ouro", "prata", "joia", "bracelete", "colar", "quadro", "escultura", "pintura", "ações",
+            "criptomoeda", "títulos", "bonds", "consulta médica", "terapia", "psicólogo", "exames", "tratamentos",
+            "cirurgia", "plano de saúde", "curso", "faculdade", "mentoria", "aluguel", "imposto", "multa", "reforma",
+            "manutenção", "limpeza", "seguro", "doação", "gorjeta", "champanhe", "champagne", "viagem", "piscina",
+            "piso", "porcelanato", "tijolo", "bloco", "universo", "planeta", "sol", "furacao", "aeroporto", "lua",
+            "parque de diversão", "cinema", "parque", "ingresso", "ingressos", "teatro", "museu", "exposição",
+            "espetáculo", "circense", "ópera", "concerto", "balé", "excursão", "tour guiado", "passeio", "visita guiada",
+            "galeria de arte", "livro", "livros", "revista", "revistas", "e-book", "cd", "dvd", "vinil", "curso de arte",
+            "curso de música", "curso de dança", "assinatura", "streaming", "streaming de vídeo", "streaming de áudio",
+            "netflix", "spotify", "disney+", "globoplay", "prime video", "youtube premium", "youtube", "deezer", "tidal",
+            "hbo max", "telecine play", "bilhete de trem", "bilhete de ônibus", "passagem aérea", "hotel", "aula de teatro",
+            "aluguel de carro", "praia", "camping", "pesca", "caça", "boliche", "patinação", "escalada", "kart",
+            "paintball", "tirolesa", "rapel", "trilha", "academia", "yoga", "pilates", "crossfit", "luta", "massagem",
+            "spa", "sauna", "day spa", "clube de campo", "mensalidade clube", "rodízio", "buffet", "restaurante",
+            "bar", "cafeteria", "fast food", "pacote de viagem", "lazer", "entretenimento", "recreação", "hobbies",
+            "compra com milhas", "cartão presente", "gift card", "crédito em plataforma", "recarga de celular",
+            "compra de pontos", "programa de pontos", "sorteio", "rifa", "prédio", "casa", "apartamento",
+            "previdência privada", "previdência", "plano de previdência", "cdi", "cdb", "certificado de depósito bancário",
+            "lci", "lca", "letra de crédito imobiliário", "letra de crédito do agronegócio", "títulos de renda fixa",
+            "fundos de investimento", "cotas de fundos", "lci 180 dias", "investimento via cartão", "aporte via cartão",
+            "cashback investimento", "milhas para investimento", "compra de milhas", "criptomoedas",
+            "token de investimento", "nucoin", "cashback", "cash back", "bitcoin", "milhas", "brinquedo", "brinquedos",
+            "veneno", "mata inseto", "isca", "iscas", "cobasi", "arvore", "flores", "planta"
+        ].map(normalize),
 
-    restritos: [
-        "drogas", "produtos falsificados", "material pornográfico", "porno", "pornografia", "espécies ameaçadas",
-        "remédios controlados", "produtos de tabaco", "cigarro", "charuto", "munição", "prostituta", "puta",
-        "programa", "night", "sexo", "transar", "camisinha", "vibrador", "KY", "chupeta"
-    ].map(normalize),
+        restritos: [
+            "drogas", "produtos falsificados", "material pornográfico", "porno", "pornografia", "espécies ameaçadas",
+            "remédios controlados", "produtos de tabaco", "cigarro", "charuto", "munição", "prostituta", "puta",
+            "programa", "night", "sexo", "transar", "camisinha", "vibrador", "KY", "chupeta"
+        ].map(normalize),
 
-    inteligenciaArtificial: [
-        "ChatGPT", "GPT-3", "GPT-4", "GPT-4o", "GPT", "Gemini", "Google Gemini", "Gemini Pro", "Gemini Ultra",
-        "Microsoft Copilot", "Copilot", "Claude", "Claude 3", "Claude 3 Opus", "Claude 3 Sonnet", "Claude 3 Haiku",
-        "Llama", "Llama 2", "Llama 3", "Mistral", "Grok", "AlphaGo", "IBM Watson", "Watson", "TensorFlow", "PyTorch",
-        "Keras", "Azure AI", "Azure Machine Learning", "Google Cloud AI", "Vertex AI", "Amazon SageMaker", "DALL-E",
-        "DALL-E 2", "DALL-E 3", "Midjourney", "Stable Diffusion", "Stable Diffusion XL", "SDXL", "Code Llama", "Whisper",
-        "Jasper", "Jasper AI", "Copy AI", "Beautiful AI", "Grammarly", "Synthesia", "Picsart AI", "Otter AI",
-        "Tesla Autopilot", "ClickUp Brain", "H2O.ai", "Scikit-learn", "OpenAI Gym", "Tabnine", "GitHub Copilot",
-        "Perplexity", "Duck AI", "Siri", "Alexa", "Meta AI", "NotebookLM", "WordAI", "DeepBrain AI", "Salesforce Einstein",
-        "Fireflies", "Pictory", "Speechify", "Poised", "You.com", "Andi", "Chatfuel", "Dialogflow", "Cursor",
-        "Mya Systems", "Olivia by Paradox", "SeekOut", "SAP S/4HANA AI", "Breeze by HubSpot", "sap", "github", "excel",
-        "word", "text-pad", "textpad"
-    ].map(normalize);
+        inteligenciaArtificial: [
+            "ChatGPT", "GPT-3", "GPT-4", "GPT-4o", "GPT", "Gemini", "Google Gemini", "Gemini Pro", "Gemini Ultra",
+            "Microsoft Copilot", "Copilot", "Claude", "Claude 3", "Claude 3 Opus", "Claude 3 Sonnet", "Claude 3 Haiku",
+            "Llama", "Llama 2", "Llama 3", "Mistral", "Grok", "AlphaGo", "IBM Watson", "Watson", "TensorFlow", "PyTorch",
+            "Keras", "Azure AI", "Azure Machine Learning", "Google Cloud AI", "Vertex AI", "Amazon SageMaker", "DALL-E",
+            "DALL-E 2", "DALL-E 3", "Midjourney", "Stable Diffusion", "Stable Diffusion XL", "SDXL", "Code Llama", "Whisper",
+            "Jasper", "Jasper AI", "Copy AI", "Beautiful AI", "Grammarly", "Synthesia", "Picsart AI", "Otter AI",
+            "Tesla Autopilot", "ClickUp Brain", "H2O.ai", "Scikit-learn", "OpenAI Gym", "Tabnine", "GitHub Copilot",
+            "Perplexity", "Duck AI", "Siri", "Alexa", "Meta AI", "NotebookLM", "WordAI", "DeepBrain AI", "Salesforce Einstein",
+            "Fireflies", "Pictory", "Speechify", "Poised", "You.com", "Andi", "Chatfuel", "Dialogflow", "Cursor",
+            "Mya Systems", "Olivia by Paradox", "SeekOut", "SAP S/4HANA AI", "Breeze by HubSpot", "sap", "github", "excel",
+            "word", "text-pad", "textpad"
+        ].map(normalize),
 
-              // 👇 Piadinha / intro por grupo
-          const mensagensBrincadeiraPorGrupo = {
-            eletrodomesticos: "Front de loja não é cozinha planejada, né? 😅",
-            eletroportateis: "Vai montar uma cozinha gourmet aí na loja? 😂",
-            climatizacao: "Climatizar a loja é importante, mas isso entra como patrimônio, não no cartão da Clara 😉",
-            moveisUtensiliosCasa: "Parece mais compra de mobília do que despesa do dia a dia da loja 😬",
-            eletronicos: "Isso aí tá com mais cara de patrimônio do que de gasto operacional… 📺",
-            games: "Montar lan house com cartão da loja não vai rolar, hein 🎮😄",
-            veiculos: "Cartão Clara não é financiamento de concessionária 🚗💳",
-            instrumentosMusicais: "Vai montar uma banda aí na loja? 🎸😄",
-            ferramentas: "Essas ferramentas entram como patrimônio/manutenção maior, não no cartão da loja 🔧",
-            animais: "Nossa, não sabia que você tava montando um zoológico na loja 🤣",
-            armasGuerra: "Calma lá, Rambo… o cartão é pra operação da loja, não pra guerra ⚔️😂",
-            bensServicosAbstratos: "Isso tem bem mais cara de investimento/lazer/serviço pessoal do que despesa da loja 😅",
-            restritos: "Esse tipo de item é proibido de qualquer jeito, dentro ou fora da política da Clara 😶‍🌫️",
-            inteligenciaArtificial: "Nem as IAs escapam da política do cartão corporativo, viu? 🤖🚫"
-          };
+        utensiliosCozinha: [
+            "garfo", "faca", "colher", "colher de sopa", "colher de chá", "colher de sobremesa", "faca de serra",
+            "faca de pão", "faca de carne", "espátula", "concha", "escumadeira", "fouet", "batedor de ovos",
+            "abridor de lata", "abridor de garrafa", "saca-rolhas", "ralador", "descascador", "peneira",
+            "espremedor de alho", "cortador de pizza", "tesoura de cozinha", "pegador de macarrão",
+            "pegador de salada", "tábua de corte", "pirex", "travessa", "assadeira", "forma de bolo",
+            "frigideira", "panela", "caçarola", "leiteira", "cuscuzeiro", "chaleira", "bule", "xícara",
+            "copo", "taça", "prato", "pires", "saladeira", "tigela", "bowl"
+        ].map(normalize)
 
-        
-        function avaliarCompraEspecifica(msgNorm) {
-                const baseMsg = `Esse tipo de item <b>NÃO</b> pode ser comprado com o cartão.<br>
-            Ele deve seguir o processo de requisição junto à área de Compras (se for relevante e apto de acordo com o negócio e estiver dentro da política da área), com aprovação formal, não o cartão da loja.`;
+    };
 
-                // 1) Checa os GRUPOS de proibidos primeiro
-                for (const [grupo, palavras] of Object.entries(gruposProibidos)) {
-                    for (const palavra of palavras) {
-                        if (msgNorm.includes(palavra)) {
-                            const intro = mensagensBrincadeiraPorGrupo[grupo] || "⛔ Não pode usar o cartão Clara pra isso.";
-                            const respostaFinal = `${intro}<br><br>${baseMsg}`;
+    const mensagensBrincadeiraPorGrupo = {
+        eletrodomesticos: "Front de loja não é cozinha planejada, né? 😅",
+        eletroportateis: "Vai montar uma cozinha gourmet aí na loja? 😂",
+        climatizacao: "Climatizar a loja é importante, mas isso entra como patrimônio, não no cartão da Clara 😉",
+        moveisUtensiliosCasa: "Parece mais compra de mobília do que despesa do dia a dia da loja 😬",
+        eletronicos: "Isso aí tá com mais cara de patrimônio do que de gasto operacional… 📺",
+        games: "Montar lan house com cartão da loja não vai rolar, hein 🎮😄",
+        veiculos: "Cartão Clara não é financiamento de concessionária e nem tem limite infinito, hein! 🚗💳",
+        instrumentosMusicais: "Vai montar uma banda aí na loja? 🎸😄",
+        ferramentas: "Vai montar uma oficina? 😥",
+        animais: "Nossa, não sabia que você tava montando um zoológico na loja 🤣",
+        armasGuerra: "Calma lá, Rambo… o cartão é pra operação da loja, não pra guerra ⚔️😂",
+        bensServicosAbstratos: "Isso tem bem mais cara de investimento/lazer/serviço pessoal do que despesa da loja. Tá estressado e quer relaxar, né? 😅",
+        restritos: "Esse tipo de item é proibido de qualquer jeito, dentro ou fora da política da Clara 😶‍🌫️",
+        inteligenciaArtificial: "Nem as IAs escapam da política do cartão corporativo, viu? 🤖🚫",
+        utensiliosCozinha: "MasterChef que habita em você não é o mesmo que habita na Clara 🧑🏼‍🍳"
+    };
 
-                            return {
-                                pode: false,
-                                resposta: respostaFinal
-                            };
-                        }
-                    }
+    function avaliarCompraEspecifica(msgNorm) {
+        const baseMsg = `Esse tipo de item <b>NÃO</b> pode ser comprado com o cartão.<br>
+Ele deve seguir o processo de requisição junto à área de Compras (se for relevante e apto de acordo com o negócio e estiver dentro da política da área), com aprovação formal, não o cartão da loja.`;
+
+        // 1) Checa os GRUPOS de proibidos primeiro
+        for (const [grupo, palavras] of Object.entries(gruposProibidos)) {
+            for (const palavra of palavras) {
+                const regex = new RegExp(`\\b${palavra}\\b`, "i");
+                    if (regex.test(msgNorm)) {
+                    const intro = mensagensBrincadeiraPorGrupo[grupo] || "⛔ Não pode usar o cartão Clara pra isso.";
+                    const respostaFinal = `${intro}<br><br>${baseMsg}`;
+
+                    return {
+                        pode: false,
+                        resposta: respostaFinal
+                    };
                 }
-
-                // 2) (Opcional) Aqui você pode manter/colocar sua regra de "pode usar o cartão"
-                //    Exemplo (se um dia você tiver essa lógica):
-                //
-                // const etiqueta = encontrarEtiquetaValida(msgNorm);
-                // if (etiqueta) {
-                //   return {
-                //     pode: true,
-                //     etiquetaValida: etiqueta
-                //   };
-                // }
-
-                // 3) Se não casou em nada, deixa para a resposta genérica
-                return { pode: null, resposta: "" };
             }
+        }
 
-
-
+        // 2) Casos específicos de PROIBIDOS (alimentação pessoal, álcool, transporte pessoal)
         const pessoalAlim = [
             "paguei meu almoco","paguei meu almoço","paguei meu jantar",
             "paguei meu lanche","paguei meu café","paguei meu cafe",
@@ -1711,6 +1758,7 @@ setTimeout(() => {
             }
         }
 
+        // 3) Casos específicos PERMITIDOS (lanche time, periféricos, serviços emergenciais)
         const palavrasTime = [
             "coffee break","lanche pra equipe","lanche para equipe","lanche equipe",
             "lanche time","lanche pro time","lanche para o time",
@@ -1775,13 +1823,12 @@ setTimeout(() => {
             }
         }
 
-        return {
-            pode: null,
-            resposta: `Não ficou claro se isso é uma despesa operacional imediata da loja...`
-        };
+        // 4) Se não casou em nada, deixa para a resposta genérica
+        return { pode: null, resposta: "" };
     }
 
     /* ========= RESPOSTAS ========= */
+
 
     function respostaForaEscopo() {
         return `HTML:<p class="text-sm text-slate-700">
@@ -2832,6 +2879,9 @@ Sem problemas, vamos falar de outro assunto então. 😉
     /* ========= ENVIO (ENTER / BOTÃO) ========= */
 
     function enviarMensagem() {
+
+      // 👇 pede permissão de notificação logo na primeira interação
+        solicitarPermissaoNotificacao();
         const texto = userInput.value.trim();
         if (!texto) return;
 
