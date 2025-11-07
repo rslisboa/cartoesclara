@@ -317,3 +317,91 @@ function enviarPendenciasPorEmail(lojaCodigo, emailDestino) {
     };
   }
 }
+
+// 🔹 NOVA função: pendências para caso de bloqueio (mostra só as 2 últimas datas)
+function getPendenciasParaBloqueio(lojaCodigo) {
+  try {
+    const ss = SpreadsheetApp.openById("1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI");
+    const sheet = ss.getSheetByName("BaseClara");
+    if (!sheet) {
+      return { ok: false, error: "Aba 'BaseClara' não encontrada." };
+    }
+
+    const dados = sheet.getDataRange().getValues();
+    if (dados.length < 2) {
+      return { ok: false, error: "Sem dados." };
+    }
+
+    const header = dados[0];
+    const idxData = header.indexOf("Data da Transação");
+    const idxAlias = header.indexOf("Alias Do Cartão");
+    const idxValor = header.indexOf("Valor em R$");
+    const idxCategoria = header.indexOf("Categoria da Compra");
+    const idxStatus = header.indexOf("Status");
+
+    if (idxData === -1 || idxAlias === -1) {
+      return { ok: false, error: "Colunas esperadas não encontradas." };
+    }
+
+    const lojaAlvo = String(lojaCodigo).padStart(4, "0"); // Ex: 314 -> 0314
+    const linhas = dados.slice(1);
+
+    // filtra apenas as pendências (status diferente de aprovado, por ex.)
+    const pendentes = linhas.filter(l => {
+      const alias = String(l[idxAlias] || "");
+      const lojaNum = alias.replace(/\D+/g, "").padStart(4, "0");
+      const status = String(l[idxStatus] || "").toLowerCase();
+      return lojaNum === lojaAlvo && status.includes("pendente");
+    });
+
+    if (pendentes.length === 0) {
+      return { ok: true, loja: lojaCodigo, html: "<p>Não encontrei pendências recentes para esta loja.</p>" };
+    }
+
+    // ordena por data mais recente
+    pendentes.sort((a, b) => new Date(b[idxData]) - new Date(a[idxData]));
+
+    // pega apenas as 2 últimas
+    const ultimas = pendentes.slice(0, 2);
+
+    // monta HTML da tabela
+    let html = `
+      <div class="text-sm text-slate-700">
+      <p>
+      Encontrei abaixo as últimas pendências relacionadas ao cartão da loja <b>${lojaCodigo}</b>.<br/>
+      Essas pendências podem ter ocasionado o bloqueio do cartão.<br/><br/>
+      Caso a pendência já tenha sido regularizada e o seu cartão ainda esteja bloqueado, solicite o desbloqueio através de abertura de chamado no ServiceNow:<br/>
+      <b>Contas a Receber > Cartão Clara > Solicitação de Desbloqueio</b>.
+      </p>
+      <div class="mt-2 overflow-x-auto">
+      <table class="min-w-full text-xs border border-slate-200">
+      <thead><tr class="bg-slate-100">
+        <th class="border px-2 py-1 text-left">Data</th>
+        <th class="border px-2 py-1 text-left">Categoria</th>
+        <th class="border px-2 py-1 text-left">Valor (R$)</th>
+        <th class="border px-2 py-1 text-left">Status</th>
+      </tr></thead><tbody>
+    `;
+
+    for (const l of ultimas) {
+      const data = l[idxData] instanceof Date
+        ? Utilities.formatDate(l[idxData], "America/Sao_Paulo", "dd/MM/yyyy")
+        : l[idxData];
+      html += `
+        <tr>
+          <td class="border px-2 py-1">${data}</td>
+          <td class="border px-2 py-1">${l[idxCategoria] || ""}</td>
+          <td class="border px-2 py-1">${l[idxValor] || ""}</td>
+          <td class="border px-2 py-1">${l[idxStatus] || ""}</td>
+        </tr>
+      `;
+    }
+
+    html += `</tbody></table></div></div>`;
+
+    return { ok: true, loja: lojaCodigo, html };
+
+  } catch (err) {
+    return { ok: false, error: err.message || err };
+  }
+}
