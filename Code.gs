@@ -7,16 +7,14 @@ function doGet(e) {
 
   var nome = "";
   if (email) {
-    // pega só a parte antes do @
     var antesArroba = email.split("@")[0];           // ex: rodrigo.lisboa
     var partes = antesArroba.split(/[.\s_]+/);       // ["rodrigo","lisboa"]
 
-    // capitaliza cada parte -> "Rodrigo Lisboa"
-      var nomeFormatado = "";
-      if (partes.length > 0) {
-        nomeFormatado =
-          partes[0].charAt(0).toUpperCase() + partes[0].slice(1);
-}
+    var nomeFormatado = "";
+    if (partes.length > 0) {
+      nomeFormatado =
+        partes[0].charAt(0).toUpperCase() + partes[0].slice(1);
+    }
 
     nome = nomeFormatado;
   }
@@ -25,7 +23,12 @@ function doGet(e) {
     .createTemplateFromFile('index');
 
   // passa o nome para o HTML
-  template.userName = nome;
+  template.userName  = nome;
+  // 👇 passa também o e-mail bruto
+  template.userEmail = email;
+
+  // 👇 NOVO: passa também o e-mail bruto
+  template.userEmail = email;
 
   return template
     .evaluate()
