@@ -878,21 +878,19 @@ setTimeout(() => {
               }
             }
 
-            // Dispara notificação quando chega mensagem nova do bot
+          // Dispara notificação quando chega mensagem nova do bot
             function notificarNovaMensagem(text) {
               if (!("Notification" in window)) return;
               if (Notification.permission !== "granted") return;
 
-              // Opcional: só notificar se o usuário NÃO estiver olhando pro chat
-              if (document.hasFocus()) return;
+              // ❌ REMOVIDO: esse cara bloqueava tudo quando a aba estava em foco
+              // if (document.hasFocus()) return;
 
               let conteudo = "";
 
               if (typeof text === "string") {
-                // Se vier no formato "HTML:..."
                 if (text.startsWith("HTML:")) {
                   const semPrefixo = text.replace(/^HTML:/, "");
-                  // remove tags HTML pra não aparecer tudo <p> na notificação
                   conteudo = semPrefixo.replace(/<[^>]+>/g, " ");
                 } else {
                   conteudo = text;
@@ -902,16 +900,16 @@ setTimeout(() => {
               conteudo = conteudo.trim();
               if (!conteudo) return;
 
-              // Limita o tamanho da mensagem na notificação
               if (conteudo.length > 140) {
                 conteudo = conteudo.slice(0, 137) + "...";
               }
 
               new Notification("Vektor - nova resposta", {
                 body: conteudo,
-                icon: ROBOT_IMG_URL // mesma imagem que você usa pro avatar do bot
+                icon: ROBOT_IMG_URL
               });
             }
+
 
 
     /* ========= INTENÇÃO ========= */
@@ -978,6 +976,100 @@ setTimeout(() => {
             return "limite";
         }
 
+                // 🔹 Transação negada / categoria bloqueada para compra
+        if (
+            msgNorm.includes("transacao negada") ||
+            msgNorm.includes("transação negada") ||
+            msgNorm.includes("transacao recusada") ||
+            msgNorm.includes("transação recusada") ||
+            msgNorm.includes("compra negada") ||
+            msgNorm.includes("compra recusada") ||
+            msgNorm.includes("compra rejeitada") ||
+            msgNorm.includes("compra nao passou") ||
+            msgNorm.includes("compra não passou") ||
+            msgNorm.includes("compra nao autorizada") ||
+            msgNorm.includes("compra não autorizada") ||
+            msgNorm.includes("transacao nao autorizada") ||
+            msgNorm.includes("transação não autorizada") ||
+            msgNorm.includes("transacao bloqueada") ||
+            msgNorm.includes("transação bloqueada") ||
+            msgNorm.includes("cartao nao passou") ||
+            msgNorm.includes("cartão não passou") ||
+            msgNorm.includes("cartao recusado") ||
+            msgNorm.includes("cartão recusado") ||
+            msgNorm.includes("cartao negado") ||
+            msgNorm.includes("cartão negado") ||
+            msgNorm.includes("cartao nao autorizou") ||
+            msgNorm.includes("cartão não autorizou") ||
+            msgNorm.includes("cartao travou na maquininha") ||
+            msgNorm.includes("cartao travou na máquina") ||
+            msgNorm.includes("cartao travou") ||
+            msgNorm.includes("cartão travou") ||
+            msgNorm.includes("nao passou o cartao") ||
+            msgNorm.includes("não passou o cartão") ||
+            msgNorm.includes("nao autorizou a compra") ||
+            msgNorm.includes("não autorizou a compra") ||
+            msgNorm.includes("recusou a compra") ||
+            msgNorm.includes("recusou o pagamento") ||
+            msgNorm.includes("falha na compra") ||
+            msgNorm.includes("falha de pagamento") ||
+            msgNorm.includes("erro na compra") ||
+            msgNorm.includes("erro de pagamento") ||
+            msgNorm.includes("erro no cartao") ||
+            msgNorm.includes("erro no cartão") ||
+            msgNorm.includes("compra deu erro") ||
+            msgNorm.includes("pagamento negado") ||
+            msgNorm.includes("pagamento recusado") ||
+            msgNorm.includes("pagamento bloqueado") ||
+            msgNorm.includes("categoria bloqueada") ||
+            msgNorm.includes("categoria bloqueado") ||
+            msgNorm.includes("categoria nao liberada") ||
+            msgNorm.includes("tentando usar o cartão") ||
+            msgNorm.includes("tentando usar o cartao") ||
+            msgNorm.includes("categoria não liberada") ||
+            msgNorm.includes("liberar categoria") ||
+            msgNorm.includes("liberacao de categoria") ||
+            msgNorm.includes("tentei passar o cartão e deu erro") ||
+            msgNorm.includes("tentar passar o cartão") ||
+            msgNorm.includes("tentar passar o cartao") ||
+            msgNorm.includes("tentar usar o cartao") ||
+            msgNorm.includes("tentar usar o cartão") ||
+            msgNorm.includes("tentei passar o cartao e deu erro") ||
+            msgNorm.includes("a compra foi recusada na maquininha") ||
+            msgNorm.includes("não consegui usar o cartão") ||
+            msgNorm.includes("não consegui usar o cartao") ||
+            msgNorm.includes("nao consegui usar o cartao") ||
+            msgNorm.includes("liberação de categoria") ||
+            msgNorm.includes("mcc bloqueado") ||
+            msgNorm.includes("codigo bloqueado") ||
+            msgNorm.includes("código bloqueado") ||
+            msgNorm.includes("nao liberou") ||
+            msgNorm.includes("não liberou") ||
+            msgNorm.includes("nao conseguiu passar") ||
+            msgNorm.includes("não conseguiu passar") ||
+            msgNorm.includes("nao consegui usar") ||
+            msgNorm.includes("não consegui usar") ||
+            msgNorm.includes("tentei usar e nao foi") ||
+            msgNorm.includes("tentei usar e não foi") ||
+            msgNorm.includes("tentei comprar e deu erro") ||
+            msgNorm.includes("tentou passar e nao foi") ||
+            msgNorm.includes("tentou passar e não foi") ||
+            msgNorm.includes("nao aceitou") ||
+            msgNorm.includes("não aceitou") ||
+            msgNorm.includes("nao deu certo a compra") ||
+            msgNorm.includes("não deu certo a compra") ||
+            msgNorm.includes("bloqueou a compra") ||
+            msgNorm.includes("bloqueou a transacao") ||
+            msgNorm.includes("bloqueou a transação") ||
+            msgNorm.includes("compra nao permitida") ||
+            msgNorm.includes("compra não permitida") ||
+            msgNorm.includes("transacao nao permitida") ||
+            msgNorm.includes("transação não permitida")) 
+
+          {
+            return "transacaoNegadaCategoria";}
+
+
         if (msgNorm.includes("bloqueou") ||
             msgNorm.includes("bloqueado") ||
             msgNorm.includes("desbloquear") ||
@@ -1010,16 +1102,13 @@ setTimeout(() => {
             msgNorm.includes("reativar cartao") ||
             msgNorm.includes("reativar cartão") ||
             msgNorm.includes("travamento") ||
-            msgNorm.includes("cartao recusado") ||
-            msgNorm.includes("cartão recusado") ||
-            msgNorm.includes("recusou a compra") ||
             msgNorm.includes("por que nao funciona") ||
             msgNorm.includes("por que não funciona") ||
             msgNorm.includes("desliguei o cartao") ||
             msgNorm.includes("desliguei o cartão") ||
             msgNorm.includes("bloqueio preventivo")) {
             return "bloqueio";
-        }
+      }
 
         if (msgNorm.includes("como justificar") ||
             msgNorm.includes("justificar compra") ||
@@ -1858,75 +1947,92 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
 
     function respBloqueio() {
         return `HTML:<p class="text-sm text-slate-700">
-Geralmente quando você não consegue usar o cartão pode ser devido ao bloqueio preventivo, que acontece quando tem alguma compra sem justificar na Clara dentro do prazo (até 48h):<br/>
-• faltou nota fiscal/recibo;<br/>
-• não colocou etiqueta correta;<br/>
-• descrição não explica o uso operacional.<br/><br/>
-Passos pra desbloquear:<br/>
-1. Regulariza a transação na plataforma (anexa nota, escolher etiqueta certa, descrever o motivo real).<br/>
-2. Encaminhar chamado via <b>ServiceNow</b> para desbloqueio, caminho: <b>Contas a Receber &gt; Cartão Clara &gt; Solicitação de Desbloqueio</b>.<br/><br/>
-</p>`;
-    }
+            Geralmente quando você não consegue usar o cartão pode ser devido ao bloqueio preventivo, que acontece quando tem alguma compra sem justificar na Clara dentro do prazo (até 48h):<br/>
+            • faltou nota fiscal/recibo;<br/>
+            • não colocou etiqueta correta;<br/>
+            • descrição não explica o uso operacional.<br/><br/>
+            Passos pra desbloquear:<br/>
+            1. Regulariza a transação na plataforma (anexa nota, escolher etiqueta certa, descrever o motivo real).<br/>
+            2. Encaminhar chamado via <b>ServiceNow</b> para desbloqueio, caminho: <b>Contas a Receber &gt; Cartão Clara &gt; Solicitação de Desbloqueio</b>.<br/><br/>
+            </p>`;
+                }
 
-    function respPoliticaOficial() {
+                / 🔹 NOVA RESPOSTA – transação negada / categoria bloqueada
+                function respTransacaoNegadaCategoria() {
+                    return `HTML:<div class="text-sm text-slate-700">
+            <p>Algumas compras podem ser <b>negadas</b> mesmo com limite disponível e cartão ativo (<i>É importante que você verifique que seu cartã não está bloqueado</i>), porque a <b>categoria do estabelecimento</b> (MCC) está bloqueada pela política de uso dos cartões Clara.</p>
+
+            <p class="mt-2">Nesses casos, siga estes passos:</p>
+            <ol class="list-decimal ml-4 mt-1">
+            <li>Verifique no app/plataforma da Clara o motivo da recusa e a categoria da compra (MCC);</li>
+            <li>Se a despesa for necessária para a operação da loja, abra um chamado no <b>ServiceNow</b> em:<br/>
+            <b>Contas a Receber &gt; Cartão Clara &gt; Solicitação de Liberação de Categoria para Compra</b>;</li>
+            <li>Explique o contexto da compra, qual tipo de serviço/produto precisa ser liberado e se a liberação é pontual ou recorrente.</li>
+            </ol>
+
+            <p class="mt-2">Depois da liberação pelo Financeiro no ServiceNow, você pode tentar a compra novamente com o cartão Clara.</p>
+            </div>`;
+                }
+
+              function respPoliticaOficial() {
         return `HTML:<div class="text-sm text-slate-700">
-<p>Seguem as regras oficiais de referência da empresa.</p>
-<p>
-<a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer">
-<strong>Política de Uso dos Cartões Clara (documento oficial)</strong>
-</a>.
-</p>
-<p>Use sempre esse documento como fonte final.</p>
-</div>`;
-    }
+          <p>Seguem as regras oficiais de referência da empresa.</p>
+          <p>
+          <a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer">
+          <strong>Política de Uso dos Cartões Clara (documento oficial)</strong>
+          </a>.
+          </p>
+          <p>Use sempre esse documento como fonte final.</p>
+          </div>`;
+              }
 
     function respCatalogoEtiquetas() {
         return `HTML:<div class="text-sm text-slate-700">
-<p><b>Etiquetas oficiais e quando usar:</b></p>
+            <p><b>Etiquetas oficiais e quando usar:</b></p>
 
-<p class="mt-2"><b>MATERIAL DE INFORMÁTICA</b><br/>
-Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (baixo valor, sem controle patrimonial).<br/>
-Exemplo de descrição: "Teclado PDV loja 1234".</p>
+            <p class="mt-2"><b>MATERIAL DE INFORMÁTICA</b><br/>
+            Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (baixo valor, sem controle patrimonial).<br/>
+            Exemplo de descrição: "Teclado PDV loja 1234".</p>
 
-<p class="mt-2"><b>MATERIAL DE ESCRITÓRIO</b><br/>
-Caneta, pasta, bloco de anotação, grampeador, etiqueta adesiva, organizador de mesa, papelaria básica da operação administrativa da loja.</p>
+            <p class="mt-2"><b>MATERIAL DE ESCRITÓRIO</b><br/>
+            Caneta, pasta, bloco de anotação, grampeador, etiqueta adesiva, organizador de mesa, papelaria básica da operação administrativa da loja.</p>
 
-<p class="mt-2"><b>AGUA POTÁVEL</b><br/>
-Galão de água mineral / garrafas de água para abastecimento da equipe ou uso da loja, quando previsto e autorizado operacionalmente.</p>
+            <p class="mt-2"><b>AGUA POTÁVEL</b><br/>
+            Galão de água mineral / garrafas de água para abastecimento da equipe ou uso da loja, quando previsto e autorizado operacionalmente.</p>
 
-<p class="mt-2"><b>LANCHES DE REFEIÇÕES</b><br/>
-Coffee break ou lanche para treinamento interno autorizado, ação oficial da área (VM, regional, diretoria) ou premiação operacional da equipe (não vale refeição pessoal).</p>
+            <p class="mt-2"><b>LANCHES DE REFEIÇÕES</b><br/>
+            Coffee break ou lanche para treinamento interno autorizado, ação oficial da área (VM, regional, diretoria) ou premiação operacional da equipe (não vale refeição pessoal).</p>
 
-<p class="mt-2"><b>TRANSPORTE SERVIÇOS EMERGENCIAS</b><br/>
-Motoboy emergencial / frete local urgente para levar ou buscar material importante entre lojas ou matriz.</p>
+            <p class="mt-2"><b>TRANSPORTE SERVIÇOS EMERGENCIAS</b><br/>
+            Motoboy emergencial / frete local urgente para levar ou buscar material importante entre lojas ou matriz.</p>
 
-<p class="mt-2"><b>CORREIOS_SEDEX/AR/POSTAGEM</b><br/>
-Envio de documentos oficiais da loja via Sedex/AR/postagem. Também serve para devoluções pequenas quando for processo formal.</p>
+            <p class="mt-2"><b>CORREIOS_SEDEX/AR/POSTAGEM</b><br/>
+            Envio de documentos oficiais da loja via Sedex/AR/postagem. Também serve para devoluções pequenas quando for processo formal.</p>
 
-<p class="mt-2"><b>CHAVEIRO EMERGENCIAL</b><br/>
-Abertura urgente de cofre / estoque / sala administrativa quando houve perda de chave ou travamento, só em situação emergencial.</p>
+            <p class="mt-2"><b>CHAVEIRO EMERGENCIAL</b><br/>
+            Abertura urgente de cofre / estoque / sala administrativa quando houve perda de chave ou travamento, só em situação emergencial.</p>
 
-<p class="mt-2"><b>MANUTENÇÃO CIVIL</b><br/>
-Pequenos reparos estruturais internos de baixa complexidade: ajuste em porta, troca de vidro quebrado, fixar prateleira, ajuste de revestimento etc.</p>
+            <p class="mt-2"><b>MANUTENÇÃO CIVIL</b><br/>
+            Pequenos reparos estruturais internos de baixa complexidade: ajuste em porta, troca de vidro quebrado, fixar prateleira, ajuste de revestimento etc.</p>
 
-<p class="mt-2"><b>MANUTENÇÃO ELÉTRICA</b><br/>
-Troca de tomada, disjuntor, interruptor, soquete, reator, extensão, pequenos reparos de baixa tensão necessários pro funcionamento da loja.</p>
+            <p class="mt-2"><b>MANUTENÇÃO ELÉTRICA</b><br/>
+            Troca de tomada, disjuntor, interruptor, soquete, reator, extensão, pequenos reparos de baixa tensão necessários pro funcionamento da loja.</p>
 
-<p class="mt-2"><b>MANUTENÇÃO AR-CONDICIONADO</b><br/>
-Limpeza de filtro, troca de controle remoto, carga de gás simples, pequenos ajustes que mantenham o ar funcionando.</p>
+            <p class="mt-2"><b>MANUTENÇÃO AR-CONDICIONADO</b><br/>
+            Limpeza de filtro, troca de controle remoto, carga de gás simples, pequenos ajustes que mantenham o ar funcionando.</p>
 
-<p class="mt-2"><b>BOBINA ECF</b><br/>
-Bobina fiscal / bobina de impressora obrigatória pro PDV, quando não há fornecimento centralizado.</p>
+            <p class="mt-2"><b>BOBINA ECF</b><br/>
+            Bobina fiscal / bobina de impressora obrigatória pro PDV, quando não há fornecimento centralizado.</p>
 
-<p class="mt-2"><b>SERVIÇOS GRÁFICOS E DE COPIADORAS</b><br/>
-Impressão de banner, adesivo de campanha, plotagem promocional, encadernação de material de comunicação da loja.</p>
+            <p class="mt-2"><b>SERVIÇOS GRÁFICOS E DE COPIADORAS</b><br/>
+            Impressão de banner, adesivo de campanha, plotagem promocional, encadernação de material de comunicação da loja.</p>
 
-<p class="mt-2"><b>MANUTENÇÃO EQUIPAMENTOS</b><br/>
-Ajustes/reparos em máquinas de estampar, impressoras de etiqueta, computadores fora de garantia e de baixo valor etc. (nada de compra de equipamento grande).</p>
+            <p class="mt-2"><b>MANUTENÇÃO EQUIPAMENTOS</b><br/>
+            Ajustes/reparos em máquinas de estampar, impressoras de etiqueta, computadores fora de garantia e de baixo valor etc. (nada de compra de equipamento grande).</p>
 
-<p class="mt-4">Se você não encontrou nada que encaixa no seu caso, abra chamado no<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>pedindo criação ou liberação de etiqueta.</p>
-</div>`;
-    }
+            <p class="mt-4">Se você não encontrou nada que encaixa no seu caso, abra chamado no<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>pedindo criação ou liberação de etiqueta.</p>
+            </div>`;
+                }
 
     function respPrestacaoContas() {
         return `HTML:<p class="text-sm text-slate-700">
@@ -2346,6 +2452,12 @@ Detalhe: ${erro}
             </div>`;
                 break;
 
+             // 🔹 NOVO: transação negada / categoria bloqueada
+            case "transacaoNegadaCategoria":
+                ultimaIntencao = "transacaoNegadaCategoria";
+                resposta = respTransacaoNegadaCategoria();
+                break;   
+
 
             case "etiqueta": {
                 ultimaIntencao = "etiqueta";
@@ -2368,6 +2480,7 @@ Detalhe: ${erro}
                 }
                 break;
             }
+
 
             case "sobreBot":
             resposta = `HTML:<div class="text-sm text-slate-700">
@@ -2404,7 +2517,7 @@ Detalhe: ${erro}
             resposta = respCartaoGeral();
             break;
 
-
+    
             case "bloqueio": {
                   ultimaIntencao = "bloqueio";
 
