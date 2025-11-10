@@ -305,16 +305,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const USER_EMAIL = <?= JSON.stringify(userEmail || "") ?>;
     const USER_EMAIL_REPLACED = USER_EMAIL.replace(/^"+|"+$/g, "").trim();
 
-// 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
-setTimeout(() => {
-    if (displayName) {
+        // 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
+        setTimeout(() => {
+            if (displayName) {
         // Versão com nome
         renderBotMessage(
             "HTML:<p class='text-sm text-slate-700'><b>" +
             displayName +
             "</b>, como posso te ajudar agora?</p>"
         );
-    } else {
+            } else {
         // Versão sem nome (fallback)
         renderBotMessage(
             "HTML:<p class='text-sm text-slate-700'>Como posso te ajudar agora?</p>"
@@ -322,7 +322,7 @@ setTimeout(() => {
     }
 }, 2000);
 
-    /* ========= ESTADOS ========= */
+    //* ========= ESTADOS ========= *//
     let estadoPendencias = "nenhum"; // "nenhum" | "aguardando_loja" | "aguardando_confirmacao_email" | "aguardando_email"
     let lojaPendenciasAtual = "";
     let ultimaPendenciaResumo = null; // { loja, data }
@@ -372,6 +372,7 @@ setTimeout(() => {
             clearTimeout(pendenciasTimeoutId);
             pendenciasTimeoutId = null;
         }
+        
 
 // 🗣️ mensagens alternativas de fechamento
 const mensagensOutroAssunto = [
@@ -404,8 +405,9 @@ pendenciasTimeoutId = setTimeout(() => {
 
 
         // 👇 Cole AQUI, logo abaixo de scrollToBottom()
-  // Adiciona indicador de "digitando..."
-  function showTypingIndicator() {
+
+          // Adiciona indicador de "digitando..."
+          function showTypingIndicator() {
     const chatWindow = document.getElementById('chatWindow');
     const typingDiv = document.createElement('div');
     typingDiv.id = 'typingIndicator';
@@ -468,6 +470,7 @@ pendenciasTimeoutId = setTimeout(() => {
         }
 
     /* ========= NORMALIZAÇÃO ========= */
+    
     function normalize(str) {
         return (str || "")
             .toLowerCase()
@@ -478,10 +481,6 @@ pendenciasTimeoutId = setTimeout(() => {
     }
 
 
-/**
- * Interpreta períodos de tempo em frases como:
- * "de 1 a 15 de novembro", "em outubro", "no dia 10/11/2025", "no mês passado", "de 05/10 a 12/10"
- */
 function extrairIntervaloDatas(msgOriginal) {
 
     const hoje = new Date();
@@ -565,7 +564,7 @@ function extrairIntervaloDatas(msgOriginal) {
     return null;
 }
 
-function renderResumoTransacoesSemana(res) { //- PERGUNTA CHAT GRAFICO - 2//
+function renderResumoTransacoesSemana(res) { 
     if (!res || !res.ok) {
         const msg = res && res.error
             ? `Tive um problema ao consultar os dados: ${res.error}`
@@ -3333,7 +3332,6 @@ Sem problemas, vamos falar de outro assunto então. 😉
     /* ========= ENVIO (ENTER / BOTÃO) ========= */
 
     function enviarMensagem() {
-
 
       // 🆕 cancela timeout de pendências ao responder
         if (pendenciasTimeoutId) {
