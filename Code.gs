@@ -36,46 +36,187 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-// ID da planilha que você mandou (BASE)
-const BASE_SPREADSHEET_ID = '1jcNdVTxdDYqwHwsOkT7gb_2BdZke9qIb39RiwgTKxUQ';
-const BASE_SHEET_NAME = 'BASE';
+
+// 📊 Planilha de transações Captura_Clara (BaseClara)
+const CAPTURA_CLARA_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI";
+const CAPTURA_CLARA_ABA = "BaseClara";
+
+// 🌐 BigQuery – validação de loja
+const PROJECT_ID = 'cnto-data-lake';
+const BQ_TABLE_LOJAS = '`cnto-data-lake.refined.cnt_ref_gld_dim_estrutura_loja`';
 
 /**
- * Normaliza o código da loja (ex: "297" -> "0297")  
- * e verifica se existe na aba BASE (coluna A).
- * 
+ * Normaliza o código da loja (ex: "297" -> "0297")
+ * e verifica se existe na tabela BigQuery
+ * `cnto-data-lake.refined.cnt_ref_gld_dim_estrutura_loja` (coluna cod_loja).
+ *
  * @param {string|number} lojaInformada
  * @return {string|null} código 4 dígitos se existir, senão null
  */
-function normalizarLojaSeExistir(lojaInformada) {
-  if (!lojaInformada && lojaInformada !== 0) return null;
 
-  // tira tudo que não for número
-  const apenasDigitos = String(lojaInformada).replace(/\D/g, '');
+function normalizarLojaSeExistir(lojaInformada) {
+  // nada informado
+  if (lojaInformada === null || lojaInformada === undefined || lojaInformada === "") {
+    return null;
+  }
+
+  // mantém só dígitos
+  var apenasDigitos = String(lojaInformada).replace(/\D/g, '');
   if (!apenasDigitos) return null;
 
   // força 4 dígitos (297 -> 0297)
-  const codigo4 = ('0000' + apenasDigitos).slice(-4);
+  var codigo4 = ('0000' + apenasDigitos).slice(-4);
 
-  const ss = SpreadsheetApp.openById(BASE_SPREADSHEET_ID);
-  const sheet = ss.getSheetByName(BASE_SHEET_NAME);
-  if (!sheet) return null;
+  // 🔎 monta a query no BigQuery
+  // OBS: assumindo que cod_loja pode ser comparado como STRING
+  var query = ''
+    + 'SELECT cod_loja '
+    + 'FROM ' + BQ_TABLE_LOJAS + ' '
+    + 'WHERE CAST(cod_loja AS STRING) = "' + codigo4 + '" '
+    + 'LIMIT 1';
 
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return null;
+  var request = {
+    query: query,
+    useLegacySql: false
+  };
 
-  // Coluna A, da linha 2 até a última
-  const values = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  // Executa a query no BigQuery (serviço avançado)
+  var queryResults = BigQuery.Jobs.query(request, PROJECT_ID);
 
-  const existe = values.some(row => {
-    const val = row[0];
-    if (!val) return false;
-    const valStr = ('0000' + String(val).replace(/\D/g, '')).slice(-4);
-    return valStr === codigo4;
-  });
+  if (!queryResults || queryResults.jobComplete !== true) {
+    throw new Error('Falha ao executar consulta no BigQuery para validar loja.');
+  }
 
-  return existe ? codigo4 : null;
+  var rows = queryResults.rows;
+  if (rows && rows.length > 0) {
+    // Existe ao menos um registro de cod_loja = codigo4
+    return codigo4;
+  }
+
+  // Não achou a loja
+  return null;
 }
+
+
+/**
+ * Busca resumo de transações por loja dentro de um período (ou últimos 7 dias se não houver período)
+ */
+
+function getResumoTransacoesPorGrupo(grupoNome, dataInicioIso, dataFimIso) {
+  try {
+    const ss = SpreadsheetApp.openById(CAPTURA_CLARA_ID);
+    const sheet = ss.getSheetByName(CAPTURA_CLARA_ABA);
+    if (!sheet) return { ok: false, error: "Aba BaseClara não encontrada." };
+
+    const values = sheet.getDataRange().getValues();
+    if (!values || values.length < 2) return { ok: true, lojas: [], top: null };
+
+    const header = values[0];
+    const dados = values.slice(1);
+    const idxData = header.indexOf("Data da Transação");
+    const idxGrupo = header.indexOf("Grupos");
+    const idxLoja = header.indexOf("LojaNum");
+
+    if (idxData === -1 || idxGrupo === -1 || idxLoja === -1)
+      return { ok: false, error: "Colunas necessárias não encontradas." };
+
+    const hoje = new Date();
+    const dataInicio = dataInicioIso ? new Date(dataInicioIso) : new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 7);
+    const dataFim = dataFimIso ? new Date(dataFimIso) : hoje;
+
+    const grupoFiltro = String(grupoNome).toLowerCase();
+    const contagem = {};
+
+    dados.forEach((row) => {
+      const dVal = row[idxData];
+      const gVal = row[idxGrupo];
+      const lVal = row[idxLoja];
+      if (!dVal || !gVal || !lVal) return;
+
+      const dataObj = dVal instanceof Date ? dVal : parseDataGenerica(dVal);
+      if (!dataObj) return;
+      if (dataObj < dataInicio || dataObj > dataFim) return;
+
+      if (!String(gVal).toLowerCase().includes(grupoFiltro)) return;
+
+      const loja = String(lVal).trim();
+      contagem[loja] = (contagem[loja] || 0) + 1;
+    });
+
+    const lojas = Object.keys(contagem).map((l) => ({ loja: l, total: contagem[l] }));
+    if (lojas.length === 0) return { ok: true, grupo: grupoNome, lojas: [], top: null };
+
+    lojas.sort((a, b) => b.total - a.total);
+    const top = lojas[0];
+    return { ok: true, grupo: grupoNome, lojas, top, dataInicio, dataFim };
+  } catch (e) {
+    return { ok: false, error: e.message || e.toString() };
+  }
+}
+
+function parseDataGenerica(v) {
+  if (v instanceof Date) return v;
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (s.includes("/")) {
+      const [d, m, a] = s.split("/").map(Number);
+      return new Date(a, m - 1, d);
+    }
+    if (s.includes("-")) {
+      const [a, m, d] = s.split("-").map(Number);
+      return new Date(a, m - 1, d);
+    }
+  }
+  return null;
+}
+
+/**
+ * Retorna o nome da loja (coluna nom_shopping)
+ * a partir do código informado (cod_loja).
+ *
+ * @param {string|number} lojaCodigo
+ * @return {object} { ok: true, nome: "CATUAÍ CASCAVEL" } ou { ok: false }
+ */
+
+function obterNomeLojaBigQuery(lojaCodigo) {
+  try {
+    if (!lojaCodigo) return { ok: false, error: "Código não informado." };
+
+    var apenasDigitos = String(lojaCodigo).replace(/\D/g, '');
+    if (!apenasDigitos) return { ok: false, error: "Código inválido." };
+
+    var codigo4 = ('0000' + apenasDigitos).slice(-4);
+
+    var query = `
+      SELECT nom_shopping
+      FROM \`cnto-data-lake.refined.cnt_ref_gld_dim_estrutura_loja\`
+      WHERE CAST(cod_loja AS STRING) = "${codigo4}"
+      LIMIT 1
+    `;
+
+    var request = {
+      query: query,
+      useLegacySql: false
+    };
+
+    var result = BigQuery.Jobs.query(request, PROJECT_ID);
+
+    if (!result || !result.jobComplete) {
+      throw new Error("Falha ao consultar BigQuery.");
+    }
+
+    if (!result.rows || result.rows.length === 0) {
+      return { ok: false, error: "Loja não encontrada." };
+    }
+
+    var nome = result.rows[0].f[0].v || "";
+    return { ok: true, nome: nome };
+
+  } catch (err) {
+    return { ok: false, error: err.message || err };
+  }
+}
+
 
 /**
  * Função interna que lê CLARA_PEND e devolve:
@@ -91,6 +232,7 @@ function normalizarLojaSeExistir(lojaInformada) {
  *   rows: [ [B..G + textoPendencias], ... ]
  * }
  */
+
 function _obterPendenciasLoja(lojaCodigo) {
   var lojaParam = (lojaCodigo || "").toString().trim().replace(/\D/g, "");
   var lojaNumero = lojaParam.replace(/^0+/, ""); // "0171" -> "171"
@@ -256,6 +398,7 @@ function _obterPendenciasLoja(lojaCodigo) {
 /**
  * Usado pelo front (chat) para mostrar tabela de pendências no chat.
  */
+
 function getPendenciasPorLoja(lojaCodigo) {
   try {
     // 🆕 normaliza + valida na BASE
@@ -283,6 +426,7 @@ function getPendenciasPorLoja(lojaCodigo) {
 /**
  * Envia e-mail com pendências (usado depois do usuário informar o e-mail no chat).
  */
+
 function enviarPendenciasPorEmail(lojaCodigo, emailDestino) {
   try {
     if (!emailDestino) {
@@ -372,7 +516,8 @@ function enviarPendenciasPorEmail(lojaCodigo, emailDestino) {
   }
 }
 
-// 🔹 Pendências para bloqueio: usa mesma aba CLARA_PEND, mas pega as 2 últimas datas de cobrança
+// Pendências para bloqueio: usa mesma aba CLARA_PEND, mas pega as 2 últimas datas de cobrança
+
 function getPendenciasParaBloqueio(lojaCodigo) {
   try {
     // 🆕 normaliza + valida na BASE
