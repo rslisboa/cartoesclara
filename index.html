@@ -330,6 +330,10 @@ setTimeout(() => {
     let ultimaIntencao = null;
     let origemPendenciasBloqueio = false;
 
+    let origemPendenciasBloqueio = false;
+    let pendenciasTimeoutId = null; // 🆕 timeout pra mensagem de outro assunto
+
+
 
     /* ========= ELEMENTOS UI ========= */
     const chatWindow = document.getElementById("chatWindow");
@@ -362,6 +366,26 @@ setTimeout(() => {
         chatWindow.appendChild(wrapper);
         scrollToBottom();
     }
+
+
+        function iniciarTimeoutPendencias() {
+        // limpa qualquer timeout pendente
+        if (pendenciasTimeoutId) {
+            clearTimeout(pendenciasTimeoutId);
+            pendenciasTimeoutId = null;
+        }
+
+        // dispara em 10 segundos
+        pendenciasTimeoutId = setTimeout(() => {
+            renderBotMessage(
+                `HTML:<p class="text-sm text-slate-700">
+          Quer falar sobre outro assunto? Se sim pode mandar bala!
+          </p>`
+            );
+            pendenciasTimeoutId = null;
+        }, 10000); // 10 segundos
+    }
+
 
         // 👇 Cole AQUI, logo abaixo de scrollToBottom()
   // Adiciona indicador de "digitando..."
@@ -2253,19 +2277,8 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
                     const erro = (res && res.error) ? res.error : "erro desconhecido";
                     renderBotMessage(
                         `HTML:<p class="text-sm text-slate-700">
-Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>
-Detalhe: ${erro}
-</p>`
-                    );
-                    estadoPendencias = "nenhum";
-                    lojaPendenciasAtual = "";
-                    return;
-                }
-
-                if (!res.rows || res.rows.length === 0) {
-                    renderBotMessage(
-                        `HTML:<p class="text-sm text-slate-700">
-                  Não encontrei pendências para a loja <b>${loja}</b> na última data de cobrança.
+                  Não consegui consultar as pendências da loja <b>${loja}</b>.<br/>
+                  Detalhe: ${erro}
                   </p>`
                     );
                     estadoPendencias = "nenhum";
@@ -2273,6 +2286,33 @@ Detalhe: ${erro}
                     return;
                 }
 
+                // 🆕 loja não existe na BASE
+                if (res.lojaInvalida) {
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+                  A numeração informada não existe, peço que verifique o nº correto da loja.
+                  </p>`
+                    );
+                    // continua aguardando número da loja
+                    estadoPendencias = "aguardando_loja";
+                    lojaPendenciasAtual = "";
+                    iniciarTimeoutPendencias(); // dispara o timer de 10s
+                    return;
+                }
+
+                // loja existe, mas NÃO tem pendências na CLARA_PEND
+                if (!res.rows || res.rows.length === 0) {
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+                Não encontrei pendências para a loja <b>${loja}</b> na última data de cobrança.
+                </p>`
+                    );
+                    estadoPendencias = "nenhum";
+                    lojaPendenciasAtual = "";
+                    return;
+                }
+
+                // ✅ loja válida + tem pendências → continua igual
                 ultimaPendenciaResumo = { loja: res.loja, data: res.ultimaData };
                 lojaPendenciasAtual = res.loja;
 
@@ -2302,7 +2342,6 @@ Detalhe: ${erro}
 
                 renderBotMessage("HTML:" + tabela);
 
-                // pergunta se quer e-mail
                 estadoPendencias = "aguardando_confirmacao_email";
                 renderBotMessage(
                     'HTML:<p class="text-sm text-slate-700 mt-2">Quer que eu envie esse resumo por e-mail também? (responda <b>"sim"</b> ou <b>"não"</b>).</p>'
@@ -2319,57 +2358,79 @@ Detalhe: ${erro}
             .getPendenciasPorLoja(loja);
     }
 
-            function consultarPendenciasBloqueio(loja) {
-                google.script.run
-                .withSuccessHandler(res => {
-                // algum erro ou resposta estranha
-                if (!res || !res.ok || !res.html) {
+
+                function consultarPendenciasBloqueio(loja) {
+        google.script.run
+            .withSuccessHandler(res => {
+                // erro genérico
+                if (!res || !res.ok) {
+                    estadoPendencias = "nenhum";
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+                    Tive um problema ao buscar as pendências da loja <b>${loja}</b>. Tente novamente em instantes.
+                    </p>`
+                    );
+                    return;
+                }
+
+                // 🆕 loja não existe na BASE
+                if (res.lojaInvalida) {
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+                    A numeração informada não existe, peço que verifique o nº correto da loja.
+                    </p>`
+                    );
+                    estadoPendencias = "aguardando_loja";
+                    lojaPendenciasAtual = "";
+                    iniciarTimeoutPendencias(); // timer de 10s
+                    return;
+                }
+
+                // se chegou aqui, loja é válida → precisa ter html
+                if (!res.html) {
+                    estadoPendencias = "nenhum";
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700">
+                    Tive um problema ao buscar as pendências da loja <b>${loja}</b>. Tente novamente em instantes.
+                    </p>`
+                    );
+                    return;
+                }
+
+                // mostra o HTML (tabela ou "Não encontrei pendências")
+                renderBotMessage("HTML:" + res.html);
+
+                // 🟡 CASO 1: loja válida mas sem pendências
+                if (res.html.includes("Não encontrei pendências")) {
+                    estadoPendencias = "nenhum";
+
+                    renderBotMessage(
+                        `HTML:<p class="text-sm text-slate-700 mt-2">
+                  Acredito que, caso realmente o cartão esteja bloqueado, possa ser por algum outro motivo. Verifique com o time do Financeiro o que pode ter ocorrido, ok?
+                  </p>`
+                    );
+                    return;
+                }
+
+                // 🟢 CASO 2: loja válida + tem pendências → pergunta se quer e-mail
+                estadoPendencias = "aguardando_confirmacao_email";
+
+                renderBotMessage(
+                    `HTML:<p class="text-sm text-slate-700 mt-2">
+                Quer que eu envie esse resumo por e-mail também? (responda <b>"sim"</b> ou <b>"não"</b>).
+                </p>`
+                );
+            })
+            .withFailureHandler(err => {
                 estadoPendencias = "nenhum";
                 renderBotMessage(
                     `HTML:<p class="text-sm text-slate-700">
-                Tive um problema ao buscar as pendências da loja <b>${loja}</b>. Tente novamente em instantes.
-                </p>`
-                            );
-                            return;
-                        }
-
-                        // mostra o HTML que veio do .gs (tabela ou mensagem de "não encontrei")
-                        renderBotMessage("HTML:" + res.html);
-
-                        // 🟡 CASO 1: não há pendências para essa loja
-                        // (detectamos pela mensagem de "Não encontrei pendências")
-                        if (res.html.includes("Não encontrei pendências")) {
-                            estadoPendencias = "nenhum"; // não faz sentido perguntar de e-mail
-
-                            renderBotMessage(
-                                `HTML:<p class="text-sm text-slate-700 mt-2">
-                    Acredito que, caso realmente o cartão esteja bloqueado, possa ser por algum outro motivo. Verifique com o time do Financeiro o que pode ter ocorrido, ok?
-                    </p>`
-                                    );
-
-                            return; // encerra aqui
-                        }
-
-                        // 🟢 CASO 2: há pendências (tabela com dados) → pergunta se quer enviar por e-mail
-                        estadoPendencias = "aguardando_confirmacao_email";
-
-                        renderBotMessage(
-                            `HTML:<p class="text-sm text-slate-700 mt-2">
-                    Quer que eu envie esse resumo por e-mail também? (responda <b>"sim"</b> ou <b>"não"</b>).
-                    </p>`
-                        );
-                    })
-                    .withFailureHandler(err => {
-                        estadoPendencias = "nenhum";
-                        renderBotMessage(
-                            `HTML:<p class="text-sm text-slate-700">
             Tive um problema ao buscar as pendências da loja <b>${loja}</b>. Tente novamente em instantes.
             </p>`
-                        );
-                    })
-                    .getPendenciasParaBloqueio(loja);
-            }
-
+                );
+            })
+            .getPendenciasParaBloqueio(loja);
+    }
 
 
     function chamarEnvioPendenciasPorEmail(loja, email) {
@@ -2992,6 +3053,13 @@ Sem problemas, vamos falar de outro assunto então. 😉
     /* ========= ENVIO (ENTER / BOTÃO) ========= */
 
     function enviarMensagem() {
+
+
+      // 🆕 cancela timeout de pendências ao responder
+        if (pendenciasTimeoutId) {
+            clearTimeout(pendenciasTimeoutId);
+            pendenciasTimeoutId = null;
+        }
 
       // 👇 pede permissão de notificação logo na primeira interação
         solicitarPermissaoNotificacao();
