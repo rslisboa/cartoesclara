@@ -482,7 +482,6 @@ pendenciasTimeoutId = setTimeout(() => {
 
 
 function extrairIntervaloDatas(msgOriginal) {
-
     const hoje = new Date();
     const anoAtual = hoje.getFullYear();
     const meses = {
@@ -493,11 +492,16 @@ function extrairIntervaloDatas(msgOriginal) {
     const norm = msgOriginal.toLowerCase();
 
     // 🗓️ 1. De tal dia a tal dia (ex.: "de 5 a 12 de novembro")
-
     let m = norm.match(/de\s+(\d{1,2})\s+a\s+(\d{1,2})\s+de\s+([a-zç]+)/);
     if (m) {
-        const diaIni = Number(m[1]), diaFim = Number(m[2]);
-        const mes = meses[m[3]] ?? null;
+        const diaIni = Number(m[1]);
+        const diaFim = Number(m[2]);
+
+        const chaveMes = m[3];
+        const mes = Object.prototype.hasOwnProperty.call(meses, chaveMes)
+            ? meses[chaveMes]
+            : null;
+
         if (mes !== null) {
             const ini = new Date(anoAtual, mes, diaIni);
             const fim = new Date(anoAtual, mes, diaFim);
@@ -505,49 +509,68 @@ function extrairIntervaloDatas(msgOriginal) {
         }
     }
 
-    // 🗓️ 2. Apenas um dia específico (ex.: "no dia 10/11/2025" ou "em 5 de outubro")
-
+    // 🗓️ 2. Apenas um dia específico (ex.: "no dia 10/11/2025")
     m = norm.match(/dia\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
     if (m) {
-        const dia = Number(m[1]), mes = Number(m[2]) - 1, ano = m[3] ? Number(m[3]) : anoAtual;
+        const dia = Number(m[1]);
+        const mes = Number(m[2]) - 1;
+        const ano = m[3] ? Number(m[3]) : anoAtual;
         const d = new Date(ano, mes, dia);
         return { tipo: "dia", dataInicio: d, dataFim: d };
     }
 
+    // 🗓️ 2b. "em 5 de outubro"
     m = norm.match(/(em|no)\s+(\d{1,2})\s+de\s+([a-zç]+)/);
     if (m) {
-        const dia = Number(m[2]), mes = meses[m[3]] ?? null;
+        const dia = Number(m[2]);
+        const chaveMes = m[3];
+        const mes = Object.prototype.hasOwnProperty.call(meses, chaveMes)
+            ? meses[chaveMes]
+            : null;
+
         if (mes !== null) {
             const d = new Date(anoAtual, mes, dia);
             return { tipo: "dia", dataInicio: d, dataFim: d };
         }
     }
 
-    // 🗓️ 3. Mês inteiro (ex.: "em outubro", "no mês de setembro")
+    // 🗓️ 3a. "no mês de setembro"
     m = norm.match(/(em|no)\s+m[eê]s\s+de\s+([a-zç]+)/);
     if (m) {
-        const mes = meses[m[2]] ?? null;
+        const chaveMes2 = m[2];
+        const mes = Object.prototype.hasOwnProperty.call(meses, chaveMes2)
+            ? meses[chaveMes2]
+            : null;
+
         if (mes !== null) {
             const ini = new Date(anoAtual, mes, 1);
             const fim = new Date(anoAtual, mes + 1, 0);
             return { tipo: "mes", dataInicio: ini, dataFim: fim };
         }
     }
+
+    // 🗓️ 3b. "em outubro"
     m = norm.match(/(em|no)\s+([a-zç]+)/);
-    if (m && meses[m[2]] !== undefined) {
-        const mes = meses[m[2]];
-        const ini = new Date(anoAtual, mes, 1);
-        const fim = new Date(anoAtual, mes + 1, 0);
-        return { tipo: "mes", dataInicio: ini, dataFim: fim };
+    if (m) {
+        const chaveMes3 = m[2];
+        if (Object.prototype.hasOwnProperty.call(meses, chaveMes3)) {
+            const mes = meses[chaveMes3];
+            const ini = new Date(anoAtual, mes, 1);
+            const fim = new Date(anoAtual, mes + 1, 0);
+            return { tipo: "mes", dataInicio: ini, dataFim: fim };
+        }
     }
 
     // 🗓️ 4. Mês passado
     if (norm.includes("mês passado") || norm.includes("mes passado")) {
-        const mes = hoje.getMonth() - 1;
-        const ano = mes < 0 ? anoAtual - 1 : anoAtual;
-        const mesAjustado = (mes + 12) % 12;
-        const ini = new Date(ano, mesAjustado, 1);
-        const fim = new Date(ano, mesAjustado + 1, 0);
+        let mes = hoje.getMonth() - 1;
+        let ano = anoAtual;
+        if (mes < 0) {
+            mes += 12;
+            ano = anoAtual - 1;
+        }
+        const ini = new Date(ano, mes, 1);
+        const fim = new Date(ano, mes + 1, 0);
         return { tipo: "mes_passado", dataInicio: ini, dataFim: fim };
     }
 
@@ -3066,22 +3089,23 @@ if (estadoPendencias === "aguardando_confirmacao_email") {
     const mudouDeAssunto = palavrasMudancaAssunto.some(p => norm.includes(p));
 
     // Usuário mudou de assunto no meio
+
     if (!ehSim && !ehNao && mudouDeAssunto) {
         estadoPendencias = "nenhum";
         lojaPendenciasAtual = "";
         return `HTML:<div class="text-sm text-slate-700">
-<p>Tranquilo, vamos falar de outro assunto então. 😉</p>
-<p class="mt-1">Se depois você quiser receber o resumo por e-mail, é só me pedir de novo.</p>
-</div>`;
-    }
+                    <p>Tranquilo, vamos falar de outro assunto então. 😉</p>
+                    <p class="mt-1">Se depois você quiser receber o resumo por e-mail, é só me pedir de novo.</p>
+                    </div>`;
+     }
 
     // Usuário disse que NÃO quer e-mail
     if (ehNao) {
         estadoPendencias = "nenhum";
         lojaPendenciasAtual = "";
         return `HTML:<p class="text-sm text-slate-700">
-Fechado, não vou enviar por e-mail. Se quiser depois, é só pedir de novo. 👍
-</p>`;
+                          Fechado, não vou enviar por e-mail. Se quiser depois, é só pedir de novo. 👍
+                          </p>`;
     }
 
     // Usuário disse que SIM quer e-mail
@@ -3094,8 +3118,8 @@ Fechado, não vou enviar por e-mail. Se quiser depois, é só pedir de novo. �
             estadoPendencias = "nenhum";
             lojaPendenciasAtual = "";
             return `HTML:<p class="text-sm text-slate-700">
-Não tenho mais a loja em memória. Me peça de novo pra consultar as pendências, por favor.
-</p>`;
+                      Não tenho mais a loja em memória. Me peça de novo pra consultar as pendências, por favor.
+                      </p>`;
         }
 
         // ✅ Se temos e-mail do usuário logado, já envia direto
@@ -3106,8 +3130,8 @@ Não tenho mais a loja em memória. Me peça de novo pra consultar as pendência
             // avisa no chat
             renderBotMessage(
                 `HTML:<p class="text-sm text-slate-700">
-Perfeito! Vou enviar o resumo das pendências da loja <b>${loja}</b> para <b>${emailSessao}</b>.
-</p>`
+                    Perfeito! Vou enviar o resumo das pendências da loja <b>${loja}</b> para <b>${emailSessao}</b>.
+                    </p>`
             );
 
             // chama o Apps Script pra mandar o e-mail
@@ -3120,16 +3144,16 @@ Perfeito! Vou enviar o resumo das pendências da loja <b>${loja}</b> para <b>${e
         // ❌ Se NÃO temos e-mail na sessão, volta para o fluxo antigo (pede e-mail)
         estadoPendencias = "aguardando_email";
         return `HTML:<p class="text-sm text-slate-700">
-Perfeito! Me informa o seu e-mail corporativo (ex.: <b>nome.sobrenome@xxxxx.com.br</b>) para eu enviar o resumo.
-</p>`;
+            Perfeito! Me informa o seu e-mail corporativo (ex.: <b>nome.sobrenome@xxxxx.com.br</b>) para eu enviar o resumo.
+            </p>`;
     }
 
-    // Se não entendeu nem sim nem não
-    return `HTML:<p class="text-sm text-slate-700">
-Só pra eu entender: você quer que eu envie por e-mail também?<br/>
-Responda apenas <b>"sim"</b> ou <b>"não"</b>. 🙂
-</p>`;
-}
+                    // Se não entendeu nem sim nem não
+                    return `HTML:<p class="text-sm text-slate-700">
+                  Só pra eu entender: você quer que eu envie por e-mail também?<br/>
+                  Responda apenas <b>"sim"</b> ou <b>"não"</b>. 🙂
+                  </p>`;
+                  }
 
         // 7) Fluxo pendências - aguardando e-mail
         if (estadoPendencias === "aguardando_email") {
@@ -3142,14 +3166,14 @@ Responda apenas <b>"sim"</b> ou <b>"não"</b>. 🙂
                     estadoPendencias = "nenhum";
                     lojaPendenciasAtual = "";
                     return `HTML:<p class="text-sm text-slate-700">
-Não tenho mais a loja em memória. Me peça de novo pra consultar as pendências, por favor.
-</p>`;
+                          Não tenho mais a loja em memória. Me peça de novo pra consultar as pendências, por favor.
+                          </p>`;
                 }
 
                 renderBotMessage(
                     `HTML:<p class="text-sm text-slate-700">
-Perfeito! Vou enviar o resumo das pendências da loja <b>${loja}</b> para <b>${textoOriginal}</b>.
-</p>`
+                    Perfeito! Vou enviar o resumo das pendências da loja <b>${loja}</b> para <b>${textoOriginal}</b>.
+                    </p>`
                 );
                 chamarEnvioPendenciasPorEmail(loja, textoOriginal);
                 estadoPendencias = "nenhum";
@@ -3163,15 +3187,15 @@ Perfeito! Vou enviar o resumo das pendências da loja <b>${loja}</b> para <b>${t
                 estadoPendencias = "nenhum";
                 lojaPendenciasAtual = "";
                 return `HTML:<div class="text-sm text-slate-700">
-<p>Beleza, vamos mudar de assunto então 😉</p>
-<p class="mt-1">Se depois você quiser voltar a ver as pendências da loja ou receber por e-mail, é só me pedir de novo.</p>
-</div>`;
-            }
+              <p>Beleza, vamos mudar de assunto então 😉</p>
+              <p class="mt-1">Se depois você quiser voltar a ver as pendências da loja ou receber por e-mail, é só me pedir de novo.</p>
+              </div>`;
+          }
 
-            return `HTML:<p class="text-sm text-slate-700">
-Esse e-mail parece inválido. Me envia no formato: <b>nome.sobrenome@gruposbf.com.br</b>.<br/><br/>
-Se preferir mudar de assunto, pode me perguntar outra coisa diretamente (ex.: "sangria", "novo cartão", "limite", "etiqueta", etc.).
-</p>`;
+                          return `HTML:<p class="text-sm text-slate-700">
+              Esse e-mail parece inválido. Me envia no formato: <b>nome.sobrenome@gruposbf.com.br</b>.<br/><br/>
+              Se preferir mudar de assunto, pode me perguntar outra coisa diretamente (ex.: "sangria", "novo cartão", "limite", "etiqueta", etc.).
+              </p>`;
         }
 
         // 8) Fluxo novo cartão – aguardando se é 1ª ou 2ª via
@@ -3219,8 +3243,8 @@ Se preferir mudar de assunto, pode me perguntar outra coisa diretamente (ex.: "s
             if (!ehPrimeira && !ehSegunda && mudouDeAssunto) {
                 fluxoNovoCartao = null;
                 return `HTML:<p class="text-sm text-slate-700">
-Sem problemas, vamos falar de outro assunto então. 😉
-</p>`;
+              Sem problemas, vamos falar de outro assunto então. 😉
+              </p>`;
             }
 
             if (ehPrimeira) {
@@ -3295,7 +3319,7 @@ Sem problemas, vamos falar de outro assunto então. 😉
 
             return `HTML:<p class="text-sm text-slate-700">Consigo consultar as pendências Clara da sua loja.<br/> Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
             </p>`;
-}
+      }
 
 
         // 10) Gatilhos direto – primeira via
