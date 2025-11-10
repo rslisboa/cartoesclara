@@ -36,6 +36,47 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+// ID da planilha que você mandou (BASE)
+const BASE_SPREADSHEET_ID = '1jcNdVTxdDYqwHwsOkT7gb_2BdZke9qIb39RiwgTKxUQ';
+const BASE_SHEET_NAME = 'BASE';
+
+/**
+ * Normaliza o código da loja (ex: "297" -> "0297")  
+ * e verifica se existe na aba BASE (coluna A).
+ * 
+ * @param {string|number} lojaInformada
+ * @return {string|null} código 4 dígitos se existir, senão null
+ */
+function normalizarLojaSeExistir(lojaInformada) {
+  if (!lojaInformada && lojaInformada !== 0) return null;
+
+  // tira tudo que não for número
+  const apenasDigitos = String(lojaInformada).replace(/\D/g, '');
+  if (!apenasDigitos) return null;
+
+  // força 4 dígitos (297 -> 0297)
+  const codigo4 = ('0000' + apenasDigitos).slice(-4);
+
+  const ss = SpreadsheetApp.openById(BASE_SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(BASE_SHEET_NAME);
+  if (!sheet) return null;
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  // Coluna A, da linha 2 até a última
+  const values = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+
+  const existe = values.some(row => {
+    const val = row[0];
+    if (!val) return false;
+    const valStr = ('0000' + String(val).replace(/\D/g, '')).slice(-4);
+    return valStr === codigo4;
+  });
+
+  return existe ? codigo4 : null;
+}
+
 /**
  * Função interna que lê CLARA_PEND e devolve:
  * - última data de cobrança da loja
@@ -217,7 +258,20 @@ function _obterPendenciasLoja(lojaCodigo) {
  */
 function getPendenciasPorLoja(lojaCodigo) {
   try {
-    return _obterPendenciasLoja(lojaCodigo);
+    // 🆕 normaliza + valida na BASE
+    const lojaNormalizada = normalizarLojaSeExistir(lojaCodigo);
+
+    if (!lojaNormalizada) {
+      // Loja NÃO existe na planilha BASE
+      return {
+        ok: true,
+        lojaInvalida: true
+      };
+    }
+
+    // Usa a loja normalizada (ex.: "0297") no fluxo de pendências
+    return _obterPendenciasLoja(lojaNormalizada);
+
   } catch (err) {
     return {
       ok: false,
@@ -321,12 +375,19 @@ function enviarPendenciasPorEmail(lojaCodigo, emailDestino) {
 // 🔹 Pendências para bloqueio: usa mesma aba CLARA_PEND, mas pega as 2 últimas datas de cobrança
 function getPendenciasParaBloqueio(lojaCodigo) {
   try {
-    var lojaParam = (lojaCodigo || "").toString().trim().replace(/\D/g, "");
-    var lojaNumero = lojaParam.replace(/^0+/, ""); // "0171" -> "171"
+    // 🆕 normaliza + valida na BASE
+    const lojaNormalizada = normalizarLojaSeExistir(lojaCodigo);
 
-    if (!lojaNumero) {
-      return { ok: false, error: "Código de loja inválido." };
+    if (!lojaNormalizada) {
+      // Loja NÃO existe na planilha BASE
+      return {
+        ok: true,
+        lojaInvalida: true
+      };
     }
+
+    // remove zeros à esquerda para comparar com a coluna de loja da CLARA_PEND
+    var lojaNumero = lojaNormalizada.replace(/^0+/, ""); // "0171" -> "171"
 
     // Mesma planilha / aba usada no fluxo normal de pendências
     var ss  = SpreadsheetApp.getActiveSpreadsheet();
@@ -393,6 +454,7 @@ function getPendenciasParaBloqueio(lojaCodigo) {
       }
     });
 
+    // Loja existe na BASE, mas não tem pendências na CLARA_PEND
     if (linhasLoja.length === 0) {
       return {
         ok: true,
