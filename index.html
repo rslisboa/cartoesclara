@@ -329,8 +329,6 @@ setTimeout(() => {
     let fluxoNovoCartao = null; // null | "aguardando_tipo_via"
     let ultimaIntencao = null;
     let origemPendenciasBloqueio = false;
-
-    let origemPendenciasBloqueio = false;
     let pendenciasTimeoutId = null; // 🆕 timeout pra mensagem de outro assunto
 
 
@@ -375,15 +373,33 @@ setTimeout(() => {
             pendenciasTimeoutId = null;
         }
 
-        // dispara em 10 segundos
-        pendenciasTimeoutId = setTimeout(() => {
-            renderBotMessage(
-                `HTML:<p class="text-sm text-slate-700">
-          Quer falar sobre outro assunto? Se sim pode mandar bala!
-          </p>`
-            );
-            pendenciasTimeoutId = null;
-        }, 10000); // 10 segundos
+// 🗣️ mensagens alternativas de fechamento
+const mensagensOutroAssunto = [
+  "Quer falar sobre outro assunto? Se sim, pode mandar bala!",
+  "Quer aproveitar e falar de outro tema?",
+  "Quer conversar sobre outra coisa?",
+  "Planeta Terra chamando! Tem alguém ai? 🙄",
+  "Me diz se quer mudar de assunto? 😉",  
+  "Tem outro assunto que quer tratar?",
+  "Posso te ajudar com mais alguma coisa?",
+  "Quer mudar de assunto? Manda ver!",
+  "Se quiser falar de outro tema, é só digitar 👇",
+  "Posso te ajudar em outro ponto se quiser...",
+  "Quer conversar sobre outra coisa agora?"
+];
+
+// 🕒 dispara o lembrete depois de 10s sem resposta
+pendenciasTimeoutId = setTimeout(() => {
+  // escolhe uma frase aleatória do array
+  const fraseAleatoria = mensagensOutroAssunto[
+    Math.floor(Math.random() * mensagensOutroAssunto.length)
+  ];
+
+  renderBotMessage(
+    `HTML:<p class="text-sm text-slate-700">${fraseAleatoria}</p>`
+  );
+}, 10000);
+
     }
 
 
@@ -2757,8 +2773,8 @@ if (estadoPendencias === "aguardando_loja") {
 
             renderBotMessage(
                 `HTML:<p class="text-sm text-slate-700">
-Beleza! Vou consultar as últimas pendências relacionadas ao cartão da loja <b>${soDigitos}</b>, que podem ter ocasionado o bloqueio. ⏳
-</p>`
+                Beleza! Vou consultar as últimas pendências relacionadas ao cartão da loja <b>${soDigitos}</b>, que podem ter ocasionado o bloqueio. ⏳
+                </p>`
             );
 
             // aqui a gente NÃO coloca estadoPendencias = "nenhum"
@@ -2768,22 +2784,54 @@ Beleza! Vou consultar as últimas pendências relacionadas ao cartão da loja <b
             return null;
         }
 
-        // 🔹 CASO NORMAL: fluxo padrão de pendências Clara
-        estadoPendencias = "nenhum";
+        if (soDigitos && soDigitos.length >= 2 && soDigitos.length <= 4) {
+    lojaPendenciasAtual = soDigitos;
+
+    // 🔹 CASO ESPECIAL: fluxo veio do bloqueio de cartão
+    if (origemPendenciasBloqueio) {
+        origemPendenciasBloqueio = false; // consumiu a flag
 
         renderBotMessage(
             `HTML:<p class="text-sm text-slate-700">
-        Beleza! Vou consultar as pendências Clara da loja <b>${soDigitos}</b> e já te mostro aqui no chat. ⏳
-        </p>`
+                Beleza! Vou consultar as últimas pendências relacionadas ao cartão da loja <b>${soDigitos}</b>, que podem ter ocasionado o bloqueio. ⏳
+                </p>`
         );
-        consultarPendenciasNoServidor(soDigitos);
+
+        consultarPendenciasBloqueio(soDigitos);
         return null;
     }
 
-    return `HTML:<p class="text-sm text-slate-700">
-        Pra eu consultar as pendências, preciso do código numérico da loja (ex.: <b>0999</b>).<br/>
-        Se quiser tratar de outro assunto, é só me perguntar diretamente. 😉
-        </p>`;
+    // 🔹 CASO NORMAL: fluxo padrão de pendências Clara
+    estadoPendencias = "nenhum";
+
+    // 🆕 busca nome da loja no servidor antes de mostrar a mensagem
+    google.script.run
+      .withSuccessHandler((res) => {
+        let nomeLojaTxt = "";
+        if (res && res.ok && res.nome) {
+          nomeLojaTxt = " - " + res.nome;
+        }
+
+        renderBotMessage(
+          `HTML:<p class="text-sm text-slate-700">
+          Beleza! Vou consultar as pendências Clara da loja <b>${soDigitos}${nomeLojaTxt}</b> e já te mostro aqui no chat. ⏳
+          </p>`
+        );
+
+        consultarPendenciasNoServidor(soDigitos);
+      })
+      .withFailureHandler((err) => {
+        // fallback se der erro no BigQuery
+        renderBotMessage(
+          `HTML:<p class="text-sm text-slate-700">
+          Beleza! Vou consultar as pendências Clara da loja <b>${soDigitos}</b> e já te mostro aqui no chat. ⏳
+          </p>`
+        );
+        consultarPendenciasNoServidor(soDigitos);
+      })
+      .obterNomeLojaBigQuery(soDigitos);
+
+    return null;
 }
 
         // 6) Fluxo pendências - aguardando confirmação de envio por e-mail
@@ -2994,34 +3042,44 @@ Sem problemas, vamos falar de outro assunto então. 😉
           // tenta extrair número de loja já presente na mensagem (2 a 6 dígitos)
           const matchLoja = msgUsuario.match(/\b(\d{2,6})\b/);
 
-          if (matchLoja) {
-              const lojaBruta = matchLoja[1];
-              const lojaNormalizada = lojaBruta.replace(/\D/g, "");
+              if (matchLoja) {
+        const lojaBruta = matchLoja[1];
+        const lojaNormalizada = lojaBruta.replace(/\D/g, "");
 
         lojaPendenciasAtual = lojaNormalizada;
         ultimaPendenciaResumo = null;
         estadoPendencias = "aguardando_confirmacao_email";
 
-        renderBotMessage(
-            `HTML:<p class="text-sm text-slate-700">
-          Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}</b> e já te mostro aqui no chat. ⏳
-          </p>`
-                  );
+        // 🆕 busca nome da loja antes de responder
+        google.script.run
+          .withSuccessHandler((res) => {
+            let nomeLojaTxt = "";
+            if (res && res.ok && res.nome) {
+              nomeLojaTxt = " - " + res.nome;
+            }
 
-                  consultarPendenciasNoServidor(lojaNormalizada);
-                  return null; // não retorna outro texto (renderBotMessage já enviou)
-              }
+            renderBotMessage(
+              `HTML:<p class="text-sm text-slate-700">
+              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}${nomeLojaTxt}</b> e já te mostro aqui no chat. ⏳
+              </p>`
+            );
 
-              // caso não tenha número na frase, segue fluxo normal
-              estadoPendencias = "aguardando_loja";
-              lojaPendenciasAtual = "";
-              ultimaPendenciaResumo = null;
+            consultarPendenciasNoServidor(lojaNormalizada);
+          })
+          .withFailureHandler((err) => {
+            // fallback se der erro no BigQuery
+            renderBotMessage(
+              `HTML:<p class="text-sm text-slate-700">
+              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}</b> e já te mostro aqui no chat. ⏳
+              </p>`
+            );
+            consultarPendenciasNoServidor(lojaNormalizada);
+          })
+          .obterNomeLojaBigQuery(lojaNormalizada);
 
-              return `HTML:<p class="text-sm text-slate-700">
-              Consigo consultar as pendências Clara da sua loja.<br/>
-              Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
-              </p>`;
-          }
+        return null; // não retorna outro texto (renderBotMessage já enviou)
+    }
+
 
         // 10) Gatilhos direto – primeira via
         if (termosPrimeiraViaDireta.some(t => norm.includes(t))) {
