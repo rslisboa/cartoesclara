@@ -628,6 +628,36 @@ function renderResumoTransacoesSemana(res) {
 }
 
 
+function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
+    const temMaiorNumTransacoes =
+        norm.includes("maior numero de transacoes") ||
+        norm.includes("maior número de transações") ||
+        norm.includes("mais transacoes") ||
+        norm.includes("mais transações");
+
+    const periodo = extrairIntervaloDatas(msgOriginal);
+
+    if (!temMaiorNumTransacoes) return null;
+
+    const msgLower = msgOriginal.toLowerCase();
+    const padroes = [
+        /time\s+(.+?)(?:\s+(na|no|de|em)\s+|$)/,
+        /grupo\s+(.+?)(?:\s+(na|no|de|em)\s+|$)/,
+    ];
+
+    let grupo = null;
+    for (const rex of padroes) {
+        const m = msgLower.match(rex);
+        if (m && m[1]) {
+            grupo = m[1].trim();
+            break;
+        }
+    }
+
+    return { grupo: grupo, periodo: periodo };
+}
+
+
     /* ========= DADOS / TABELAS ========= */
 
     const etiquetasOficiais = [
@@ -2855,45 +2885,11 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
     return null;
 }
 
-    function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
-          const temMaiorNumTransacoes =
-        norm.includes("maior numero de transacoes") ||
-        norm.includes("maior número de transações") ||
-        norm.includes("mais transacoes") ||
-        norm.includes("mais transações");
-
-    const periodo = extrairIntervaloDatas(msgOriginal);
-    const temPeriodo = !!periodo;
-
-    if (!temMaiorNumTransacoes) return null;
-
-    const msgLower = msgOriginal.toLowerCase();
-    const padroes = [
-        /time\s+(.+?)(?:\s+(na|no|de|em)\s+|$)/,
-        /grupo\s+(.+?)(?:\s+(na|no|de|em)\s+|$)/,
-    ];
-
-    let grupo = null;
-    for (const rex of padroes) {
-        const m = msgLower.match(rex);
-        if (m && m[1]) {
-            grupo = m[1].trim();
-            break;
-        }
-    }
-
-    return { grupo: grupo, periodo: periodo };
-}
-
-        // 1) Termo de responsabilidade
+            // 1) Termo de responsabilidade
         if (frasesTermo.some(f => norm.includes(f))) {
             return respTermoResponsabilidade();
         }
 
-        // 1) Termo de responsabilidade
-        if (frasesTermo.some(f => norm.includes(f))) {
-            return respTermoResponsabilidade();
-        }
 
         // 2) Saudações
         for (const saud of saudacoes) {
