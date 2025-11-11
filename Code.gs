@@ -759,86 +759,53 @@ function filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr) {
 }
 
 /**
- * Retorna, para um determinado time/grupo, um resumo de transações por loja:
+ * Retorna, para um determinado time/grupo (ou geral se grupo vazio), um resumo de transações por loja:
  * - total de transações
  * - valor total em R$
  *
+ * criterio:
+ *   "quantidade" -> ordena pelo número de transações
+ *   "valor"      -> ordena pelo valor total em R$
+ *
  * É chamado pelo front via google.script.run.getResumoTransacoesPorGrupo(...)
  */
-function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr) {
+function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, criterio) {
   var info = carregarLinhasBaseClara_();
   if (info.error) {
     return { ok: false, error: info.error };
   }
 
+  // guarda o nome original (com acento/maiúsculas) pra exibir no chat
+  var grupoOriginal = (grupo || "").toString().trim();
+  // versão normalizada pra filtrar
+  grupo = grupoOriginal.toLowerCase();
+
+  criterio = (criterio || "").toString().toLowerCase();
+  if (criterio !== "valor") {
+    criterio = "quantidade"; // default
+  }
+
   var linhas = info.linhas;
 
-  // Índices das colunas na BaseClara
+  // Índices das colunas na BaseClara (começando em 0)
+  // A: Data da Transação
+  // F: Valor em R$
+  // R: Grupos
+  // V: LojaNum
   var IDX_DATA  = 0;   // "Data da Transação"
   var IDX_VALOR = 5;   // "Valor em R$"
   var IDX_GRUPO = 17;  // "Grupos"
   var IDX_LOJA  = 21;  // "LojaNum"
 
-  // --------- Normalizador de texto (sem acento, minúsculo) ----------
-  function normalizarTexto(t) {
-    return t
-      ? t.toString()
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .trim()
-      : "";
-  }
-
-  // Nome do grupo informado pelo usuário (normalizado)
-  var grupoInformadoNorm = normalizarTexto(grupo);
-
-  // Lista oficial de times (normalizada)
-  var timesOficiais = [
-    "aguias de elite",
-    "aguias do cerrado",
-    "guardioes da fronteira",
-    "esquadrao 40 graus",
-    "esquadrao valente",
-    "falcoes sp",
-    "flechas do norte",
-    "furacao sul",
-    "ultra high",
-    "furia do interior",
-    "gigante paulista",
-    "lobos sp",
-    "guerreiros do cangaco",
-    "legiao de elite",
-    "sulcesso"
-  ];
-
-  // Descobre qual time oficial melhor casa com o que o usuário digitou
-  var alvoNorm = grupoInformadoNorm;
-  if (grupoInformadoNorm) {
-    for (var i = 0; i < timesOficiais.length; i++) {
-      var t = timesOficiais[i];
-      // casa se o usuário digitou parte do nome ou o nome completo
-      if (grupoInformadoNorm.indexOf(t) !== -1 || t.indexOf(grupoInformadoNorm) !== -1) {
-        alvoNorm = t;
-        break;
-      }
-    }
-  }
-
-  // Filtra linhas pelo período
   var filtradas = filtrarLinhasPorPeriodo_(linhas, IDX_DATA, dataInicioStr, dataFimStr);
 
   var mapa = {};
-
   for (var i = 0; i < filtradas.length; i++) {
     var row = filtradas[i];
 
-    // Normaliza o texto do grupo da linha da planilha
-    var grupoLinhaNorm = normalizarTexto(row[IDX_GRUPO]);
-
-    // 🔴 Filtro por time: se o usuário informou algum time, só entra
-    // linha cuja coluna "Grupos" contenha esse time.
-    if (alvoNorm && grupoLinhaNorm.indexOf(alvoNorm) === -1) {
+    var grupoLinha = (row[IDX_GRUPO] || "").toString().toLowerCase().trim();
+    if (grupo && grupoLinha.indexOf(grupo) === -1) {
+      // se o usuário informou um grupo/time e essa linha não casa, pula
       continue;
     }
 
@@ -848,9 +815,7 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr) {
     if (!mapa[loja]) {
       mapa[loja] = { loja: loja, total: 0, valorTotal: 0 };
     }
-
     mapa[loja].total++;
-
     var valor = Number(row[IDX_VALOR]) || 0;
     mapa[loja].valorTotal += valor;
   }
@@ -862,24 +827,31 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr) {
     }
   }
 
-  // Se não encontrou nada para esse time/período
-  if (!lojasArr.length) {
-    return { ok: true, grupo: grupo, lojas: [], top: null };
+  // ordenação conforme critério
+  if (criterio === "valor") {
+    lojasArr.sort(function (a, b) {
+      if (b.valorTotal !== a.valorTotal) {
+        return b.valorTotal - a.valorTotal;
+      }
+      return b.total - a.total; // desempate por quantidade
+    });
+  } else {
+    // "quantidade"
+    lojasArr.sort(function (a, b) {
+      if (b.total !== a.total) {
+        return b.total - a.total;
+      }
+      return b.valorTotal - a.valorTotal; // desempate por valor
+    });
   }
 
-  // Ordena: 1º por quantidade de transações, 2º por valor total
-  lojasArr.sort(function (a, b) {
-    if (b.total !== a.total) {
-      return b.total - a.total;
-    }
-    return b.valorTotal - a.valorTotal;
-  });
-
-  var top = lojasArr[0];
+  var top = lojasArr.length ? lojasArr[0] : null;
 
   return {
     ok: true,
-    grupo: grupo,   // mantém o texto original para exibir no chat
+    grupoOriginal: grupoOriginal,
+    grupo: grupo,
+    criterio: criterio,
     lojas: lojasArr,
     top: top
   };
