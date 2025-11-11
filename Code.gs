@@ -771,30 +771,74 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr) {
     return { ok: false, error: info.error };
   }
 
-  // normaliza nome do grupo para busca (lowercase, sem espaços extras)
-  grupo = (grupo || "").toString().toLowerCase().trim();
-
   var linhas = info.linhas;
 
-  // Índices das colunas na BaseClara (começando em 0)
-  // A: Data da Transação
-  // F: Valor em R$
-  // R: Grupos
-  // V: LojaNum
+  // Índices das colunas na BaseClara
   var IDX_DATA  = 0;   // "Data da Transação"
   var IDX_VALOR = 5;   // "Valor em R$"
   var IDX_GRUPO = 17;  // "Grupos"
   var IDX_LOJA  = 21;  // "LojaNum"
 
+  // --------- Normalizador de texto (sem acento, minúsculo) ----------
+  function normalizarTexto(t) {
+    return t
+      ? t.toString()
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .trim()
+      : "";
+  }
+
+  // Nome do grupo informado pelo usuário (normalizado)
+  var grupoInformadoNorm = normalizarTexto(grupo);
+
+  // Lista oficial de times (normalizada)
+  var timesOficiais = [
+    "aguias de elite",
+    "aguias do cerrado",
+    "guardioes da fronteira",
+    "esquadrao 40 graus",
+    "esquadrao valente",
+    "falcoes sp",
+    "flechas do norte",
+    "furacao sul",
+    "ultra high",
+    "furia do interior",
+    "gigante paulista",
+    "lobos sp",
+    "guerreiros do cangaco",
+    "legiao de elite",
+    "sulcesso"
+  ];
+
+  // Descobre qual time oficial melhor casa com o que o usuário digitou
+  var alvoNorm = grupoInformadoNorm;
+  if (grupoInformadoNorm) {
+    for (var i = 0; i < timesOficiais.length; i++) {
+      var t = timesOficiais[i];
+      // casa se o usuário digitou parte do nome ou o nome completo
+      if (grupoInformadoNorm.indexOf(t) !== -1 || t.indexOf(grupoInformadoNorm) !== -1) {
+        alvoNorm = t;
+        break;
+      }
+    }
+  }
+
+  // Filtra linhas pelo período
   var filtradas = filtrarLinhasPorPeriodo_(linhas, IDX_DATA, dataInicioStr, dataFimStr);
 
   var mapa = {};
+
   for (var i = 0; i < filtradas.length; i++) {
     var row = filtradas[i];
 
-    var grupoLinha = (row[IDX_GRUPO] || "").toString().toLowerCase().trim();
-    if (grupo && grupoLinha.indexOf(grupo) === -1) {
-      // se o usuário informou um grupo/time e essa linha não casa, pula
+    // Normaliza o texto do grupo da linha da planilha
+    var grupoLinhaNorm = normalizarTexto(row[IDX_GRUPO]);
+
+    // 🔴 Filtro por time: se o usuário informou algum time, só entra
+    // linha cuja coluna "Grupos" contenha esse time.
+    if (alvoNorm && grupoLinhaNorm.indexOf(alvoNorm) === -1) {
       continue;
     }
 
@@ -804,7 +848,9 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr) {
     if (!mapa[loja]) {
       mapa[loja] = { loja: loja, total: 0, valorTotal: 0 };
     }
+
     mapa[loja].total++;
+
     var valor = Number(row[IDX_VALOR]) || 0;
     mapa[loja].valorTotal += valor;
   }
@@ -816,7 +862,12 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr) {
     }
   }
 
-  // ordena pela quantidade de transações e, em empate, pelo maior valor
+  // Se não encontrou nada para esse time/período
+  if (!lojasArr.length) {
+    return { ok: true, grupo: grupo, lojas: [], top: null };
+  }
+
+  // Ordena: 1º por quantidade de transações, 2º por valor total
   lojasArr.sort(function (a, b) {
     if (b.total !== a.total) {
       return b.total - a.total;
@@ -824,12 +875,44 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr) {
     return b.valorTotal - a.valorTotal;
   });
 
-  var top = lojasArr.length ? lojasArr[0] : null;
+  var top = lojasArr[0];
 
   return {
     ok: true,
-    grupo: grupo,
+    grupo: grupo,   // mantém o texto original para exibir no chat
     lojas: lojasArr,
     top: top
   };
+}
+
+function enviarResumoPorEmail(grupo) {
+  try {
+    const emailDestino = Session.getActiveUser().getEmail();
+    if (!emailDestino) return { ok: false, error: "Usuário sem e-mail ativo" };
+
+    const resumo = getResumoTransacoesPorGrupo(grupo, "", "");
+    if (!resumo.ok || !resumo.top) return { ok: false, error: "Sem dados" };
+
+    let corpo = `
+      <p>Segue resumo de transações para o time <b>${resumo.grupo}</b>:</p>
+      <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px">
+        <tr style="background:#005E27;color:#fff"><th>Loja</th><th>Transações</th><th>Valor (R$)</th></tr>
+        ${resumo.lojas.slice(0,10).map(l => `
+          <tr><td>${l.loja}</td><td align="right">${l.total}</td><td align="right">${l.valorTotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</td></tr>
+        `).join("")}
+      </table>
+      <br/>
+      <p><i>Gerado automaticamente pelo Assistente Vektor</i></p>`;
+
+    MailApp.sendEmail({
+      to: emailDestino,
+      subject: `Resumo de transações | ${resumo.grupo}`,
+      htmlBody: corpo,
+      name: "Assistente Vektor"
+    });
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
