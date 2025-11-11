@@ -37,10 +37,6 @@ function doGet(e) {
 }
 
 
-// 📊 Planilha de transações Captura_Clara (BaseClara)
-const CAPTURA_CLARA_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI";
-const CAPTURA_CLARA_ABA = "BaseClara";
-
 // 🌐 BigQuery – validação de loja
 const PROJECT_ID = 'cnto-data-lake';
 const BQ_TABLE_LOJAS = '`cnto-data-lake.refined.cnt_ref_gld_dim_estrutura_loja`';
@@ -98,77 +94,6 @@ function normalizarLojaSeExistir(lojaInformada) {
 }
 
 
-/**
- * Busca resumo de transações por loja dentro de um período (ou últimos 7 dias se não houver período)
- */
-
-function getResumoTransacoesPorGrupo(grupoNome, dataInicioIso, dataFimIso) {
-  try {
-    const ss = SpreadsheetApp.openById(CAPTURA_CLARA_ID);
-    const sheet = ss.getSheetByName(CAPTURA_CLARA_ABA);
-    if (!sheet) return { ok: false, error: "Aba BaseClara não encontrada." };
-
-    const values = sheet.getDataRange().getValues();
-    if (!values || values.length < 2) return { ok: true, lojas: [], top: null };
-
-    const header = values[0];
-    const dados = values.slice(1);
-    const idxData = header.indexOf("Data da Transação");
-    const idxGrupo = header.indexOf("Grupos");
-    const idxLoja = header.indexOf("LojaNum");
-
-    if (idxData === -1 || idxGrupo === -1 || idxLoja === -1)
-      return { ok: false, error: "Colunas necessárias não encontradas." };
-
-    const hoje = new Date();
-    const dataInicio = dataInicioIso ? new Date(dataInicioIso) : new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 7);
-    const dataFim = dataFimIso ? new Date(dataFimIso) : hoje;
-
-    const grupoFiltro = String(grupoNome).toLowerCase();
-    const contagem = {};
-
-    dados.forEach((row) => {
-      const dVal = row[idxData];
-      const gVal = row[idxGrupo];
-      const lVal = row[idxLoja];
-      if (!dVal || !gVal || !lVal) return;
-
-      const dataObj = dVal instanceof Date ? dVal : parseDataGenerica(dVal);
-      if (!dataObj) return;
-      if (dataObj < dataInicio || dataObj > dataFim) return;
-
-      if (!String(gVal).toLowerCase().includes(grupoFiltro)) return;
-
-      const loja = String(lVal).trim();
-      contagem[loja] = (contagem[loja] || 0) + 1;
-    });
-
-    const lojas = Object.keys(contagem).map((l) => ({ loja: l, total: contagem[l] }));
-    if (lojas.length === 0) return { ok: true, grupo: grupoNome, lojas: [], top: null };
-
-    lojas.sort((a, b) => b.total - a.total);
-    const top = lojas[0];
-    return { ok: true, grupo: grupoNome, lojas, top, dataInicio, dataFim };
-  } catch (e) {
-    return { ok: false, error: e.message || e.toString() };
-  }
-}
-
-function parseDataGenerica(v) {
-  if (v instanceof Date) return v;
-  if (typeof v === "string") {
-    const s = v.trim();
-    if (s.includes("/")) {
-      const [d, m, a] = s.split("/").map(Number);
-      return new Date(a, m - 1, d);
-    }
-    if (s.includes("-")) {
-      const [a, m, d] = s.split("-").map(Number);
-      return new Date(a, m - 1, d);
-    }
-  }
-  return null;
-}
 
 /**
  * Retorna o nome da loja (coluna nom_shopping)
@@ -550,6 +475,7 @@ function getPendenciasParaBloqueio(lojaCodigo) {
     var dados  = values.slice(headerRowIndex + 1); // a partir da linha 6
 
     // Índices zero-based das colunas usadas (mesmos da _obterPendenciasLoja)
+
     var COL_DATA_COBR  = 1;  // B
     var COL_DATA_TRANS = 2;  // C
     var COL_TRANSACAO  = 3;  // D
@@ -754,4 +680,156 @@ function getPendenciasParaBloqueio(lojaCodigo) {
   } catch (err) {
     return { ok: false, error: err.message || err.toString() };
   }
+}
+
+// ========= RELATÓRIO CLARA (PLANILHA Captura_Clara / aba BaseClara) ========= //
+
+var SPREADSHEET_ID_CLARA = '1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI'; // Captura_Clara
+var SHEET_NOME_BASE_CLARA = 'BaseClara';
+
+// Abre a aba BaseClara
+function getBaseClaraSheet_() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID_CLARA);
+  return ss.getSheetByName(SHEET_NOME_BASE_CLARA);
+}
+
+// Converte o valor da coluna "Data da Transação" para Date
+function parseDateClara_(value) {
+  if (!value) return null;
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    return value;
+  }
+  if (typeof value === "string") {
+    // tenta formato dd/MM/yyyy
+    var parts = value.split("/");
+    if (parts.length === 3) {
+      var d = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      var y = parseInt(parts[2], 10);
+      return new Date(y, m, d);
+    }
+  }
+  return null;
+}
+
+// Lê todas as linhas da BaseClara (ignorando cabeçalho)
+function carregarLinhasBaseClara_() {
+  var sh = getBaseClaraSheet_();
+  if (!sh) {
+    return { header: [], linhas: [], error: "Aba 'BaseClara' não encontrada na planilha Captura_Clara." };
+  }
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) {
+    return { header: values && values[0] ? values[0] : [], linhas: [], error: null };
+  }
+  var header = values[0];
+  var linhas = values.slice(1);
+  return { header: header, linhas: linhas, error: null };
+}
+
+// Filtra linhas pelo período [dataInicioStr, dataFimStr].
+// Se vier vazio, considera últimos 7 dias.
+function filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr) {
+  var hoje = new Date();
+  var ini, fim;
+
+  if (dataInicioStr) {
+    ini = new Date(dataInicioStr);
+  } else {
+    ini = new Date(hoje);
+    ini.setDate(hoje.getDate() - 7);
+  }
+
+  if (dataFimStr) {
+    fim = new Date(dataFimStr);
+  } else {
+    fim = hoje;
+  }
+
+  var resultado = [];
+  for (var i = 0; i < linhas.length; i++) {
+    var row = linhas[i];
+    var d = parseDateClara_(row[idxData]);
+    if (!d) continue;
+    if (d >= ini && d <= fim) {
+      resultado.push(row);
+    }
+  }
+  return resultado;
+}
+
+/**
+ * Retorna, para um determinado time/grupo, um resumo de transações por loja:
+ * - total de transações
+ * - valor total em R$
+ *
+ * É chamado pelo front via google.script.run.getResumoTransacoesPorGrupo(...)
+ */
+function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr) {
+  var info = carregarLinhasBaseClara_();
+  if (info.error) {
+    return { ok: false, error: info.error };
+  }
+
+  // normaliza nome do grupo para busca (lowercase, sem espaços extras)
+  grupo = (grupo || "").toString().toLowerCase().trim();
+
+  var linhas = info.linhas;
+
+  // Índices das colunas na BaseClara (começando em 0)
+  // A: Data da Transação
+  // F: Valor em R$
+  // R: Grupos
+  // V: LojaNum
+  var IDX_DATA  = 0;   // "Data da Transação"
+  var IDX_VALOR = 5;   // "Valor em R$"
+  var IDX_GRUPO = 17;  // "Grupos"
+  var IDX_LOJA  = 21;  // "LojaNum"
+
+  var filtradas = filtrarLinhasPorPeriodo_(linhas, IDX_DATA, dataInicioStr, dataFimStr);
+
+  var mapa = {};
+  for (var i = 0; i < filtradas.length; i++) {
+    var row = filtradas[i];
+
+    var grupoLinha = (row[IDX_GRUPO] || "").toString().toLowerCase().trim();
+    if (grupo && grupoLinha.indexOf(grupo) === -1) {
+      // se o usuário informou um grupo/time e essa linha não casa, pula
+      continue;
+    }
+
+    var loja = (row[IDX_LOJA] || "").toString().trim();
+    if (!loja) continue;
+
+    if (!mapa[loja]) {
+      mapa[loja] = { loja: loja, total: 0, valorTotal: 0 };
+    }
+    mapa[loja].total++;
+    var valor = Number(row[IDX_VALOR]) || 0;
+    mapa[loja].valorTotal += valor;
+  }
+
+  var lojasArr = [];
+  for (var key in mapa) {
+    if (Object.prototype.hasOwnProperty.call(mapa, key)) {
+      lojasArr.push(mapa[key]);
+    }
+  }
+
+  // ordena pela quantidade de transações e, em empate, pelo maior valor
+  lojasArr.sort(function (a, b) {
+    if (b.total !== a.total) {
+      return b.total - a.total;
+    }
+    return b.valorTotal - a.valorTotal;
+  });
+
+  var top = lojasArr.length ? lojasArr[0] : null;
+
+  return {
+    ok: true,
+    grupo: grupo,
+    lojas: lojasArr,
+    top: top
+  };
 }
