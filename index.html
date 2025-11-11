@@ -484,7 +484,61 @@ pendenciasTimeoutId = setTimeout(() => {
             .trim();
     }
 
-    // ========= INTERVALOS DE DATA PARA PERGUNTAS DE RELATÓRIO ========= //
+    // ===== TIMES OFICIAIS (para identificar "time X" / "grupo X") =====
+const TIMES_OFICIAIS = [
+  "Águias de Elite",
+  "Águias do Cerrado",
+  "Guardiões da Fronteira",
+  "Esquadrão 40 Graus",
+  "Esquadrão Valente",
+  "Falcões SP",
+  "Flechas do Norte",
+  "Furacão Sul",
+  "Ultra High",
+  "Fúria do Interior",
+  "Gigante Paulista",
+  "Lobos SP",
+  "Guerreiros do Cangaço",
+  "Legião de Elite",
+  "SULcesso"
+];
+
+// Usa a mesma normalize() do chat pra comparar mensagem x times
+function encontrarTimeNaMensagem(msgOriginal) {
+  const texto = normalize(msgOriginal);
+
+  let melhorNome = null;
+  let melhorScore = 0;
+
+  TIMES_OFICIAIS.forEach((nome) => {
+    const nomeNorm = normalize(nome);
+
+    // separa em palavras e tira preposições/coisas fracas
+    const tokens = nomeNorm
+      .split(" ")
+      .filter(t => !["do","da","de","dos","das","sp","sul"].includes(t));
+
+    let score = 0;
+
+    // se o nome completo aparecer, já dá um boost forte
+    if (texto.includes(nomeNorm)) {
+      score += 100;
+    }
+
+    // +10 pra cada palavra relevante encontrada
+    tokens.forEach(tok => {
+      if (texto.includes(tok)) score += 10;
+    });
+
+    if (score > melhorScore) {
+      melhorScore = score;
+      melhorNome = nome;
+    }
+  });
+
+  // se nada bateu, volta null
+  return melhorNome;
+}
 
 
     /* ========= DADOS / TABELAS ========= */
@@ -2680,53 +2734,56 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
         const norm = normalize(msgUsuario);
 
 
-        // >>> NOVO BLOCO: perguntas de relatório (planilha Captura_Clara / BaseClara)
+            // >>> NOVO BLOCO: perguntas de relatório (planilha Captura_Clara / BaseClara)
 
-    const det = detectarPerguntaLojaMaisTransacoes(msgUsuario, norm);
-    if (det && det.grupo) {
-        const grupoNome = det.grupo;
-        const periodo   = det.periodo;
+const det = detectarPerguntaLojaMaisTransacoes(msgUsuario, norm);
+if (det) {
+  const grupoNome = det.grupo || "";      // pode vir vazio (sem time)
+  const periodo   = det.periodo;
+  const tipo      = det.tipo || "quantidade"; // "quantidade" ou "valor"
 
+  const grupoTxt = grupoNome
+    ? ` do time <b>${grupoNome}</b>`
+    : "";
 
-        const grupoExibicao = grupoNome
-            ? grupoNome.charAt(0).toUpperCase() + grupoNome.slice(1)
-            : "";
+  const criterioTxt = tipo === "valor"
+    ? "maior <b>valor</b> de transações"
+    : "maior <b>número</b> de transações";
 
-            renderBotMessage(
-              `HTML:<p class="text-sm text-slate-700">
-              Beleza! Vou consultar as transações do time <b>${grupoExibicao}</b>${
-                  periodo ? " no período solicitado" : ""
-              } e já te trago um resumo. ⏳
-              </p>`
-            );
+  renderBotMessage(
+    `HTML:<p class="text-sm text-slate-700">
+      Beleza! Vou consultar qual loja tem ${criterioTxt}${grupoTxt}${
+        periodo ? " no período solicitado" : ""
+      } e já te trago um resumo. ⏳
+    </p>`
+  );
 
-        // Converte datas (se existirem) para string ISO pra mandar pro Apps Script
-        const dataInicioStr = (periodo && periodo.dataInicio)
-            ? periodo.dataInicio.toISOString()
-            : "";
-        const dataFimStr = (periodo && periodo.dataFim)
-            ? periodo.dataFim.toISOString()
-            : "";
+  // Converte datas (se existirem) para string ISO pra mandar pro Apps Script
+  const dataInicioStr = (periodo && periodo.dataInicio)
+    ? periodo.dataInicio.toISOString()
+    : "";
+  const dataFimStr = (periodo && periodo.dataFim)
+    ? periodo.dataFim.toISOString()
+    : "";
 
-        google.script.run
-          .withSuccessHandler(function (res) {
-              // monta o "gráfico" / resumo no chat
-              renderResumoTransacoesSemana(res);
-          })
-          .withFailureHandler(function (err) {
-              renderBotMessage(
-                  `HTML:<p class="text-sm text-slate-700">
-                  Tive um problema ao consultar os dados da planilha. Tente novamente em alguns instantes.
-                  </p>`
-              );
-          })
-          .getResumoTransacoesPorGrupo(grupoNome, dataInicioStr, dataFimStr);
+  google.script.run
+    .withSuccessHandler(function (res) {
+      renderResumoTransacoesSemana(res);
+    })
+    .withFailureHandler(function () {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Tive um problema ao consultar os dados da planilha. Tente novamente em alguns instantes.</p>"
+      );
+    })
+    // 👇 agora também envia o tipo ("quantidade" ou "valor")
+    .getResumoTransacoesPorGrupo(grupoNome, dataInicioStr, dataFimStr, tipo);
 
-        // resposta vem assíncrona (via renderBotMessage no callback), então aqui não devolve nada
-        return null;
-    }
-    
-    // <<< FIM DO BLOCO NOVO //
+  // resposta vem assíncrona (via renderBotMessage no callback), então aqui não devolve nada
+  return null;
+}
+
+// <<< FIM DO BLOCO NOVO
+
 
         // 1) Termo de responsabilidade
         if (frasesTermo.some(f => norm.includes(f))) {
@@ -3330,23 +3387,48 @@ function renderResumoTransacoesSemana(res) {
     return;
   }
 
-  const grupo = res.grupo || "";
-  const lojas = res.lojas || [];
-  const top   = res.top || null;
+  // no Code.gs vamos passar grupoOriginal também (ver passo 5)
+  const grupo    = res.grupoOriginal || res.grupo || "";
+  const lojas    = res.lojas || [];
+  const top      = res.top || null;
+  const criterio = res.criterio || "quantidade"; // "quantidade" ou "valor"
 
   if (!top) {
+    const grupoHtml = grupo
+      ? ` para o time/grupo <b>${grupo}</b>`
+      : "";
     renderBotMessage(
       `HTML:<div class="text-sm text-slate-700">
-        <p>Não encontrei transações para o time/grupo <b>${grupo}</b> no período analisado.</p>
+        <p>Não encontrei transações${grupoHtml} no período analisado.</p>
         <p class="mt-1">Verifique se o nome do time está correto na coluna <b>Grupos</b> da planilha ou se realmente não houve compras nesse período.</p>
       </div>`
     );
     return;
   }
 
-  // 🔹 Gera tabela HTML simples
+  const valorTopFmt = top.valorTotal.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+
+  const grupoHtml = grupo ? ` para o time <b>${grupo}</b>` : "";
+
+  let fraseResumo = "";
+  if (criterio === "valor") {
+    fraseResumo =
+      `No <b>período analisado</b>, a loja com maior <b>valor</b> de transações${grupoHtml} ` +
+      `foi a loja <b>${top.loja}</b>, com <b>${valorTopFmt}</b> em compras ` +
+      `(total de <b>${top.total}</b> transações).`;
+  } else {
+    fraseResumo =
+      `No <b>período analisado</b>, a loja com maior <b>número</b> de transações${grupoHtml} ` +
+      `foi a loja <b>${top.loja}</b>, com <b>${top.total}</b> transações ` +
+      `(valor total de <b>${valorTopFmt}</b>).`;
+  }
+
+  // 🔹 Tabela resumida (top 10)
   let tabelaHtml = `
-    <table class="min-w-full text-xs border border-slate-200 mt-2">
+    <table class="min-w-full text-xs border border-slate-200 mt-3">
       <thead class="bg-slate-100">
         <tr>
           <th class="border px-2 py-1">Loja</th>
@@ -3354,122 +3436,89 @@ function renderResumoTransacoesSemana(res) {
           <th class="border px-2 py-1">Valor (R$)</th>
         </tr>
       </thead>
-      <tbody>`;
-  lojas.slice(0, 10).forEach(l => {
+      <tbody>
+  `;
+  lojas.slice(0, 10).forEach((l) => {
+    const valorFmt = l.valorTotal.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    });
     tabelaHtml += `
       <tr>
         <td class="border px-2 py-1">${l.loja}</td>
         <td class="border px-2 py-1 text-right">${l.total}</td>
-        <td class="border px-2 py-1 text-right">
-          ${Number(l.valorTotal || 0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}
-        </td>
-      </tr>`;
+        <td class="border px-2 py-1 text-right">${valorFmt}</td>
+      </tr>
+    `;
   });
   tabelaHtml += `</tbody></table>`;
 
-  // 🔹 Div única para o gráfico
-  const chartDivId = "chart-" + Date.now();
+  const lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
 
   const html = `
     <div class="text-sm text-slate-700">
-      <p>
-        No <b>período analisado</b>, a loja com maior número de transações para o time
-        <b>${grupo}</b> foi a loja <b>${top.loja}</b>, com <b>${top.total}</b> transações.
-      </p>
-      <div id="${chartDivId}" style="width:100%;height:300px" class="mt-3"></div>
+      <p>${fraseResumo}</p>
       ${tabelaHtml}
-      <button id="btnEmail-${chartDivId}"
-              class="mt-3 bg-[#005E27] text-white text-xs px-3 py-2 rounded-md">
-        📧 Enviar por e-mail
-      </button>
+      <a href="${lookerUrl}"
+         target="_blank"
+         class="inline-flex items-center mt-3 px-3 py-2 rounded-md text-white text-xs font-medium"
+         style="background:#005E27;">
+         📊 Abrir relatório completo no Looker Studio
+      </a>
     </div>
   `;
 
   renderBotMessage("HTML:" + html);
-
-  // 🔹 Desenha o gráfico + configura o botão de e-mail depois que o HTML foi inserido
-  setTimeout(() => {
-    // desenhar o gráfico (se google.charts já estiver carregado)
-    if (window.google && google.visualization) {
-      const data = new google.visualization.DataTable();
-      data.addColumn('string', 'Loja');
-      data.addColumn('number', 'Transações');
-      data.addRows(
-        lojas.slice(0, 10).map(l => [String(l.loja), Number(l.total || 0)])
-      );
-
-      const options = {
-        title: `Top lojas por transações (${grupo})`,
-        curveType: 'function',
-        legend: { position: 'bottom' },
-        colors: ['#005E27'],
-        backgroundColor: '#f8fafc'
-      };
-
-      const el = document.getElementById(chartDivId);
-      if (el) {
-        const chart = new google.visualization.LineChart(el);
-        chart.draw(data, options);
-      }
-    }
-
-    // botão de e-mail
-    const btn = document.getElementById(`btnEmail-${chartDivId}`);
-    if (btn) {
-      btn.addEventListener("click", () => {
-        google.script.run
-          .withSuccessHandler(() => {
-            renderBotMessage(
-              `HTML:<p class="text-sm text-slate-700">
-              ✅ Relatório enviado para o seu e-mail corporativo!
-              </p>`
-            );
-          })
-          .withFailureHandler(() => {
-            renderBotMessage(
-              `HTML:<p class="text-sm text-slate-700">
-              ❌ Não consegui enviar o e-mail. Verifique se há endereço disponível.
-              </p>`
-            );
-          })
-          .enviarResumoPorEmail(grupo);
-      });
-    }
-  }, 500);
 }
-  
 
-// ========= DETECTOR: "loja com maior número de transações para o time X..." ========= //
+// ========= DETECTOR: "loja com maior número/valor de transações para o time X..." ========= //
 
 function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
-    const temMaiorNumTransacoes =
-        norm.includes("maior numero de transacoes") ||
-        norm.includes("maior numero de transacao")  ||
-        norm.includes("mais transacoes") ||
-        norm.includes("mais transacao")  ||
-        norm.includes("maior quantidade de transacoes") ||
-        norm.includes("loja com mais transacoes");
+  const texto = norm || "";
 
-    const periodo = extrairIntervaloDatas(msgOriginal);
+  // fala claramente de loja
+  const falaDeLoja =
+    texto.includes("qual loja") ||
+    texto.includes("loja com")  ||
+    texto.includes("loja mais");
 
-    if (!temMaiorNumTransacoes) return null;
+  // pedindo topo por QUANTIDADE de transações
+  const falaDeTransacoes =
+    texto.includes("mais transacoes") ||
+    texto.includes("mais transacao")  ||
+    texto.includes("maior numero de transacoes") ||
+    texto.includes("maior numero de transacao")  ||
+    texto.includes("maior quantidade de transacoes");
 
-    const msgLower = (msgOriginal || "").toLowerCase();
-    const padroes = [
-        /time\s+(.+?)(?:\s+(na|no|de|em)\s+|$)/,
-        /grupo\s+(.+?)(?:\s+(na|no|de|em)\s+|$)/,
-    ];
+  // pedindo topo por VALOR de transações
+  const falaDeValor =
+    texto.includes("maior valor de transacoes")  ||
+    texto.includes("maior valor de transacao")   ||
+    texto.includes("maior valor de compras")     ||
+    texto.includes("mais gastou")                ||
+    texto.includes("mais gasto")                 ||
+    texto.includes("mais gastos")                 ||
+    texto.includes("mais comprou");
 
-    let grupo = null;
-    for (const rex of padroes) {
-        const m = msgLower.match(rex);
-        if (m && m[1]) {
-            grupo = m[1].trim();
-            break;
-        }
-    }
+  // se não for pergunta de loja + (transações ou valor), ignora
+  if (!falaDeLoja || (!falaDeTransacoes && !falaDeValor)) {
+    return null;
+  }
 
-    return { grupo: grupo, periodo: periodo };
+  // intervalo de datas (ontem, esse mês, mês passado, "de 1 a 30 de outubro", etc.)
+  const periodo = extrairIntervaloDatas(msgOriginal);
+
+  // tenta achar um dos TIMES_OFICIAIS no texto
+  const grupoNomeOficial = encontrarTimeNaMensagem(msgOriginal); // pode ser null
+
+  // se falou de "valor" (gastou/comprou), é consulta por valor; senão, por quantidade
+  const tipo = falaDeValor ? "valor" : "quantidade";
+
+  return {
+    grupo: grupoNomeOficial, // null => todas as lojas, independente de time
+    periodo: periodo,
+    tipo: tipo
+  };
 }
 
     /* ========= ENVIO (ENTER / BOTÃO) ========= */
