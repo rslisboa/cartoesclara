@@ -2736,11 +2736,11 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
 
             // >>> NOVO BLOCO: perguntas de relatório (planilha Captura_Clara / BaseClara)
 
-const det = detectarPerguntaLojaMaisTransacoes(msgUsuario, norm);
-if (det) {
-  const grupoNome = det.grupo || "";      // pode vir vazio (sem time)
-  const periodo   = det.periodo;
-  const tipo      = det.tipo || "quantidade"; // "quantidade" ou "valor"
+    const det = detectarPerguntaLojaMaisTransacoes(msgUsuario, norm);
+    if (det) {
+          const grupoNome = det.grupo || "";      // pode vir vazio (sem time)
+          const periodo   = det.periodo;
+          const tipo      = det.tipo || "quantidade"; // "quantidade" ou "valor"
 
   const grupoTxt = grupoNome
     ? ` do time <b>${grupoNome}</b>`
@@ -3236,7 +3236,8 @@ function extrairIntervaloDatas(msgOriginal) {
         julho: 6, agosto: 7, setembro: 8, outubro: 9, novembro: 10, dezembro: 11
     };
 
-    const norm = (msgOriginal || "").toLowerCase();
+    //const norm = (msgOriginal || "").toLowerCase();
+    const norm = normalize(msgOriginal || "");
 
     // 0) Hoje / Ontem
     if (norm.includes("ontem")) {
@@ -3253,7 +3254,7 @@ function extrairIntervaloDatas(msgOriginal) {
     if (norm.includes("ultima semana") || norm.includes("última semana")) {
         const fim = new Date(hoje);
         const ini = new Date(hoje);
-        ini.setDate(hoje.getDate() - 7);
+        ini.setDate(hoje.getDate() - 30);
         return { tipo: "ultima_semana", dataInicio: ini, dataFim: fim };
     }
 
@@ -3269,6 +3270,22 @@ function extrairIntervaloDatas(msgOriginal) {
         const fim = new Date(ano, mes + 1, 0);
         return { tipo: "mes_passado", dataInicio: ini, dataFim: fim };
     }
+
+    // 0) Intervalo numérico "de 01/11/2025 a 15/11/2025"
+          let m = norm.match(/de\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+a\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+          if (m) {
+            const d1 = Number(m[1]);
+            const m1 = Number(m[2]) - 1;
+            const y1 = Number(m[3]);
+            const d2 = Number(m[4]);
+            const m2 = Number(m[5]) - 1;
+            const y2 = Number(m[6]);
+
+            const ini = new Date(y1, m1, d1);
+            const fim = new Date(y2, m2, d2, 23, 59, 59);
+            return { tipo: "intervalo_numerico", dataInicio: ini, dataFim: fim };
+          }
+
 
     // 0d) Esse mês / neste mês
     if (
@@ -3297,6 +3314,26 @@ function extrairIntervaloDatas(msgOriginal) {
             return { tipo: "intervalo", dataInicio: ini, dataFim: fim };
         }
     }
+
+    // 2b) "entre 1 e 15 de novembro"
+m = norm.match(/entre\s+(\d{1,2})\s+e\s+(\d{1,2})\s+de\s+([a-zç]+)/);
+if (m) {
+  const dia1 = Number(m[1]);
+  const dia2 = Number(m[2]);
+  const mesStr = m[3];
+  const meses = {
+    janeiro:0, fevereiro:1, marco:2, março:2, abril:3, maio:4, junho:5,
+    julho:6, agosto:7, setembro:8, outubro:9, novembro:10, dezembro:11
+  };
+  const mes = meses[mesStr];
+  if (mes !== undefined) {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const ini = new Date(ano, mes, dia1);
+    const fim = new Date(ano, mes, dia2, 23, 59, 59);
+    return { tipo: "intervalo_mes_texto", dataInicio: ini, dataFim: fim };
+  }
+}
 
     // 2) "no dia 10/11/2025" ou "dia 10/11"
     m = norm.match(/dia\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
@@ -3351,27 +3388,52 @@ function extrairIntervaloDatas(msgOriginal) {
     }
 
     // 4) "mês passado"
-    if (norm.includes("mes passado") || norm.includes("mês passado")) {
-        let mes = hoje.getMonth() - 1;
-        let ano = anoAtual;
-        if (mes < 0) {
-            mes += 12;
-            ano = anoAtual - 1;
-        }
-        const ini = new Date(ano, mes, 1);
-        const fim = new Date(ano, mes + 1, 0);
-        return { tipo: "mes_passado", dataInicio: ini, dataFim: fim };
+if (norm.includes("mes passado")) {   // depois do normalize, "mês" já virou "mes"
+    let mes = hoje.getMonth() - 1;
+    let ano = anoAtual;
+    if (mes < 0) {
+        mes += 12;
+        ano = anoAtual - 1;
     }
+    const ini = new Date(ano, mes, 1);
+    const fim = new Date(ano, mes + 1, 0);
+    return { tipo: "mes_passado", dataInicio: ini, dataFim: fim };
+}
 
-    // 5) "últimos 15 dias", etc.
-    m = norm.match(/ultimos?\s+(\d{1,3})\s+dias?/);
-    if (m) {
-        const qtd = Number(m[1]);
-        const fim = hoje;
-        const ini = new Date(hoje);
-        ini.setDate(hoje.getDate() - qtd);
-        return { tipo: "ultimos_dias", dataInicio: ini, dataFim: fim };
-    }
+// 5) "últimos X meses"
+m = norm.match(/ultimos?\s+(\d{1,2})\s+mes(es)?/);
+if (m) {
+    const qtdMeses = Number(m[1]);
+    const fim = hoje;
+    const ini = new Date(hoje);
+    ini.setMonth(hoje.getMonth() - qtdMeses);
+    return { tipo: "ultimos_meses", dataInicio: ini, dataFim: fim };
+}
+
+// 6) "últimos 15 dias", etc.
+m = norm.match(/ultimos?\s+(\d{1,3})\s+dias?/);
+if (m) {
+    const qtd = Number(m[1]);
+    const fim = hoje;
+    const ini = new Date(hoje);
+    ini.setDate(hoje.getDate() - qtd);
+    return { tipo: "ultimos_dias", dataInicio: ini, dataFim: fim };
+}
+
+  // 7) "2 ultimas semanas" ou "ultimas 2 semanas"
+m = norm.match(/(\d{1,2})\s+ultimas?\s+semanas?/);
+if (!m) {
+  m = norm.match(/ultimas?\s+(\d{1,2})\s+semanas?/);
+}
+if (m) {
+  const qtdSemanas = Number(m[1]);
+  const dias = qtdSemanas * 7;
+  const hoje = new Date();
+  const fim = hoje;
+  const ini = new Date(hoje);
+  ini.setDate(hoje.getDate() - dias);
+  return { tipo: "ultimas_semanas", dataInicio: ini, dataFim: fim };
+}
 
     return null;
 }
@@ -3459,12 +3521,13 @@ function renderResumoTransacoesSemana(res) {
     <div class="text-sm text-slate-700">
       <p>${fraseResumo}</p>
       ${tabelaHtml}
-      <a href="${lookerUrl}"
-         target="_blank"
-         class="inline-flex items-center mt-3 px-3 py-2 rounded-md text-white text-xs font-medium"
-         style="background:#005E27;">
-         📊 Abrir relatório completo no Looker Studio
-      </a>
+          <a href="${lookerUrl}"
+   target="_blank"
+   class="inline-flex items-center mt-3 px-4 py-2 rounded-md font-semibold text-sm shadow-md transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-lime-400"
+   style="background:#B5FF20; color:#000; display: block; width: fit-content; margin: 0 auto;">
+   📊 Acesse o Relatório do Looker Studio aqui
+</a>
+
     </div>
   `;
 
@@ -3480,6 +3543,7 @@ function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
   const falaDeLoja =
     texto.includes("qual loja") ||
     texto.includes("loja com")  ||
+    texto.includes("loja que mais")  ||
     texto.includes("loja mais");
 
   // pedindo topo por QUANTIDADE de transações
