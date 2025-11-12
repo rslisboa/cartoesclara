@@ -2751,12 +2751,85 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
 function gerarRespostaDoBot(msgUsuario) {
   const norm = normalize(msgUsuario || "");
 
+  // >>> TODAS AS LOJAS (geral) por valor
+const detTodasLojas = detectarListarTodasLojasGeral(msgUsuario, norm);
+if (detTodasLojas) {
+  const p = detTodasLojas.periodo;
+  const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+  const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+  renderBotMessage("HTML:<p class='text-sm text-slate-700'>Listando <b>todas as lojas</b> por <b>valor</b>" +
+    (p ? " no período solicitado" : "") + "…</p>");
+
+google.script.run
+  .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: 1, forGroup: false }); })
+  .withFailureHandler(function () { renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>"); })
+  .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, "valor");
+  return;
+}
+
+// >>> TIMES (plural e singular)
+const detTimes = detectarConsultasTimes(msgUsuario, norm);
+if (detTimes) {
+  const p    = detTimes.periodo;
+  const tipo = detTimes.tipo || "valor";
+  const topN = detTimes.topN; // null => TODOS
+  const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+  const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+  renderBotMessage("HTML:<p class='text-sm text-slate-700'>" +
+    (detTimes.modo === "singular" ? "Buscando o <b>time campeão</b>" : "Montando <b>ranking de times</b>") +
+    " por " + (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
+    (p ? " no período solicitado" : "") + "…</p>");
+
+  google.script.run
+    .withSuccessHandler(function (res) { renderResumoTransacoesPorTime(res, { topN: topN }); })
+    .withFailureHandler(function () {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
+    })
+    .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
+
+  return;
+}
+
+function detectarConsultasTimes(msgOriginal, norm) {
+  const t = norm || "";
+  const periodo = extrairIntervaloDatas(msgOriginal);
+
+  // plural por quantidade (listar TODOS)
+  if (t.includes("times com maior numero de transacoes") || t.includes("times com mais transacoes") ||
+      t.includes("times com mais transacao") || t.includes("times com maior quantidade de transacoes")) {
+    return { periodo, tipo: "quantidade", topN: null, modo: "plural" };
+  }
+
+  // plural por valor (listar TODOS)
+  if (t.includes("quais times mais gastaram") || t.includes("times com maior valor de transacoes") ||
+      t.includes("times que mais gastaram")) {
+    return { periodo, tipo: "valor", topN: null, modo: "plural" };
+  }
+
+  // singular -> top 1 por valor
+  if (t.includes("qual time mais gastou") || t.includes("time com maior valor de transacoes")) {
+    return { periodo, tipo: "valor", topN: 1, modo: "singular" };
+  }
+
+  return null;
+}
+
 const detRankLoja = detectarRankingLojas(msgUsuario, norm);
 if (detRankLoja) {
   const periodo = detRankLoja.periodo;
   const tipo    = detRankLoja.tipo || "valor";
   const topN    = detRankLoja.topN; // pode ser null
   const grupo   = detRankLoja.grupo || "";
+
+    // Aviso: ranking geral de lojas (sem time) e sem "top" informado => mostraremos 10
+  if (!grupo && detRankLoja.topN == null) {
+    renderBotMessage(
+      "HTML:<p class='text-xs text-slate-600 italic'>Obs.: Como o número de lojas é grande, mostrarei as <b>10 primeiras</b> por padrão. Você pode pedir, por exemplo, <b>top 20 lojas</b>.</p>"
+    );
+  }
+
 
   renderBotMessage(
     "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de lojas</b> por " +
@@ -2769,11 +2842,11 @@ if (detRankLoja) {
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
   google.script.run
-    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: topN, forGroup: !!grupo }); })
+    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: 1, forGroup: false }); })
     .withFailureHandler(function () {
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (lojas).</p>");
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>");
     })
-    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
+    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, "valor");
 
   return null;
 }
@@ -2797,11 +2870,11 @@ if (detLojasPlural) {
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
   google.script.run
-    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: topN, forGroup: !!grupo }); })
+    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: 1, forGroup: true }); })
     .withFailureHandler(function () {
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (lojas - plural).</p>");
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja por time).</p>");
     })
-    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
+    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, "valor");
 
   return null;
 }
@@ -3776,9 +3849,7 @@ function renderResumoTransacoesPorTime(resumo, opts) {
   renderBotMessage("HTML:" + html);
 }
 
-// Extrai "top N" (ex.: "top 5", "top5", "top   12").
-// Se NÃO houver "top", retorna null (para deixarmos "listar todos" quando for o caso).
-
+// Extrai "top N" (ex.: "top 5", "top5"). Se não houver "top", retorna null.
 function extrairTopN(texto) {
   if (!texto) return null;
   let m = texto.match(/top\s*(\d{1,2})/);
@@ -3790,24 +3861,28 @@ function extrairTopN(texto) {
   return null;
 }
 
-
-// Decide critério: "quantidade" se mencionar 'transa(c)oes|numero|quantidade'; senão "valor"
+// Decide critério: "quantidade" se falar de transações; senão "valor".
 function extrairCriterioGeral(texto) {
   if (!texto) return "valor";
+
   const falaDeTransacoes =
-    texto.includes("transacoes") ||
-    texto.includes("transacao")  ||
-    texto.includes("numero de transacoes") ||
-    texto.includes("quantidade de transacoes");
+    texto.includes("transacoes") || 
+    texto.includes("transacao") ||
+    texto.includes("numero de transacoes") || 
+    texto.includes("quantidade de transacoes") ||
+    texto.includes("mais transacoes") || 
+    texto.includes("maior numero de transacoes");
+
   const falaDeValor =
-    texto.includes("valor") ||
+    texto.includes("valor") || 
+    texto.includes("gasto") || 
     texto.includes("gastou") ||
-    texto.includes("gasto")  ||
-    texto.includes("gastos") ||
+    texto.includes("gastaram") || 
+    texto.includes("gastos") || 
     texto.includes("compras") ||
-    texto.includes("compra");
+    texto.includes("valor de transacoes");
+
   if (falaDeTransacoes && !falaDeValor) return "quantidade";
-  // se falar dos dois, mantenho "valor" como padrão (ajuste se quiser priorizar qtd)
   return "valor";
 }
 
@@ -3904,6 +3979,17 @@ function detectarRankingLojas(msgOriginal, norm) {
   const topN    = extrairTopN(texto);          // null se não informou
 
   return { grupo: grupoNomeOficial, periodo, tipo, topN };
+}
+
+// "listar todas as lojas por valor ..." (geral, sem time, sem top)
+function detectarListarTodasLojasGeral(msgOriginal, norm) {
+  const t = norm || "";
+  const pedeTodas = t.includes("listar todas as lojas") || t.startsWith("todas as lojas");
+  const falaValor = t.includes("por valor") || t.includes("valor");
+  if (!(pedeTodas && falaValor)) return null;
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  return { periodo, tipo: "valor", topN: null, grupo: "" }; // grupo vazio = geral
 }
 
 // ========= DETECTOR: "lojas com maior valor/transações ..." (plural, sem 'top'/'ranking') =========
