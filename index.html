@@ -2154,7 +2154,7 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
             <p class="mt-2"><b>MANUTENÇÃO EQUIPAMENTOS</b><br/>
             Ajustes/reparos em máquinas de estampar, impressoras de etiqueta, computadores fora de garantia e de baixo valor etc. (nada de compra de equipamento grande).</p>
 
-            <p class="mt-4">Se você não encontrou nada que encaixa no seu caso, abra chamado no<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>pedindo criação ou liberação de etiqueta.</p>
+            <p class="mt-4">Se você não encontrou nada que encaixa no seu caso, abra chamado no<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>pedindo criação ou liberação de etiqueta.</p>
             </div>`;
                 }
 
@@ -2769,6 +2769,60 @@ google.script.run
   return;
 }
 
+// >>> RANKING DE TIMES (top N)
+const detRankTimes = detectarRankingTimes(msgUsuario, norm);
+if (detRankTimes) {
+  const p    = detRankTimes.periodo;
+  const tipo = detRankTimes.tipo || "valor";      // "valor" ou "quantidade"
+  const topN = detRankTimes.topN ?? 10;           // padrão: 10
+  const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+  const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de times</b> por " +
+    (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
+    (p ? " no período solicitado" : "") + "…</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      renderResumoTransacoesPorTime(res, { topN: topN });
+    })
+    .withFailureHandler(function () {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
+    })
+    .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
+
+  return; // igual ao seu bloco de "detTimes", encerra aqui
+}
+
+// >>> RANKING DE TIMES (top N)
+const detRankTimes = detectarRankingTimes(msgUsuario, norm);
+if (detRankTimes) {
+  const p    = detRankTimes.periodo;
+  const tipo = detRankTimes.tipo || "valor";      // "valor" ou "quantidade"
+  const topN = detRankTimes.topN ?? 10;           // padrão: 10
+  const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+  const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de times</b> por " +
+    (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
+    (p ? " no período solicitado" : "") + "…</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      renderResumoTransacoesPorTime(res, { topN: topN });
+    })
+    .withFailureHandler(function () {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
+    })
+    .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
+
+  return; // igual ao seu bloco de "detTimes", encerra aqui
+}
+
 // >>> TIMES (plural e singular)
 const detTimes = detectarConsultasTimes(msgUsuario, norm);
 if (detTimes) {
@@ -2843,11 +2897,11 @@ if (detRankLoja) {
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
   google.script.run
-    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: 1, forGroup: false }); })
+    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: (topN ?? 10), forGroup: !!grupo }); })
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>");
     })
-    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, "valor");
+    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
 
   return null;
 }
@@ -2875,7 +2929,7 @@ if (detLojasPlural) {
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja por time).</p>");
     })
-    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, "valor");
+    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, "tipo);
 
   return null;
 }
