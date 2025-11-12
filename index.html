@@ -429,6 +429,25 @@ pendenciasTimeoutId = setTimeout(() => {
     chatWindow.scrollTop = chatWindow.scrollHeight;
   }
 
+  // ---- DEBUG: mostra erros de JS dentro do chat ----
+(function instalarErroNoChat(){
+  if (window.__erroNoChatInstalado) return;
+  window.__erroNoChatInstalado = true;
+
+  window.addEventListener("error", function (e) {
+    try {
+      var msg = (e && e.message) ? e.message : String(e);
+      renderBotMessage(
+        "HTML:<div style='font-family:Arial,sans-serif;font-size:12px;color:#B00020;background:#FFECEC;padding:8px;border:1px solid #B00020;border-radius:6px'>" +
+        "<b>Erro de script:</b> " + msg + "<br/>" +
+        "<small>(" + (e && e.filename ? e.filename : "inline") + ":" + (e && e.lineno ? e.lineno : "?") + ")</small>" +
+        "</div>"
+      );
+    } catch (_) {}
+  });
+})();
+
+
   function hideTypingIndicator() {
     const typingDiv = document.getElementById('typingIndicator');
     if (typingDiv) typingDiv.remove();
@@ -2726,11 +2745,12 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
         return resposta;
     }
 
-    
 
     /* ========= GERADOR FINAL ========= */
 
-// 1) RANKING de LOJAS (com/sem time)
+function gerarRespostaDoBot(msgUsuario) {
+  const norm = normalize(msgUsuario || "");
+
 const detRankLoja = detectarRankingLojas(msgUsuario, norm);
 if (detRankLoja) {
   const periodo = detRankLoja.periodo;
@@ -3847,6 +3867,7 @@ function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
 }
 
 // ========= DETECTOR: "ranking geral de times" / "top N times ..." =========
+
 function detectarRankingTimes(msgOriginal, norm) {
   const texto = norm || "";
   const falaDeTime =
@@ -3864,6 +3885,7 @@ function detectarRankingTimes(msgOriginal, norm) {
 }
 
 // ========= DETECTOR: "ranking/top N de LOJAS" (opcional: do time X) =========
+
 function detectarRankingLojas(msgOriginal, norm) {
   const texto = norm || "";
 
