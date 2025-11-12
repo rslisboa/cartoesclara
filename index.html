@@ -1562,6 +1562,7 @@ function encontrarTimeNaMensagem(msgOriginal) {
         if (
             msgNorm.includes("o que voce faz") ||
             msgNorm.includes("qual o seu nome") ||
+            msgNorm.includes("qual seu nome") ||
             msgNorm.includes("qual é o seu nome") ||
             msgNorm.includes("qual eh o seu nome") ||
             msgNorm.includes("qual eh seu nome") ||
@@ -2762,7 +2763,7 @@ if (detTodasLojas) {
     (p ? " no período solicitado" : "") + "…</p>");
 
 google.script.run
-  .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: 1, forGroup: false }); })
+  .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: null, forGroup: false }); })
   .withFailureHandler(function () { renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>"); })
   .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, "valor");
   return;
@@ -2870,7 +2871,7 @@ if (detLojasPlural) {
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
   google.script.run
-    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: 1, forGroup: true }); })
+    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: null, forGroup: true }); })
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja por time).</p>");
     })
@@ -2895,12 +2896,16 @@ if (detRankTime) {
   const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
-  google.script.run
-    .withSuccessHandler(function (res) { renderResumoTransacoesPorTime(res, { topN: topN }); })
-    .withFailureHandler(function () {
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
-    })
-    .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
+google.script.run
+  .withSuccessHandler(function (res) {
+    // se veio "top 5", respeita; se não veio top, default do renderer = 10 (e mostramos aviso mais acima)
+    renderResumoTransacoesSemana(res, { topN: topN, forGroup: !!grupo });
+  })
+  .withFailureHandler(function () {
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (lojas).</p>");
+  })
+  .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
+
 
   return null;
 }
@@ -2940,7 +2945,7 @@ if (detRankTime) {
 
   google.script.run
     .withSuccessHandler(function (res) {
-      renderResumoTransacoesSemana(res);
+      renderResumoTransacoesSemana(res, { topN: 1, forGroup: !!grupoNome });
     })
     .withFailureHandler(function () {
       renderBotMessage(
@@ -3661,15 +3666,22 @@ if (m) {
     : "Não encontrei transações" + grupoHtml + " no período selecionado.";
 
   // Quantas linhas exibir
+  
   var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
   var linhas;
-  if (typeof opts.topN === "number") {
-    linhas = all.slice(0, opts.topN);   // respeita top N
-  } else if (opts.forGroup) {
-    linhas = all;                       // sem top + filtrando por time -> TODAS as lojas do time
+  if (opts && (opts.topN === null)) {
+    // pedido explícito para listar TODAS as linhas
+    linhas = all;
+  } else if (typeof opts.topN === "number") {
+    linhas = all.slice(0, Math.max(0, opts.topN)); // respeita top N
+  } else if (opts && opts.forGroup) {
+    // sem top + filtrando por time -> TODAS as lojas do time
+    linhas = all;
   } else {
-    linhas = all.slice(0, 10);          // ranking geral sem top -> 10 por padrão
+    // ranking geral sem top -> 10 por padrão
+    linhas = all.slice(0, 10);
   }
+
 
   // Somatórios com base no que será exibido
   var totalValor = 0, totalQtd = 0;
