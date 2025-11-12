@@ -233,7 +233,7 @@
 
             <div class="chat-header-avatar">
                 <img
-                    src="https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png"
+                    src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png"
                     alt="Assistente Clara (robô)" />
             </div>
         </div>
@@ -246,7 +246,7 @@
             <!-- Mensagem inicial do bot -->
             <div class="flex items-start gap-3">
                 <img
-                    src="https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png"
+                    src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png"
                     alt="Assistente Clara (robô)"
                     class="h-16 w-auto object-contain flex-shrink-0"
                 />
@@ -302,7 +302,7 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png";
+    const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png";
 
         // Nome vindo do template Apps Script (Code.gs → tmpl.userName)
     const userName = <?= JSON.stringify(userName || "") ?>;
@@ -418,7 +418,7 @@ pendenciasTimeoutId = setTimeout(() => {
     typingDiv.id = 'typingIndicator';
     typingDiv.className = 'flex items-start gap-3 mt-3';
     typingDiv.innerHTML = `
-      <img src="https://raw.githubusercontent.com/rslisboa/cartoesclara/df8a11a559812686406837aafcae70759e9c73a8/Gemini_Generated_Image_nzni5znzni5znzni.png" alt="Vektor" class="w-8 h-8 rounded-full">
+      <img src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png" alt="Vektor" class="w-8 h-8 rounded-full">
       <div class="bot-bubble px-4 py-3 max-w-[80%]">
         <div class="typing-indicator">
           <span></span><span></span><span></span>
@@ -1727,7 +1727,7 @@ function encontrarTimeNaMensagem(msgOriginal) {
 
         moveisUtensiliosCasa: [
             "mesa", "cadeira", "sofá", "poltrona", "armário", "cômoda", "estante", "tapete", "persiana", "lustre",
-            "aquario", "aquarios", "churraqueira", "carvão", "churrasco", "cadeira de balanço"
+            "aquario", "aquarios", "churraqueira", "carvão", "churrasco", "cadeira de balanço", "carrinho de bebê"
         ].map(normalize),
 
         eletronicos: [
@@ -2730,45 +2730,87 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
 
     /* ========= GERADOR FINAL ========= */
 
-    function gerarRespostaDoBot(msgUsuario) {
-        const norm = normalize(msgUsuario);
-
-
-        // >>> NOVO BLOCO (A): perguntas de ranking POR TIME
-const detTime = detectarPerguntaTimeMaisTransacoes(msgUsuario, norm);
-if (detTime) {
-  const periodo = detTime.periodo;
-  const tipo    = detTime.tipo || "quantidade"; // "quantidade" ou "valor"
-
-  const criterioTxt = tipo === "valor"
-    ? "maior <b>valor</b> de transações"
-    : "maior <b>número</b> de transações";
+// 1) RANKING de LOJAS (com/sem time)
+const detRankLoja = detectarRankingLojas(msgUsuario, norm);
+if (detRankLoja) {
+  const periodo = detRankLoja.periodo;
+  const tipo    = detRankLoja.tipo || "valor";
+  const topN    = detRankLoja.topN; // pode ser null
+  const grupo   = detRankLoja.grupo || "";
 
   renderBotMessage(
-    `HTML:<p class="text-sm text-slate-700">
-      Beleza! Vou consultar qual <b>time</b> tem ${criterioTxt}${
-        periodo ? " no período solicitado" : ""
-      } e já te trago um resumo. ⏳
-    </p>`
+    "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de lojas</b> por " +
+    (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
+    (grupo ? " do time <b>" + grupo + "</b>" : "") +
+    (periodo ? " no período solicitado" : "") + "…</p>"
   );
 
   const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
   google.script.run
-    .withSuccessHandler(function (res) {
-      renderResumoTransacoesPorTime(res);
-    })
+    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: topN, forGroup: !!grupo }); })
     .withFailureHandler(function () {
-      renderBotMessage(
-        "HTML:<p class='text-sm text-slate-700'>Tive um problema ao consultar os dados da planilha. Tente novamente em alguns instantes.</p>"
-      );
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (lojas).</p>");
+    })
+    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
+
+  return null;
+}
+
+// 2) LOJAS (plural) sem top/ranking  -> lista TODAS do time
+const detLojasPlural = detectarLojasMaisTransacoesPlural(msgUsuario, norm);
+if (detLojasPlural) {
+  const periodo = detLojasPlural.periodo;
+  const tipo    = detLojasPlural.tipo || "valor";
+  const grupo   = detLojasPlural.grupo || ""; // se vier time, listaremos TODAS as lojas do time
+  const topN    = null; // força 'todas'
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Vou listar <b>todas as lojas</b> " +
+    (grupo ? "do time <b>" + grupo + "</b> " : "") +
+    "ordenadas por " + (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
+    (periodo ? " no período solicitado" : "") + "…</p>"
+  );
+
+  const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
+  const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
+
+  google.script.run
+    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: topN, forGroup: !!grupo }); })
+    .withFailureHandler(function () {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (lojas - plural).</p>");
+    })
+    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
+
+  return null;
+}
+
+// 3) RANKING de TIMES (sempre pode listar TODOS se não houver top)
+const detRankTime = detectarRankingTimes(msgUsuario, norm);
+if (detRankTime) {
+  const periodo = detRankTime.periodo;
+  const tipo    = detRankTime.tipo || "valor";
+  const topN    = detRankTime.topN; // pode ser null -> listar TODOS
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de times</b> por " +
+    (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
+    (periodo ? " no período solicitado" : "") + "…</p>"
+  );
+
+  const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
+  const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
+
+  google.script.run
+    .withSuccessHandler(function (res) { renderResumoTransacoesPorTime(res, { topN: topN }); })
+    .withFailureHandler(function () {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
     })
     .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
 
-  return null; // resposta vem assíncrona
+  return null;
 }
-// <<< FIM BLOCO (A)
 
 
   // >>> NOVO BLOCO: perguntas de relatório (planilha Captura_Clara / BaseClara)
@@ -3309,6 +3351,32 @@ if (estadoPendencias === "nenhum" &&
         return { tipo: "mes_passado", dataInicio: ini, dataFim: fim };
     }
 
+    // "último trimestre" / "trimestre passado"
+if (norm.includes("ultimo trimestre") || norm.includes("trimestre passado")) {
+  const mesAtual = hoje.getMonth();         // 0..11
+  const trimestreAtual = Math.floor(mesAtual / 3); // 0..3
+  let ano = anoAtual;
+  let trimestreAnterior = trimestreAtual - 1;
+  if (trimestreAnterior < 0) {
+    trimestreAnterior = 3;
+    ano = anoAtual - 1;
+  }
+  const inicioMes = trimestreAnterior * 3; // 0,3,6,9
+  const ini = new Date(ano, inicioMes, 1);
+  const fim = new Date(ano, inicioMes + 3, 0); // último dia do trimestre
+  return { tipo: "trimestre_passado", dataInicio: ini, dataFim: fim };
+}
+
+// "neste trimestre" / "este trimestre"
+if (norm.includes("neste trimestre") || norm.includes("este trimestre")) {
+  const mesAtual = hoje.getMonth();
+  const trimestreAtual = Math.floor(mesAtual / 3);
+  const inicioMes = trimestreAtual * 3;
+  const ini = new Date(anoAtual, inicioMes, 1);
+  const fim = hoje;
+  return { tipo: "trimestre_atual", dataInicio: ini, dataFim: fim };
+}
+
     // 0) Intervalo numérico "de 01/11/2025 a 15/11/2025"
           m = norm.match(/de\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+a\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
           if (m) {
@@ -3478,85 +3546,118 @@ if (m) {
 
 // ========= RESUMO LOJA x TIME (GRÁFICO) ========= //
 
-    function renderResumoTransacoesSemana(resumo) {
-      if (!resumo || !resumo.ok) {
-        renderBotMessage(
-          "HTML:<p class='text-sm text-slate-700'>Não consegui encontrar informações de transações para esse filtro. Verifique se o time e o período estão corretos.</p>"
-        );
-        return;
-      }
+    function renderResumoTransacoesSemana(resumo, opts) {
+  if (!resumo || !resumo.ok) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Não consegui encontrar informações de transações para esse filtro. Verifique se o time e o período estão corretos.</p>"
+    );
+    return;
+  }
 
-      const grupo = resumo.grupoOriginal || resumo.grupo || "";
-      const grupoHtml = grupo ? ` para o time <b>${grupo}</b>` : "";
+  opts = opts || {};
 
+  var grupo = resumo.grupoOriginal || resumo.grupo || "";
+  var grupoHtml = grupo ? (" para o time <b>" + grupo + "</b>") : "";
 
-      // monta texto do critério
-      const criterioTxt =
-        resumo.criterio === "valor"
-          ? "maior <b>valor total</b> de transações"
-          : "maior <b>número</b> de transações";
+  var criterioTxt = (resumo.criterio === "valor")
+    ? "maior <b>valor total</b> de transações"
+    : "maior <b>número</b> de transações";
 
-      let fraseResumo = "";
-      if (resumo.top) {
-            fraseResumo =
-              `A loja <b>${resumo.top.loja}</b> foi a que teve ${criterioTxt} ` +
-              `no período selecionado${grupoHtml}.`;
-          } else {
-            fraseResumo =
-              `Não encontrei transações${grupoHtml} no período selecionado.`;
-          }
+  var fraseResumo = resumo.top
+    ? "A loja <b>" + resumo.top.loja + "</b> foi a que teve " + criterioTxt + " no período selecionado" + grupoHtml + "."
+    : "Não encontrei transações" + grupoHtml + " no período selecionado.";
 
-      // tabela de lojas (top 10)
-      let tabelaHtml = "";
-      if (resumo.lojas && resumo.lojas.length) {
-        tabelaHtml += `
-          <table border="1" cellspacing="0" cellpadding="6"
-                 style="border-collapse:collapse;font-family:Arial,sans-serif;
-                        font-size:12px; margin-top:8px; width:100%; text-align:center;">
-            <tr style="background:#06167d;color:#fff">
-              <th>Loja</th>
-              <th>Qtd Transações</th>
-              <th>Valor (R$)</th>
-            </tr>
-        `;
+  // Quantas linhas exibir
+  var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
+  var linhas;
+  if (typeof opts.topN === "number") {
+    linhas = all.slice(0, opts.topN);   // respeita top N
+  } else if (opts.forGroup) {
+    linhas = all;                       // sem top + filtrando por time -> TODAS as lojas do time
+  } else {
+    linhas = all.slice(0, 10);          // ranking geral sem top -> 10 por padrão
+  }
 
-        resumo.lojas.slice(0, 10).forEach((l) => {
-          tabelaHtml += `
-            <tr>
-              <td>${l.loja}</td>
-              <td>${l.total}</td>
-              <td>${l.valorTotal.toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}</td>
-            </tr>
-          `;
-        });
+  // Somatórios com base no que será exibido
+  var totalValor = 0, totalQtd = 0;
+  for (var i = 0; i < linhas.length; i++) {
+    totalValor += Number(linhas[i].valorTotal) || 0;
+    totalQtd   += Number(linhas[i].total) || 0;
+  }
 
-        tabelaHtml += `</table>`;
-      }
+  var linhasTabela = [];
+  if (linhas.length) {
+    linhasTabela.push(
+      "<table border='1' cellspacing='0' cellpadding='6' " +
+      "style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;" +
+      "margin-top:8px;width:100%;text-align:center;border:1px solid #000;'>"
+    );
+    linhasTabela.push(
+      "<tr style='background:#06167d;color:#fff'>" +
+        "<th style='border:1px solid #000;'>Loja</th>" +
+        "<th style='border:1px solid #000;'>Transações</th>" +
+        "<th style='border:1px solid #000;'>% Transações</th>" +
+        "<th style='border:1px solid #000;'>Valor (R$)</th>" +
+        "<th style='border:1px solid #000;'>% Valor</th>" +
+      "</tr>"
+    );
 
-      // 🔗 link do Looker
-      const lookerUrl =
-        "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
+    for (var j = 0; j < linhas.length; j++) {
+      var l = linhas[j];
+      var qtd = Number(l.total) || 0;
+      var val = Number(l.valorTotal) || 0;
+      var pctQtd = (totalQtd > 0)   ? ((qtd / totalQtd)   * 100).toFixed(1) + "%" : "—";
+      var pctVal = (totalValor > 0) ? ((val / totalValor) * 100).toFixed(1) + "%" : "—";
 
-      const html = `
-        <div class="text-sm text-slate-700">
-          <p>${fraseResumo}</p>
-          ${tabelaHtml}
-          <a href="${lookerUrl}"
-             target="_blank"
-             class="inline-flex items-center mt-3 px-4 py-2 rounded-md text-xs font-semibold shadow-md"
-             style="background-color:#B5FF20; color:#000; display:block; width:fit-content; margin:0 auto; text-decoration:none;">
-            📊 Clique aqui para acessar o RELATÓRIO CONSOLIDADO DE TRANSAÇÕES
-          </a>
-        </div>
-      `;
-
-      renderBotMessage("HTML:" + html);
+      linhasTabela.push(
+        "<tr>" +
+          "<td style='border:1px solid #000;'>" + l.loja + "</td>" +
+          "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+          "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+          "<td style='border:1px solid #000;'>" +
+            val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+          "</td>" +
+          "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+        "</tr>"
+      );
     }
 
-    function renderResumoTransacoesPorTime(resumo) {
+    // TOTAL
+    linhasTabela.push(
+      "<tr style='font-weight:bold;background:#f2f2f2;'>" +
+        "<td style='border:1px solid #000;'>TOTAL</td>" +
+        "<td style='border:1px solid #000;'>" + totalQtd + "</td>" +
+        "<td style='border:1px solid #000;'>" + (totalQtd > 0 ? "100%" : "—") + "</td>" +
+        "<td style='border:1px solid #000;'>" +
+          totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+        "<td style='border:1px solid #000;'>" + (totalValor > 0 ? "100%" : "—") + "</td>" +
+      "</tr>"
+    );
+
+    linhasTabela.push("</table>");
+  }
+  var tabelaHtml = linhasTabela.join("");
+
+  var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
+  var html = [
+    "<div class='text-sm text-slate-700'>",
+      "<p>", fraseResumo, "</p>",
+      tabelaHtml,
+      "<a href='", lookerUrl, "' target='_blank' ",
+         "class='inline-flex items-center mt-3 px-4 py-2 rounded-md text-xs font-semibold shadow-md' ",
+         "style='background-color:#B5FF20;color:#000;display:block;width:fit-content;margin:16px auto 0 auto;text-decoration:none;'>",
+         "📊 Acesse o Relatório do Looker Studio aqui",
+      "</a>",
+    "</div>"
+  ].join("");
+
+  renderBotMessage("HTML:" + html);
+}
+
+// RESUMO POR TIME INICIO //
+
+function renderResumoTransacoesPorTime(resumo, opts) {
   if (!resumo || !resumo.ok) {
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>Não consegui encontrar informações por <b>time</b> para esse período.</p>"
@@ -3564,55 +3665,130 @@ if (m) {
     return;
   }
 
-  const criterioTxt = resumo.criterio === "valor"
+  opts = opts || {};
+
+  var criterioTxt = (resumo.criterio === "valor")
     ? "maior <b>valor total</b> de transações"
     : "maior <b>número</b> de transações";
 
-  let fraseResumo = "";
-  if (resumo.top) {
-    fraseResumo =
-      `O <b>time ${resumo.top.time}</b> foi o que teve ${criterioTxt} no período selecionado.`;
-  } else {
-    fraseResumo = "Não encontrei transações no período selecionado.";
+  var fraseResumo = resumo.top
+    ? "O <b>time " + resumo.top.time + "</b> foi o que teve " + criterioTxt + " no período selecionado."
+    : "Não encontrei transações no período selecionado.";
+
+  // Quantas linhas exibir (para time: sem top => TODOS)
+  var all = Array.isArray(resumo.times) ? resumo.times : [];
+  var linhas = (typeof opts.topN === "number") ? all.slice(0, opts.topN) : all;
+
+  // Somatórios com base no que será exibido
+  var totalValor = 0, totalQtd = 0;
+  for (var i = 0; i < linhas.length; i++) {
+    totalValor += Number(linhas[i].valorTotal) || 0;
+    totalQtd   += Number(linhas[i].total) || 0;
   }
 
-  let tabelaHtml = "";
-  if (resumo.times && resumo.times.length) {
-    tabelaHtml += `
-      <table border="1" cellspacing="0" cellpadding="6"
-             style="border-collapse:collapse;font-family:Arial,sans-serif;
-                    font-size:12px;margin-top:8px;width:100%;text-align:center;">
-        <tr style="background:#06167d;color:#fff">
-          <th>Time</th>
-          <th>Transações</th>
-          <th>Valor (R$)</th>
-        </tr>
-    `;
-    resumo.times.slice(0, 10).forEach(t => {
-      tabelaHtml += `
-        <tr>
-          <td>${t.time}</td>
-          <td>${t.total}</td>
-          <td>${t.valorTotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</td>
-        </tr>
-      `;
-    });
-    tabelaHtml += `</table>`;
-  }
+  var linhasTabela = [];
+  if (linhas.length) {
+    linhasTabela.push(
+      "<table border='1' cellspacing='0' cellpadding='6' " +
+      "style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;" +
+      "margin-top:8px;width:100%;text-align:center;border:1px solid #000;'>"
+    );
+    linhasTabela.push(
+      "<tr style='background:#06167d;color:#fff'>" +
+        "<th style='border:1px solid #000;'>Time</th>" +
+        "<th style='border:1px solid #000;'>Transações</th>" +
+        "<th style='border:1px solid #000;'>% Transações</th>" +
+        "<th style='border:1px solid #000;'>Valor (R$)</th>" +
+        "<th style='border:1px solid #000;'>% Valor</th>" +
+      "</tr>"
+    );
 
-  const lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
-  const html = `
-    <div class="text-sm text-slate-700">
-      <p>${fraseResumo}</p>
-      ${tabelaHtml}
-      <a href="${lookerUrl}" target="_blank"
-         class="inline-flex items-center mt-3 px-4 py-2 rounded-md text-xs font-semibold shadow-md"
-         style="background-color:#B5FF20;color:#000;display:block;width:fit-content;margin:0 auto;text-decoration:none;">
-        📊 Acesse o Relatório do Looker Studio aqui
-      </a>
-    </div>
-  `;
+    for (var j = 0; j < linhas.length; j++) {
+      var t = linhas[j];
+      var qtd = Number(t.total) || 0;
+      var val = Number(t.valorTotal) || 0;
+      var pctQtd = (totalQtd > 0)   ? ((qtd / totalQtd)   * 100).toFixed(1) + "%" : "—";
+      var pctVal = (totalValor > 0) ? ((val / totalValor) * 100).toFixed(1) + "%" : "—";
+
+      linhasTabela.push(
+        "<tr>" +
+          "<td style='border:1px solid #000;'>" + t.time + "</td>" +
+          "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+          "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+          "<td style='border:1px solid #000;'>" +
+            val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+          "</td>" +
+          "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+        "</tr>"
+      );
+    }
+
+    // TOTAL
+    linhasTabela.push(
+      "<tr style='font-weight:bold;background:#f2f2f2;'>" +
+        "<td style='border:1px solid #000;'>TOTAL</td>" +
+        "<td style='border:1px solid #000;'>" + totalQtd + "</td>" +
+        "<td style='border:1px solid #000;'>" + (totalQtd > 0 ? "100%" : "—") + "</td>" +
+        "<td style='border:1px solid #000;'>" +
+          totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+        "<td style='border:1px solid #000;'>" + (totalValor > 0 ? "100%" : "—") + "</td>" +
+      "</tr>"
+    );
+
+    linhasTabela.push("</table>");
+  }
+  var tabelaHtml = linhasTabela.join("");
+
+  var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
+  var html = [
+    "<div class='text-sm text-slate-700'>",
+      "<p>", fraseResumo, "</p>",
+      tabelaHtml,
+      "<a href='", lookerUrl, "' target='_blank' ",
+         "class='inline-flex items-center mt-3 px-4 py-2 rounded-md text-xs font-semibold shadow-md' ",
+         "style='background-color:#B5FF20;color:#000;display:block;width:fit-content;margin:16px auto 0 auto;text-decoration:none;'>",
+         "📊 Acesse o Relatório do Looker Studio aqui",
+      "</a>",
+    "</div>"
+  ].join("");
+
   renderBotMessage("HTML:" + html);
+}
+
+// Extrai "top N" (ex.: "top 5", "top5", "top   12").
+// Se NÃO houver "top", retorna null (para deixarmos "listar todos" quando for o caso).
+
+function extrairTopN(texto) {
+  if (!texto) return null;
+  let m = texto.match(/top\s*(\d{1,2})/);
+  if (!m) m = texto.match(/top(\d{1,2})/);
+  if (m) {
+    const n = Number(m[1]);
+    if (!isNaN(n)) return Math.min(Math.max(n, 1), 50); // 1..50
+  }
+  return null;
+}
+
+
+// Decide critério: "quantidade" se mencionar 'transa(c)oes|numero|quantidade'; senão "valor"
+function extrairCriterioGeral(texto) {
+  if (!texto) return "valor";
+  const falaDeTransacoes =
+    texto.includes("transacoes") ||
+    texto.includes("transacao")  ||
+    texto.includes("numero de transacoes") ||
+    texto.includes("quantidade de transacoes");
+  const falaDeValor =
+    texto.includes("valor") ||
+    texto.includes("gastou") ||
+    texto.includes("gasto")  ||
+    texto.includes("gastos") ||
+    texto.includes("compras") ||
+    texto.includes("compra");
+  if (falaDeTransacoes && !falaDeValor) return "quantidade";
+  // se falar dos dois, mantenho "valor" como padrão (ajuste se quiser priorizar qtd)
+  return "valor";
 }
 
 // ========= DETECTOR: "loja e time com maior número/valor de transações..." ========= //
@@ -3641,6 +3817,7 @@ function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
     texto.includes("maior valor de transacao")   ||
     texto.includes("maior valor de compras")     ||
     texto.includes("mais gastou")                ||
+    texto.includes("mais gastaram")                ||
     texto.includes("mais gasto")                 ||
     texto.includes("mais gastou")                 ||
     texto.includes("loja que mais gastou")        ||
@@ -3666,6 +3843,79 @@ function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
     periodo: periodo,
     tipo: tipo
   };
+
+}
+
+// ========= DETECTOR: "ranking geral de times" / "top N times ..." =========
+function detectarRankingTimes(msgOriginal, norm) {
+  const texto = norm || "";
+  const falaDeTime =
+    texto.includes("ranking de times") ||
+    texto.includes("ranking geral de times") ||
+    (texto.includes("top") && (texto.includes("times") || texto.includes("time")));
+
+  if (!falaDeTime) return null;
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo = extrairCriterioGeral(texto);  // "valor" ou "quantidade"
+  const topN = extrairTopN(texto);           // número de linhas
+
+  return { periodo, tipo, topN };
+}
+
+// ========= DETECTOR: "ranking/top N de LOJAS" (opcional: do time X) =========
+function detectarRankingLojas(msgOriginal, norm) {
+  const texto = norm || "";
+
+  // Aceita: "ranking de lojas", "ranking geral de lojas", "top 5 lojas",
+  // "ranking loja", "top 3 loja" (singular/plural)
+  const mencionaRankingOuTop = texto.includes("ranking") || texto.includes("top");
+  const mencionaLojas = texto.includes("lojas") || texto.includes("loja");
+
+  if (!(mencionaRankingOuTop && mencionaLojas)) return null;
+
+  // Time opcional (usa seu matcher)
+  const grupoNomeOficial = encontrarTimeNaMensagem(msgOriginal) || "";
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo    = extrairCriterioGeral(texto); // "valor" ou "quantidade"
+  const topN    = extrairTopN(texto);          // null se não informou
+
+  return { grupo: grupoNomeOficial, periodo, tipo, topN };
+}
+
+// ========= DETECTOR: "lojas com maior valor/transações ..." (plural, sem 'top'/'ranking') =========
+function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
+  const texto = norm || "";
+
+  // precisa mencionar "lojas " (plural) + critério
+  const mencionaLojasPlural = texto.includes("lojas ");
+  if (!mencionaLojasPlural) return null;
+
+  // critério
+  const falaDeTransacoes =
+    texto.includes("mais transacoes") ||
+    texto.includes("mais transacao")  ||
+    texto.includes("maior numero de transacoes") ||
+    texto.includes("maior quantidade de transacoes");
+
+  const falaDeValor =
+    texto.includes("maior valor")     ||
+    texto.includes("mais gastou")     ||
+    texto.includes("mais gasto")      ||
+    texto.includes("mais gastos")     ||
+    texto.includes("mais comprou")    ||
+    texto.includes("valor de transacoes");
+
+  if (!falaDeTransacoes && !falaDeValor) return null;
+
+  const tipo = falaDeValor ? "valor" : "quantidade";
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const grupo = encontrarTimeNaMensagem(msgOriginal) || "";
+
+  // sem 'top' => queremos listar TODAS as lojas do time (se grupo vier),
+  // ou o default que você preferir para "todas as lojas gerais" (vamos deixar limitado se não houver time)
+  return { grupo, periodo, tipo, topN: null }; // topN=null => deixe o renderer decidir "listar todas"
 }
 
 // ========= DETECTOR: "time com maior número/valor de transações ..." ========= //
@@ -3693,6 +3943,7 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
     texto.includes("maior valor de transacao")   ||
     texto.includes("maior valor de compras")     ||
     texto.includes("mais gastou")                ||
+    texto.includes("mais gastaram")                ||
     texto.includes("mais gasto")                 ||
     texto.includes("mais gastos")                ||
     texto.includes("mais comprou");
