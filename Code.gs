@@ -682,6 +682,23 @@ function getPendenciasParaBloqueio(lojaCodigo) {
   }
 }
 
+/**
+ * Normaliza texto para comparação:
+ * - transforma em string
+ * - trim
+ * - remove acentos
+ * - deixa tudo minúsculo
+ */
+function normalizarTexto_(str) {
+  if (!str) return "";
+  return str
+    .toString()
+    .trim()
+    .normalize("NFD")                // separa letras dos acentos
+    .replace(/[\u0300-\u036f]/g, "") // remove os acentos
+    .toLowerCase();
+}
+
 // ========= RELATÓRIO CLARA (PLANILHA Captura_Clara / aba BaseClara) ========= //
 
 var SPREADSHEET_ID_CLARA = '1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI'; // Captura_Clara
@@ -737,7 +754,7 @@ function filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr) {
     ini = new Date(dataInicioStr);
   } else {
     ini = new Date(hoje);
-    ini.setDate(hoje.getDate() - 7);
+    ini.setDate(hoje.getDate() - 30);
   }
 
   if (dataFimStr) {
@@ -777,12 +794,14 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, criterio)
 
   // guarda o nome original (com acento/maiúsculas) pra exibir no chat
   var grupoOriginal = (grupo || "").toString().trim();
-  // versão normalizada pra filtrar
-  grupo = grupoOriginal.toLowerCase();
+  // versão normalizada (sem acento, minúscula) para filtrar
+  var grupoNorm = normalizarTexto_(grupoOriginal);
 
+  // normaliza critério
   criterio = (criterio || "").toString().toLowerCase();
-  if (criterio !== "valor") {
-    criterio = "quantidade"; // default
+  if (criterio !== "valor" && criterio !== "quantidade") {
+    // se vier vazio ou algo diferente, usa "quantidade" por padrão
+    criterio = "quantidade";
   }
 
   var linhas = info.linhas;
@@ -803,13 +822,28 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, criterio)
   for (var i = 0; i < filtradas.length; i++) {
     var row = filtradas[i];
 
-    var grupoLinha = (row[IDX_GRUPO] || "").toString().toLowerCase().trim();
-    if (grupo && grupoLinha.indexOf(grupo) === -1) {
-      // se o usuário informou um grupo/time e essa linha não casa, pula
-      continue;
+        // 🔹 FALTOU ESTA LINHA:
+    var loja = (row[IDX_LOJA] || "").toString().trim();
+
+    // valor de grupo na linha da planilha
+    var grupoLinhaOriginal = (row[IDX_GRUPO] || "").toString();
+    var grupoLinhaNorm = normalizarTexto_(grupoLinhaOriginal);
+
+    // se o usuário informou um grupo/time no chat, aplica filtro
+    if (grupoNorm) {
+      // regra flexível:
+      // - se a linha contiver o grupo completo (ex: "aguias do cerrado")
+      //   OU
+      // - se o grupo informado contiver o valor da linha (ex: "lobos sp" contém "lobos")
+      var casaGrupo =
+        grupoLinhaNorm.indexOf(grupoNorm) !== -1 ||
+        grupoNorm.indexOf(grupoLinhaNorm) !== -1;
+
+      if (!casaGrupo) {
+        continue;
+      }
     }
 
-    var loja = (row[IDX_LOJA] || "").toString().trim();
     if (!loja) continue;
 
     if (!mapa[loja]) {
@@ -866,15 +900,26 @@ function enviarResumoPorEmail(grupo) {
     if (!resumo.ok || !resumo.top) return { ok: false, error: "Sem dados" };
 
     let corpo = `
-      <p>Segue resumo de transações para o time <b>${resumo.grupo}</b>:</p>
-      <table border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px">
-        <tr style="background:#005E27;color:#fff"><th>Loja</th><th>Transações</th><th>Valor (R$)</th></tr>
-        ${resumo.lojas.slice(0,10).map(l => `
-          <tr><td>${l.loja}</td><td align="right">${l.total}</td><td align="right">${l.valorTotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</td></tr>
-        `).join("")}
-      </table>
-      <br/>
-      <p><i>Gerado automaticamente pelo Assistente Vektor</i></p>`;
+  <p>Segue resumo de transações para o time <b>${resumo.grupo}</b>:</p>
+  <table border="1" cellspacing="0" cellpadding="6"
+         style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;text-align:center">
+    <tr style="background:#06167d;color:#fff">
+      <th style="text-align:center">Loja</th>
+      <th style="text-align:center">Qtd Transações</th>
+      <th style="text-align:center">Valor (R$)</th>
+    </tr>
+    ${resumo.lojas.slice(0,10).map(l => `
+      <tr>
+        <td style="text-align:center">${l.loja}</td>
+        <td style="text-align:center">${l.total}</td>
+        <td style="text-align:center">
+          ${l.valorTotal.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}
+        </td>
+      </tr>
+    `).join("")}
+  </table>
+  <br/>
+  <p><i>Gerado automaticamente pelo Assistente Vektor</i></p>`;
 
     MailApp.sendEmail({
       to: emailDestino,
@@ -886,5 +931,80 @@ function enviarResumoPorEmail(grupo) {
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
+  }
+}
+
+/**
+ * Ranking POR TIME (grupo), por quantidade ou por valor.
+ * @param {string} dataInicioStr ISO ou vazio
+ * @param {string} dataFimStr ISO ou vazio
+ * @param {string} criterio "quantidade" | "valor"
+ */
+function getResumoTransacoesPorTime(dataInicioStr, dataFimStr, criterio) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return { ok:false, error: info.error };
+
+    criterio = (criterio || "").toString().toLowerCase();
+    if (criterio !== "valor" && criterio !== "quantidade") criterio = "quantidade";
+
+    var linhas = info.linhas;
+
+    // Índices fixos conforme sua base
+    var IDX_DATA  = 0;   // "Data da Transação"
+    var IDX_VALOR = 5;   // "Valor em R$"
+    var IDX_GRUPO = 17;  // "Grupos"
+
+    var filtradas = filtrarLinhasPorPeriodo_(linhas, IDX_DATA, dataInicioStr, dataFimStr);
+
+    var mapa = {}; // chave = grupo normalizado; valor = { time: nomeOriginal, total, valorTotal }
+    for (var i = 0; i < filtradas.length; i++) {
+      var row = filtradas[i];
+
+      var grupoOriginal = (row[IDX_GRUPO] || "").toString().trim();
+      if (!grupoOriginal) continue;
+
+      var grupoNorm = normalizarTexto_(grupoOriginal);
+      if (!grupoNorm) continue;
+
+      if (!mapa[grupoNorm]) {
+        mapa[grupoNorm] = { time: grupoOriginal, total: 0, valorTotal: 0 };
+      }
+
+      mapa[grupoNorm].total++;
+      var valor = Number(row[IDX_VALOR]) || 0;
+      mapa[grupoNorm].valorTotal += valor;
+    }
+
+    var timesArr = [];
+    for (var k in mapa) {
+      if (Object.prototype.hasOwnProperty.call(mapa, k)) {
+        timesArr.push(mapa[k]);
+      }
+    }
+
+    // ordena conforme critério
+    if (criterio === "valor") {
+      timesArr.sort(function (a, b) {
+        if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal;
+        return b.total - a.total; // empate por quantidade
+      });
+    } else {
+      timesArr.sort(function (a, b) {
+        if (b.total !== a.total) return b.total - a.total;
+        return b.valorTotal - a.valorTotal; // empate por valor
+      });
+    }
+
+    var top = timesArr.length ? timesArr[0] : null;
+
+    return {
+      ok: true,
+      criterio: criterio,
+      times: timesArr,  // [{time, total, valorTotal}, ...]
+      top: top
+    };
+  } catch (e) {
+    return { ok:false, error: "Falha em getResumoTransacoesPorTime: " + e };
   }
 }
