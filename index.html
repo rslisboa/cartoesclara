@@ -429,23 +429,50 @@ pendenciasTimeoutId = setTimeout(() => {
     chatWindow.scrollTop = chatWindow.scrollHeight;
   }
 
-  // ---- DEBUG: mostra erros de JS dentro do chat ----
-(function instalarErroNoChat(){
+  // ---- DEBUG TURBINADO: mostra erros e rejeições dentro do chat ----
+(function instalarErroNoChat() {
   if (window.__erroNoChatInstalado) return;
   window.__erroNoChatInstalado = true;
 
-  window.addEventListener("error", function (e) {
+  // Função auxiliar pra mostrar a mensagem no chat
+  function mostrarErro(titulo, msg, linha, arquivo) {
     try {
-      var msg = (e && e.message) ? e.message : String(e);
       renderBotMessage(
         "HTML:<div style='font-family:Arial,sans-serif;font-size:12px;color:#B00020;background:#FFECEC;padding:8px;border:1px solid #B00020;border-radius:6px'>" +
-        "<b>Erro de script:</b> " + msg + "<br/>" +
-        "<small>(" + (e && e.filename ? e.filename : "inline") + ":" + (e && e.lineno ? e.lineno : "?") + ")</small>" +
+          "<b>" + titulo + ":</b> " + msg +
+          (linha ? "<br/><small>(" + (arquivo || "inline") + ":" + linha + ")</small>" : "") +
         "</div>"
       );
-    } catch (_) {}
+    } catch (_) {
+      console.error("Erro ao mostrar debug no chat:", msg);
+    }
+  }
+
+  // 1️⃣ Erros comuns de execução
+  window.addEventListener("error", function (e) {
+    const msg = e.message || String(e);
+    mostrarErro("Erro de script", msg, e.lineno, e.filename);
   });
+
+  // 2️⃣ Promises rejeitadas (async/await sem catch)
+  window.addEventListener("unhandledrejection", function (e) {
+    const msg = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+    mostrarErro("Promise rejeitada", msg);
+  });
+
+  // 3️⃣ Aviso de que o script carregou e debug está ativo
+  window.addEventListener("DOMContentLoaded", function () {
+    console.log("✅ Debug do chat ativado!");
+  });
+
+  // 4️⃣ Falhas no carregamento de scripts externos
+  window.addEventListener("error", function (e) {
+    if (e.target && e.target.tagName === "SCRIPT") {
+      mostrarErro("Falha ao carregar script", e.target.src || "(inline script)");
+    }
+  }, true);
 })();
+
 
 
   function hideTypingIndicator() {
@@ -2458,7 +2485,6 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
             .getPendenciasPorLoja(loja);
     }
 
-
                 function consultarPendenciasBloqueio(loja) {
         google.script.run
             .withSuccessHandler(res => {
@@ -2796,56 +2822,6 @@ if (detRankTimes) {
   return; // igual ao seu bloco de "detTimes", encerra aqui
 }
 
-// >>> RANKING DE TIMES (top N)
-const detRankTimes = detectarRankingTimes(msgUsuario, norm);
-if (detRankTimes) {
-  const p    = detRankTimes.periodo;
-  const tipo = detRankTimes.tipo || "valor";      // "valor" ou "quantidade"
-  const topN = detRankTimes.topN ?? 10;           // padrão: 10
-  const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
-  const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
-
-  renderBotMessage(
-    "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de times</b> por " +
-    (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
-    (p ? " no período solicitado" : "") + "…</p>"
-  );
-
-  google.script.run
-    .withSuccessHandler(function (res) {
-      renderResumoTransacoesPorTime(res, { topN: topN });
-    })
-    .withFailureHandler(function () {
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
-    })
-    .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
-
-  return; // igual ao seu bloco de "detTimes", encerra aqui
-}
-
-// >>> TIMES (plural e singular)
-const detTimes = detectarConsultasTimes(msgUsuario, norm);
-if (detTimes) {
-  const p    = detTimes.periodo;
-  const tipo = detTimes.tipo || "valor";
-  const topN = detTimes.topN; // null => TODOS
-  const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
-  const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
-
-  renderBotMessage("HTML:<p class='text-sm text-slate-700'>" +
-    (detTimes.modo === "singular" ? "Buscando o <b>time campeão</b>" : "Montando <b>ranking de times</b>") +
-    " por " + (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
-    (p ? " no período solicitado" : "") + "…</p>");
-
-  google.script.run
-    .withSuccessHandler(function (res) { renderResumoTransacoesPorTime(res, { topN: topN }); })
-    .withFailureHandler(function () {
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
-    })
-    .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
-
-  return;
-}
 
 function detectarConsultasTimes(msgOriginal, norm) {
   const t = norm || "";
@@ -2901,7 +2877,7 @@ if (detRankLoja) {
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>");
     })
-    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
+    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, "tipo);
 
   return null;
 }
@@ -2925,11 +2901,14 @@ if (detLojasPlural) {
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
   google.script.run
-    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: null, forGroup: true }); })
+    .withSuccessHandler(function (res) {
+  const n = (topN == null && !grupo) ? 10 : topN; // 10 só no geral; por time você decide
+  renderResumoTransacoesSemana(res, { topN: n, forGroup: true });
+})
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja por time).</p>");
     })
-    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, "tipo);
+    .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
 
   return null;
 }
@@ -2952,9 +2931,10 @@ if (detRankTime) {
 
 google.script.run
   .withSuccessHandler(function (res) {
-    // se veio "top 5", respeita; se não veio top, default do renderer = 10 (e mostramos aviso mais acima)
-    renderResumoTransacoesSemana(res, { topN: topN, forGroup: !!grupo });
-  })
+  const n = (topN == null && !grupo) ? 10 : topN;
+  renderResumoTransacoesSemana(res, { topN: n, forGroup: !!grupo });
+})
+
   .withFailureHandler(function () {
     renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (lojas).</p>");
   })
