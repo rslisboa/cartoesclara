@@ -357,32 +357,6 @@
 document.addEventListener("DOMContentLoaded", () => {
     const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png";
 
-        // === CONTROLE DE CARREGAMENTO DO GOOGLE CHARTS ===
-    let chartsReady = false;
-    let chartJobsQueue = [];
-
-    function initGoogleChartsReady() {
-      // tenta registrar callback quando o Google Charts terminar de carregar
-      if (window.google && google.charts && google.charts.setOnLoadCallback) {
-        google.charts.setOnLoadCallback(function () {
-          chartsReady = true;
-
-          // executa qualquer gráfico que ficou pendente
-          const fila = chartJobsQueue.slice();
-          chartJobsQueue = [];
-          fila.forEach(fn => {
-            try { fn(); } catch (e) { console.error("Erro ao desenhar gráfico pendente:", e); }
-          });
-        });
-      } else {
-        // se ainda não carregou, tenta de novo depois de 300ms
-        setTimeout(initGoogleChartsReady, 300);
-      }
-    }
-
-    // inicia a verificação
-    initGoogleChartsReady();
-
 
         // Nome vindo do template Apps Script (Code.gs → tmpl.userName)
     const userName = <?= JSON.stringify(userName || "") ?>;
@@ -476,118 +450,184 @@ setTimeout(() => {
       return n * multiplicador;
     }
 
-        // Procura uma <table> dentro da resposta e desenha um gráfico de barras
-    function desenharGraficoParaTabelaSeExistir(bubble) {
-      const table = bubble.querySelector("table");
-      if (!table) return; // resposta sem tabela → nada a fazer
+    // Procura uma <table> na bolha do bot e, se achar dados numéricos, desenha um gráfico de barras
+function desenharGraficoSeTiverTabela(bubble) {
+  if (!window.google || !google.visualization) {
+    // se o Google Charts ainda não estiver pronto, deixa para depois
+    chartJobsQueue.push(() => desenharGraficoSeTiverTabela(bubble));
+    return;
+  }
 
-      // Se o Google Charts ainda não estiver pronto, tenta de novo em 500ms
-      if (!window.google || !window.google.visualization || !window.vektorChartsReady) {
-        setTimeout(function () {
-          desenharGraficoParaTabelaSeExistir(bubble);
-        }, 500);
-        return;
-      }
+  const table = bubble.querySelector("table");
+  if (!table) return; // essa resposta não tem tabela
 
-      const linhas = table.querySelectorAll("tr");
-      if (linhas.length < 2) return; // precisa de cabeçalho + pelo menos 1 linha
+  const linhas = table.querySelectorAll("tr");
+  if (linhas.length < 2) return; // cabeçalho + pelo menos 1 linha
 
-      const headerCells = linhas[0].querySelectorAll("th,td");
-      const numCols = headerCells.length;
-      if (numCols < 2) return;
+  const headerCells = linhas[0].querySelectorAll("th,td");
+  if (headerCells.length < 2) return;
 
-      // 👉 Escolhe automaticamente QUAL coluna é numérica (valor / quantidade)
-      let numericColIndex = -1;
-      let bestCount = 0;
+  const categoriaIndex = 0; // primeira coluna = Loja / Time / etc.
 
-      // começa da coluna 1 (coluna 0 vamos usar como categoria: loja / time / mês)
-      for (let j = 1; j < numCols; j++) {
-        let count = 0;
-        for (let i = 1; i < linhas.length; i++) {
-          const cells = linhas[i].querySelectorAll("th,td");
-          if (cells.length <= j) continue;
-          const v = vektorParseNumero(cells[j].innerText);
-          if (!isNaN(v)) count++;
-        }
-        if (count > bestCount) {
-          bestCount = count;
-          numericColIndex = j;
-        }
-      }
+  // ---------- 1) Descobre qual coluna numérica usar (VALOR x QUANTIDADE) ----------
+  let idxValor = -1;
+  let idxQtd   = -1;
 
-      // se não achar nenhuma coluna numérica, avisa e sai
-      if (numericColIndex === -1 || bestCount === 0) {
-        const msg = document.createElement("p");
-        msg.style.fontSize = "11px";
-        msg.style.color = "#64748b";
-        msg.style.marginTop = "8px";
-        msg.textContent = "(Não consegui montar o gráfico: não achei uma coluna numérica na tabela.)";
-        bubble.appendChild(msg);
-        return;
-      }
+  for (let j = 1; j < headerCells.length; j++) {
+    const txt = (headerCells[j].innerText || "").toLowerCase();
 
-      const categoriaIndex = 0; // primeira coluna = loja / time / mês
-
-      const labelCategoria = (headerCells[categoriaIndex].innerText || "Categoria").trim();
-      let labelValor = (headerCells[numericColIndex].innerText || "Valor").trim();
-
-      // Ajusta rótulo do eixo conforme o tipo
-      const headerValorNorm = labelValor.toLowerCase();
-      if (headerValorNorm.includes("transa") || headerValorNorm.includes("qtd") || headerValorNorm.includes("quant")) {
-        labelValor = "Quantidade de transações";
-      } else {
-        labelValor = "Valor em R$";
-      }
-
-      const dataArray = [[labelCategoria, labelValor]];
-
-      // Lê as linhas: categoria (coluna 0) + valor (coluna numérica que detectamos)
-      for (let i = 1; i < linhas.length; i++) {
-        const cells = linhas[i].querySelectorAll("th,td");
-        if (cells.length <= numericColIndex) continue;
-
-        const categoria = (cells[categoriaIndex].innerText || "").trim();
-        const valor = vektorParseNumero(cells[numericColIndex].innerText);
-
-        if (!categoria || isNaN(valor)) continue;
-        dataArray.push([categoria, valor]);
-      }
-
-      if (dataArray.length <= 1) {
-        return; // não tem dados suficientes
-      }
-
-      // Cria o <div> do gráfico logo abaixo da tabela
-      const chartDiv = document.createElement("div");
-      chartDiv.style.width = "100%";
-      chartDiv.style.height = "320px";
-      chartDiv.style.marginTop = "16px";
-      chartDiv.className = "mt-4 border border-slate-200 rounded-lg";
-      bubble.appendChild(chartDiv);
-
-      const data = google.visualization.arrayToDataTable(dataArray);
-
-      const options = {
-        title: "",
-        legend: { position: "top", textStyle: { fontSize: 12 } },
-        backgroundColor: "transparent",
-        chartArea: { left: 200, top: 30, width: "55%", height: "70%" },
-        hAxis: {
-          minValue: 0,
-          textStyle: { fontSize: 11 }
-        },
-        vAxis: {
-          textStyle: { fontSize: 12 }
-        },
-        // verde no padrão Vektor
-        colors: ["#005E27"],
-        bar: { groupWidth: "70%" }
-      };
-
-      const chart = new google.visualization.BarChart(chartDiv);
-      chart.draw(data, options);
+    // candidatos a coluna de VALOR em R$
+    if (idxValor === -1 &&
+        (txt.includes("valor") || txt.includes("r$") || txt.includes("vlr"))) {
+      idxValor = j;
     }
 
+    // candidatos a coluna de QUANTIDADE de transações
+    if (idxQtd === -1 &&
+        (txt.includes("transa") || txt.includes("qtd") || txt.includes("quant"))) {
+      idxQtd = j;
+    }
+  }
+
+  let numericColIndex = -1;
+  let ehQuantidade    = true; // assume quantidade, ajusta depois
+
+  // Regra principal:
+  // 1) Se existir coluna de "Valor", usamos ela (gráfico de VALOR).
+  // 2) Senão, se existir coluna de "Transações"/"Qtd", usamos ela (gráfico de QUANTIDADE).
+  // 3) Senão, caímos no fallback: primeira coluna numérica com dados.
+  if (idxValor !== -1) {
+    numericColIndex = idxValor;
+    ehQuantidade    = false;
+  } else if (idxQtd !== -1) {
+    numericColIndex = idxQtd;
+    ehQuantidade    = true;
+  } else {
+    // ---------- Fallback: procura a primeira coluna realmente numérica ----------
+    let bestCount = 0;
+
+    for (let j = 1; j < headerCells.length; j++) {
+      let count = 0;
+      for (let i = 1; i < linhas.length; i++) {
+        const cells = linhas[i].querySelectorAll("th,td");
+        if (cells.length <= j) continue;
+
+        const v = parseNumeroBrasil(cells[j].innerText);
+        if (!isNaN(v)) count++;
+      }
+      if (count > bestCount) {
+        bestCount      = count;
+        numericColIndex = j;
+      }
+    }
+
+    if (numericColIndex === -1 || bestCount === 0) return;
+
+    // tenta adivinhar se é quantidade ou valor pelo tamanho dos números
+    let maxValor = 0;
+    for (let i = 1; i < linhas.length; i++) {
+      const cells = linhas[i].querySelectorAll("th,td");
+      if (cells.length <= numericColIndex) continue;
+
+      const v = parseNumeroBrasil(cells[numericColIndex].innerText);
+      if (!isNaN(v) && v > maxValor) maxValor = v;
+    }
+    ehQuantidade = maxValor <= 100; // se for número pequeno, tende a ser quantidade
+  }
+
+  const labelCategoria = (headerCells[categoriaIndex].innerText || "Categoria").trim();
+
+  let labelValor;
+  if (ehQuantidade) {
+    labelValor = "Quantidade de transações";
+  } else {
+    labelValor = "Valor de transações (R$)";
+  }
+
+  // ---------- 2) Monta o array de dados (categoria + valor) ----------
+  const dados = [];
+
+  for (let i = 1; i < linhas.length; i++) {
+    const cells = linhas[i].querySelectorAll("th,td");
+    if (cells.length <= numericColIndex) continue;
+
+    const categoria = (cells[categoriaIndex].innerText || "").trim();
+    const n = parseNumeroBrasil(cells[numericColIndex].innerText);
+
+    if (!categoria || isNaN(n)) continue;
+    dados.push({ categoria, valor: n });
+  }
+
+  if (!dados.length) return;
+
+  // Ordena em ordem DECRESCENTE, como você pediu
+  dados.sort((a, b) => b.valor - a.valor);
+
+  const dataArray = [[labelCategoria, labelValor]];
+  dados.forEach(d => {
+    dataArray.push([d.categoria, d.valor]);
+  });
+
+  // ---------- 3) Cria o container do gráfico ----------
+  const chartDiv = document.createElement("div");
+  chartDiv.style.width = "100%";
+  chartDiv.style.height = "320px";
+  chartDiv.style.marginTop = "16px";
+  chartDiv.className = "mt-4 border border-slate-200 rounded-lg";
+  bubble.appendChild(chartDiv);
+
+  // ---------- 4) Monta o TÍTULO correto ----------
+  const numLinhas = dados.length;
+  const catNorm   = labelCategoria.toLowerCase();
+  let sujeito;
+
+  if (catNorm.includes("loja")) {
+    sujeito = numLinhas === 1 ? "Loja" : "Lojas";
+  } else if (catNorm.includes("time")) {
+    sujeito = numLinhas === 1 ? "Time" : "Times";
+  } else {
+    sujeito = numLinhas === 1 ? labelCategoria : labelCategoria + "s";
+  }
+
+  const titulo =
+    ehQuantidade
+      ? `${sujeito} com maior quantidade de transações`
+      : `${sujeito} com maior valor de transações`;
+
+  // ---------- 5) Desenha o gráfico ----------
+  const desenhar = () => {
+    const data = google.visualization.arrayToDataTable(dataArray);
+
+    const options = {
+      title: titulo,
+      legend: { position: "top", textStyle: { fontSize: 12 } },
+      backgroundColor: "rgba(255,255,255,0.9)", // fundo ~90% branco
+      chartArea: { left: 220, top: 40, width: "60%", height: "70%" },
+      hAxis: {
+        minValue: 0,
+        textStyle: { fontSize: 11 },
+        gridlines: { color: "#000000", count: 5 } // linhas de grade finas pretas
+      },
+      vAxis: {
+        textStyle: { fontSize: 12 }
+      },
+      colors: ["#005E27"],
+      bar: {
+        // se tiver MUITAS lojas/times, diminui a largura das barras pra espaçar melhor
+        groupWidth: dados.length > 12 ? "50%" : "70%"
+      }
+    };
+
+    const chart = new google.visualization.BarChart(chartDiv);
+    chart.draw(data, options);
+  };
+
+  if (chartsReady) {
+    desenhar();
+  } else {
+    chartJobsQueue.push(desenhar);
+  }
+}
 
         function iniciarTimeoutPendencias() {
         // limpa qualquer timeout pendente
@@ -596,116 +636,7 @@ setTimeout(() => {
             pendenciasTimeoutId = null;
         }
 
-            // Converte textos no padrão PT-BR para número (ex.: "340,8 mil", "59,1", "R$ 10.500,00")
-    function parseNumeroBrasil(texto) {
-      if (!texto) return NaN;
-
-      let t = String(texto).toLowerCase();
-
-      // identifica "mil"
-      let multiplicador = 1;
-      if (t.includes(" mil")) {
-        multiplicador = 1000;
-      }
-
-      // remove palavras e símbolos (R$, "mil", etc.)
-      t = t.replace(/mil/gi, "");
-      t = t.replace(/[^\d,.\-]/g, "");
-
-      // remove pontos de milhar e troca vírgula por ponto
-      t = t.replace(/\./g, "").replace(",", ".");
-
-      const n = parseFloat(t);
-      if (isNaN(n)) return NaN;
-      return n * multiplicador;
-    }
-
-    // Procura uma <table> na bolha do bot e, se achar dados numéricos, desenha um gráfico de barras
-    function desenharGraficoSeTiverTabela(bubble) {
-      if (!window.google || !google.visualization) {
-        // se o Google Charts ainda não estiver pronto, deixa para depois
-        chartJobsQueue.push(() => desenharGraficoSeTiverTabela(bubble));
-        return;
-      }
-
-      const table = bubble.querySelector("table");
-      if (!table) return; // essa resposta não tem tabela, então não faz nada
-
-      const linhas = table.querySelectorAll("tr");
-      if (linhas.length < 2) return; // precisa ter pelo menos cabeçalho + 1 linha
-
-      const headerCells = linhas[0].querySelectorAll("th,td");
-      if (headerCells.length < 2) return;
-
-      const labelCategoria = (headerCells[0].innerText || "Categoria").trim();
-      let labelValor = (headerCells[1].innerText || "Valor").trim();
-
-      // tenta descobrir se é valor em R$ ou quantidade de transações
-      const headerValorNorm = labelValor.toLowerCase();
-      if (headerValorNorm.includes("transa") || headerValorNorm.includes("qtd") || headerValorNorm.includes("quant")) {
-        labelValor = "Quantidade de transações";
-      } else {
-        labelValor = "Valor em R$";
-      }
-
-      const dataArray = [[labelCategoria, labelValor]];
-
-      // Lê as demais linhas da tabela (lojas/times + valor)
-      for (let i = 1; i < linhas.length; i++) {
-        const cells = linhas[i].querySelectorAll("th,td");
-        if (cells.length < 2) continue;
-
-        const categoria = (cells[0].innerText || "").trim();
-        const valor = parseNumeroBrasil(cells[1].innerText);
-
-        if (!categoria || isNaN(valor)) continue;
-        dataArray.push([categoria, valor]);
-      }
-
-      if (dataArray.length <= 1) return; // só cabeçalho, sem dados
-
-      // Cria o container do gráfico logo abaixo da tabela
-      const chartDiv = document.createElement("div");
-      chartDiv.style.width = "100%";
-      chartDiv.style.height = "320px";
-      chartDiv.style.marginTop = "16px";
-      chartDiv.className = "mt-4 border border-slate-200 rounded-lg";
-      bubble.appendChild(chartDiv);
-
-      const desenhar = () => {
-        const data = google.visualization.arrayToDataTable(dataArray);
-
-        const options = {
-          title: "",
-          legend: { position: "top", textStyle: { fontSize: 12 } },
-          backgroundColor: "transparent",
-          chartArea: { left: 200, top: 30, width: "55%", height: "70%" },
-          hAxis: {
-            minValue: 0,
-            textStyle: { fontSize: 11 }
-          },
-          vAxis: {
-            textStyle: { fontSize: 12 }
-          },
-          // cor verde no padrão do Vektor
-          colors: ["#005E27"],
-          bar: { groupWidth: "70%" }
-        };
-
-        const chart = new google.visualization.BarChart(chartDiv);
-        chart.draw(data, options);
-      };
-
-      // Se o Charts já estiver pronto, desenha; se não, deixa na fila
-      if (chartsReady) {
-        desenhar();
-      } else {
-        chartJobsQueue.push(desenhar);
-      }
-    }
-
-// 🗣️ mensagens alternativas de fechamento
-const mensagensOutroAssunto = [
+    const mensagensOutroAssunto = [
   "Quer falar sobre outro assunto? Se sim, pode mandar bala!",
   "Quer aproveitar e falar de outro tema?",
   "Quer conversar sobre outra coisa?",
@@ -842,7 +773,7 @@ pendenciasTimeoutId = setTimeout(() => {
 
           // NOVO: tenta desenhar gráfico se essa resposta tiver tabela com valores/transações
           try {
-            desenharGraficoSeTiverTabela(bubble);
+            desenharGraficoParaTabelaSeExistir(bubble);
           } catch (e) {
             console.error("Erro ao desenhar gráfico:", e);
           }
@@ -1153,7 +1084,7 @@ function encontrarTimeNaMensagem(msgOriginal) {
   {
     nome: "LANCHES DE REFEIÇÕES",
     palavrasChave: [
-      "lanche", "coffee break", "café", "bolo", "salgado", "biscoito", "refrigerante", "suco", "premiação", "treinamento", "ação interna", "almoco", "almoço", "jantar", "pizza", "comida", "refeicao", "refeição", "confraternização", "confraternizacao", "evento interno", "kit lanche", "break", "agua", "água", "doces", "chocolates", "frutas", "pão", "pao", "torta", "sanduíche", "sanduiche", "kit café", "bebidas", "snacks", "celebracao", "celebração", "coquetel", "buffet", "catering", "alimentos",
+      "lanche", "coffee break", "café", "bolo", "salgado", "biscoito", "refrigerante", "suco", "premiação", "treinamento", "ação interna", "almoco", "almoço", "jantar", "pizza", "comida", "refeicao", "refeição", "confraternização", "confraternizacao", "evento interno", "kit lanche", "break", "doces", "chocolates", "frutas", "pão", "pao", "torta", "sanduíche", "sanduiche", "kit café", "bebidas", "snacks", "celebracao", "celebração", "coquetel", "buffet", "catering", "alimentos",
   "compra de comida", "alimentacao", "alimentação", "workshop", "curso", "reuniao", "reunião"
     ],
     descricao:
@@ -4264,7 +4195,7 @@ if (tabelaHtml) {
         "onclick=\"exportTableToCSV(this, 'transacoes_lojas')\" " +
         "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
                "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-        "⬇ Exportar CSV" +
+        "⬇ Exportar tabela em CSV" +
       "</button>" +
     "</div>";
 }
@@ -4375,7 +4306,7 @@ if (tabelaHtml) {
         "onclick=\"exportTableToCSV(this, 'transacoes_times')\" " +
         "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
                "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-        "⬇ Exportar CSV" +
+        "⬇ Exportar tabela em CSV" +
       "</button>" +
     "</div>";
 }
