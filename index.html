@@ -567,6 +567,78 @@ pendenciasTimeoutId = setTimeout(() => {
           notificarNovaMensagem(text);
         }
 
+          // ========= EXPORTAÇÃO DE TABELA PARA CSV =========
+
+  // Usado pelo botão "⬇ Exportar CSV" dentro das respostas com tabela.
+  // IMPORTANT: precisa estar dentro do document.addEventListener("DOMContentLoaded", ...)
+  // e exposto em window para o onclick funcionar.
+  window.exportTableToCSV = function(btn, defaultFileName) {
+    try {
+      // 1. Encontrar o container da mensagem do bot onde o botão está
+      var container = btn.closest(".bot-bubble");
+      if (!container) {
+        container = btn.closest("div");
+      }
+
+      if (!container) {
+        alert("Não consegui localizar a tabela para exportar.");
+        return;
+      }
+
+      // 2. Achar a tabela dentro dessa resposta
+      var table = container.querySelector("table");
+      if (!table) {
+        alert("Não encontrei nenhuma tabela nessa resposta para exportar.");
+        return;
+      }
+
+      // 3. Montar o CSV linha a linha
+      var linhas = table.querySelectorAll("tr");
+      var csvLinhas = [];
+
+      for (var i = 0; i < linhas.length; i++) {
+        var cols = linhas[i].querySelectorAll("th,td");
+        var linhaCampos = [];
+        for (var j = 0; j < cols.length; j++) {
+          var texto = (cols[j].innerText || "").replace(/\s+/g, " ").trim();
+
+          // Escapa aspas duplas
+          texto = texto.replace(/"/g, '""');
+
+          // Se tiver ;, quebra de linha ou aspas, envolve em aspas
+          if (/[;"\n]/.test(texto)) {
+            texto = '"' + texto + '"';
+          }
+
+          linhaCampos.push(texto);
+        }
+
+        // Usando ; como separador (mais comum no Excel PT-BR)
+        csvLinhas.push(linhaCampos.join(";"));
+      }
+
+      var csv = csvLinhas.join("\n");
+
+      // 4. Criar o arquivo e disparar o download
+      var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      var agora = new Date();
+      var stamp = agora.toISOString().slice(0,19).replace(/[:T\-]/g,"");
+
+      a.href = url;
+      a.download = (defaultFileName || "exportacao") + "_" + stamp + ".csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error("Erro ao exportar CSV:", e);
+      alert("Não consegui gerar o CSV desta tabela.");
+    }
+  };
+
     /* ========= NORMALIZAÇÃO ========= */
     function normalize(str) {
         return (str || "")
@@ -3898,15 +3970,30 @@ if (m) {
   }
   var tabelaHtml = linhasTabela.join("");
 
-  var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
-  var html = [
-    "<div class='text-sm text-slate-700'>",
-      "<p>", fraseResumo, "</p>",
-      tabelaHtml,
-    "</div>"
-  ].join("");
+  // 🔽 Botão de exportação em CSV (só aparece se tiver tabela)
+var botaoCsv = "";
+if (tabelaHtml) {
+  botaoCsv =
+    "<div style='margin-top:8px;text-align:right;'>" +
+      "<button type='button' " +
+        "onclick=\"exportTableToCSV(this, 'transacoes_lojas')\" " +
+        "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+               "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+        "⬇ Exportar CSV" +
+      "</button>" +
+    "</div>";
+}
 
-  renderBotMessage("HTML:" + html);
+var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
+var html = [
+  "<div class='text-sm text-slate-700'>",
+    "<p>", fraseResumo, "</p>",
+    tabelaHtml,
+    botaoCsv,
+  "</div>"
+].join("");
+
+renderBotMessage("HTML:" + html);
 }
 
 // RESUMO POR TIME INICIO //
@@ -3994,15 +4081,30 @@ function renderResumoTransacoesPorTime(resumo, opts) {
   }
   var tabelaHtml = linhasTabela.join("");
 
-  var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
-  var html = [
-    "<div class='text-sm text-slate-700'>",
-      "<p>", fraseResumo, "</p>",
-      tabelaHtml,
-    "</div>"
-  ].join("");
+  // 🔽 Botão de exportação em CSV para o resumo por TIME
+var botaoCsv = "";
+if (tabelaHtml) {
+  botaoCsv =
+    "<div style='margin-top:8px;text-align:right;'>" +
+      "<button type='button' " +
+        "onclick=\"exportTableToCSV(this, 'transacoes_times')\" " +
+        "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+               "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+        "⬇ Exportar CSV" +
+      "</button>" +
+    "</div>";
+}
 
-  renderBotMessage("HTML:" + html);
+var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
+var html = [
+  "<div class='text-sm text-slate-700'>",
+    "<p>", fraseResumo, "</p>",
+    tabelaHtml,
+    botaoCsv,
+  "</div>"
+].join("");
+
+renderBotMessage("HTML:" + html);
 }
 
 // Extrai "top N" (ex.: "top 5", "top5"). Se não houver "top", retorna null.
