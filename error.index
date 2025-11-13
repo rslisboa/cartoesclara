@@ -336,10 +336,7 @@
               <!-- Carregamento do Google Charts -->
 
 <script src="https://www.gstatic.com/charts/loader.js"></script>
-<script>
-  google.charts.load('current', { packages: ['corechart'] });
-</script>
-
+<script> google.charts.load('current', { packages: ['corechart'] });</script>
 
 <script>
   // Fecha o modal do vídeo de apresentação
@@ -349,7 +346,7 @@
       modal.style.display = "none";
     }
   }
-
+  
 
 document.addEventListener("DOMContentLoaded", () => {
     const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png";
