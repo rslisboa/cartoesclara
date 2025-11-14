@@ -658,6 +658,54 @@ pendenciasTimeoutId = setTimeout(() => {
     }
   };
 
+
+
+  // ========= DRILL-DOWN: EXPANDIR LINHA DA TABELA ========= //
+
+window.vektorExpandirLinha = function (tr, tipoTabela) {
+  try {
+    if (!tr || !tr.cells || tr.cells.length === 0) return;
+
+    const chave = (tr.cells[0].innerText || "").trim();
+    if (!chave || chave === "TOTAL") return;
+
+    let pergunta = "";
+
+    // TIME → LOJAS
+    if (tipoTabela === "time") {
+      pergunta = `top 10 lojas com maior valor de gastos para o time ${chave}`;
+    }
+
+    // LOJA → ESTABELECIMENTOS
+    else if (tipoTabela === "loja") {
+      pergunta = `top 10 estabelecimentos com maior valor de gastos para a loja ${chave}`;
+    }
+
+    // ESTABELECIMENTO → LOJAS
+    else if (tipoTabela === "estabelecimento") {
+      pergunta = `quais lojas mais gastaram no estabelecimento ${chave}`;
+    }
+
+    // CATEGORIA → LOJAS
+    else if (tipoTabela === "categoria") {
+      pergunta = `quais lojas mais gastaram na categoria ${chave}`;
+    }
+
+    if (!pergunta) return;
+
+    const input = document.getElementById("userInput");
+    const form  = document.getElementById("chatForm");
+
+    if (!input || !form) return;
+
+    input.value = pergunta;
+    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+
+  } catch (e) {
+    console.error("Erro no drill:", e);
+  }
+};
+
     /* ========= NORMALIZAÇÃO ========= */
     function normalize(str) {
         return (str || "")
@@ -4046,17 +4094,22 @@ if (m) {
       var pctQtd = (totalQtd > 0)   ? ((qtd / totalQtd)   * 100).toFixed(1) + "%" : "—";
       var pctVal = (totalValor > 0) ? ((val / totalValor) * 100).toFixed(1) + "%" : "—";
 
+      var hint = "Clique para detalhar: ver estabelecimentos da loja " + l.loja;
+
       linhasTabela.push(
-        "<tr>" +
-          "<td style='border:1px solid #000;'>" + l.loja + "</td>" +
-          "<td style='border:1px solid #000;'>" + qtd + "</td>" +
-          "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
-          "<td style='border:1px solid #000;'>" +
-            val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
-          "</td>" +
-          "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
-        "</tr>"
-      );
+    "<tr onclick=\"vektorExpandirLinha(this,'loja')\" " +
+      "style='cursor:pointer;' " +
+      "title=\"" + hint + "\">" +
+      "<td style='border:1px solid #000;'>" + l.loja + "</td>" +
+      "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+      "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+      "<td style='border:1px solid #000;'>" +
+        val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+      "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+    "</tr>"
+  );
+
     }
 
     // TOTAL
@@ -4157,17 +4210,24 @@ function renderResumoTransacoesPorTime(resumo, opts) {
       var pctQtd = (totalQtd > 0)   ? ((qtd / totalQtd)   * 100).toFixed(1) + "%" : "—";
       var pctVal = (totalValor > 0) ? ((val / totalValor) * 100).toFixed(1) + "%" : "—";
 
-      linhasTabela.push(
-        "<tr>" +
-          "<td style='border:1px solid #000;'>" + t.time + "</td>" +
-          "<td style='border:1px solid #000;'>" + qtd + "</td>" +
-          "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
-          "<td style='border:1px solid #000;'>" +
-            val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
-          "</td>" +
-          "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
-        "</tr>"
-      );
+      var hint = "Clique para detalhar: ver lojas do time " + t.time;
+
+  var hint = "Clique para detalhar: ver lojas do time " + t.time;
+
+  linhasTabela.push(
+    "<tr onclick=\"vektorExpandirLinha(this,'time')\" " +
+      "style='cursor:pointer;' " +
+      "title=\"" + hint + "\">" +
+      "<td style='border:1px solid #000;'>" + t.time + "</td>" +
+      "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+      "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+      "<td style='border:1px solid #000;'>" +
+        val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+      "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+    "</tr>"
+  );
+
     }
 
     // TOTAL
@@ -4205,6 +4265,7 @@ var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45c
 var html = [
   "<div class='text-sm text-slate-700'>",
     "<p>", fraseResumo, "</p>",
+    "<p style='font-size:11px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>",
     tabelaHtml,
     botaoCsv,
   "</div>"
@@ -4226,6 +4287,17 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   var tipoChave = opts.tipoChave || "Categoria"; // ou "Estabelecimento"
   var titulo    = opts.titulo || ("Resumo por " + tipoChave.toLowerCase());
   var topN      = (typeof opts.topN === "number" && opts.topN > 0) ? opts.topN : null;
+
+    var tipoTabelaExpand = (tipoChave.toLowerCase() === "estabelecimento")
+    ? "estabelecimento"
+    : "categoria";
+
+
+    // para o drill-down: se for Estabelecimento ou Categoria
+    var tipoTabelaExpand = (tipoChave.toLowerCase() === "estabelecimento")
+    ? "estabelecimento"
+    : "categoria";
+
 
   // Descobre qual lista veio do backend
   var lista = [];
@@ -4252,6 +4324,7 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   // Calcula somatórios para porcentagens
   var totalQtd = 0;
   var totalValor = 0;
+
   for (var i = 0; i < lista.length; i++) {
     var it = lista[i];
     totalQtd   += Number(it.total || it.qtd || 0);
@@ -4290,17 +4363,26 @@ function renderResumoPorChaveGenerico(resumo, opts) {
     var pctQtd = totalQtd   > 0 ? ((qtd   / totalQtd)   * 100).toFixed(1) + "%" : "—";
     var pctVal = totalValor > 0 ? ((valor / totalValor) * 100).toFixed(1) + "%" : "—";
 
+     var hint = "";
+  if (tipoTabelaExpand === "estabelecimento") {
+    hint = "Clique para detalhar: ver lojas que mais gastaram neste estabelecimento.";
+  } else {
+    hint = "Clique para detalhar: ver lojas que mais gastaram nesta categoria.";
+  }
+
     linhasTabela.push(
-      "<tr>" +
-        "<td style='border:1px solid #000;'>" + nome + "</td>" +
-        "<td style='border:1px solid #000;'>" + qtd + "</td>" +
-        "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
-        "<td style='border:1px solid #000;'>" +
-          valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
-        "</td>" +
-        "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
-      "</tr>"
-    );
+    "<tr onclick=\"vektorExpandirLinha(this,'" + tipoTabelaExpand + "')\" " +
+      "style='cursor:pointer;' title=\"" + hint + "\">" +
+      "<td style='border:1px solid #000;'>" + nome + "</td>" +
+      "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+      "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+      "<td style='border:1px solid #000;'>" +
+        valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+      "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+    "</tr>"
+  );
+
   }
 
   // Linha de TOTAL
@@ -4334,11 +4416,12 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   }
 
   var html =
-    "<div class='text-sm text-slate-700'>" +
-      "<p>" + titulo + "</p>" +
-      linhasTabela.join("") +
-      botaoCsv +
-    "</div>";
+  "<div class='text-sm text-slate-700'>" +
+    "<p>" + titulo + "</p>" +
+    "<p style='font-size:11px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>" +
+    linhasTabela.join("") +
+    botaoCsv +
+  "</div>";
 
   renderBotMessage("HTML:" + html);
 }
@@ -4588,6 +4671,20 @@ function detectarRankingTimes(msgOriginal, norm) {
 
 function detectarRankingLojas(msgOriginal, norm) {
   const texto = norm || "";
+
+  // 🚫 Se falar de local/estabelecimento, NÃO é ranking de lojas
+  if (
+    texto.includes("estabelecimento") ||
+    texto.includes("estabelecimentos") ||
+    texto.includes("local") ||
+    texto.includes("locais") ||
+    texto.includes("lugar") ||
+    texto.includes("lugares") ||
+    texto.includes("fornecedor") ||
+    texto.includes("fornecedores")
+  ) {
+    return null;
+  }
 
   // Aceita: "ranking de lojas", "ranking geral de lojas", "top 5 lojas",
   // "ranking loja", "top 3 loja" (singular/plural)
