@@ -292,7 +292,7 @@
                     />
                     <div class="bot-bubble px-4 py-3 max-w-[80%] text-slate-700">
                         <p class="font-semibold text-slate-800 text-base">
-                            Olá! 👋 Eu sou o Vektor, agente do <b>Grupo SBF</b> especializado na Clara.
+                            Olá! 👋 Eu sou o Vektor, atleta do <b>Grupo SBF</b> especializado na Clara.
                         </p>
                     </div>
                 </div>
@@ -3096,6 +3096,93 @@ if (detLojasPlural) {
   return null;
 }
 
+// === NOVO: CONSULTAS POR CATEGORIA (BaseClara) ===
+const detCategorias = detectarPerguntaCategorias(msgUsuario, norm);
+if (detCategorias) {
+  const periodo = detCategorias.periodo;
+  const tipo    = detCategorias.tipo || "valor";
+  const topN    = detCategorias.topN;
+
+  const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
+  const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Montando <b>resumo por categoria</b> " +
+    (tipo === "valor" ? "considerando <b>valor</b>" : "por <b>quantidade de transações</b>") +
+    (periodo ? " no período solicitado" : " em toda a base") +
+    "…</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      renderResumoPorChaveGenerico(res, {
+        tipoChave: "Categoria",
+        titulo: (tipo === "valor"
+          ? "Categorias com maior valor de transações"
+          : "Categorias com maior quantidade de transações"),
+        topN: topN
+      });
+    })
+    .withFailureHandler(function () {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados por categoria.</p>");
+    })
+    .getResumoTransacoesPorCategoria(
+      dataInicioStr,
+      dataFimStr,
+      tipo
+    );
+
+  return null;
+}
+
+// === NOVO: CONSULTAS POR ESTABELECIMENTO / LOCAL (BaseClara) ===
+const detEstab = detectarPerguntaEstabelecimentos(msgUsuario, norm);
+if (detEstab) {
+  const periodo = detEstab.periodo;
+  const tipo    = detEstab.tipo || "valor";
+  const topN    = detEstab.topN;
+  const grupo   = detEstab.grupo || "";
+  const loja    = detEstab.loja  || "";
+
+  const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
+  const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
+
+  let contexto = "";
+  if (grupo) contexto += " para o time <b>" + grupo + "</b>";
+  if (loja)  contexto += (contexto ? " e " : " para ") + "a loja <b>" + loja + "</b>";
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Montando <b>resumo por estabelecimento</b>" +
+    contexto +
+    (tipo === "valor" ? " com foco em <b>valor</b>" : " por <b>quantidade de transações</b>") +
+    (periodo ? " no período solicitado" : " em toda a base") +
+    "…</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      renderResumoPorChaveGenerico(res, {
+        tipoChave: "Estabelecimento",
+        titulo: (tipo === "valor"
+          ? "Locais com maior valor de gastos"
+          : "Locais com maior quantidade de transações"),
+        topN: topN
+      });
+    })
+    .withFailureHandler(function () {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados por estabelecimento.</p>");
+    })
+    .getResumoTransacoesPorEstabelecimento(
+      dataInicioStr,
+      dataFimStr,
+      tipo,
+      grupo,
+      loja
+    );
+
+  return null;
+}
+
 // >>> TIME CAMPEÃO (singular): "qual time gastou mais ...", "time com mais transações ..."
 const detTimeCampeao = detectarPerguntaTimeMaisTransacoes(msgUsuario, norm);
 if (detTimeCampeao) {
@@ -3998,7 +4085,7 @@ if (tabelaHtml) {
         "onclick=\"exportTableToCSV(this, 'transacoes_lojas')\" " +
         "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
                "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-        "⬇ Exportar tabela em CSV" +
+        "⬇ Exportar CSV" +
       "</button>" +
     "</div>";
 }
@@ -4109,7 +4196,7 @@ if (tabelaHtml) {
         "onclick=\"exportTableToCSV(this, 'transacoes_times')\" " +
         "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
                "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-        "⬇ Exportar tabela em CSV" +
+        "⬇ Exportar CSV" +
       "</button>" +
     "</div>";
 }
@@ -4124,6 +4211,136 @@ var html = [
 ].join("");
 
 renderBotMessage("HTML:" + html);
+}
+
+// ========= RENDER GENÉRICO: CATEGORIAS / ESTABELECIMENTOS ========= //
+function renderResumoPorChaveGenerico(resumo, opts) {
+  if (!resumo || !resumo.ok) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Não consegui montar o resumo para esse pedido.</p>"
+    );
+    return;
+  }
+
+  opts = opts || {};
+  var tipoChave = opts.tipoChave || "Categoria"; // ou "Estabelecimento"
+  var titulo    = opts.titulo || ("Resumo por " + tipoChave.toLowerCase());
+  var topN      = (typeof opts.topN === "number" && opts.topN > 0) ? opts.topN : null;
+
+  // Descobre qual lista veio do backend
+  var lista = [];
+  if (Array.isArray(resumo.categorias)) {
+    lista = resumo.categorias;
+  } else if (Array.isArray(resumo.estabelecimentos)) {
+    lista = resumo.estabelecimentos;
+  } else if (Array.isArray(resumo.linhas)) {
+    lista = resumo.linhas;
+  }
+
+  if (!lista.length) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Não encontrei movimentações para esse filtro.</p>"
+    );
+    return;
+  }
+
+  // Se tiver topN, recorta
+  if (topN !== null && lista.length > topN) {
+    lista = lista.slice(0, topN);
+  }
+
+  // Calcula somatórios para porcentagens
+  var totalQtd = 0;
+  var totalValor = 0;
+  for (var i = 0; i < lista.length; i++) {
+    var it = lista[i];
+    totalQtd   += Number(it.total || it.qtd || 0);
+    totalValor += Number(it.valorTotal || it.valor || 0);
+  }
+
+  var linhasTabela = [];
+
+  linhasTabela.push(
+    "<table border='1' cellspacing='0' cellpadding='6' " +
+    "style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;" +
+    "margin-top:8px;width:100%;text-align:center;border:1px solid #000;'>"
+  );
+
+  linhasTabela.push(
+    "<tr style='background:#06167d;color:#fff'>" +
+      "<th style='border:1px solid #000;'>" + tipoChave + "</th>" +
+      "<th style='border:1px solid #000;'>Transações</th>" +
+      "<th style='border:1px solid #000;'>% Transações</th>" +
+      "<th style='border:1px solid #000;'>Valor (R$)</th>" +
+      "<th style='border:1px solid #000;'>% Valor</th>" +
+    "</tr>"
+  );
+
+  for (var j = 0; j < lista.length; j++) {
+    var l = lista[j];
+    var nome =
+      l.estabelecimento ||
+      l.categoria || 
+      l.chave ||
+      "—";
+
+    var qtd   = Number(l.total || l.qtd || 0);
+    var valor = Number(l.valorTotal || l.valor || 0);
+
+    var pctQtd = totalQtd   > 0 ? ((qtd   / totalQtd)   * 100).toFixed(1) + "%" : "—";
+    var pctVal = totalValor > 0 ? ((valor / totalValor) * 100).toFixed(1) + "%" : "—";
+
+    linhasTabela.push(
+      "<tr>" +
+        "<td style='border:1px solid #000;'>" + nome + "</td>" +
+        "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+        "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+        "<td style='border:1px solid #000;'>" +
+          valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+        "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+      "</tr>"
+    );
+  }
+
+  // Linha de TOTAL
+  linhasTabela.push(
+    "<tr style='font-weight:bold;background:#f2f2f2;'>" +
+      "<td style='border:1px solid #000;'>TOTAL</td>" +
+      "<td style='border:1px solid #000;'>" + totalQtd + "</td>" +
+      "<td style='border:1px solid #000;'>" + (totalQtd > 0 ? "100%" : "—") + "</td>" +
+      "<td style='border:1px solid #000;'>" +
+        totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+      "<td style='border:1px solid #000;'>" + (totalValor > 0 ? "100%" : "—") + "</td>" +
+    "</tr>"
+  );
+
+  linhasTabela.push("</table>");
+
+  // Botão CSV
+  var botaoCsv = "";
+  if (linhasTabela.length) {
+    var slug = tipoChave.toLowerCase();
+    botaoCsv =
+      "<div style='margin-top:8px;text-align:right;'>" +
+        "<button type='button' " +
+          "onclick=\"exportTableToCSV(this, 'resumo_" + slug + "')\" " +
+          "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "⬇ Exportar CSV" +
+        "</button>" +
+      "</div>";
+  }
+
+  var html =
+    "<div class='text-sm text-slate-700'>" +
+      "<p>" + titulo + "</p>" +
+      linhasTabela.join("") +
+      botaoCsv +
+    "</div>";
+
+  renderBotMessage("HTML:" + html);
 }
 
 // Extrai "top N" (ex.: "top 5", "top5"). Se não houver "top", retorna null.
@@ -4161,6 +4378,116 @@ function extrairCriterioGeral(texto) {
 
   if (falaDeTransacoes && !falaDeValor) return "quantidade";
   return "valor";
+}
+
+// ========= DETECTOR: CATEGORIAS ========= //
+function detectarPerguntaCategorias(msgOriginal, norm) {
+  const t = norm || "";
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  let topN      = extrairTopN(t);
+  let tipo      = extrairCriterioGeral(t);  // "valor" ou "quantidade"
+
+  // Se falar "mais uso", força tratar como quantidade (uso = número de vezes)
+  if (t.includes("mais uso")) {
+    tipo = "quantidade";
+  }
+
+  const falaCategoria =
+    t.includes("categoria") ||
+    t.includes("categorias");
+
+  if (!falaCategoria) return null;
+
+  const falaUso =
+    t.includes("mais uso") ||
+    t.includes("mais gasto") ||
+    t.includes("mais gastos") ||
+    t.includes("mais transacoes") ||
+    t.includes("mais transacao") ||
+    t.includes("maior valor") ||
+    t.includes("maior gasto") ||
+    t.includes("maior numero de transacoes") ||
+    t.includes("maior quantidade de transacoes");
+
+  if (!falaUso) return null;
+
+  // Se não tiver "top" explícito mas for "qual categoria ...", trata como top 1
+  if (!topN && /\bqual\s+categoria\b/.test(t)) {
+    topN = 1;
+  }
+
+  return {
+    periodo,
+    tipo,
+    topN
+  };
+}
+
+// ========= DETECTOR: ESTABELECIMENTOS (TRANSACAO) ========= //
+
+function detectarPerguntaEstabelecimentos(msgOriginal, norm) {
+  const t = norm || "";
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo    = extrairCriterioGeral(t);
+  let   topN    = extrairTopN(t); // let para conseguirmos ajustar para 1
+
+  // Palavras que DEFINEM claramente a intenção de estabelecimento
+  const falaLocal =
+    t.includes("estabelecimento") ||
+    t.includes("estabelecimentos") ||
+    t.includes("local") ||
+    t.includes("locais") ||
+    t.includes("lugar") ||
+    t.includes("lugares") ||
+    t.includes("fornecedor") ||
+    t.includes("fornecedores") ||
+    t.includes("transacao no") ||
+    t.includes("transacao na") ||
+    t.includes("transacao em") ||
+    t.includes("transações para") ||
+    t.includes("transação para") ||
+    t.includes("onde foi feita") ||
+    t.includes("onde foi a compra");
+
+  // Palavras que INDICAM time campeão — e por isso devem bloquear
+  const falaTimeCampeao =
+    t.includes("time que mais gastou") ||
+    t.includes("qual time gastou mais") ||
+    t.includes("time com maior valor") ||
+    t.includes("maior valor total por time") ||
+    t.includes("maior gasto por time");
+
+  // Se não for claramente estabelecimento, ou se cair no caso de time → ignora
+  if (!falaLocal || falaTimeCampeao) return null;
+
+  // Se não tem “top” mas a pessoa perguntou “qual local/estabelecimento” → força topN = 1
+  if (!topN) {
+    const temQualLocal =
+      /\bqual\s+local\b/.test(t) || /\bqual\s+locais\b/.test(t);
+    const temQualEstab =
+      /\bqual\s+estabelecimento\b/.test(t) ||
+      /\bqual\s+estabelecimentos\b/.test(t);
+
+    if (temQualLocal || temQualEstab) {
+      topN = 1;
+    }
+  }
+
+  // Tenta extrair time (opcional)
+  const grupo = encontrarTimeNaMensagem(msgOriginal) || "";
+
+  // Tenta extrair loja
+  let loja = "";
+  const mLoja = t.match(/loja\s+([a-z0-9\-]+)/);
+  if (mLoja) loja = mLoja[1];
+
+  return {
+    periodo,
+    tipo,
+    topN,
+    grupo,
+    loja
+  };
 }
 
 // ========= DETECTOR: "loja e time com maior número/valor de transações..." ========= //
@@ -4225,6 +4552,20 @@ function detectarRankingTimes(msgOriginal, norm) {
   if (/\bqual\s+time\s+(gastou|teve)\s+mais\b/.test(norm)) return null;
 
   const texto = norm || "";
+
+  // 🚫 ESCUDO: se falar de local/estabelecimento, NÃO é pergunta de time
+  if (
+    texto.includes("local") ||
+    texto.includes("locais") ||
+    texto.includes("estabelecimento") ||
+    texto.includes("estabelecimentos") ||
+    texto.includes("lugar") ||
+    texto.includes("lugares") ||
+    texto.includes("fornecedor") ||
+    texto.includes("fornecedores")
+  ) {
+    return null;
+  }
 
   // se fala explicitamente de loja(s), não é ranking de times
   if (texto.includes("lojas") || texto.includes("loja")) return null;
@@ -4313,6 +4654,20 @@ function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
 // ========= DETECTOR: "time com maior número/valor de transações ..." ========= //
 function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
   const texto = norm || "";
+
+  // 🚫 Se a frase fala de estabelecimento/local, NÃO é pergunta de time campeão
+  if (
+    texto.includes("local") ||
+    texto.includes("locais") ||
+    texto.includes("estabelecimento") ||
+    texto.includes("estabelecimentos") ||
+    texto.includes("lugar") ||
+    texto.includes("lugares") ||
+    texto.includes("fornecedor") ||
+    texto.includes("fornecedores")
+  ) {
+    return null;
+  }
 
   // fala claramente de time (não de loja)
   const falaDeTime =
