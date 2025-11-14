@@ -659,45 +659,84 @@ pendenciasTimeoutId = setTimeout(() => {
   };
 
 
+// ========= DRILL-DOWN: EXPANDIR LINHA DA TABELA (com dropdown + mesmo período) ========= //
 
-  // ========= DRILL-DOWN: EXPANDIR LINHA DA TABELA ========= //
-
-window.vektorExpandirLinha = function (tr, tipoTabela) {
+window.vektorExpandirLinha = function (tr, tipoTabelaBase) {
   try {
     if (!tr || !tr.cells || tr.cells.length === 0) return;
 
     const chave = (tr.cells[0].innerText || "").trim();
     if (!chave || chave === "TOTAL") return;
 
+    // 1) Descobre o dropdown da MESMA resposta do bot
+    let alvo = null;
+    const bubble = tr.closest(".bot-bubble");
+    if (bubble) {
+      const sel = bubble.querySelector("select.drill-select");
+      if (sel && sel.value) {
+        // valores esperados: "time" | "loja" | "estabelecimento" | "categoria"
+        alvo = sel.value;
+      }
+    }
+
+    // 2) Se não tiver dropdown, mantém o comportamento antigo
+    if (!alvo) {
+      if (tipoTabelaBase === "time")            alvo = "loja";
+      else if (tipoTabelaBase === "loja")       alvo = "estabelecimento";
+      else if (tipoTabelaBase === "estabelecimento") alvo = "loja";
+      else if (tipoTabelaBase === "categoria")  alvo = "loja";
+    }
+
     let pergunta = "";
 
-    // TIME → LOJAS
-    if (tipoTabela === "time") {
-      pergunta = `top 10 lojas com maior valor de gastos para o time ${chave}`;
+    // ========= TIME (tabela de times) =========
+
+    if (tipoTabelaBase === "time" && alvo === "loja") {
+      pergunta = `top 10 lojas com maior valor de transações para o time ${chave}`;
+    } else if (tipoTabelaBase === "time" && alvo === "estabelecimento") {
+      pergunta = `top 10 estabelecimentos com maior valor de transações para o time ${chave}`;
+    } else if (tipoTabelaBase === "time" && alvo === "categoria") {
+      pergunta = `top 10 categorias com maior valor de transações para o time ${chave}`;
     }
 
-    // LOJA → ESTABELECIMENTOS
-    else if (tipoTabela === "loja") {
-      pergunta = `top 10 estabelecimentos com maior valor de gastos para a loja ${chave}`;
+    // ========= LOJA (tabela de lojas) =========
+
+    else if (tipoTabelaBase === "loja" && alvo === "estabelecimento") {
+      pergunta = `top 10 estabelecimentos com maior valor de transações na loja ${chave}`;
+    } else if (tipoTabelaBase === "loja" && alvo === "categoria") {
+      pergunta = `top 10 categorias com maior valor de transações na loja ${chave}`;
+    } else if (tipoTabelaBase === "loja" && alvo === "time") {
+      pergunta = `qual time gastou mais na loja ${chave}`;
     }
 
-    // ESTABELECIMENTO → LOJAS
-    else if (tipoTabela === "estabelecimento") {
+    // ========= ESTABELECIMENTO (tabela de estabelecimentos) =========
+
+    else if (tipoTabelaBase === "estabelecimento" && alvo === "loja") {
       pergunta = `quais lojas mais gastaram no estabelecimento ${chave}`;
+    } else if (tipoTabelaBase === "estabelecimento" && alvo === "categoria") {
+      // detalhar categorias dentro do estabelecimento
+      pergunta = `top 10 categorias com maior valor de transações no estabelecimento ${chave}`;
+    } else if (tipoTabelaBase === "estabelecimento" && alvo === "time") {
+      pergunta = `qual time gastou mais no estabelecimento ${chave}`;
     }
 
-    // CATEGORIA → LOJAS
-    else if (tipoTabela === "categoria") {
+    // ========= CATEGORIA (tabela de categorias) =========
+
+    else if (tipoTabelaBase === "categoria" && alvo === "loja") {
       pergunta = `quais lojas mais gastaram na categoria ${chave}`;
+    } else if (tipoTabelaBase === "categoria" && alvo === "estabelecimento") {
+      pergunta = `top 10 estabelecimentos com maior valor de transações na categoria ${chave}`;
+    } else if (tipoTabelaBase === "categoria" && alvo === "time") {
+      pergunta = `qual time gastou mais na categoria ${chave}`;
     }
 
     if (!pergunta) return;
 
     const input = document.getElementById("userInput");
     const form  = document.getElementById("chatForm");
-
     if (!input || !form) return;
 
+    // dispara a "nova pergunta" no chat reaproveitando todo o fluxo que já existe
     input.value = pergunta;
     form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
 
@@ -4022,6 +4061,48 @@ if (m) {
     return null;
 }
 
+// ===== Cache de período para drill-down: "mesmo período da pergunta anterior" =====
+(function () {
+  // Guarda referência da função original
+  const _extrairOriginal = extrairIntervaloDatas;
+
+  // Cache global do último período entendido
+  window.__vektorUltimoPeriodo = null;
+
+  // Sobrescreve a função usada no restante do código
+  extrairIntervaloDatas = function (msgOriginal) {
+    try {
+      // 1) Se a mensagem falar "mesmo período da pergunta anterior"
+      //    e já tivermos um período salvo, devolve direto o cache
+      if (msgOriginal && typeof msgOriginal === "string") {
+        const norm = normalize(msgOriginal);
+        if (
+          norm.includes("mesmo periodo da pergunta anterior") &&
+          window.__vektorUltimoPeriodo &&
+          window.__vektorUltimoPeriodo.dataInicio &&
+          window.__vektorUltimoPeriodo.dataFim
+        ) {
+          return window.__vektorUltimoPeriodo;
+        }
+      }
+
+      // 2) Caso contrário, usa a função original
+      const periodo = _extrairOriginal(msgOriginal);
+
+      // 3) Se a função original achou um período, salva no cache global
+      if (periodo && periodo.dataInicio && periodo.dataFim) {
+        window.__vektorUltimoPeriodo = periodo;
+      }
+
+      return periodo;
+    } catch (e) {
+      console.error("Erro no wrapper de extrairIntervaloDatas:", e);
+      // fallback: chama função original
+      return _extrairOriginal(msgOriginal);
+    }
+  };
+})();
+
 // ========= RESUMO LOJA x TIME (GRÁFICO) ========= //
 
     function renderResumoTransacoesSemana(resumo, opts) {
@@ -4072,6 +4153,20 @@ if (m) {
 
   var linhasTabela = [];
   if (linhas.length) {
+
+    // 🔽 Dropdown de drilldown para a tabela de LOJAS
+        linhasTabela.push(
+          "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
+            "Drilldown desta tabela de lojas: " +
+            "<select class='vektor-drill-select' data-base='loja' " +
+                   "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
+              "<option value='time'>Times</option>" +
+              "<option value='estabelecimento'>Estabelecimentos</option>" +
+              "<option value='categoria'>Categorias</option>" +
+            "</select>" +
+          "</div>"
+        );  
+
     linhasTabela.push(
       "<table border='1' cellspacing='0' cellpadding='6' " +
       "style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;" +
@@ -4188,6 +4283,20 @@ function renderResumoTransacoesPorTime(resumo, opts) {
 
   var linhasTabela = [];
   if (linhas.length) {
+
+     // 🔽 Dropdown de drilldown para a tabela de TIMES
+        linhasTabela.push(
+          "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
+            "Expandir a tabela por: " +
+            "<select class='vektor-drill-select' data-base='time' " +
+                   "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
+              "<option value='loja'>Lojas</option>" +
+              "<option value='estabelecimento'>Estabelecimentos</option>" +
+              "<option value='categoria'>Categorias</option>" +
+            "</select>" +
+          "</div>"
+        ); 
+
     linhasTabela.push(
       "<table border='1' cellspacing='0' cellpadding='6' " +
       "style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;" +
@@ -4265,7 +4374,7 @@ var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45c
 var html = [
   "<div class='text-sm text-slate-700'>",
     "<p>", fraseResumo, "</p>",
-    "<p style='font-size:11px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>",
+    "<p style='font-size:13px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>",
     tabelaHtml,
     botaoCsv,
   "</div>"
@@ -4275,6 +4384,7 @@ renderBotMessage("HTML:" + html);
 }
 
 // ========= RENDER GENÉRICO: CATEGORIAS / ESTABELECIMENTOS ========= //
+
 function renderResumoPorChaveGenerico(resumo, opts) {
   if (!resumo || !resumo.ok) {
     renderBotMessage(
@@ -4284,20 +4394,42 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   }
 
   opts = opts || {};
-  var tipoChave = opts.tipoChave || "Categoria"; // ou "Estabelecimento"
+  var tipoChave = opts.tipoChave || "Categoria"; // "Categoria" ou "Estabelecimento"
   var titulo    = opts.titulo || ("Resumo por " + tipoChave.toLowerCase());
   var topN      = (typeof opts.topN === "number" && opts.topN > 0) ? opts.topN : null;
 
-    var tipoTabelaExpand = (tipoChave.toLowerCase() === "estabelecimento")
-    ? "estabelecimento"
-    : "categoria";
+  // ===== Definição da base da tabela (categoria/estabelecimento/loja/time)
+  //       e texto-base do tooltip, usados no drilldown e no dropdown
+  var tipoChaveLower = tipoChave.toLowerCase();
+  var baseTabela      = "categoria";    // usado no data-base do <select>
+  var tipoTabelaExpand = "categoria";   // parâmetro passado para vektorExpandirLinha
+  var hintBase        = "";
 
-
-    // para o drill-down: se for Estabelecimento ou Categoria
-    var tipoTabelaExpand = (tipoChave.toLowerCase() === "estabelecimento")
-    ? "estabelecimento"
-    : "categoria";
-
+  if (tipoChaveLower === "estabelecimento") {
+    baseTabela      = "estabelecimento";
+    tipoTabelaExpand = "estabelecimento";
+    hintBase =
+      "Clique para detalhar este estabelecimento pela dimensão selecionada (lojas, times ou categorias), " +
+      "respeitando o mesmo período da pergunta inicial.";
+  } else if (tipoChaveLower === "categoria") {
+    baseTabela      = "categoria";
+    tipoTabelaExpand = "categoria";
+    hintBase =
+      "Clique para detalhar esta categoria pela dimensão selecionada (lojas, times ou estabelecimentos), " +
+      "respeitando o mesmo período da pergunta inicial.";
+  } else if (tipoChaveLower === "loja") {
+    baseTabela      = "loja";
+    tipoTabelaExpand = "loja";
+    hintBase =
+      "Clique para detalhar esta loja pela dimensão selecionada (times, estabelecimentos ou categorias), " +
+      "respeitando o mesmo período da pergunta inicial.";
+  } else if (tipoChaveLower === "time") {
+    baseTabela      = "time";
+    tipoTabelaExpand = "time";
+    hintBase =
+      "Clique para detalhar este time pela dimensão selecionada (lojas, estabelecimentos ou categorias), " +
+      "respeitando o mesmo período da pergunta inicial.";
+  }
 
   // Descobre qual lista veio do backend
   var lista = [];
@@ -4333,6 +4465,28 @@ function renderResumoPorChaveGenerico(resumo, opts) {
 
   var linhasTabela = [];
 
+  // ===== 🔽 DROPDOWN DE DRILLDOWN (item 3.3) =====
+  // Monta as opções de drilldown de acordo com a base da tabela
+  var opcoes = [];
+  // Para estabelecimentos: time / loja / categoria
+  // Para categorias: time / loja / estabelecimento
+  // (regra geral: todas as dimensões menos a própria baseTabela)
+  if (baseTabela !== "time")           opcoes.push("<option value='time'>Times</option>");
+  if (baseTabela !== "loja")           opcoes.push("<option value='loja'>Lojas</option>");
+  if (baseTabela !== "estabelecimento") opcoes.push("<option value='estabelecimento'>Estabelecimentos</option>");
+  if (baseTabela !== "categoria")      opcoes.push("<option value='categoria'>Categorias</option>");
+
+  linhasTabela.push(
+    "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
+      "Drilldown desta tabela de " + tipoChave.toLowerCase() + ": " +
+      "<select class='vektor-drill-select' data-base='" + baseTabela + "' " +
+              "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
+        opcoes.join("") +
+      "</select>" +
+    "</div>"
+  );
+
+  // ===== TABELA PRINCIPAL =====
   linhasTabela.push(
     "<table border='1' cellspacing='0' cellpadding='6' " +
     "style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;" +
@@ -4363,26 +4517,21 @@ function renderResumoPorChaveGenerico(resumo, opts) {
     var pctQtd = totalQtd   > 0 ? ((qtd   / totalQtd)   * 100).toFixed(1) + "%" : "—";
     var pctVal = totalValor > 0 ? ((valor / totalValor) * 100).toFixed(1) + "%" : "—";
 
-     var hint = "";
-  if (tipoTabelaExpand === "estabelecimento") {
-    hint = "Clique para detalhar: ver lojas que mais gastaram neste estabelecimento.";
-  } else {
-    hint = "Clique para detalhar: ver lojas que mais gastaram nesta categoria.";
-  }
+    // ===== TOOLTIP (item 4) =====
+    var hint = hintBase || "Clique para detalhar pela dimensão escolhida no seletor acima, respeitando o mesmo período da pergunta inicial.";
 
     linhasTabela.push(
-    "<tr onclick=\"vektorExpandirLinha(this,'" + tipoTabelaExpand + "')\" " +
-      "style='cursor:pointer;' title=\"" + hint + "\">" +
-      "<td style='border:1px solid #000;'>" + nome + "</td>" +
-      "<td style='border:1px solid #000;'>" + qtd + "</td>" +
-      "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
-      "<td style='border:1px solid #000;'>" +
-        valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
-      "</td>" +
-      "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
-    "</tr>"
-  );
-
+      "<tr onclick=\"vektorExpandirLinha(this,'" + tipoTabelaExpand + "')\" " +
+        "style='cursor:pointer;' title=\"" + hint + "\">" +
+        "<td style='border:1px solid #000;'>" + nome + "</td>" +
+        "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+        "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+        "<td style='border:1px solid #000;'>" +
+          valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+        "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+      "</tr>"
+    );
   }
 
   // Linha de TOTAL
@@ -4416,12 +4565,12 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   }
 
   var html =
-  "<div class='text-sm text-slate-700'>" +
-    "<p>" + titulo + "</p>" +
-    "<p style='font-size:11px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>" +
-    linhasTabela.join("") +
-    botaoCsv +
-  "</div>";
+    "<div class='text-sm text-slate-700'>" +
+      "<p>" + titulo + "</p>" +
+      "<p style='font-size:13px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>" +
+      linhasTabela.join("") +
+      botaoCsv +
+    "</div>";
 
   renderBotMessage("HTML:" + html);
 }
