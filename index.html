@@ -661,87 +661,191 @@ pendenciasTimeoutId = setTimeout(() => {
 
 // ========= DRILL-DOWN: EXPANDIR LINHA DA TABELA (com dropdown + mesmo período) ========= //
 
-window.vektorExpandirLinha = function (tr, tipoTabelaBase) {
+window.vektorExpandirLinha = function (tr, base) {
   try {
-    if (!tr || !tr.cells || tr.cells.length === 0) return;
+    if (!tr || !tr.cells || !tr.cells.length) return;
 
-    const chave = (tr.cells[0].innerText || "").trim();
-    if (!chave || chave === "TOTAL") return;
+    // Nome da linha (Time / Loja / Categoria / Estabelecimento)
+    const chave = (tr.cells[0].innerText || tr.cells[0].textContent || "").trim();
+    if (!chave) return;
 
-    // 1) Descobre o dropdown da MESMA resposta do bot
-    let alvo = null;
-    const bubble = tr.closest(".bot-bubble");
-    if (bubble) {
-      const sel = bubble.querySelector("select.drill-select");
-      if (sel && sel.value) {
-        // valores esperados: "time" | "loja" | "estabelecimento" | "categoria"
-        alvo = sel.value;
+    // Encontra o <select> relacionado ao drilldown
+    const container = tr.closest("div");
+    const select = container
+      ? container.querySelector(".vektor-drill-select[data-base='" + base + "']")
+      : null;
+
+    const alvo = select ? select.value : null; // loja / categoria / estabelecimento / time
+
+    // Período da pergunta original (cache)
+    const periodo = window.__vektorUltimoPeriodo || null;
+    const dataInicioStr =
+      periodo && periodo.dataInicio ? periodo.dataInicio.toISOString() : "";
+    const dataFimStr =
+      periodo && periodo.dataFim ? periodo.dataFim.toISOString() : "";
+
+    let periodoTxt = "";
+    if (periodo && periodo.dataInicio && periodo.dataFim) {
+      const di = periodo.dataInicio;
+      const df = periodo.dataFim;
+      periodoTxt =
+        di.toLocaleDateString("pt-BR") + " a " + df.toLocaleDateString("pt-BR");
+    }
+
+    const tipo = "valor"; // padrão do drilldown
+
+    // ================== BASE = TIME ==================
+    if (base === "time") {
+      // ▼ TIME → LOJAS (padrão)
+      if (alvo === "loja" || !alvo) {
+        renderBotMessage(
+          `HTML:<p class="text-sm text-slate-700">
+            Detalhando o time <b>${chave}</b> por <b>lojas</b>…</p>`
+        );
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            // topN null + forGroup=true => todas as lojas do time
+            renderResumoTransacoesSemana(res, { topN: null, forGroup: true });
+          })
+          .withFailureHandler(function () {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar por lojas.</p>"
+            );
+          })
+          .getResumoTransacoesPorGrupo(chave, dataInicioStr, dataFimStr, tipo);
       }
+
+      // ▼ TIME → CATEGORIAS
+      else if (alvo === "categoria") {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+            "Detalhando por <b>categorias</b> do time <b>" + chave + "</b> " +
+            (periodoTxt ? "no período <b>" + periodoTxt + "</b>" : "") +
+            "…</p>"
+        );
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            renderResumoPorChaveGenerico(res, {
+              tipoChave: "Categoria",
+              titulo: "Categorias do time " + chave,
+              topN: null
+            });
+          })
+          .withFailureHandler(function () {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar categorias do time.</p>"
+            );
+          })
+          .getResumoTransacoesPorCategoriaTime(
+            dataInicioStr,
+            dataFimStr,
+            tipo,   // "valor" ou "quantidade"
+            chave   // nome do time
+          );
+      }
+
+      // ▼ TIME → ESTABELECIMENTOS
+      else if (alvo === "estabelecimento") {
+        renderBotMessage(
+          `HTML:<p class="text-sm text-slate-700">
+            Detalhando o time <b>${chave}</b> por <b>estabelecimentos</b>…</p>`
+        );
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            renderResumoPorChaveGenerico(res, {
+              tipoChave: "Estabelecimento",
+              titulo: "Estabelecimentos do time " + chave,
+              topN: null
+            });
+          })
+          .withFailureHandler(function () {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar estabelecimentos.</p>"
+            );
+          })
+          .getResumoTransacoesPorEstabelecimento(
+            dataInicioStr,
+            dataFimStr,
+            tipo,
+            chave, // grupo = time
+            ""     // loja vazia
+          );
+      }
+
+      return;
     }
 
-    // 2) Se não tiver dropdown, mantém o comportamento antigo
-    if (!alvo) {
-      if (tipoTabelaBase === "time")            alvo = "loja";
-      else if (tipoTabelaBase === "loja")       alvo = "estabelecimento";
-      else if (tipoTabelaBase === "estabelecimento") alvo = "loja";
-      else if (tipoTabelaBase === "categoria")  alvo = "loja";
+    // ================== BASE = LOJA ==================
+    if (base === "loja") {
+      // ▼ LOJA → ESTABELECIMENTOS
+      if (alvo === "estabelecimento") {
+        renderBotMessage(
+          `HTML:<p class="text-sm text-slate-700">
+            Detalhando a loja <b>${chave}</b> por <b>estabelecimentos</b>…</p>`
+        );
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            renderResumoPorChaveGenerico(res, {
+              tipoChave: "Estabelecimento",
+              titulo: "Estabelecimentos da loja " + chave,
+              topN: null
+            });
+          })
+          .withFailureHandler(function () {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar estabelecimentos.</p>"
+            );
+          })
+          .getResumoTransacoesPorEstabelecimento(
+            dataInicioStr,
+            dataFimStr,
+            tipo,
+            "",
+            chave // loja
+          );
+      }
+
+      // ▼ LOJA → CATEGORIAS
+      else if (alvo === "categoria") {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+            "Detalhando por <b>categorias</b> da loja <b>" + chave + "</b> " +
+            (periodoTxt ? "no período <b>" + periodoTxt + "</b>" : "") +
+            "…</p>"
+        );
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            renderResumoPorChaveGenerico(res, {
+              tipoChave: "Categoria",
+              titulo: "Categorias da loja " + chave,
+              topN: null
+            });
+          })
+          .withFailureHandler(function () {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar categorias da loja.</p>"
+            );
+          })
+          .getResumoTransacoesPorCategoriaLoja(
+            dataInicioStr,
+            dataFimStr,
+            tipo,     // "valor" ou "quantidade"
+            chave     // código/nome da loja
+          );
+      }
+
+      return;
     }
-
-    let pergunta = "";
-
-    // ========= TIME (tabela de times) =========
-
-    if (tipoTabelaBase === "time" && alvo === "loja") {
-      pergunta = `top 10 lojas com maior valor de transações para o time ${chave}`;
-    } else if (tipoTabelaBase === "time" && alvo === "estabelecimento") {
-      pergunta = `top 10 estabelecimentos com maior valor de transações para o time ${chave}`;
-    } else if (tipoTabelaBase === "time" && alvo === "categoria") {
-      pergunta = `top 10 categorias com maior valor de transações para o time ${chave}`;
-    }
-
-    // ========= LOJA (tabela de lojas) =========
-
-    else if (tipoTabelaBase === "loja" && alvo === "estabelecimento") {
-      pergunta = `top 10 estabelecimentos com maior valor de transações na loja ${chave}`;
-    } else if (tipoTabelaBase === "loja" && alvo === "categoria") {
-      pergunta = `top 10 categorias com maior valor de transações na loja ${chave}`;
-    } else if (tipoTabelaBase === "loja" && alvo === "time") {
-      pergunta = `qual time gastou mais na loja ${chave}`;
-    }
-
-    // ========= ESTABELECIMENTO (tabela de estabelecimentos) =========
-
-    else if (tipoTabelaBase === "estabelecimento" && alvo === "loja") {
-      pergunta = `quais lojas mais gastaram no estabelecimento ${chave}`;
-    } else if (tipoTabelaBase === "estabelecimento" && alvo === "categoria") {
-      // detalhar categorias dentro do estabelecimento
-      pergunta = `top 10 categorias com maior valor de transações no estabelecimento ${chave}`;
-    } else if (tipoTabelaBase === "estabelecimento" && alvo === "time") {
-      pergunta = `qual time gastou mais no estabelecimento ${chave}`;
-    }
-
-    // ========= CATEGORIA (tabela de categorias) =========
-
-    else if (tipoTabelaBase === "categoria" && alvo === "loja") {
-      pergunta = `quais lojas mais gastaram na categoria ${chave}`;
-    } else if (tipoTabelaBase === "categoria" && alvo === "estabelecimento") {
-      pergunta = `top 10 estabelecimentos com maior valor de transações na categoria ${chave}`;
-    } else if (tipoTabelaBase === "categoria" && alvo === "time") {
-      pergunta = `qual time gastou mais na categoria ${chave}`;
-    }
-
-    if (!pergunta) return;
-
-    const input = document.getElementById("userInput");
-    const form  = document.getElementById("chatForm");
-    if (!input || !form) return;
-
-    // dispara a "nova pergunta" no chat reaproveitando todo o fluxo que já existe
-    input.value = pergunta;
-    form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
-
   } catch (e) {
-    console.error("Erro no drill:", e);
+    console.error("Erro no vektorExpandirLinha:", e);
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Tive um problema ao tentar detalhar essa linha.</p>"
+    );
   }
 };
 
@@ -1462,6 +1566,8 @@ function encontrarTimeNaMensagem(msgOriginal) {
             msgNorm.includes("meu cartao nao funciona") ||
             msgNorm.includes("meu cartão não funciona") ||
             msgNorm.includes("meu cartão tá bloqueado") ||
+            msgNorm.includes("pq meu cartão tá bloqueadp") ||
+            msgNorm.includes("pq meu cartão tá bloqueado") ||
             msgNorm.includes("meu cartao ta bloqueado") ||
             msgNorm.includes("nao consigo usar o cartao") ||
             msgNorm.includes("não consigo usar o cartão") ||
@@ -3121,16 +3227,23 @@ const detRankLoja = detectarRankingLojas(msgUsuario, norm);
 if (detRankLoja) {
   const periodo = detRankLoja.periodo;
   const tipo    = detRankLoja.tipo || "valor";
-  const topN    = detRankLoja.topN; // pode ser null
   const grupo   = detRankLoja.grupo || "";
+  const topNReq = detRankLoja.topN; // pode ser null
 
-    // Aviso: ranking geral de lojas (sem time) e sem "top" informado => mostraremos 10
-  if (!grupo && detRankLoja.topN == null) {
+  // 📌 Regra de TOP:
+  // - Se o usuário falar "top X" → usa X
+  // - Se NÃO falar top e NÃO tiver time → padrão = 10
+  // - Se NÃO falar top e TIVER time → deixa null pra listar todas as lojas do time
+  const topNFinal = (topNReq != null)
+    ? topNReq
+    : (grupo ? null : 10);
+
+  // Aviso: ranking geral de lojas (sem time) e sem "top" informado => mostraremos 10
+  if (!grupo && topNReq == null) {
     renderBotMessage(
       "HTML:<p class='text-xs text-slate-600 italic'>Obs.: Como o número de lojas é grande, mostrarei as <b>10 primeiras</b> por padrão. Você pode pedir, por exemplo, <b>top 20 lojas</b>.</p>"
     );
   }
-
 
   renderBotMessage(
     "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de lojas</b> por " +
@@ -3143,7 +3256,12 @@ if (detRankLoja) {
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
   google.script.run
-    .withSuccessHandler(function (res) { renderResumoTransacoesSemana(res, { topN: (topN ?? 10), forGroup: !!grupo }); })
+    .withSuccessHandler(function (res) {
+      renderResumoTransacoesSemana(res, {
+        topN: topNFinal,        // respeita TOP pedido (ou 10 / null)
+        forGroup: !!grupo       // true se estiver filtrando por time
+      });
+    })
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>");
     })
@@ -3296,37 +3414,6 @@ if (detTimeCampeao) {
     .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
 
   return; // encerra aqui
-}
-
-// 3) RANKING de TIMES (sempre pode listar TODOS se não houver top)
-const detRankTime = detectarRankingTimes(msgUsuario, norm);
-if (detRankTime) {
-  const periodo = detRankTime.periodo;
-  const tipo    = detRankTime.tipo || "valor";
-  const topN    = detRankTime.topN; // pode ser null -> listar TODOS
-
-  renderBotMessage(
-    "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de times</b> por " +
-    (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
-    (periodo ? " no período solicitado" : "") + "…</p>"
-  );
-
-  const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
-  const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
-
-google.script.run
-  .withSuccessHandler(function (res) {
-  const n = (topN == null && !grupo) ? 10 : topN;
-  renderResumoTransacoesPorTime(res, { topN: n, forGroup: !!grupo });
-})
-
-  .withFailureHandler(function () {
-    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (lojas).</p>");
-  })
-  .getResumoTransacoesPorTime(grupo, dataInicioStr, dataFimStr, tipo);
-
-
-  return null;
 }
 
 
@@ -3943,20 +4030,16 @@ m = norm.match(/entre\s+(\d{1,2})\s+e\s+(\d{1,2})\s+de\s+([a-zç]+)/);
 if (m) {
   const dia1 = Number(m[1]);
   const dia2 = Number(m[2]);
+
+  
   const mesStr = m[3];
-  const meses = {
-    janeiro:0, fevereiro:1, marco:2, março:2, abril:3, maio:4, junho:5,
-    julho:6, agosto:7, setembro:8, outubro:9, novembro:10, dezembro:11
-  };
-  const mes = meses[mesStr];
+  const mes = meses[mesStr];        // usa o "meses" já declarado no topo da função
   if (mes !== undefined) {
-    const hoje = new Date();
-    const ano = hoje.getFullYear();
+    const ano = anoAtual;           // reaproveita o anoAtual já calculado
     const ini = new Date(ano, mes, dia1);
     const fim = new Date(ano, mes, dia2, 23, 59, 59);
     return { tipo: "intervalo_mes_texto", dataInicio: ini, dataFim: fim };
-  }
-}
+  }}
 
     // 2) "no dia 10/11/2025" ou "dia 10/11"
     m = norm.match(/dia\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
@@ -4051,7 +4134,6 @@ if (!m) {
 if (m) {
   const qtdSemanas = Number(m[1]);
   const dias = qtdSemanas * 7;
-  const hoje = new Date();
   const fim = hoje;
   const ini = new Date(hoje);
   ini.setDate(hoje.getDate() - dias);
@@ -4160,7 +4242,6 @@ if (m) {
             "Drilldown desta tabela de lojas: " +
             "<select class='vektor-drill-select' data-base='loja' " +
                    "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
-              "<option value='time'>Times</option>" +
               "<option value='estabelecimento'>Estabelecimentos</option>" +
               "<option value='categoria'>Categorias</option>" +
             "</select>" +
@@ -4189,7 +4270,7 @@ if (m) {
       var pctQtd = (totalQtd > 0)   ? ((qtd / totalQtd)   * 100).toFixed(1) + "%" : "—";
       var pctVal = (totalValor > 0) ? ((val / totalValor) * 100).toFixed(1) + "%" : "—";
 
-      var hint = "Clique para detalhar: ver estabelecimentos da loja " + l.loja;
+      var hint = "Clique para detalhar pelo filtro escolhido " + l.loja;
 
       linhasTabela.push(
     "<tr onclick=\"vektorExpandirLinha(this,'loja')\" " +
@@ -4319,9 +4400,9 @@ function renderResumoTransacoesPorTime(resumo, opts) {
       var pctQtd = (totalQtd > 0)   ? ((qtd / totalQtd)   * 100).toFixed(1) + "%" : "—";
       var pctVal = (totalValor > 0) ? ((val / totalValor) * 100).toFixed(1) + "%" : "—";
 
-      var hint = "Clique para detalhar: ver lojas do time " + t.time;
+      var hint = "Clique para detalhar pelo filtro escolhido  " + t.time;
 
-  var hint = "Clique para detalhar: ver lojas do time " + t.time;
+    //var hint = "Clique para detalhar pelo filtro escolhido  " + t.time;
 
   linhasTabela.push(
     "<tr onclick=\"vektorExpandirLinha(this,'time')\" " +
@@ -4399,32 +4480,31 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   var topN      = (typeof opts.topN === "number" && opts.topN > 0) ? opts.topN : null;
 
   // ===== Definição da base da tabela (categoria/estabelecimento/loja/time)
-  //       e texto-base do tooltip, usados no drilldown e no dropdown
   var tipoChaveLower = tipoChave.toLowerCase();
   var baseTabela      = "categoria";    // usado no data-base do <select>
   var tipoTabelaExpand = "categoria";   // parâmetro passado para vektorExpandirLinha
   var hintBase        = "";
 
   if (tipoChaveLower === "estabelecimento") {
-    baseTabela      = "estabelecimento";
+    baseTabela       = "estabelecimento";
     tipoTabelaExpand = "estabelecimento";
     hintBase =
       "Clique para detalhar este estabelecimento pela dimensão selecionada (lojas, times ou categorias), " +
       "respeitando o mesmo período da pergunta inicial.";
   } else if (tipoChaveLower === "categoria") {
-    baseTabela      = "categoria";
+    baseTabela       = "categoria";
     tipoTabelaExpand = "categoria";
     hintBase =
       "Clique para detalhar esta categoria pela dimensão selecionada (lojas, times ou estabelecimentos), " +
       "respeitando o mesmo período da pergunta inicial.";
   } else if (tipoChaveLower === "loja") {
-    baseTabela      = "loja";
+    baseTabela       = "loja";
     tipoTabelaExpand = "loja";
     hintBase =
       "Clique para detalhar esta loja pela dimensão selecionada (times, estabelecimentos ou categorias), " +
       "respeitando o mesmo período da pergunta inicial.";
   } else if (tipoChaveLower === "time") {
-    baseTabela      = "time";
+    baseTabela       = "time";
     tipoTabelaExpand = "time";
     hintBase =
       "Clique para detalhar este time pela dimensão selecionada (lojas, estabelecimentos ou categorias), " +
@@ -4465,26 +4545,28 @@ function renderResumoPorChaveGenerico(resumo, opts) {
 
   var linhasTabela = [];
 
-  // ===== 🔽 DROPDOWN DE DRILLDOWN (item 3.3) =====
-  // Monta as opções de drilldown de acordo com a base da tabela
-  var opcoes = [];
-  // Para estabelecimentos: time / loja / categoria
-  // Para categorias: time / loja / estabelecimento
-  // (regra geral: todas as dimensões menos a própria baseTabela)
-  if (baseTabela !== "time")           opcoes.push("<option value='time'>Times</option>");
-  if (baseTabela !== "loja")           opcoes.push("<option value='loja'>Lojas</option>");
-  if (baseTabela !== "estabelecimento") opcoes.push("<option value='estabelecimento'>Estabelecimentos</option>");
-  if (baseTabela !== "categoria")      opcoes.push("<option value='categoria'>Categorias</option>");
+  // 🔹 Flag: só tem drilldown se a base for TIME ou LOJA
+  var temDrilldown = !(baseTabela === "categoria" || baseTabela === "estabelecimento");
 
-  linhasTabela.push(
-    "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
-      "Drilldown desta tabela de " + tipoChave.toLowerCase() + ": " +
-      "<select class='vektor-drill-select' data-base='" + baseTabela + "' " +
-              "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
-        opcoes.join("") +
-      "</select>" +
-    "</div>"
-  );
+  // ===== 🔽 DROPDOWN DE DRILLDOWN (somente se tiver drilldown) =====
+  if (temDrilldown) {
+    var opcoes = [];
+    // Regra: todas as dimensões menos a própria baseTabela
+    if (baseTabela !== "time")            opcoes.push("<option value='time'>Times</option>");
+    if (baseTabela !== "loja")            opcoes.push("<option value='loja'>Lojas</option>");
+    if (baseTabela !== "estabelecimento") opcoes.push("<option value='estabelecimento'>Estabelecimentos</option>");
+    if (baseTabela !== "categoria")       opcoes.push("<option value='categoria'>Categorias</option>");
+
+    linhasTabela.push(
+      "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
+        "Drilldown desta tabela de " + tipoChave.toLowerCase() + ": " +
+        "<select class='vektor-drill-select' data-base='" + baseTabela + "' " +
+                "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
+          opcoes.join("") +
+        "</select>" +
+      "</div>"
+    );
+  }
 
   // ===== TABELA PRINCIPAL =====
   linhasTabela.push(
@@ -4507,7 +4589,7 @@ function renderResumoPorChaveGenerico(resumo, opts) {
     var l = lista[j];
     var nome =
       l.estabelecimento ||
-      l.categoria || 
+      l.categoria ||
       l.chave ||
       "—";
 
@@ -4517,21 +4599,37 @@ function renderResumoPorChaveGenerico(resumo, opts) {
     var pctQtd = totalQtd   > 0 ? ((qtd   / totalQtd)   * 100).toFixed(1) + "%" : "—";
     var pctVal = totalValor > 0 ? ((valor / totalValor) * 100).toFixed(1) + "%" : "—";
 
-    // ===== TOOLTIP (item 4) =====
-    var hint = hintBase || "Clique para detalhar pela dimensão escolhida no seletor acima, respeitando o mesmo período da pergunta inicial.";
+    // ===== LINHA: com ou sem onclick dependendo do drilldown =====
+    if (temDrilldown) {
+      var hint = hintBase ||
+        "Clique para detalhar pela dimensão escolhida no seletor acima, respeitando o mesmo período da pergunta inicial.";
 
-    linhasTabela.push(
-      "<tr onclick=\"vektorExpandirLinha(this,'" + tipoTabelaExpand + "')\" " +
-        "style='cursor:pointer;' title=\"" + hint + "\">" +
-        "<td style='border:1px solid #000;'>" + nome + "</td>" +
-        "<td style='border:1px solid #000;'>" + qtd + "</td>" +
-        "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
-        "<td style='border:1px solid #000;'>" +
-          valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
-        "</td>" +
-        "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
-      "</tr>"
-    );
+      linhasTabela.push(
+        "<tr onclick=\"vektorExpandirLinha(this,'" + tipoTabelaExpand + "')\" " +
+          "style='cursor:pointer;' title=\"" + hint + "\">" +
+          "<td style='border:1px solid #000;'>" + nome + "</td>" +
+          "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+          "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+          "<td style='border:1px solid #000;'>" +
+            valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+          "</td>" +
+          "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+        "</tr>"
+      );
+    } else {
+      // 🔹 Categoria / Estabelecimento → SEM drilldown
+      linhasTabela.push(
+        "<tr>" +
+          "<td style='border:1px solid #000;'>" + nome + "</td>" +
+          "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+          "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+          "<td style='border:1px solid #000;'>" +
+            valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+          "</td>" +
+          "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+        "</tr>"
+      );
+    }
   }
 
   // Linha de TOTAL
@@ -4567,7 +4665,6 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   var html =
     "<div class='text-sm text-slate-700'>" +
       "<p>" + titulo + "</p>" +
-      "<p style='font-size:13px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>" +
       linhasTabela.join("") +
       botaoCsv +
     "</div>";
