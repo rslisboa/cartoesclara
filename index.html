@@ -3255,7 +3255,7 @@ window.vektorManualClaraSecao = function (secaoId) {
   else if (secaoId === "duvidas") {
     html =
       "<p><b>06 Dúvidas:</b></p><br>" +
-      "<p>Alguns pontos importantes do manual:</p>" +
+      "<p>Alguns pontos importantes:</p>" +
       "<ul>" +
         "<li>• <b>Autenticação em 2 etapas</b>: sempre use o código de 6 dígitos do app de autenticação ao entrar no site.</li>" +
         "<li>• <b>Problema de login</b>: verifique e-mail minúsculo, senha correta ou use “Continuar com Google” se já usou antes.</li>" +
@@ -3452,6 +3452,7 @@ function usuarioViuTopicoManualRecentemente(secaoId, minutosJanela) {
 }
 
 // Lê a pergunta do usuário e, se fizer sentido, sugere um tópico do Manual da Clara
+
 function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
   try {
     if (!msgOriginal || typeof msgOriginal !== "string") return;
@@ -3486,7 +3487,7 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
           secaoId: "anexar_comprovante",
           tituloBotao: "Ver como anexar comprovante",
           textoIntro:
-            "Percebi que você está falando de nota fiscal/comprovante. Quer abrir o trecho do Manual da Clara sobre isso?"
+            "Percebi que você está falando de nota fiscal, comprovante ou pendência. Quer abrir o trecho do Manual da Clara sobre isso?"
         };
       }
     }
@@ -3548,7 +3549,7 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
       }
     }
 
-    // 5) Dúvidas gerais, suporte, estorno, cartão perdido
+    // 5) Dúvidas gerais, suporte, estorno, cartão perdido, etc.
     else if (
       norm.includes("duvida") ||
       norm.includes("dúvida") ||
@@ -3561,6 +3562,10 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
       norm.includes("contestação") ||
       norm.includes("perdi o cartao") ||
       norm.includes("perdi o cartão") ||
+      norm.includes("cartao perdido") ||
+      norm.includes("cartão perdido") ||
+      norm.includes("cartao roubado") ||
+      norm.includes("cartão roubado") ||
       norm.includes("bloquear cartao") ||
       norm.includes("bloquear cartão")
     ) {
@@ -3569,7 +3574,67 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
           secaoId: "duvidas",
           tituloBotao: "Ver dúvidas e canais de suporte",
           textoIntro:
-            "Como você mencionou dúvidas/suporte, posso te mostrar o trecho do Manual da Clara com os principais contatos e orientações:"
+            "Como você mencionou dúvidas, suporte, estorno ou perda/bloqueio de cartão, posso te mostrar o trecho do Manual da Clara com os principais contatos e orientações:"
+        };
+      }
+    }
+
+    // 6) Limite / aumento de limite / limite estourado
+    else if (
+      norm.includes("limite") ||
+      norm.includes("aumentar limite") ||
+      norm.includes("aumento de limite") ||
+      norm.includes("ajustar limite") ||
+      norm.includes("cartão sem limite limite") ||
+      norm.includes("estourou o limite") ||
+      norm.includes("limite estourado")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("duvidas", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "duvidas",
+          tituloBotao: "Ver orientações gerais e canais de suporte",
+          textoIntro:
+            "Você falou sobre limite de cartão. Posso abrir a parte do Manual com orientações gerais e canais de suporte para esse tipo de dúvida:"
+        };
+      }
+    }
+
+    // 7) Bloqueio por pendência / cartão recusado
+    else if (
+      norm.includes("cartao bloqueado") ||
+      norm.includes("cartão bloqueado") ||
+      norm.includes("cartao recusado") ||
+      norm.includes("cartão recusado") ||
+      norm.includes("nao aprovou") ||
+      norm.includes("não aprovou") ||
+      norm.includes("recusou a compra") ||
+      norm.includes("compra recusada")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("anexar_comprovante", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "anexar_comprovante",
+          tituloBotao: "Ver como regularizar usando comprovantes",
+          textoIntro:
+            "Quando há bloqueios e recusas, muitas vezes o problema está em pendências de comprovantes. Quer ver o trecho do Manual que explica como anexar comprovantes e regularizar?"
+        };
+      }
+    }
+
+    // 8) Fraude / transação desconhecida / contestação
+    else if (
+      norm.includes("fraude") ||
+      norm.includes("transacao desconhecida") ||
+      norm.includes("transação desconhecida") ||
+      norm.includes("lancamento indevido") ||
+      norm.includes("lançamento indevido") ||
+      norm.includes("compra indevida")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("duvidas", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "duvidas",
+          tituloBotao: "Ver orientações de contestação/estorno",
+          textoIntro:
+            "Você comentou sobre transação desconhecida ou possível fraude. Posso abrir a parte do Manual que fala sobre contestação e estorno:"
         };
       }
     }
@@ -3595,7 +3660,9 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
   }
 }
 
+
 // ========= SUGESTÃO AUTOMÁTICA DE TÓPICOS RELACIONADOS ========= //
+
 window.vektorSugerirTopicoRelacionadoManual = function (secaoId) {
   // Por enquanto vamos tratar apenas o caso "anexar_comprovante"
   if (secaoId !== "anexar_comprovante") return;
