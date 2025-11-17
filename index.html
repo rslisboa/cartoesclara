@@ -1619,7 +1619,7 @@ function encontrarTimeNaMensagem(msgOriginal) {
             msgNorm.includes("transação não permitida")) 
 
           {
-            return "transacaoNegadaCategoria";}
+            return "  ";}
 
 
         if (msgNorm.includes("bloqueou") ||
@@ -3286,7 +3286,7 @@ window.vektorManualClaraSecao = function (secaoId) {
   scrollToBottom && scrollToBottom();
 
   // 👉 Mostra um resumo do que o usuário já acessou (se tiver mais de 1 item)
-  vektorMostrarHistoricoManualSeExistir();
+  //vektorMostrarHistoricoManualSeExistir();
 
     // 👉 Sugestão automática baseada no tópico aberto
   if (typeof window.vektorSugerirTopicoRelacionadoManual === "function") {
@@ -3420,6 +3420,181 @@ function vektorMostrarHistoricoManualSeExistir() {
   }
 }
 
+// ---------------------------------------------------------------------
+// SUGESTÕES AUTOMÁTICAS DO MANUAL DA CLARA A PARTIR DE OUTROS ASSUNTOS
+// ---------------------------------------------------------------------
+
+const VEKTOR_TEMPO_SUGESTAO_MIN = 3;
+
+// Verifica se o usuário já abriu um tópico do manual há pouco tempo
+function usuarioViuTopicoManualRecentemente(secaoId, minutosJanela) {
+  try {
+    minutosJanela = minutosJanela || 10; // padrão = 10 minutos
+    const historico = obterHistoricoManualClara();
+    if (!historico || !historico.length) return false;
+
+    const agora = Date.now();
+    const limiteMs = minutosJanela * 60 * 1000;
+
+    for (let i = 0; i < historico.length; i++) {
+      const item = historico[i];
+      if (!item || item.secao !== secaoId || !item.dataIso) continue;
+
+      const t = Date.parse(item.dataIso);
+      if (!isNaN(t) && (agora - t) <= limiteMs) {
+        return true; // já viu recentemente
+      }
+    }
+  } catch (e) {
+    console.warn("Erro ao checar histórico recente do manual:", e);
+  }
+  return false;
+}
+
+// Lê a pergunta do usuário e, se fizer sentido, sugere um tópico do Manual da Clara
+function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
+  try {
+    if (!msgOriginal || typeof msgOriginal !== "string") return;
+
+    const norm = normalize(msgOriginal);
+
+    // Se o usuário já pediu o manual explicitamente, não sugerimos aqui
+    if (
+      norm.includes("manual clara") ||
+      norm.includes("manual da clara") ||
+      norm.includes("treinamento clara") ||
+      norm.includes("treinamento da clara")
+    ) {
+      return;
+    }
+
+    let sugestao = null;
+
+    // 1) Comprovante / nota / justificativa → sugerir "Como anexar comprovante"
+    if (
+      norm.includes("comprovante") ||
+      norm.includes("nota fiscal") ||
+      norm.includes(" nf ") ||
+      norm.includes(" xml") ||
+      norm.includes("justificativa") ||
+      norm.includes("justificar") ||
+      norm.includes("pendencia") ||
+      norm.includes("pendência")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("anexar_comprovante", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "anexar_comprovante",
+          tituloBotao: "Ver como anexar comprovante",
+          textoIntro:
+            "Percebi que você está falando de nota fiscal/comprovante. Quer abrir o trecho do Manual da Clara sobre isso?"
+        };
+      }
+    }
+
+    // 2) Problemas de login / primeiro acesso
+    else if (
+      norm.includes("primeiro acesso") ||
+      norm.includes("primeiro login") ||
+      norm.includes("junte-se a clara") ||
+      norm.includes("junte se a clara") ||
+      norm.includes("nao consigo acessar") ||
+      norm.includes("não consigo acessar") ||
+      norm.includes("erro de acesso")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("primeiro_acesso", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "primeiro_acesso",
+          tituloBotao: "Ver instruções de primeiro acesso",
+          textoIntro:
+            "Se for sua primeira vez usando a Clara ou estiver com dificuldade de acesso, este trecho do Manual pode ajudar:"
+        };
+      }
+    }
+
+    // 3) Esqueci a senha / senha do cartão
+    else if (
+      norm.includes("esqueci a senha") ||
+      norm.includes("esqueci minha senha") ||
+      norm.includes("senha do cartao") ||
+      norm.includes("senha do cartão") ||
+      norm.includes("senha de acesso")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("esqueci_senha", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "esqueci_senha",
+          tituloBotao: "Ver como recuperar/consultar senha",
+          textoIntro:
+            "Você comentou sobre senha. Posso abrir a parte do Manual da Clara que fala sobre isso:"
+        };
+      }
+    }
+
+    // 4) Tipo de acesso / perfil
+    else if (
+      norm.includes("meu acesso") ||
+      norm.includes("tipo de acesso") ||
+      norm.includes("owner") ||
+      norm.includes("manager") ||
+      norm.includes("employee") ||
+      norm.includes("contador")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("qual_meu_acesso", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "qual_meu_acesso",
+          tituloBotao: "Ver tipos de acesso na Clara",
+          textoIntro:
+            "Se a dúvida é sobre qual é o seu tipo de acesso na Clara, este trecho do Manual pode ajudar:"
+        };
+      }
+    }
+
+    // 5) Dúvidas gerais, suporte, estorno, cartão perdido
+    else if (
+      norm.includes("duvida") ||
+      norm.includes("dúvida") ||
+      norm.includes("ajuda") ||
+      norm.includes("suporte") ||
+      norm.includes("telefone") ||
+      norm.includes("0800") ||
+      norm.includes("estorno") ||
+      norm.includes("contestacao") ||
+      norm.includes("contestação") ||
+      norm.includes("perdi o cartao") ||
+      norm.includes("perdi o cartão") ||
+      norm.includes("bloquear cartao") ||
+      norm.includes("bloquear cartão")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("duvidas", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "duvidas",
+          tituloBotao: "Ver dúvidas e canais de suporte",
+          textoIntro:
+            "Como você mencionou dúvidas/suporte, posso te mostrar o trecho do Manual da Clara com os principais contatos e orientações:"
+        };
+      }
+    }
+
+    // Se nenhuma sugestão foi montada, sai
+    if (!sugestao) return;
+
+    const html =
+      "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+        "<p>" + sugestao.textoIntro + "</p>" +
+        "<button type='button' " +
+          "onclick=\"vektorManualClaraSecao('" + sugestao.secaoId + "')\" " +
+          "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
+                 "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+          sugestao.tituloBotao +
+        "</button>" +
+      "</div>";
+
+    renderBotMessage(html);
+    if (typeof scrollToBottom === "function") scrollToBottom();
+  } catch (e) {
+    console.warn("Erro ao sugerir tópico do Manual da Clara:", e);
+  }
+}
+
 // ========= SUGESTÃO AUTOMÁTICA DE TÓPICOS RELACIONADOS ========= //
 window.vektorSugerirTopicoRelacionadoManual = function (secaoId) {
   // Por enquanto vamos tratar apenas o caso "anexar_comprovante"
@@ -3442,7 +3617,7 @@ window.vektorSugerirTopicoRelacionadoManual = function (secaoId) {
 
   renderBotMessage(html);
   if (typeof scrollToBottom === "function") scrollToBottom();
-};
+}
 
 // Quando o usuário clicar em "Ver política de justificativas"
 window.vektorAbrirPoliticaJustificativas = function () {
@@ -5512,6 +5687,13 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
 
         const resposta = gerarRespostaDoBot(texto);
         if (resposta) renderBotMessage(resposta);
+
+        // Depois de responder normalmente, avalia se faz sentido sugerir um tópico do Manual da Clara
+    try {
+      vektorSugerirManualAPartirDaPergunta(texto);
+    } catch (e) {
+      console.warn("Erro ao tentar sugerir Manual da Clara:", e);
+    }
 
         userInput.value = "";
         userInput.focus();
