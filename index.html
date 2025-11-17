@@ -253,6 +253,15 @@
     📊 Relatório Clara (Looker Studio)
   </button>
 
+  <!-- Botão: Feedback -->
+  <button
+    type="button"
+    onclick= "window.open('https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF/edit','_blank')"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  >
+    📝 Feedback
+  </button>
+  
 </aside>
  
    <!-- COLUNA DIREITA: CHAT -->
@@ -300,7 +309,10 @@
               </main>      <!-- fecha .chat-body -->
 
 <!-- Modal de apresentação do Vektor -->
-<div id="vektorModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+
+<div id="vektorModal"
+     class="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+     style="display:none;">
   <div class="bg-white p-5 rounded-xl shadow-lg max-w-[600px] w-[95%]">
     <div class="rounded-xl overflow-hidden">
       <iframe
@@ -319,6 +331,65 @@
   </div>
 </div>
 
+<!-- Modal do Manual da Clara -->
+<div id="manualClaraModal"
+     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
+  <div class="bg-white p-5 rounded-xl shadow-lg max-w-[520px] w-[95%]">
+    <h2 class="text-base font-semibold text-slate-800 mb-2">
+      Manual da Clara – principais tópicos
+    </h2>
+    <p class="text-xs text-slate-500 mb-3">
+      Escolha um dos itens abaixo. A resposta aparece aqui no chat.
+    </p>
+
+    <div class="flex flex-col gap-2 text-sm text-slate-700">
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('primeiro_acesso'); closeManualClaraModal();">
+        01 Primeiro acesso
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('recebi_cartao'); closeManualClaraModal();">
+        02 Recebi o cartão, e agora?
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('esqueci_senha'); closeManualClaraModal();">
+        03 Esqueci a senha do cartão / acesso
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('qual_meu_acesso'); closeManualClaraModal();">
+        04 Qual o meu acesso?
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('anexar_comprovante'); closeManualClaraModal();">
+        05 Como anexar comprovante?
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('duvidas'); closeManualClaraModal();">
+        06 Dúvidas
+      </button>
+    </div>
+
+    <button type="button"
+            onclick="closeManualClaraModal()"
+            class="mt-4 w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-semibold">
+      Fechar
+    </button>
+  </div>
+</div>
+
+
                   <!-- FOOTER / INPUT -->
                   <footer class="chat-footer">
                       <form id="chatForm" class="w-full">
@@ -335,13 +406,15 @@
 
 
 <script>
+
   // Fecha o modal do vídeo de apresentação
-  function closeVektorModal() {
-    const modal = document.getElementById("vektorModal");
-    if (modal) {
-      modal.style.display = "none";
-    }
+function closeVektorModal() {
+  var modal = document.getElementById("vektorModal");
+  if (modal) {
+    modal.style.display = "none";
   }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png";
 
@@ -2442,7 +2515,7 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
                 // 🔹 NOVA RESPOSTA – transação negada / categoria bloqueada
                 function respTransacaoNegadaCategoria() {
                     return `HTML:<div class="text-sm text-slate-700">
-            <p>Algumas compras podem ser <b>negadas</b> mesmo com limite disponível e cartão ativo (<i>É importante que você verifique que seu cartã não está bloqueado</i>), porque a <b>categoria do estabelecimento</b> (MCC) está bloqueada pela política de uso dos cartões Clara.</p>
+            <p>Algumas compras podem ser <b>negadas</b> mesmo com limite disponível e cartão ativo (<i>É importante que você verifique que seu cartão não está bloqueado</i>), porque a <b>categoria do estabelecimento</b> (MCC) está bloqueada pela política de uso dos cartões Clara.</p>
 
             <p class="mt-2">Nesses casos, siga estes passos:</p>
             <ol class="list-decimal ml-4 mt-1">
@@ -3110,11 +3183,379 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
         return resposta;
     }
 
+    // ====== MINI BOT DO MANUAL CLARA ======
+
+    
+const MANUAL_CLARA_LINK = "https://drive.google.com/file/d/1TYJ7x5Uxb5C47pNpUDWIzxXZb9lJfm8I/view?usp=sharing";
+const POLITICA_CARTOES_CLARA_LINK = "https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing";
+
+window.vektorManualClaraSecao = function (secaoId) {
+  let html = "";
+
+  if (secaoId === "primeiro_acesso") {
+    html =
+      "<p><b>01 Primeiro acesso:</b></p><br>" +
+      "<p>1️⃣ Verifique se você recebeu o e-mail da Clara com o assunto <b>“Junte-se à Clara”</b> (olhe também no SPAM).</p>" +
+      "<p>2️⃣ Siga o link do e-mail para criar sua senha.</p>" +
+      "<p>3️⃣ Ative a autenticação em 2 etapas com um app como o <b>Google Authenticator</b> e escaneie o QR Code ao fazer o primeiro login no site da Clara.</p>" +
+      "<p>4️⃣ Depois disso, sempre que entrar no site será pedido o código de 6 dígitos gerado pelo app de autenticação.</p>";
+  }
+
+  else if (secaoId === "recebi_cartao") {
+    html =
+      "<p><b>02 Recebi o cartão, e agora?</b></p><br>" +
+      "<p>1️⃣ Baixe o app <b>Clara Card</b> (iOS ou Android).</p>" +
+      "<p>2️⃣ Faça login com o mesmo e-mail/senha que você usa na plataforma Clara.</p>" +
+      "<p>3️⃣ Vá em <b>Cartões</b>, selecione o cartão recebido e clique em <b>Ativar</b>.</p>" +
+      "<p>4️⃣ Informe os <b>4 últimos dígitos</b> do cartão e conclua a ativação.</p>" +
+      "<p>Depois disso o cartão já fica pronto para uso.</p>";
+  }
+
+  else if (secaoId === "esqueci_senha") {
+    html =
+      "<p><b>03 Esqueci a senha do cartão / acesso:</b></p><br>" +
+      "<p>🔐 <b>Senha do cartão</b>: você vê apenas pelo aplicativo da Clara, em <b>Cartões &gt; Ver senha</b>. A senha é gerada automaticamente e não é alterável.</p><br>" +
+      "<p>🔑 <b>Senha de login</b>: se esqueceu, use a opção de <b>redefinir senha</b> na tela de login da Clara. Um link será enviado para seu e-mail para criar uma nova senha.</p>" +
+      "<p>Se você perdeu acesso ao app de autenticação (2 etapas), peça para alguém com acesso administrativo redefinir sua autenticação.</p>";
+  }
+
+  else if (secaoId === "qual_meu_acesso") {
+    html =
+      "<p><b>04 Qual o meu acesso?</b></p><br>" +
+      "<p>1️⃣ Entre na plataforma Clara pelo computador.</p>" +
+      "<p>2️⃣ Clique em <b>Meu Perfil</b>, no canto superior direito.</p>" +
+      "<p>3️⃣ Na área de <b>Ações do usuário</b> aparece o seu tipo de acesso:</p>" +
+      "<ul>" +
+        "<li>• <b>Administrador (Owner)</b>: acesso total, vê saldo global, faturas, relatórios completos.</li>" +
+        "<li>• <b>Gerente (Manager)</b>: gerencia usuários/cartões do seu grupo e vê saldo global.</li>" +
+        "<li>• <b>Colaborador (Employee)</b>: vê somente seus cartões, transações e pode anexar notas.</li>" +
+        "<li>• <b>Contador (Accountant)</b>: acesso a todas as faturas, boletos, relatórios e transações.</li>" +
+      "</ul>";
+  }
+
+  else if (secaoId === "anexar_comprovante") {
+    html =
+      "<p><b>05 Como anexar comprovante?</b></p><br>" +
+      "<p><b>Pelo app (celular):</b></p>" +
+      "<ol>" +
+        "<li>1. Abra o app da Clara e faça login.</li>" +
+        "<li>2. Vá em <b>Transações</b> e selecione a compra.</li>" +
+        "<li>3. Toque em <b>Anexar</b> e tire foto ou escolha o arquivo (XML, PDF, JPG ou PNG).</li>" +
+        "<li>4. Opcional: adicione um <b>comentário</b> explicando a despesa.</li><br>" +
+      "</ol>" +
+      "<p><b>Pelo computador:</b></p>" +
+      "<ol>" +
+        "<li>1. Acesse a plataforma Clara e vá em <b>Transações</b>.</li>" +
+        "<li>2. Clique na transação desejada.</li>" +
+        "<li>3. Em <b>Selecionar arquivos</b>, envie o comprovante (XML, PDF, JPG ou PNG).</li>" +
+        "<li>4. Opcional: adicione um comentário explicando a despesa.</li>" +
+      "</ol>";
+  }
+
+  else if (secaoId === "duvidas") {
+    html =
+      "<p><b>06 Dúvidas:</b></p><br>" +
+      "<p>Alguns pontos importantes do manual:</p>" +
+      "<ul>" +
+        "<li>• <b>Autenticação em 2 etapas</b>: sempre use o código de 6 dígitos do app de autenticação ao entrar no site.</li>" +
+        "<li>• <b>Problema de login</b>: verifique e-mail minúsculo, senha correta ou use “Continuar com Google” se já usou antes.</li>" +
+        "<li>• <b>Perdi o celular ou cartão</b>: peça para alguém com acesso administrativo bloquear/cancelar o cartão e criar outro.</li>" +
+        "<li>• <b>Cancelamento/estorno</b>: tente primeiro com o estabelecimento; se não resolver, conteste a transação via app/plataforma da Clara.</li>" +
+      "</ul>" +
+      "<p>Canais de suporte Clara: telefone 0800, e-mail, chat na Central de Ajuda (conforme manual).</p>";
+  }
+
+  if (!html) return;
+
+  // Rodapé padrão com link para o manual completo
+  html +=
+    "<p style='margin-top:8px;font-size:12px;color:#475569;'>" +
+      "Caso queira mais detalhes, acesse o manual completo: " +
+      "<a href='" + MANUAL_CLARA_LINK + "' target='_blank' style='color:#005E27;font-weight:bold;'>Manual do Usuário Clara</a>." +
+    "</p>";
+
+  // 👉 REGISTRA o tópico no histórico
+  try {
+    registrarTopicoManualClara(secaoId);
+  } catch (e) {
+    console.warn("Não consegui registrar histórico do manual:", e);
+  }
+
+  // Envia a resposta principal
+  renderBotMessage("HTML:<div class='text-sm text-slate-700'>" + html + "</div>");
+  scrollToBottom && scrollToBottom();
+
+  // 👉 Mostra um resumo do que o usuário já acessou (se tiver mais de 1 item)
+  vektorMostrarHistoricoManualSeExistir();
+
+    // 👉 Sugestão automática baseada no tópico aberto
+  if (typeof window.vektorSugerirTopicoRelacionadoManual === "function") {
+    window.vektorSugerirTopicoRelacionadoManual(secaoId);
+  }
+};
+
+// Mapeia o ID técnico para um título amigável
+function mapSecaoManualParaTitulo(secaoId) {
+  switch (secaoId) {
+    case "primeiro_acesso":
+      return "01 Primeiro acesso";
+    case "recebi_cartao":
+      return "02 Recebi o cartão, e agora?";
+    case "esqueci_senha":
+      return "03 Esqueci a senha do cartão / acesso";
+    case "qual_meu_acesso":
+      return "04 Qual o meu acesso?";
+    case "anexar_comprovante":
+      return "05 Como anexar comprovante?";
+    case "duvidas":
+      return "06 Dúvidas";
+    default:
+      return null;
+  }
+}
+
+// Salva o histórico no localStorage (máx. 20 registros)
+function registrarTopicoManualClara(secaoId) {
+  try {
+    const titulo = mapSecaoManualParaTitulo(secaoId);
+    if (!titulo) return;
+
+    const STORAGE_KEY = "vektor_manual_clara_historico";
+
+    let historico = [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) historico = parsed;
+      } catch (e) {
+        console.warn("Histórico do manual Clara estava corrompido, reiniciando.");
+      }
+    }
+
+    historico.push({
+      secao: secaoId,
+      titulo: titulo,
+      dataIso: new Date().toISOString()
+    });
+
+    // limita a 20 entradas mais recentes
+    if (historico.length > 20) {
+      historico = historico.slice(historico.length - 20);
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(historico));
+  } catch (e) {
+    console.warn("Erro ao salvar histórico do manual Clara:", e);
+  }
+}
+
+// Lê o histórico e devolve ordenado do mais recente para o mais antigo
+function obterHistoricoManualClara() {
+  const STORAGE_KEY = "vektor_manual_clara_historico";
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    // ordena do mais recente para o mais antigo
+    return parsed
+      .filter(item => item && item.titulo && item.dataIso)
+      .sort((a, b) => (a.dataIso || "").localeCompare(b.dataIso || ""));
+  } catch (e) {
+    console.warn("Erro ao ler histórico do manual Clara:", e);
+    return [];
+  }
+}
+
+// Mostra uma mensagem "Você já acessou recentemente..." no chat
+function vektorMostrarHistoricoManualSeExistir() {
+  try {
+    const historico = obterHistoricoManualClara();
+    if (!historico || historico.length <= 1) {
+      // se só tem 0 ou 1 item, não faz sentido falar em "recentemente"
+      return;
+    }
+
+    // pega no máximo 5 mais recentes (sem duplicar títulos)
+    const vistos = [];
+    const titulosJaUsados = new Set();
+
+    for (let i = 0; i < historico.length; i++) {
+      const item = historico[i];
+      if (!item || !item.titulo) continue;
+      if (titulosJaUsados.has(item.titulo)) continue;
+
+      titulosJaUsados.add(item.titulo);
+      vistos.push(item.titulo);
+
+      if (vistos.length >= 5) break;
+    }
+
+    if (!vistos.length) return;
+
+    const listaHtml = vistos
+      .map(t => "<li>• " + t + "</li>")
+      .join("");
+
+    const html =
+      "<div class='text-sm text-slate-700'>" +
+        "<p><b>Você já acessou recentemente:</b></p>" +
+        "<ul style='margin-top:4px;margin-left:16px;'>" +
+          listaHtml +
+        "</ul>" +
+        "<p style='margin-top:6px;font-size:12px;color:#64748b;'>" +
+          "Você pode clicar novamente nos botões do Manual da Clara para reabrir qualquer um desses tópicos." +
+        "</p>" +
+      "</div>";
+
+    renderBotMessage("HTML:" + html);
+    if (typeof scrollToBottom === "function") {
+      scrollToBottom();
+    }
+  } catch (e) {
+    console.warn("Erro ao mostrar histórico do manual Clara:", e);
+  }
+}
+
+// ========= SUGESTÃO AUTOMÁTICA DE TÓPICOS RELACIONADOS ========= //
+window.vektorSugerirTopicoRelacionadoManual = function (secaoId) {
+  // Por enquanto vamos tratar apenas o caso "anexar_comprovante"
+  if (secaoId !== "anexar_comprovante") return;
+
+  const html =
+    "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+      "<p><b>Sugestão:</b> Quer ver também como funciona a <b>política de justificativas</b>?</p>" +
+      "<div style='margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;'>" +
+        "<button onclick=\"vektorAbrirPoliticaJustificativas()\" " +
+                "class='px-3 py-2 rounded-md bg-[#005E27] text-white text-sm font-semibold'>" +
+          "Ver política de justificativas" +
+        "</button>" +
+        "<button onclick=\"vektorIgnorarSugestaoPolitica()\" " +
+                "class='px-3 py-2 rounded-md border text-sm'>" +
+          "Agora não" +
+        "</button>" +
+      "</div>" +
+    "</div>";
+
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") scrollToBottom();
+};
+
+// Quando o usuário clicar em "Ver política de justificativas"
+window.vektorAbrirPoliticaJustificativas = function () {
+  const html =
+    "HTML:<div class='text-sm text-slate-700'>" +
+      "<p><b>Política de justificativas (resumo):</b></p>" +
+      "<ul style='margin-top:4px;margin-left:16px;'>" +
+        "<li>• Cada transação deve ter justificativa e comprovante anexado dentro de, no máximo, 48 horas após a cpmpra.</li><br>" +
+        "<li>• <b>Para justificar</b>: Inserir nota fiscal ou recibo da compra, informar a etiqueta do tipo de gasto e inserir no campo Descrição o item adquirido.</li><br>" +
+        "<li>• Despesas sem justificativas ou com documentos inconsistentes podem ser questionadas pelo time Financeiro.</li><br>" +
+        "<li>• Em casos recorrentes, a empresa pode adotar medidas adicionais, como o bloqueio preventivo do cartão.</li>" +
+      "</ul>" +
+   // 🔽 AQUI ENTRA O LINK NO RODAPÉ
+      "<p style='margin-top:8px;font-size:12px;color:#475569;'>" +
+        "Consulte a Política de Uso dos Cartões Clara: " +
+        "<a href='" + POLITICA_CARTOES_CLARA_LINK + "' target='_blank' " +
+        "style='color:#005E27;font-weight:bold;'>clique aqui para abrir</a>." +
+      "</p>" +
+    "</div>";
+
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") scrollToBottom();
+};
+
+// Caso ele clique em "Agora não"
+window.vektorIgnorarSugestaoPolitica = function () {
+  const html =
+    "HTML:<div class='text-sm text-slate-700'>" +
+      "<p>Beleza. Se quiser ver a política de justificativas depois, é só me pedir 😉</p>" +
+    "</div>";
+
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") scrollToBottom();
+};
 
     /* ========= GERADOR FINAL ========= */
 
 function gerarRespostaDoBot(msgUsuario) {
   const norm = normalize(msgUsuario || "");
+
+  // === Gatilho para o MINI MANUAL DA CLARA ===
+  if (
+    norm.includes("manual clara") ||
+    norm.includes("manual da clara") ||
+    norm.includes("manual") ||
+    norm.includes("treinamento clara") ||
+    norm.includes("treinamento da clara") ||
+    norm.includes("treinamentos") ||
+    norm.includes("treinamento")
+  ) {
+
+    
+    const htmlPartes = [];
+
+    htmlPartes.push(
+      "<div class='text-sm text-slate-700'>" +
+        "<p><b>Posso te ajudar a tirar dúvidas sobre o uso do cartão da Clara.</b> Escolha um dos tópicos abaixo 👇</p>" +
+        "<div class='mt-3 flex flex-col gap-2'>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('primeiro_acesso')\">" +
+        "01 Primeiro acesso" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('recebi_cartao')\">" +
+        "02 Recebi o cartão, e agora?" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('esqueci_senha')\">" +
+        "03 Esqueci a senha do cartão" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('qual_meu_acesso')\">" +
+        "04 Qual o meu acesso?" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('anexar_comprovante')\">" +
+        "05 Como anexar comprovante?" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('duvidas')\">" +
+        "06 Dúvidas" +
+      "</button>"
+    );
+
+    htmlPartes.push("</div></div>");
+
+    const htmlFinal = htmlPartes.join("");
+    return "HTML:" + htmlFinal;
+  }
 
   // >>> TODAS AS LOJAS (geral) por valor
 const detTodasLojas = detectarListarTodasLojasGeral(msgUsuario, norm);
@@ -4239,7 +4680,7 @@ if (m) {
     // 🔽 Dropdown de drilldown para a tabela de LOJAS
         linhasTabela.push(
           "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
-            "Drilldown desta tabela de lojas: " +
+            "Expandir a tabela por: " +
             "<select class='vektor-drill-select' data-base='loja' " +
                    "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
               "<option value='estabelecimento'>Estabelecimentos</option>" +
@@ -4463,6 +4904,7 @@ var html = [
 
 renderBotMessage("HTML:" + html);
 }
+
 
 // ========= RENDER GENÉRICO: CATEGORIAS / ESTABELECIMENTOS ========= //
 
@@ -4850,6 +5292,8 @@ function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
     texto.includes("mais gastou")                 ||
     texto.includes("loja que mais gastou")        ||
     texto.includes("mais gastos")                 ||
+    texto.includes("maior gastos")                 ||
+    texto.includes("maior gasto")                 ||
     texto.includes("mais comprou");
 
   // se não for pergunta de loja + (transações ou valor), ignora
@@ -4980,6 +5424,8 @@ function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
     texto.includes("mais gastou")     ||
     texto.includes("mais gasto")      ||
     texto.includes("mais gastos")     ||
+    texto.includes("maior gasto")     ||
+    texto.includes("maior gastos")     ||
     texto.includes("mais comprou")    ||
     texto.includes("valor de transacoes");
 
@@ -5088,6 +5534,42 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
         e.preventDefault();
         enviarMensagem();
     });
+
+    // 🟢 Mostrar o vídeo do Vektor só na primeira visita
+    (function () {
+      var modal = document.getElementById("vektorModal");
+      if (!modal) return;
+
+      // Verifica se já mostramos o vídeo neste navegador
+      var jaMostrou = localStorage.getItem("vektorIntroShown");
+
+      if (!jaMostrou) {
+        // Nunca mostrou → exibe o modal e marca como exibido
+        modal.style.display = "flex";   // combina com as classes flex do Tailwind
+        localStorage.setItem("vektorIntroShown", "1");
+      } else {
+        // Já mostrou uma vez → garante que fique escondido
+        modal.style.display = "none";
+      }
+    })();
+
+      // ===== MODAL DO MANUAL CLARA =====
+  window.openManualClaraModal = function () {
+    const el = document.getElementById("manualClaraModal");
+    if (el) {
+      el.classList.remove("hidden");
+      // para garantir que fique centralizado como flex
+      el.classList.add("flex");
+    }
+  };
+
+  window.closeManualClaraModal = function () {
+    const el = document.getElementById("manualClaraModal");
+    if (el) {
+      el.classList.add("hidden");
+      el.classList.remove("flex");
+    }
+  };
 
 }); // fim DOMContentLoaded
 </script>
