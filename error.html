@@ -253,6 +253,15 @@
     📊 Relatório Clara (Looker Studio)
   </button>
 
+  <!-- Botão: Feedback -->
+  <button
+    type="button"
+    onclick= "window.open('https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF/edit','_blank')"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  >
+    📝 Feedback
+  </button>
+  
 </aside>
  
    <!-- COLUNA DIREITA: CHAT -->
@@ -300,7 +309,10 @@
               </main>      <!-- fecha .chat-body -->
 
 <!-- Modal de apresentação do Vektor -->
-<div id="vektorModal" class="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+
+<div id="vektorModal"
+     class="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+     style="display:none;">
   <div class="bg-white p-5 rounded-xl shadow-lg max-w-[600px] w-[95%]">
     <div class="rounded-xl overflow-hidden">
       <iframe
@@ -319,6 +331,65 @@
   </div>
 </div>
 
+<!-- Modal do Manual da Clara -->
+<div id="manualClaraModal"
+     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
+  <div class="bg-white p-5 rounded-xl shadow-lg max-w-[520px] w-[95%]">
+    <h2 class="text-base font-semibold text-slate-800 mb-2">
+      Manual da Clara – principais tópicos
+    </h2>
+    <p class="text-xs text-slate-500 mb-3">
+      Escolha um dos itens abaixo. A resposta aparece aqui no chat.
+    </p>
+
+    <div class="flex flex-col gap-2 text-sm text-slate-700">
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('primeiro_acesso'); closeManualClaraModal();">
+        01 Primeiro acesso
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('recebi_cartao'); closeManualClaraModal();">
+        02 Recebi o cartão, e agora?
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('esqueci_senha'); closeManualClaraModal();">
+        03 Esqueci a senha do cartão / acesso
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('qual_meu_acesso'); closeManualClaraModal();">
+        04 Qual o meu acesso?
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('anexar_comprovante'); closeManualClaraModal();">
+        05 Como anexar comprovante?
+      </button>
+
+      <button type="button"
+              class="px-3 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-left"
+              onclick="window.vektorManualClaraSecao('duvidas'); closeManualClaraModal();">
+        06 Dúvidas
+      </button>
+    </div>
+
+    <button type="button"
+            onclick="closeManualClaraModal()"
+            class="mt-4 w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-semibold">
+      Fechar
+    </button>
+  </div>
+</div>
+
+
                   <!-- FOOTER / INPUT -->
                   <footer class="chat-footer">
                       <form id="chatForm" class="w-full">
@@ -335,13 +406,15 @@
 
 
 <script>
+
   // Fecha o modal do vídeo de apresentação
-  function closeVektorModal() {
-    const modal = document.getElementById("vektorModal");
-    if (modal) {
-      modal.style.display = "none";
-    }
+function closeVektorModal() {
+  var modal = document.getElementById("vektorModal");
+  if (modal) {
+    modal.style.display = "none";
   }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png";
 
@@ -665,43 +738,47 @@ window.vektorExpandirLinha = function (tr, base) {
   try {
     if (!tr || !tr.cells || !tr.cells.length) return;
 
-    // nome da linha (Time / Loja / Categoria / Estabelecimento)
-    const chave = (tr.cells[0].innerText || "").trim();
+    // Nome da linha (Time / Loja / Categoria / Estabelecimento)
+    const chave = (tr.cells[0].innerText || tr.cells[0].textContent || "").trim();
     if (!chave) return;
 
-    // encontra o <select> relacionado ao drilldown
-    let container = tr.closest("div");
-    let select = container
+    // Encontra o <select> relacionado ao drilldown
+    const container = tr.closest("div");
+    const select = container
       ? container.querySelector(".vektor-drill-select[data-base='" + base + "']")
       : null;
 
-    const alvo = select ? select.value : null; // loja / categoria / estabelecimento
+    const alvo = select ? select.value : null; // loja / categoria / estabelecimento / time
 
-    // pega o período da pergunta original (cache)
+    // Período da pergunta original (cache)
     const periodo = window.__vektorUltimoPeriodo || null;
     const dataInicioStr =
-      periodo && periodo.dataInicio
-        ? new Date(periodo.dataInicio).toISOString()
-        : "";
+      periodo && periodo.dataInicio ? periodo.dataInicio.toISOString() : "";
     const dataFimStr =
-      periodo && periodo.dataFim
-        ? new Date(periodo.dataFim).toISOString()
-        : "";
+      periodo && periodo.dataFim ? periodo.dataFim.toISOString() : "";
+
+    let periodoTxt = "";
+    if (periodo && periodo.dataInicio && periodo.dataFim) {
+      const di = periodo.dataInicio;
+      const df = periodo.dataFim;
+      periodoTxt =
+        di.toLocaleDateString("pt-BR") + " a " + df.toLocaleDateString("pt-BR");
+    }
 
     const tipo = "valor"; // padrão do drilldown
 
     // ================== BASE = TIME ==================
-
     if (base === "time") {
-      // ▼ TIME → LOJAS
+      // ▼ TIME → LOJAS (padrão)
       if (alvo === "loja" || !alvo) {
         renderBotMessage(
           `HTML:<p class="text-sm text-slate-700">
-      Detalhando o time <b>${chave}</b> por <b>lojas</b>…</p>`
+            Detalhando o time <b>${chave}</b> por <b>lojas</b>…</p>`
         );
 
         google.script.run
           .withSuccessHandler(function (res) {
+            // topN null + forGroup=true => todas as lojas do time
             renderResumoTransacoesSemana(res, { topN: null, forGroup: true });
           })
           .withFailureHandler(function () {
@@ -709,77 +786,51 @@ window.vektorExpandirLinha = function (tr, base) {
               "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar por lojas.</p>"
             );
           })
-          .getResumoTransacoesPorGrupo(
-            chave,
-            dataInicioStr,
-            dataFimStr,
-            tipo
-          );
+          .getResumoTransacoesPorGrupo(chave, dataInicioStr, dataFimStr, tipo);
       }
 
       // ▼ TIME → CATEGORIAS
-      
       else if (alvo === "categoria") {
-  // time clicado = primeira coluna da linha
-  var chave = (tr.cells[0].innerText || tr.cells[0].textContent || "").trim();
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+            "Detalhando por <b>categorias</b> do time <b>" + chave + "</b> " +
+            (periodoTxt ? "no período <b>" + periodoTxt + "</b>" : "") +
+            "…</p>"
+        );
 
-  // período da pergunta original (guardado pelo wrapper de extrairIntervaloDatas)
-  var periodo = window.__vektorUltimoPeriodo || null;
-  var dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
-  var dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
-
-  var periodoTxt = "";
-  if (periodo && periodo.dataInicio && periodo.dataFim) {
-    var di = periodo.dataInicio;
-    var df = periodo.dataFim;
-    periodoTxt = di.toLocaleDateString("pt-BR") + " a " + df.toLocaleDateString("pt-BR");
-  }
-
-  // critério: se quiser sofisticar, dá pra guardar o critério original;
-  // por enquanto vamos usar "valor" que é o mais natural pra categoria.
-  var tipo = "valor";
-
-  renderBotMessage(
-    "HTML:<p class='text-sm text-slate-700'>" +
-      "Detalhando por <b>categorias</b> do time <b>" + chave + "</b> " +
-      (periodoTxt ? "no período <b>" + periodoTxt + "</b>" : "") +
-      "…</p>"
-  );
-
-  google.script.run
-    .withSuccessHandler(function (res) {
-      renderResumoPorChaveGenerico(res, {
-        tipoChave: "Categoria",
-        titulo: "Categorias do time " + chave,
-        topN: null
-      });
-    })
-    .withFailureHandler(function () {
-      renderBotMessage(
-        "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar categorias do time.</p>"
-      );
-    })
-    .getResumoTransacoesPorCategoriaTime(
-      dataInicioStr,
-      dataFimStr,
-      tipo,     // "valor" ou "quantidade"
-      chave     // nome do time
-    );
-}
+        google.script.run
+          .withSuccessHandler(function (res) {
+            renderResumoPorChaveGenerico(res, {
+              tipoChave: "Categoria",
+              titulo: "Categorias do time " + chave,
+              topN: null
+            });
+          })
+          .withFailureHandler(function () {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar categorias do time.</p>"
+            );
+          })
+          .getResumoTransacoesPorCategoriaTime(
+            dataInicioStr,
+            dataFimStr,
+            tipo,   // "valor" ou "quantidade"
+            chave   // nome do time
+          );
+      }
 
       // ▼ TIME → ESTABELECIMENTOS
       else if (alvo === "estabelecimento") {
         renderBotMessage(
           `HTML:<p class="text-sm text-slate-700">
-        Detalhando o time <b>${chave}</b> por <b>estabelecimentos</b>…</p>`
+            Detalhando o time <b>${chave}</b> por <b>estabelecimentos</b>…</p>`
         );
 
         google.script.run
           .withSuccessHandler(function (res) {
             renderResumoPorChaveGenerico(res, {
               tipoChave: "Estabelecimento",
-              titulo:
-                "Estabelecimentos do time " + chave,
+              titulo: "Estabelecimentos do time " + chave,
               topN: null
             });
           })
@@ -801,13 +852,12 @@ window.vektorExpandirLinha = function (tr, base) {
     }
 
     // ================== BASE = LOJA ==================
-
     if (base === "loja") {
       // ▼ LOJA → ESTABELECIMENTOS
       if (alvo === "estabelecimento") {
         renderBotMessage(
           `HTML:<p class="text-sm text-slate-700">
-      Detalhando a loja <b>${chave}</b> por <b>estabelecimentos</b>…</p>`
+            Detalhando a loja <b>${chave}</b> por <b>estabelecimentos</b>…</p>`
         );
 
         google.script.run
@@ -832,56 +882,38 @@ window.vektorExpandirLinha = function (tr, base) {
           );
       }
 
-      // ▼ LOJA → CATEGORIAS (visão geral)
-
+      // ▼ LOJA → CATEGORIAS
       else if (alvo === "categoria") {
-  // loja clicada = primeira coluna da linha
-  var chaveLoja = (tr.cells[0].innerText || tr.cells[0].textContent || "").trim();
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+            "Detalhando por <b>categorias</b> da loja <b>" + chave + "</b> " +
+            (periodoTxt ? "no período <b>" + periodoTxt + "</b>" : "") +
+            "…</p>"
+        );
 
-  var periodo = window.__vektorUltimoPeriodo || null;
-  var dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
-  var dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
-
-  var periodoTxt = "";
-  if (periodo && periodo.dataInicio && periodo.dataFim) {
-    var di2 = periodo.dataInicio;
-    var df2 = periodo.dataFim;
-    periodoTxt = di2.toLocaleDateString("pt-BR") + " a " + df2.toLocaleDateString("pt-BR");
-  }
-
-  var tipo = "valor";
-
-  renderBotMessage(
-    "HTML:<p class='text-sm text-slate-700'>" +
-      "Detalhando por <b>categorias</b> da loja <b>" + chaveLoja + "</b> " +
-      (periodoTxt ? "no período <b>" + periodoTxt + "</b>" : "") +
-      "…</p>"
-  );
-
-  google.script.run
-    .withSuccessHandler(function (res) {
-      renderResumoPorChaveGenerico(res, {
-        tipoChave: "Categoria",
-        titulo: "Categorias da loja " + chaveLoja,
-        topN: null
-      });
-    })
-    .withFailureHandler(function () {
-      renderBotMessage(
-        "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar categorias da loja.</p>"
-      );
-    })
-    .getResumoTransacoesPorCategoriaLoja(
-      dataInicioStr,
-      dataFimStr,
-      tipo,        // "valor" ou "quantidade"
-      chaveLoja    // código/nome da loja
-    );
-}
+        google.script.run
+          .withSuccessHandler(function (res) {
+            renderResumoPorChaveGenerico(res, {
+              tipoChave: "Categoria",
+              titulo: "Categorias da loja " + chave,
+              topN: null
+            });
+          })
+          .withFailureHandler(function () {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Falha ao detalhar categorias da loja.</p>"
+            );
+          })
+          .getResumoTransacoesPorCategoriaLoja(
+            dataInicioStr,
+            dataFimStr,
+            tipo,     // "valor" ou "quantidade"
+            chave     // código/nome da loja
+          );
+      }
 
       return;
     }
-
   } catch (e) {
     console.error("Erro no vektorExpandirLinha:", e);
     renderBotMessage(
@@ -954,6 +986,33 @@ function encontrarTimeNaMensagem(msgOriginal) {
 
   // se nada bateu, volta null
   return melhorNome;
+}
+
+function encontrarListaTimesNaMensagem(msgOriginal) {
+  const texto = normalize(msgOriginal || "");
+  const encontrados = [];
+
+  TIMES_OFICIAIS.forEach((nome) => {
+    const nomeNorm = normalize(nome);
+
+    // usa as mesmas regras do encontrarTimeNaMensagem,
+    // mas aqui a ideia é pegar TODOS os que apareçam
+    const tokens = nomeNorm
+      .split(" ")
+      .filter(t => !["do","da","de","dos","das","sp","sul"].includes(t));
+
+    let score = 0;
+    tokens.forEach((tk) => {
+      if (!tk) return;
+      if (texto.includes(tk)) score += 1;
+    });
+
+    if (score > 0) {
+      encontrados.push(nome);
+    }
+  });
+
+  return encontrados;
 }
 
 
@@ -1587,7 +1646,7 @@ function encontrarTimeNaMensagem(msgOriginal) {
             msgNorm.includes("transação não permitida")) 
 
           {
-            return "transacaoNegadaCategoria";}
+            return "  ";}
 
 
         if (msgNorm.includes("bloqueou") ||
@@ -2483,7 +2542,7 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
                 // 🔹 NOVA RESPOSTA – transação negada / categoria bloqueada
                 function respTransacaoNegadaCategoria() {
                     return `HTML:<div class="text-sm text-slate-700">
-            <p>Algumas compras podem ser <b>negadas</b> mesmo com limite disponível e cartão ativo (<i>É importante que você verifique que seu cartã não está bloqueado</i>), porque a <b>categoria do estabelecimento</b> (MCC) está bloqueada pela política de uso dos cartões Clara.</p>
+            <p>Algumas compras podem ser <b>negadas</b> mesmo com limite disponível e cartão ativo (<i>É importante que você verifique que seu cartão não está bloqueado</i>), porque a <b>categoria do estabelecimento</b> (MCC) está bloqueada pela política de uso dos cartões Clara.</p>
 
             <p class="mt-2">Nesses casos, siga estes passos:</p>
             <ol class="list-decimal ml-4 mt-1">
@@ -2842,9 +2901,28 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
                 renderBotMessage("HTML:" + tabela);
 
                 estadoPendencias = "aguardando_confirmacao_email";
+
                 renderBotMessage(
-                    'HTML:<p class="text-sm text-slate-700 mt-2">Quer que eu envie esse resumo por e-mail também? (responda <b>"sim"</b> ou <b>"não"</b>).</p>'
+                  'HTML:' +
+                  '<div class="text-sm text-slate-700 mt-2">' +
+                    '<p>Quer que eu envie esse resumo por e-mail também?</p>' +
+                    '<div class="mt-2 flex gap-2">' +
+                      '<button type="button" ' +
+                        'onclick="vektorResponderConfirmacaoPendencias(\'sim\')" ' +
+                        'style="background:#ffffff;color:#000000;border:1px solid #cbd5e1;' +
+                              'padding:4px 10px;border-radius:999px;font-size:13px;cursor:pointer;">' +
+                        'Sim' +
+                      '</button>' +
+                      '<button type="button" ' +
+                        'onclick="vektorResponderConfirmacaoPendencias(\'não\')" ' +
+                        'style="background:#ffffff;color:#000000;border:1px solid #cbd5e1;' +
+                              'padding:4px 10px;border-radius:999px;font-size:13px;cursor:pointer;">' +
+                        'Não' +
+                      '</button>' +
+                    '</div>' +
+                  '</div>'
                 );
+                
             })
             .withFailureHandler(function(err) {
                 console.error("Erro getPendenciasPorLoja:", err);
@@ -2910,14 +2988,29 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
                     return;
                 }
 
-                // 🟢 CASO 2: loja válida + tem pendências → pergunta se quer e-mail
-                estadoPendencias = "aguardando_confirmacao_email";
+                   // 🟢 CASO 2: loja válida + tem pendências → pergunta se quer e-mail
+                    estadoPendencias = "aguardando_confirmacao_email";
 
-                renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700 mt-2">
-                Quer que eu envie esse resumo por e-mail também? (responda <b>"sim"</b> ou <b>"não"</b>).
-                </p>`
-                );
+                    renderBotMessage(
+                      'HTML:' +
+                      '<div class="text-sm text-slate-700 mt-2">' +
+                        '<p>Quer que eu envie esse resumo por e-mail também?</p>' +
+                        '<div class="mt-2 flex gap-2">' +
+                          '<button type="button" ' +
+                            'onclick="vektorResponderConfirmacaoPendencias(\'sim\')" ' +
+                            'style="background:#ffffff;color:#000000;border:1px solid #cbd5e1;' +
+                                  'padding:4px 10px;border-radius:999px;font-size:13px;cursor:pointer;">' +
+                            'Sim' +
+                          '</button>' +
+                          '<button type="button" ' +
+                            'onclick="vektorResponderConfirmacaoPendencias(\'não\')" ' +
+                            'style="background:#ffffff;color:#000000;border:1px solid #cbd5e1;' +
+                                  'padding:4px 10px;border-radius:999px;font-size:13px;cursor:pointer;">' +
+                            'Não' +
+                          '</button>' +
+                        '</div>' +
+                      '</div>'
+                    );
             })
             .withFailureHandler(err => {
                 estadoPendencias = "nenhum";
@@ -2958,7 +3051,7 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
 
     /* ========= MOTOR DA POLÍTICA ========= */
 
-    function gerarRespostaPolitica(msgUsuario) {
+ function gerarRespostaPolitica(msgUsuario) {
         const norm = normalize(msgUsuario);
         const intencao = detectarIntencaoPergunta(norm);
 
@@ -3151,16 +3244,849 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
         return resposta;
     }
 
+    // ====== MINI BOT DO MANUAL CLARA ======
+
+    
+const MANUAL_CLARA_LINK = "https://drive.google.com/file/d/1TYJ7x5Uxb5C47pNpUDWIzxXZb9lJfm8I/view?usp=sharing";
+const POLITICA_CARTOES_CLARA_LINK = "https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing";
+const LOOKER_RELATORIO_URL = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
+
+window.vektorManualClaraSecao = function (secaoId) {
+  let html = "";
+
+  if (secaoId === "primeiro_acesso") {
+    html =
+      "<p><b>01 Primeiro acesso:</b></p><br>" +
+      "<p>1️⃣ Verifique se você recebeu o e-mail da Clara com o assunto <b>“Junte-se à Clara”</b> (olhe também no SPAM).</p>" +
+      "<p>2️⃣ Siga o link do e-mail para criar sua senha.</p>" +
+      "<p>3️⃣ Ative a autenticação em 2 etapas com um app como o <b>Google Authenticator</b> e escaneie o QR Code ao fazer o primeiro login no site da Clara.</p>" +
+      "<p>4️⃣ Depois disso, sempre que entrar no site será pedido o código de 6 dígitos gerado pelo app de autenticação.</p>";
+  }
+
+  else if (secaoId === "recebi_cartao") {
+    html =
+      "<p><b>02 Recebi o cartão, e agora?</b></p><br>" +
+      "<p>1️⃣ Baixe o app <b>Clara Card</b> (iOS ou Android).</p>" +
+      "<p>2️⃣ Faça login com o mesmo e-mail/senha que você usa na plataforma Clara.</p>" +
+      "<p>3️⃣ Vá em <b>Cartões</b>, selecione o cartão recebido e clique em <b>Ativar</b>.</p>" +
+      "<p>4️⃣ Informe os <b>4 últimos dígitos</b> do cartão e conclua a ativação.</p>" +
+      "<p>Depois disso o cartão já fica pronto para uso.</p>";
+  }
+
+  else if (secaoId === "esqueci_senha") {
+    html =
+      "<p><b>03 Esqueci a senha do cartão / acesso:</b></p><br>" +
+      "<p>🔐 <b>Senha do cartão</b>: você vê apenas pelo aplicativo da Clara, em <b>Cartões &gt; Ver senha</b>. A senha é gerada automaticamente e não é alterável.</p><br>" +
+      "<p>🔑 <b>Senha de login</b>: se esqueceu, use a opção de <b>redefinir senha</b> na tela de login da Clara. Um link será enviado para seu e-mail para criar uma nova senha.</p>" +
+      "<p>Se você perdeu acesso ao app de autenticação (2 etapas), peça para alguém com acesso administrativo redefinir sua autenticação.</p>";
+  }
+
+  else if (secaoId === "qual_meu_acesso") {
+    html =
+      "<p><b>04 Qual o meu acesso?</b></p><br>" +
+      "<p>1️⃣ Entre na plataforma Clara pelo computador.</p>" +
+      "<p>2️⃣ Clique em <b>Meu Perfil</b>, no canto superior direito.</p>" +
+      "<p>3️⃣ Na área de <b>Ações do usuário</b> aparece o seu tipo de acesso:</p>" +
+      "<ul>" +
+        "<li>• <b>Administrador (Owner)</b>: acesso total, vê saldo global, faturas, relatórios completos.</li>" +
+        "<li>• <b>Gerente (Manager)</b>: gerencia usuários/cartões do seu grupo e vê saldo global.</li>" +
+        "<li>• <b>Colaborador (Employee)</b>: vê somente seus cartões, transações e pode anexar notas.</li>" +
+        "<li>• <b>Contador (Accountant)</b>: acesso a todas as faturas, boletos, relatórios e transações.</li>" +
+      "</ul>";
+  }
+
+  else if (secaoId === "anexar_comprovante") {
+    html =
+      "<p><b>05 Como anexar comprovante?</b></p><br>" +
+      "<p><b>Pelo app (celular):</b></p>" +
+      "<ol>" +
+        "<li>1. Abra o app da Clara e faça login.</li>" +
+        "<li>2. Vá em <b>Transações</b> e selecione a compra.</li>" +
+        "<li>3. Toque em <b>Anexar</b> e tire foto ou escolha o arquivo (XML, PDF, JPG ou PNG).</li>" +
+        "<li>4. Opcional: adicione um <b>comentário</b> explicando a despesa.</li><br>" +
+      "</ol>" +
+      "<p><b>Pelo computador:</b></p>" +
+      "<ol>" +
+        "<li>1. Acesse a plataforma Clara e vá em <b>Transações</b>.</li>" +
+        "<li>2. Clique na transação desejada.</li>" +
+        "<li>3. Em <b>Selecionar arquivos</b>, envie o comprovante (XML, PDF, JPG ou PNG).</li>" +
+        "<li>4. Opcional: adicione um comentário explicando a despesa.</li>" +
+      "</ol>";
+  }
+
+  else if (secaoId === "duvidas") {
+    html =
+      "<p><b>06 Dúvidas:</b></p><br>" +
+      "<p>Alguns pontos importantes:</p>" +
+      "<ul>" +
+        "<li>• <b>Autenticação em 2 etapas</b>: sempre use o código de 6 dígitos do app de autenticação ao entrar no site.</li>" +
+        "<li>• <b>Problema de login</b>: verifique e-mail minúsculo, senha correta ou use “Continuar com Google” se já usou antes.</li>" +
+        "<li>• <b>Perdi o celular ou cartão</b>: peça para alguém com acesso administrativo bloquear/cancelar o cartão e criar outro.</li>" +
+        "<li>• <b>Cancelamento/estorno</b>: tente primeiro com o estabelecimento; se não resolver, conteste a transação via app/plataforma da Clara.</li>" +
+      "</ul>" +
+      "<p>Canais de suporte Clara: telefone 0800, e-mail, chat na Central de Ajuda (conforme manual).</p>";
+  }
+
+  if (!html) return;
+
+  // Rodapé padrão com link para o manual completo
+  html +=
+    "<p style='margin-top:8px;font-size:12px;color:#475569;'>" +
+      "Caso queira mais detalhes, acesse o manual completo: " +
+      "<a href='" + MANUAL_CLARA_LINK + "' target='_blank' style='color:#005E27;font-weight:bold;'>Manual do Usuário Clara</a>." +
+    "</p>";
+
+  // 👉 REGISTRA o tópico no histórico
+  try {
+    registrarTopicoManualClara(secaoId);
+  } catch (e) {
+    console.warn("Não consegui registrar histórico do manual:", e);
+  }
+
+  // Envia a resposta principal
+  renderBotMessage("HTML:<div class='text-sm text-slate-700'>" + html + "</div>");
+  scrollToBottom && scrollToBottom();
+
+  // 👉 Mostra um resumo do que o usuário já acessou (se tiver mais de 1 item)
+  //vektorMostrarHistoricoManualSeExistir();
+
+    // 👉 Sugestão automática baseada no tópico aberto
+  if (typeof window.vektorSugerirTopicoRelacionadoManual === "function") {
+    window.vektorSugerirTopicoRelacionadoManual(secaoId);
+  }
+};
+
+// Mapeia o ID técnico para um título amigável
+function mapSecaoManualParaTitulo(secaoId) {
+  switch (secaoId) {
+    case "primeiro_acesso":
+      return "01 Primeiro acesso";
+    case "recebi_cartao":
+      return "02 Recebi o cartão, e agora?";
+    case "esqueci_senha":
+      return "03 Esqueci a senha do cartão / acesso";
+    case "qual_meu_acesso":
+      return "04 Qual o meu acesso?";
+    case "anexar_comprovante":
+      return "05 Como anexar comprovante?";
+    case "duvidas":
+      return "06 Dúvidas";
+    default:
+      return null;
+  }
+}
+
+// Salva o histórico no localStorage (máx. 20 registros)
+function registrarTopicoManualClara(secaoId) {
+  try {
+    const titulo = mapSecaoManualParaTitulo(secaoId);
+    if (!titulo) return;
+
+    const STORAGE_KEY = "vektor_manual_clara_historico";
+
+    let historico = [];
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) historico = parsed;
+      } catch (e) {
+        console.warn("Histórico do manual Clara estava corrompido, reiniciando.");
+      }
+    }
+
+    historico.push({
+      secao: secaoId,
+      titulo: titulo,
+      dataIso: new Date().toISOString()
+    });
+
+    // limita a 20 entradas mais recentes
+    if (historico.length > 20) {
+      historico = historico.slice(historico.length - 20);
+    }
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(historico));
+  } catch (e) {
+    console.warn("Erro ao salvar histórico do manual Clara:", e);
+  }
+}
+
+// Lê o histórico e devolve ordenado do mais recente para o mais antigo
+function obterHistoricoManualClara() {
+  const STORAGE_KEY = "vektor_manual_clara_historico";
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    // ordena do mais recente para o mais antigo
+    return parsed
+      .filter(item => item && item.titulo && item.dataIso)
+      .sort((a, b) => (a.dataIso || "").localeCompare(b.dataIso || ""));
+  } catch (e) {
+    console.warn("Erro ao ler histórico do manual Clara:", e);
+    return [];
+  }
+}
+
+// Mostra uma mensagem "Você já acessou recentemente..." no chat
+function vektorMostrarHistoricoManualSeExistir() {
+  try {
+    const historico = obterHistoricoManualClara();
+    if (!historico || historico.length <= 1) {
+      // se só tem 0 ou 1 item, não faz sentido falar em "recentemente"
+      return;
+    }
+
+    // pega no máximo 5 mais recentes (sem duplicar títulos)
+    const vistos = [];
+    const titulosJaUsados = new Set();
+
+    for (let i = 0; i < historico.length; i++) {
+      const item = historico[i];
+      if (!item || !item.titulo) continue;
+      if (titulosJaUsados.has(item.titulo)) continue;
+
+      titulosJaUsados.add(item.titulo);
+      vistos.push(item.titulo);
+
+      if (vistos.length >= 5) break;
+    }
+
+    if (!vistos.length) return;
+
+    const listaHtml = vistos
+      .map(t => "<li>• " + t + "</li>")
+      .join("");
+
+    const html =
+      "<div class='text-sm text-slate-700'>" +
+        "<p><b>Você já acessou recentemente:</b></p>" +
+        "<ul style='margin-top:4px;margin-left:16px;'>" +
+          listaHtml +
+        "</ul>" +
+        "<p style='margin-top:6px;font-size:12px;color:#64748b;'>" +
+          "Você pode clicar novamente nos botões do Manual da Clara para reabrir qualquer um desses tópicos." +
+        "</p>" +
+      "</div>";
+
+    renderBotMessage("HTML:" + html);
+    if (typeof scrollToBottom === "function") {
+      scrollToBottom();
+    }
+  } catch (e) {
+    console.warn("Erro ao mostrar histórico do manual Clara:", e);
+  }
+}
+
+// ---------------------------------------------------------------------
+// SUGESTÕES GERAIS DO VEKTOR (fora do Manual da Clara)
+// ---------------------------------------------------------------------
+
+function vektorSugerirTopicosGerais(msgOriginal) {
+  try {
+    if (!msgOriginal || typeof msgOriginal !== "string") return;
+
+    const norm = normalize(msgOriginal);
+    const blocos = [];
+
+    // 1) Dúvidas de PERMISSÃO DE COMPRA → sugerir Política de Uso
+    if (
+      (
+        norm.includes("pode comprar") ||
+        norm.includes("posso comprar") ||
+        norm.includes("pode usar") ||
+        norm.includes("posso usar") ||
+        norm.includes("pode pagar") ||
+        norm.includes("posso pagar") ||
+        norm.includes("permitido") ||
+        norm.includes("permitida") ||
+        norm.includes("proibido") ||
+        norm.includes("proibida")
+      ) &&
+      typeof POLITICA_CARTOES_CLARA_LINK === "string"
+    ) {
+      blocos.push(
+        "<div style='margin-top:6px;'>" +
+          "<p><b>Dica:</b> sempre que tiver dúvida se uma compra é permitida ou não, você pode consultar a <b>Política de Uso dos Cartões Clara</b>.</p>" +
+          "<button type='button' " +
+            "onclick=\"window.open('" + POLITICA_CARTOES_CLARA_LINK + "','_blank')\" " +
+            "style='margin-top:6px;background:#06167d;color:#fff;border:none;" +
+                   "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+            "Abrir Política de Uso dos Cartões Clara" +
+          "</button>" +
+        "</div>"
+      );
+    }
+
+    // 2) Pedidos de RELATÓRIO / RANKING / DASHBOARD → sugerir Looker Studio
+    if (
+      norm.includes("relatorio") ||
+      norm.includes("relatório") ||
+      norm.includes("dashboard") ||
+      norm.includes("painel") ||
+      norm.includes("top") ||
+      norm.includes("mais comprou") ||
+      norm.includes("mais gastos") ||
+      norm.includes("mais gastou") ||
+      norm.includes("mais compras") ||
+      orm.includes("maior valor") ||
+      norm.includes("mais transações") ||
+      orm.includes("mais transacoes") ||
+      norm.includes("ranking") ||
+      norm.includes("grafico") ||
+      norm.includes("gráfico") ||
+      norm.includes("analise") ||
+      norm.includes("análise") ||
+      norm.includes("looker")
+    ) {
+      blocos.push(
+        "<div style='margin-top:10px;'>" +
+          "<p>Se quiser uma visão completa (gráficos, filtros e detalhamentos), você pode abrir o relatório gerencial no <b>Looker Studio</b>:</p>" +
+          "<button type='button' " +
+            "onclick=\"window.open('" + LOOKER_RELATORIO_URL + "','_blank')\" " +
+            "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
+                   "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+            "Abrir relatório gerencial (Looker Studio)" +
+          "</button>" +
+        "</div>"
+      );
+    }
+
+    // 3) PENDÊNCIAS / JUSTIFICATIVAS → reforçar política e fluxo
+    if (
+      norm.includes("pendencia") ||
+      norm.includes("pendência") ||
+      norm.includes("pendencias") ||
+      norm.includes("pendências") ||
+      norm.includes("justificativa") ||
+      norm.includes("justificativas") ||
+      norm.includes("justificar")
+    ) {
+      blocos.push(
+        "<div style='margin-top:10px;'>" +
+          "<p>Além de anexar os comprovantes, existe uma política específica de prazos e regras para justificativas.</p>" +
+          "<p style='margin-top:4px;'>Em caso de dúvida, consulte a <b>Política de Uso dos Cartões Clara</b> ou acione o time de Conta a Receber.</p>" +
+        "</div>"
+      );
+    }
+
+    // Se nada acionou, não sugere nada
+    if (!blocos.length) return;
+
+    const html =
+  "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+    blocos.join("<hr style='margin:8px 0;border:none;border-top:1px solid #e2e8f0;'/>") +
+  "</div>";
+
+// 🔁 Aguarda para dar tempo da resposta "normal" aparecer antes
+setTimeout(function () {
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") {
+    scrollToBottom();
+  }
+}, VEKTOR_SUGESTAO_DELAY_MS);
+
+  } catch (e) {
+    console.warn("Erro ao sugerir tópicos gerais:", e);
+  }
+}
+
+// ---------------------------------------------------------------------
+// SUGESTÕES AUTOMÁTICAS DO MANUAL DA CLARA A PARTIR DE OUTROS ASSUNTOS
+// ---------------------------------------------------------------------
+
+const VEKTOR_TEMPO_SUGESTAO_MIN = 5;
+const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // 5 segundos
+
+// Verifica se o usuário já abriu um tópico do manual há pouco tempo
+function usuarioViuTopicoManualRecentemente(secaoId, minutosJanela) {
+  try {
+    minutosJanela = minutosJanela || 10; // padrão = 10 minutos
+    const historico = obterHistoricoManualClara();
+    if (!historico || !historico.length) return false;
+
+    const agora = Date.now();
+    const limiteMs = minutosJanela * 60 * 1000;
+
+    for (let i = 0; i < historico.length; i++) {
+      const item = historico[i];
+      if (!item || item.secao !== secaoId || !item.dataIso) continue;
+
+      const t = Date.parse(item.dataIso);
+      if (!isNaN(t) && (agora - t) <= limiteMs) {
+        return true; // já viu recentemente
+      }
+    }
+  } catch (e) {
+    console.warn("Erro ao checar histórico recente do manual:", e);
+  }
+  return false;
+}
+
+// Lê a pergunta do usuário e, se fizer sentido, sugere um tópico do Manual da Clara
+
+function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
+  try {
+    if (!msgOriginal || typeof msgOriginal !== "string") return;
+
+    const norm = normalize(msgOriginal);
+
+    // Se o usuário já pediu o manual explicitamente, não sugerimos aqui
+    if (
+      norm.includes("manual clara") ||
+      norm.includes("manual da clara") ||
+      norm.includes("treinamento clara") ||
+      norm.includes("treinamento da clara")
+    ) {
+      return;
+    }
+
+    let sugestao = null;
+
+    // 1) Comprovante / nota / justificativa → sugerir "Como anexar comprovante"
+    if (
+      norm.includes("comprovante") ||
+      norm.includes("nota fiscal") ||
+      norm.includes(" nf ") ||
+      norm.includes(" xml") ||
+      norm.includes("justificativa") ||
+      norm.includes("justificar") ||
+      norm.includes("pendencia") ||
+      norm.includes("pendencias") ||
+      norm.includes("pendências") ||
+      norm.includes("pendência")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("anexar_comprovante", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "anexar_comprovante",
+          tituloBotao: "Ver como anexar comprovante",
+          textoIntro:
+            "Percebi que você está falando de nota fiscal, comprovante ou pendência. Quer abrir o trecho do Manual da Clara sobre isso?"
+        };
+      }
+    }
+
+    // 2) Problemas de login / primeiro acesso
+    else if (
+      norm.includes("primeiro acesso") ||
+      norm.includes("primeiro login") ||
+      norm.includes("junte-se a clara") ||
+      norm.includes("junte se a clara") ||
+      norm.includes("nao consigo acessar") ||
+      norm.includes("não consigo acessar") ||
+      norm.includes("erro de acesso")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("primeiro_acesso", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "primeiro_acesso",
+          tituloBotao: "Ver instruções de primeiro acesso",
+          textoIntro:
+            "Se for sua primeira vez usando a Clara ou estiver com dificuldade de acesso, este trecho do Manual pode ajudar:"
+        };
+      }
+    }
+
+    // 3) Esqueci a senha / senha do cartão
+    else if (
+      norm.includes("esqueci a senha") ||
+      norm.includes("esqueci minha senha") ||
+      norm.includes("senha do cartao") ||
+      norm.includes("senha do cartão") ||
+      norm.includes("senha de acesso")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("esqueci_senha", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "esqueci_senha",
+          tituloBotao: "Ver como recuperar/consultar senha",
+          textoIntro:
+            "Você comentou sobre senha. Posso abrir a parte do Manual da Clara que fala sobre isso:"
+        };
+      }
+    }
+
+    // 4) Tipo de acesso / perfil
+    else if (
+      norm.includes("meu acesso") ||
+      norm.includes("tipo de acesso") ||
+      norm.includes("owner") ||
+      norm.includes("manager") ||
+      norm.includes("employee") ||
+      norm.includes("contador")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("qual_meu_acesso", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "qual_meu_acesso",
+          tituloBotao: "Ver tipos de acesso na Clara",
+          textoIntro:
+            "Se a dúvida é sobre qual é o seu tipo de acesso na Clara, este trecho do Manual pode ajudar:"
+        };
+      }
+    }
+
+    // 5) Dúvidas gerais, suporte, estorno, cartão perdido, etc.
+    else if (
+      norm.includes("duvida") ||
+      norm.includes("dúvida") ||
+      norm.includes("ajuda") ||
+      norm.includes("suporte") ||
+      norm.includes("telefone") ||
+      norm.includes("0800") ||
+      norm.includes("estorno") ||
+      norm.includes("contestacao") ||
+      norm.includes("contestação") ||
+      norm.includes("perdi o cartao") ||
+      norm.includes("perdi o cartão") ||
+      norm.includes("cartao perdido") ||
+      norm.includes("cartão perdido") ||
+      norm.includes("cartao roubado") ||
+      norm.includes("cartão roubado") ||
+      norm.includes("bloquear cartao") ||
+      norm.includes("bloquear cartão")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("duvidas", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "duvidas",
+          tituloBotao: "Ver dúvidas e canais de suporte",
+          textoIntro:
+            "Como você mencionou dúvidas, suporte, estorno ou perda/bloqueio de cartão, posso te mostrar o trecho do Manual da Clara com os principais contatos e orientações:"
+        };
+      }
+    }
+
+    // 6) Limite / aumento de limite / limite estourado
+    else if (
+      norm.includes("limite") ||
+      norm.includes("aumentar limite") ||
+      norm.includes("aumento de limite") ||
+      norm.includes("ajustar limite") ||
+      norm.includes("cartão sem limite limite") ||
+      norm.includes("estourou o limite") ||
+      norm.includes("limite estourado")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("duvidas", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "duvidas",
+          tituloBotao: "Ver orientações gerais e canais de suporte",
+          textoIntro:
+            "Você falou sobre limite de cartão. Posso abrir a parte do Manual do usuário da Clara com orientações gerais e canais de suporte para esse tipo de dúvida:"
+        };
+      }
+    }
+
+    // 7) Bloqueio por pendência / cartão recusado
+    else if (
+      norm.includes("cartao bloqueado") ||
+      norm.includes("cartão bloqueado") ||
+      norm.includes("cartao recusado") ||
+      norm.includes("cartão recusado") ||
+      norm.includes("nao aprovou") ||
+      norm.includes("não aprovou") ||
+      norm.includes("recusou a compra") ||
+      norm.includes("compra recusada")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("anexar_comprovante", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "anexar_comprovante",
+          tituloBotao: "Ver como regularizar usando comprovantes",
+          textoIntro:
+            "Quando há bloqueios e recusas, muitas vezes o problema está em pendências de comprovantes. Quer ver o trecho do Manual que explica como anexar comprovantes e regularizar?"
+        };
+      }
+    }
+
+    // 8) Fraude / transação desconhecida / contestação
+    else if (
+      norm.includes("fraude") ||
+      norm.includes("transacao desconhecida") ||
+      norm.includes("transação desconhecida") ||
+      norm.includes("lancamento indevido") ||
+      norm.includes("lançamento indevido") ||
+      norm.includes("compra indevida")
+    ) {
+      if (!usuarioViuTopicoManualRecentemente("duvidas", VEKTOR_TEMPO_SUGESTAO_MIN)) {
+        sugestao = {
+          secaoId: "duvidas",
+          tituloBotao: "Ver orientações de contestação/estorno",
+          textoIntro:
+            "Você comentou sobre transação desconhecida ou possível fraude. Posso abrir a parte do Manual do usuário da Clara que fala sobre contestação e estorno:"
+        };
+      }
+    }
+
+    // Se nenhuma sugestão foi montada, sai
+    if (!sugestao) return;
+
+    const html =
+  "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+    "<p>" + sugestao.textoIntro + "</p>" +
+    "<button type='button' " +
+      "onclick=\"vektorManualClaraSecao('" + sugestao.secaoId + "')\" " +
+      "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
+             "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+      sugestao.tituloBotao +
+    "</button>" +
+  "</div>";
+
+// 🔁 Aguarda para dar tempo da resposta principal aparecer antes
+setTimeout(function () {
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") {
+    scrollToBottom();
+  }
+}, VEKTOR_SUGESTAO_DELAY_MS);
+
+  } catch (e) {
+    console.warn("Erro ao sugerir tópico do Manual da Clara:", e);
+  }
+}
+
+
+// ========= SUGESTÃO AUTOMÁTICA DE TÓPICOS RELACIONADOS ========= //
+
+window.vektorSugerirTopicoRelacionadoManual = function (secaoId) {
+  // Por enquanto vamos tratar apenas o caso "anexar_comprovante"
+  if (secaoId !== "anexar_comprovante") return;
+
+  const html =
+    "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+      "<p><b>Sugestão:</b> Quer ver também como funciona a <b>política de justificativas</b>?</p>" +
+      "<div style='margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;'>" +
+        "<button onclick=\"vektorAbrirPoliticaJustificativas()\" " +
+                "class='px-3 py-2 rounded-md bg-[#005E27] text-white text-sm font-semibold'>" +
+          "Ver política de justificativas" +
+        "</button>" +
+        "<button onclick=\"vektorIgnorarSugestaoPolitica()\" " +
+                "class='px-3 py-2 rounded-md border text-sm'>" +
+          "Agora não" +
+        "</button>" +
+      "</div>" +
+    "</div>";
+
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") scrollToBottom();
+}
+
+// Quando o usuário clicar em "Ver política de justificativas"
+window.vektorAbrirPoliticaJustificativas = function () {
+  const html =
+    "HTML:<div class='text-sm text-slate-700'>" +
+      "<p><b>Política de justificativas (resumo):</b></p>" +
+      "<ul style='margin-top:4px;margin-left:16px;'>" +
+        "<li>• Cada transação deve ter justificativa e comprovante anexado dentro de, no máximo, 48 horas após a cpmpra.</li><br>" +
+        "<li>• <b>Para justificar</b>: Inserir nota fiscal ou recibo da compra, informar a etiqueta do tipo de gasto e inserir no campo Descrição o item adquirido.</li><br>" +
+        "<li>• Despesas sem justificativas ou com documentos inconsistentes podem ser questionadas pelo time Financeiro.</li><br>" +
+        "<li>• Em casos recorrentes, a empresa pode adotar medidas adicionais, como o bloqueio preventivo do cartão.</li>" +
+      "</ul>" +
+   // 🔽 AQUI ENTRA O LINK NO RODAPÉ
+      "<p style='margin-top:8px;font-size:12px;color:#475569;'>" +
+        "Consulte a Política de Uso dos Cartões Clara: " +
+        "<a href='" + POLITICA_CARTOES_CLARA_LINK + "' target='_blank' " +
+        "style='color:#005E27;font-weight:bold;'>clique aqui para abrir</a>." +
+      "</p>" +
+    "</div>";
+
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") scrollToBottom();
+};
+
+// Caso ele clique em "Agora não"
+window.vektorIgnorarSugestaoPolitica = function () {
+  const html =
+    "HTML:<div class='text-sm text-slate-700'>" +
+      "<p>Beleza. Se quiser ver a política de justificativas depois, é só me pedir 😉</p>" +
+    "</div>";
+
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") scrollToBottom();
+};
 
     /* ========= GERADOR FINAL ========= */
 
 function gerarRespostaDoBot(msgUsuario) {
   const norm = normalize(msgUsuario || "");
 
-  // >>> TODAS AS LOJAS (geral) por valor
-const detTodasLojas = detectarListarTodasLojasGeral(msgUsuario, norm);
-if (detTodasLojas) {
-  const p = detTodasLojas.periodo;
+  // === Gatilho para o MINI MANUAL DA CLARA ===
+  if (
+    norm.includes("manual clara") ||
+    norm.includes("manual da clara") ||
+    norm.includes("manual") ||
+    norm.includes("treinamento clara") ||
+    norm.includes("treinamento da clara") ||
+    norm.includes("treinamentos") ||
+    norm.includes("treinamento")
+  ) {
+
+    
+    const htmlPartes = [];
+
+    htmlPartes.push(
+      "<div class='text-sm text-slate-700'>" +
+        "<p><b>Posso te ajudar a tirar dúvidas sobre o uso do cartão da Clara.</b> Escolha um dos tópicos abaixo 👇</p>" +
+        "<div class='mt-3 flex flex-col gap-2'>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('primeiro_acesso')\">" +
+        "01 Primeiro acesso" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('recebi_cartao')\">" +
+        "02 Recebi o cartão, e agora?" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('esqueci_senha')\">" +
+        "03 Esqueci a senha do cartão" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('qual_meu_acesso')\">" +
+        "04 Qual o meu acesso?" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('anexar_comprovante')\">" +
+        "05 Como anexar comprovante?" +
+      "</button>"
+    );
+
+    htmlPartes.push(
+      "<button type='button' " +
+        "class='w-full text-left px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-sm' " +
+        "onclick=\"vektorManualClaraSecao('duvidas')\">" +
+        "06 Dúvidas" +
+      "</button>"
+    );
+
+    htmlPartes.push("</div></div>");
+
+    const htmlFinal = htmlPartes.join("");
+    return "HTML:" + htmlFinal;
+  }
+
+  // 🆕 TODAS AS LOJAS DO TIME XXXXX
+  const detTodasLojasDoTime = detectarListarTodasLojasDoTime(msgUsuario, norm);
+  if (detTodasLojasDoTime) {
+    const grupo = detTodasLojasDoTime.grupo;
+    const p = detTodasLojasDoTime.periodo;
+    const tipo = detTodasLojasDoTime.tipo || "valor";
+
+    const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Montando a <b>relação de todas as lojas do time " + grupo + "</b>, " +
+        "mostrando <b>valor total</b> e <b>quantidade de transações</b>" +
+        (p ? " no período solicitado." : ".") +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        // topN: null => todas as lojas do time
+        renderResumoTransacoesSemana(res, {
+          topN: null,
+          forGroup: true,   // já faz tabela de lojas por time
+          groupName: grupo
+        });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+          "Tive um problema ao consultar os dados para listar as lojas do time " + grupo + ".</p>"
+        );
+      })
+      .getResumoTransacoesPorGrupo(
+        grupo,          // time solicitado
+        dataInicioStr,
+        dataFimStr,
+        tipo
+      );
+
+    return null;
+  }
+
+  // Gatilho pendências (quando não há fluxo pendências em aberto)
+
+    if (estadoPendencias === "nenhum" &&
+    termosPendencias.some(t => norm.includes(t))) {
+
+    // tenta extrair número de loja já presente na mensagem (2 a 6 dígitos)
+    const matchLoja = msgUsuario.match(/\b(\d{2,6})\b/);
+
+    if (matchLoja) {
+        const lojaBruta = matchLoja[1];
+        const lojaNormalizada = lojaBruta.replace(/\D/g, "");
+
+        lojaPendenciasAtual = lojaNormalizada;
+        ultimaPendenciaResumo = null;
+        estadoPendencias = "aguardando_confirmacao_email";
+
+        // 🆕 busca nome da loja antes de responder
+        google.script.run
+          .withSuccessHandler((res) => {
+            let nomeLojaTxt = "";
+            if (res && res.ok && res.nome) {
+              nomeLojaTxt = " - " + res.nome;
+            }
+
+            renderBotMessage(
+              `HTML:<p class="text-sm text-slate-700">
+              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}${nomeLojaTxt}</b> e já te mostro aqui no chat. ⏳
+              </p>`
+            );
+
+            consultarPendenciasNoServidor(lojaNormalizada);
+          })
+          .withFailureHandler((err) => {
+            // fallback se der erro no BigQuery
+            renderBotMessage(
+              `HTML:<p class="text-sm text-slate-700">
+              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}</b> e já te mostro aqui no chat. ⏳
+              </p>`
+            );
+            consultarPendenciasNoServidor(lojaNormalizada);
+          })
+          .obterNomeLojaBigQuery(lojaNormalizada);
+
+        return null; // não retorna outro texto (renderBotMessage já enviou)
+    }
+
+    // caso não tenha número na frase, segue fluxo normal pedindo a loja
+    estadoPendencias = "aguardando_loja";
+    lojaPendenciasAtual = "";
+    ultimaPendenciaResumo = null;
+
+    return `HTML:<p class="text-sm text-slate-700">
+    Consigo consultar as pendências Clara da sua loja.<br/>
+    Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
+    </p>`;
+}
+
+ /* // >>> TODAS AS LOJAS (geral) por valor
+const detTodasLojasResumo = detectarListarTodasLojasGeral(msgUsuario, norm);
+if (detTodasLojasResumo) {
+  const p = detTodasLojasResumo.periodo;
   const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
   const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
 
@@ -3175,41 +4101,43 @@ google.script.run
   .withFailureHandler(function () { renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>"); })
   .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, "valor");
   return;
-}
+} */
 
-// >>> TIME CAMPEÃO (singular): "qual time gastou mais ...", "qual time teve mais transações ..."
-(function() {
-  // bate em frases do tipo "qual time gastou mais ..." ou "qual time teve mais transações ..."
-  const mSingTime = norm.match(/\bqual\s+time\s+(gastou|teve)\s+mais\b/);
-  if (!mSingTime) return;
+  // 🆕 TIMES ESPECÍFICOS (ex.: "times Águias do Cerrado e Lobos SP no período ...")
 
-  // tipo: "valor" para "gastou"; "quantidade" para "teve mais transações"
-  const tipo = (mSingTime[1] === "gastou") ? "valor" : "quantidade";
+  const detTimesEspec = detectarTimesEspecificosLista(msgUsuario, norm);
+  if (detTimesEspec && detTimesEspec.times && detTimesEspec.times.length > 1) {
+    const listaTimes = detTimesEspec.times;
+    const p          = detTimesEspec.periodo;
+    const tipo       = detTimesEspec.tipo || "valor";
 
-  // período: usa seu parser existente (extrairIntervaloDatas) — ele já entende "outubro", "mês passado", "últimos 60 dias"
-  const p = extrairIntervaloDatas(msgUsuario) || {};
-  const dataInicioStr = p.dataInicio ? p.dataInicio.toISOString() : "";
-  const dataFimStr    = p.dataFim    ? p.dataFim.toISOString()    : "";
+    const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
 
-  renderBotMessage(
-    "HTML:<p class='text-sm text-slate-700'>Buscando o <b>time campeão</b> por " +
-    (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
-    (p.dataInicio && p.dataFim ? " no período solicitado" : " no período padrão") +
-    "…</p>"
-  );
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou comparar apenas os times <b>" + listaTimes.join(", ") + "</b> " +
+        "por " + (tipo === "valor" ? "<b>valor total</b>" : "<b>quantidade de transações</b>") +
+        (p ? " no período solicitado." : ".") +
+      "</p>"
+    );
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      // singular => sempre Top 1
-      renderResumoTransacoesPorTime(res, { topN: 1 });
-    })
-    .withFailureHandler(function() {
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
-    })
-    .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
+    google.script.run
+      .withSuccessHandler(function (res) {
+        renderResumoTransacoesPorTime(res, {
+          topN: null,
+          filtrarTimesNomes: listaTimes
+        });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui consultar os dados para esses times.</p>"
+        );
+      })
+      .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
 
-  return; // encerra aqui pra não cair nos fluxos genéricos
-})();
+    return null;
+  }
 
 
 // >>> RANKING DE TIMES (top N)
@@ -3264,6 +4192,33 @@ function detectarConsultasTimes(msgOriginal, norm) {
   return null;
 }
 
+// =========== DETECTOR: "TIMES X E Y NO PERÍODO" =========== //
+
+function detectarTimesEspecificosLista(msgOriginal, norm) {
+  const t = norm || "";
+
+  // se falar de LOJA(S), essa função NÃO deve tratar
+  if (!t.includes("time") || t.includes("loja") || t.includes("lojas")) {
+    return null;
+  }
+
+  const lista = (typeof encontrarListaTimesNaMensagem === "function"
+    ? (encontrarListaTimesNaMensagem(msgOriginal) || [])
+    : []);
+
+  if (!lista.length) return null;
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo    = extrairCriterioGeral(t) || "valor";
+
+  return {
+    times: lista,
+    periodo,
+    tipo
+  };
+}
+
+if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
 const detRankLoja = detectarRankingLojas(msgUsuario, norm);
 if (detRankLoja) {
   const periodo = detRankLoja.periodo;
@@ -3309,9 +4264,10 @@ if (detRankLoja) {
     .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
 
   return null;
-}
+}}
 
 // 2) LOJAS (plural) sem top/ranking  -> lista TODAS do time
+if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
 const detLojasPlural = detectarLojasMaisTransacoesPlural(msgUsuario, norm);
 if (detLojasPlural) {
   const periodo = detLojasPlural.periodo;
@@ -3340,7 +4296,7 @@ if (detLojasPlural) {
     .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
 
   return null;
-}
+}}
 
 // === NOVO: CONSULTAS POR CATEGORIA (BaseClara) ===
 const detCategorias = detectarPerguntaCategorias(msgUsuario, norm);
@@ -3457,6 +4413,47 @@ if (detTimeCampeao) {
   return; // encerra aqui
 }
 
+  // 🆕 TODOS OS TIMES NO PERÍODO / RELAÇÃO DE TIMES
+  const detTodosTimes = detectarTodosTimesPeriodo(msgUsuario, norm);
+  if (detTodosTimes) {
+    const p    = detTodosTimes.periodo;
+    const tipo = detTodosTimes.tipo || "valor";
+
+    const dataInicioStr = (p && p.dataInicio)
+      ? p.dataInicio.toISOString()
+      : "";
+    const dataFimStr = (p && p.dataFim)
+      ? p.dataFim.toISOString()
+      : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou listar <b>todos os times</b> com gasto " +
+        (tipo === "valor" ? "por <b>valor total</b>" : "por <b>número de transações</b>") +
+        (p ? " no período solicitado" : "") +
+        ". A tabela vai mostrar para cada time o <b>valor total</b> e a <b>quantidade</b> de transações." +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        // topN: null => todos os times
+        renderResumoTransacoesPorTime(res, { topN: null });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (todos os times).</p>"
+        );
+      })
+      .getResumoTransacoesPorTime(
+        dataInicioStr,
+        dataFimStr,
+        tipo
+      );
+
+    return null;
+  }
+
 
   // >>> NOVO BLOCO: perguntas de relatório (planilha Captura_Clara / BaseClara)
 
@@ -3505,6 +4502,124 @@ if (detTimeCampeao) {
   // resposta vem assíncrona (via renderBotMessage no callback), então aqui não devolve nada
   return null;
 }
+
+  // 🆕 LOJAS ESPECÍFICAS (ex.: "lojas XXXX e XXXX no período ...")
+  const detLojasEspec = detectarLojasEspecificasLista(msgUsuario, norm);
+  if (detLojasEspec && detLojasEspec.codigosLojas.length > 0) {
+    const p     = detLojasEspec.periodo;
+    const tipo  = detLojasEspec.tipo || "valor";
+    const lojas = detLojasEspec.codigosLojas;
+
+    const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou montar uma tabela apenas com as <b>lojas " + lojas.join(", ") + "</b>, " +
+        "mostrando <b>valor total</b> e <b>quantidade de transações</b>" +
+        (p ? " no período solicitado." : ".") +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        renderResumoTransacoesSemana(res, {
+          topN: null,
+          forGroup: false,
+          filtrarLojasCodigos: lojas
+        });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui consultar os dados para essas lojas específicas.</p>"
+        );
+      })
+      // grupo vazio => todas as lojas; vamos filtrar no front
+      .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, tipo);
+
+    return null;
+  }
+
+  // 🆕 TODAS AS LOJAS NO PERÍODO (sem time)
+  const detTodasLojasPeriodo = detectarListarTodasLojasGeral(msgUsuario, norm);
+  if (detTodasLojasPeriodo) {
+    const periodo = detTodasLojasPeriodo.periodo;
+    const tipo    = detTodasLojasPeriodo.tipo || "valor";
+
+    const dataInicioStr = (periodo && periodo.dataInicio)
+      ? periodo.dataInicio.toISOString()
+      : "";
+    const dataFimStr = (periodo && periodo.dataFim)
+      ? periodo.dataFim.toISOString()
+      : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou montar uma <b>relação de todas as lojas</b> com gastos " +
+        (periodo ? "no período solicitado" : "no período completo disponível") +
+        ", mostrando <b>valor total</b> e <b>quantidade de transações</b>." +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        // topN: null => listar TODAS as lojas
+        renderResumoTransacoesSemana(res, { topN: null, forGroup: false });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Tive um problema ao consultar os dados da planilha para listar todas as lojas.</p>"
+        );
+      })
+      .getResumoTransacoesPorGrupo(
+        "",              // sem time (todas as lojas)
+        dataInicioStr,
+        dataFimStr,
+        tipo             // "valor" (padrão) ou "quantidade"
+      );
+
+    // resposta vem via callback, então encerra aqui
+    return null;
+  }
+
+//f🆕 TODAS AS LOJAS DE VÁRIOS TIMES
+  const detLojasTimesMulti = detectarTodasLojasDosTimes(msgUsuario, norm);
+  if (detLojasTimesMulti && detLojasTimesMulti.times.length > 0) {
+    const listaTimes = detLojasTimesMulti.times;
+    const p          = detLojasTimesMulti.periodo;
+    const tipo       = detLojasTimesMulti.tipo || "valor";
+
+    const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou listar <b>todas as lojas</b> dos times <b>" + listaTimes.join(", ") + "</b>, " +
+        "mostrando <b>valor total</b> e <b>quantidade de transações</b>" +
+        (p ? " no período solicitado." : ".") +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        renderResumoTransacoesSemana(res, {
+          topN: null,
+          forGroup: false,
+          filtrarTimesNomes: listaTimes
+        });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui consultar os dados das lojas desses times.</p>"
+        );
+      })
+      // grupo vazio => todas as lojas; filtro por time será feito no front
+      .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, tipo);
+
+    return null;
+  }
+
+
 
 // <<< FIM DO BLOCO NOVO
 
@@ -3589,8 +4704,9 @@ if (detTimeCampeao) {
             return respPoliticaOficial();
         }
 
+
               // 5) Fluxo pendências - aguardando código da loja
-if (estadoPendencias === "aguardando_loja") {
+        if (estadoPendencias === "aguardando_loja") {
     const textoOriginal = msgUsuario.trim();
     const soDigitos = textoOriginal.replace(/\D/g, "");
 
@@ -3866,62 +4982,6 @@ Sem problemas, vamos falar de outro assunto então. 😉
             </p>`;
         }
 
-        // 9) Gatilho pendências (quando não há fluxo pendências em aberto)
-if (estadoPendencias === "nenhum" &&
-    termosPendencias.some(t => norm.includes(t))) {
-
-    // tenta extrair número de loja já presente na mensagem (2 a 6 dígitos)
-    const matchLoja = msgUsuario.match(/\b(\d{2,6})\b/);
-
-    if (matchLoja) {
-        const lojaBruta = matchLoja[1];
-        const lojaNormalizada = lojaBruta.replace(/\D/g, "");
-
-        lojaPendenciasAtual = lojaNormalizada;
-        ultimaPendenciaResumo = null;
-        estadoPendencias = "aguardando_confirmacao_email";
-
-        // 🆕 busca nome da loja antes de responder
-        google.script.run
-          .withSuccessHandler((res) => {
-            let nomeLojaTxt = "";
-            if (res && res.ok && res.nome) {
-              nomeLojaTxt = " - " + res.nome;
-            }
-
-            renderBotMessage(
-              `HTML:<p class="text-sm text-slate-700">
-              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}${nomeLojaTxt}</b> e já te mostro aqui no chat. ⏳
-              </p>`
-            );
-
-            consultarPendenciasNoServidor(lojaNormalizada);
-          })
-          .withFailureHandler((err) => {
-            // fallback se der erro no BigQuery
-            renderBotMessage(
-              `HTML:<p class="text-sm text-slate-700">
-              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}</b> e já te mostro aqui no chat. ⏳
-              </p>`
-            );
-            consultarPendenciasNoServidor(lojaNormalizada);
-          })
-          .obterNomeLojaBigQuery(lojaNormalizada);
-
-        return null; // não retorna outro texto (renderBotMessage já enviou)
-    }
-
-    // caso não tenha número na frase, segue fluxo normal pedindo a loja
-    estadoPendencias = "aguardando_loja";
-    lojaPendenciasAtual = "";
-    ultimaPendenciaResumo = null;
-
-    return `HTML:<p class="text-sm text-slate-700">
-    Consigo consultar as pendências Clara da sua loja.<br/>
-    Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
-    </p>`;
-}
-
 
         // 10) Gatilhos direto – primeira via
         if (termosPrimeiraViaDireta.some(t => norm.includes(t))) {
@@ -4080,7 +5140,7 @@ if (m) {
     const ini = new Date(ano, mes, dia1);
     const fim = new Date(ano, mes, dia2, 23, 59, 59);
     return { tipo: "intervalo_mes_texto", dataInicio: ini, dataFim: fim };
-  }
+  }}
 
     // 2) "no dia 10/11/2025" ou "dia 10/11"
     m = norm.match(/dia\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
@@ -4238,21 +5298,69 @@ if (m) {
 
   opts = opts || {};
 
-  var grupo = resumo.grupoOriginal || resumo.grupo || "";
-  var grupoHtml = grupo ? (" para o time <b>" + grupo + "</b>") : "";
+  var criterioTxt = (resumo.tipo === "valor"
+  ? "maior <b>valor</b> de transações"
+  : "maior <b>número</b> de transações");
 
-  var criterioTxt = (resumo.criterio === "valor")
-    ? "maior <b>valor total</b> de transações"
-    : "maior <b>número</b> de transações";
+var grupoHtml = resumo.grupoNome
+  ? " no time <b>" + resumo.grupoNome + "</b>"
+  : "";
 
-  var fraseResumo = resumo.top
+// 🆕 verifica se veio filtro de lojas ou de times
+var temFiltroLojas = opts && Array.isArray(opts.filtrarLojasCodigos) && opts.filtrarLojasCodigos.length > 0;
+var temFiltroTimes = opts && Array.isArray(opts.filtrarTimesNomes) && opts.filtrarTimesNomes.length > 0;
+
+var fraseResumo;
+if (temFiltroLojas) {
+  // Quando o usuário pediu algo tipo "lojas 316 e 39 neste mês"
+  fraseResumo = "Comparando as lojas <b>" +
+    opts.filtrarLojasCodigos.join(", ") +
+    "</b> no período selecionado" + grupoHtml + ".";
+} else if (temFiltroTimes) {
+  // Quando o usuário pediu algo tipo "todas as lojas dos times Falcões e Lobos"
+  fraseResumo = "Mostrando lojas dos times <b>" +
+    opts.filtrarTimesNomes.join(", ") +
+    "</b> no período selecionado" + grupoHtml + ".";
+} else {
+  // Comportamento antigo padrão (sem filtro específico)
+  fraseResumo = resumo.top
     ? "A loja <b>" + resumo.top.loja + "</b> foi a que teve " + criterioTxt + " no período selecionado" + grupoHtml + "."
     : "Não encontrei transações" + grupoHtml + " no período selecionado.";
+}
 
   // Quantas linhas exibir
-  
-  var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
+var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
+
+// 🆕 aplica filtros de LOJAS e TIMES antes de cortar por topN
+if (temFiltroLojas) {
+  var codSet = {};
+  opts.filtrarLojasCodigos.forEach(function (c) {
+    var key = String(c).replace(/\D/g, "");
+    codSet[key] = true;
+  });
+
+  all = all.filter(function (linha) {
+    var codLinha = String(
+      linha.loja || linha.Loja || linha.codigoLoja || linha.CodigoLoja || ""
+    ).replace(/\D/g, "");
+    return codSet[codLinha];
+  });
+}
+
+if (temFiltroTimes) {
+  var timesSet = {};
+  opts.filtrarTimesNomes.forEach(function (nome) {
+    timesSet[String(nome).toLowerCase()] = true;
+  });
+
+  all = all.filter(function (linha) {
+    var g = String(linha.grupo || linha.Grupo || "").toLowerCase();
+    return !!timesSet[g];
+  });
+}
+
   var linhas;
+
   if (opts && (opts.topN === null)) {
     // pedido explícito para listar TODAS as linhas
     linhas = all;
@@ -4280,7 +5388,7 @@ if (m) {
     // 🔽 Dropdown de drilldown para a tabela de LOJAS
         linhasTabela.push(
           "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
-            "Drilldown desta tabela de lojas: " +
+            "Expandir a tabela por: " +
             "<select class='vektor-drill-select' data-base='loja' " +
                    "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
               "<option value='estabelecimento'>Estabelecimentos</option>" +
@@ -4393,7 +5501,21 @@ function renderResumoTransacoesPorTime(resumo, opts) {
     : "Não encontrei transações no período selecionado.";
 
   // Quantas linhas exibir (para time: sem top => TODOS)
+
   var all = Array.isArray(resumo.times) ? resumo.times : [];
+
+  // 🔎 Filtro opcional por lista de times (nomes)
+  if (opts && Array.isArray(opts.filtrarTimesNomes) && opts.filtrarTimesNomes.length > 0) {
+    const alvoNorms = opts.filtrarTimesNomes.map(function (n) {
+      return normalize(String(n));
+    });
+
+    all = all.filter(function (t) {
+      const nomeNorm = normalize(String(t.time || ""));
+      return alvoNorms.indexOf(nomeNorm) >= 0;
+    });
+  }
+
   var linhas = (typeof opts.topN === "number") ? all.slice(0, opts.topN) : all;
 
   // Somatórios com base no que será exibido
@@ -4495,8 +5617,8 @@ if (tabelaHtml) {
 var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
 var html = [
   "<div class='text-sm text-slate-700'>",
-    "<p>", fraseResumo, "</p>",
-    "<p style='font-size:13px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>",
+    "<p>", fraseResumo, //"</p>",
+    //"<p style='font-size:13px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>",
     tabelaHtml,
     botaoCsv,
   "</div>"
@@ -4504,6 +5626,7 @@ var html = [
 
 renderBotMessage("HTML:" + html);
 }
+
 
 // ========= RENDER GENÉRICO: CATEGORIAS / ESTABELECIMENTOS ========= //
 
@@ -4750,6 +5873,71 @@ function extrairCriterioGeral(texto) {
   return "valor";
 }
 
+function extrairGrupo(msgOriginal, norm) {
+  const textoOriginal = msgOriginal || "";
+  const lower = (norm || textoOriginal.toLowerCase());
+
+  // procura a palavra "time "
+  let idx = lower.indexOf("time ");
+  if (idx === -1) {
+    // se quiser, pode tentar "time:" também
+    idx = lower.indexOf("time:");
+  }
+  if (idx === -1) {
+    return "";
+  }
+
+  // pega o que vem depois de "time "
+  let parte = textoOriginal.substring(idx + 5); // 5 = len("time ")
+
+  // corta quando começar alguma palavra de período
+  const marcadores = [
+    " no ", " neste ", " nesse ", " nesta ", " nessa ",
+    " em ", " no período", " no periodo",
+    " neste mes", " nesse mes", " neste mês", " nesse mês",
+    " na semana", " nesta semana", " nessa semana"
+  ];
+
+  let corte = parte.length;
+  const parteLower = parte.toLowerCase();
+
+  marcadores.forEach(m => {
+    const j = parteLower.indexOf(m);
+    if (j !== -1 && j < corte) {
+      corte = j;
+    }
+  });
+
+  parte = parte.substring(0, corte).trim();
+
+  // remove "do", "da", "de" do começo, se tiver
+  parte = parte.replace(/^(do|da|de)\s+/i, "").trim();
+
+  return parte;
+}
+
+// FILTRAR POR MAIS DE UMA LOJA
+
+function extrairCodigosLojasDaMensagem(msgOriginal) {
+  const texto = normalize(msgOriginal || "");
+
+  // localiza a partir da palavra "loja" ou "lojas"
+  let idx = texto.indexOf("lojas");
+  if (idx < 0) idx = texto.indexOf("loja");
+  if (idx < 0) return [];
+
+  const trecho = texto.slice(idx); // parte da frase a partir de "loja(s)"
+
+  // pega números com 2 a 4 dígitos (311, 145, 023, 1020 etc.)
+  const encontrados = trecho.match(/\b\d{2,4}\b/g);
+  if (!encontrados) return [];
+
+  // normaliza tirando zeros à esquerda
+  return encontrados.map(function (c) {
+    return c.replace(/^0+/, "") || c;
+  });
+}
+
 // ========= DETECTOR: CATEGORIAS ========= //
 function detectarPerguntaCategorias(msgOriginal, norm) {
   const t = norm || "";
@@ -4891,6 +6079,8 @@ function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
     texto.includes("mais gastou")                 ||
     texto.includes("loja que mais gastou")        ||
     texto.includes("mais gastos")                 ||
+    texto.includes("maior gastos")                 ||
+    texto.includes("maior gasto")                 ||
     texto.includes("mais comprou");
 
   // se não for pergunta de loja + (transações ou valor), ignora
@@ -4954,6 +6144,39 @@ function detectarRankingTimes(msgOriginal, norm) {
   return { periodo, tipo, topN };
 }
 
+// ========= DETECTOR: "TODOS OS TIMES / RELAÇÃO DE TIMES" ========= //
+
+function detectarTodosTimesPeriodo(msgOriginal, norm) {
+  const t = norm || "";
+
+  // Frases chave:
+  // - "todos os times no período ..."
+  // - "relação de times no período ..."
+  const pedeTodosTimes =
+    t.includes("todos os times") ||
+    t.startsWith("todos os times") ||
+    t.startsWith("relacao de times") ||
+    t.includes("relacao de times no periodo") ||
+    t.includes("relação de times") ||
+    t.includes("relação de times no período");
+
+  if (!pedeTodosTimes) return null;
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  let tipo = extrairCriterioGeral(t); // "valor" ou "quantidade"
+
+  // se não especificar critério, assume valor
+  if (!tipo) {
+    tipo = "valor";
+  }
+
+  return {
+    periodo,
+    tipo,
+    topN: null // null => queremos TODOS os times
+  };
+}
+
 // ========= DETECTOR: "ranking/top N de LOJAS" (opcional: do time X) =========
 
 function detectarRankingLojas(msgOriginal, norm) {
@@ -4990,15 +6213,87 @@ function detectarRankingLojas(msgOriginal, norm) {
   return { grupo: grupoNomeOficial, periodo, tipo, topN };
 }
 
-// "listar todas as lojas por valor ..." (geral, sem time, sem top)
+// ========= DETECTOR: "TODAS AS LOJAS" GERAL (sem time) ========= //
+
 function detectarListarTodasLojasGeral(msgOriginal, norm) {
   const t = norm || "";
-  const pedeTodas = t.includes("listar todas as lojas") || t.startsWith("todas as lojas");
-  const falaValor = t.includes("por valor") || t.includes("valor");
-  if (!(pedeTodas && falaValor)) return null;
+
+  // Aceita pedidos do tipo:
+  // - "todas as lojas com gastos no período ..."
+  // - "todas as lojas com valor no período ..."
+  // - "relação de lojas no período ..."
+  const pedeTodas =
+    t.includes("listar todas as lojas") ||
+    t.startsWith("todas as lojas") ||
+    t.includes("todas as lojas com gastos") ||
+    t.includes("todas as lojas com gasto") ||
+    t.includes("todas as lojas com valor") ||
+    t.startsWith("relacao de lojas") ||
+    t.includes("relacao de lojas no periodo") ||
+    t.includes("relação de lojas") ||
+    t.includes("relação de lojas no período");
+
+  if (!pedeTodas) return null;
+
+  // critério: por padrão ordena por valor, mas a tabela mostra valor e quantidade
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo = "valor"; // mantém padrão por valor
+
+  return {
+    grupo: "",      // sem time
+    periodo,
+    tipo,
+    topN: null      // null => queremos TODAS as lojas
+  };
+}
+
+// =========== DETECTOR: "TODAS AS LOJAS DOS TIMES X E Y" =========== //
+
+function detectarTodasLojasDosTimes(msgOriginal, norm) {
+  const t = norm || "";
+
+  const falaLojas = t.includes("todas as lojas dos times") ||
+                    t.includes("todas as lojas dos time")  ||
+                    t.includes("todas as lojas do time")   ||
+                    t.includes("lojas do time")   ||
+                    t.includes("loja do time")   ||
+                    t.includes("todas as lojas do grupo")  ||
+                    t.includes("todas as lojas dos grupos");
+
+  if (!falaLojas) return null;
+
+  const listaTimes = encontrarListaTimesNaMensagem(msgOriginal) || [];
+  if (!listaTimes.length) return null;
 
   const periodo = extrairIntervaloDatas(msgOriginal);
-  return { periodo, tipo: "valor", topN: null, grupo: "" }; // grupo vazio = geral
+  const tipo    = extrairCriterioGeral(t) || "valor";
+
+  return {
+    times: listaTimes,
+    periodo,
+    tipo
+  };
+}
+
+// =========== DETECTOR: "MAIS DE UMA LOJA NO PERÍODO" =========== //
+
+function detectarLojasEspecificasLista(msgOriginal, norm) {
+  const t = norm || "";
+
+  // tem que falar de loja(s)
+  if (!t.includes("loja")) return null;
+
+  const codigos = extrairCodigosLojasDaMensagem(msgOriginal);
+  if (!codigos || codigos.length === 0) return null;
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo = extrairCriterioGeral(t) || "valor";
+
+  return {
+    codigosLojas: codigos,
+    periodo,
+    tipo
+  };
 }
 
 // ========= DETECTOR: "lojas com maior valor/transações ..." (plural, sem 'top'/'ranking') =========
@@ -5021,6 +6316,8 @@ function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
     texto.includes("mais gastou")     ||
     texto.includes("mais gasto")      ||
     texto.includes("mais gastos")     ||
+    texto.includes("maior gasto")     ||
+    texto.includes("maior gastos")     ||
     texto.includes("mais comprou")    ||
     texto.includes("valor de transacoes");
 
@@ -5033,6 +6330,48 @@ function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
   // sem 'top' => queremos listar TODAS as lojas do time (se grupo vier),
   // ou o default que você preferir para "todas as lojas gerais" (vamos deixar limitado se não houver time)
   return { grupo, periodo, tipo, topN: null }; // topN=null => deixe o renderer decidir "listar todas"
+}
+
+// =========== DETECTOR: "TODAS AS LOJAS DO TIME XXXXX" =========== //
+
+function detectarListarTodasLojasDoTime(msgOriginal, norm) {
+  const t = norm || "";
+
+  // Gatilhos específicos para perguntas de "lojas do time"
+  const pedeTodas =
+    t.includes("todas as lojas do time") ||
+    t.includes("todas as loja do time") ||   // tolera sem 's'
+    t.includes("lojas do time") ||
+    t.includes("loja do time") ||            // tolera sem 's'
+    t.includes("lojas da regional") ||
+    t.includes("loja da regional") ||
+    t.includes("todas as lojas do grupo") ||
+    t.includes("todas as loja do grupo") ||  // tolera sem 's'
+    t.includes("relacao de lojas do time") ||
+    t.includes("relação de lojas do time") ||
+    t.includes("relacao de lojas do grupo") ||
+    t.includes("relação de lojas do grupo");
+
+  if (!pedeTodas) return null;
+
+  // Usa o parser de times que já funciona
+  let listaTimes = [];
+  if (typeof encontrarListaTimesNaMensagem === "function") {
+    listaTimes = encontrarListaTimesNaMensagem(msgOriginal) || [];
+  }
+
+  if (!listaTimes.length) return null;
+
+  // pega só o primeiro time, pois a pergunta é "lojas do time X"
+  const grupo   = listaTimes[0];
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo    = extrairCriterioGeral(t) || "valor";
+
+  return {
+    grupo,
+    periodo,
+    tipo
+  };
 }
 
 // ========= DETECTOR: "time com maior número/valor de transações ..." ========= //
@@ -5106,12 +6445,51 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
         renderUserMessage(texto);
 
         const resposta = gerarRespostaDoBot(texto);
-        if (resposta) renderBotMessage(resposta);
+          if (resposta) renderBotMessage(resposta);
 
-        userInput.value = "";
-        userInput.focus();
-        scrollToBottom();
+          // Depois de responder normalmente, avalia se faz sentido sugerir algo do Manual da Clara
+          try {
+            vektorSugerirManualAPartirDaPergunta(texto);
+          } catch (e) {
+            console.warn("Erro ao tentar sugerir Manual da Clara:", e);
+          }
+
+          // E também sugestões gerais (política, relatórios, pendências, etc.)
+          try {
+            vektorSugerirTopicosGerais(texto);
+          } catch (e) {
+            console.warn("Erro ao tentar sugerir tópicos gerais:", e);
+          }
+
+          userInput.value = "";
+          userInput.focus();
+          scrollToBottom();
+        }
+
+        // ====== RESPOSTA DOS BOTÕES "SIM" / "NÃO" PARA PENDÊNCIAS ======
+        window.vektorResponderConfirmacaoPendencias = function (resposta) {
+  try {
+    // se não estiver aguardando confirmação, ignora
+    if (typeof estadoPendencias === "undefined" ||
+        estadoPendencias !== "aguardando_confirmacao_email") {
+      return;
     }
+
+    // Garante que temos os elementos necessários
+    if (!window.userInput || typeof enviarMensagem !== "function") {
+      console.warn("userInput ou enviarMensagem não disponíveis.");
+      return;
+    }
+
+    // Preenche a caixa de texto com 'sim' ou 'não' e reaproveita todo o fluxo já existente
+    userInput.value = resposta;
+    enviarMensagem();
+  } catch (e) {
+    console.error("Erro em vektorResponderConfirmacaoPendencias:", e);
+  }
+};
+
+
 
     userInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -5129,6 +6507,42 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
         e.preventDefault();
         enviarMensagem();
     });
+
+    // 🟢 Mostrar o vídeo do Vektor só na primeira visita
+    (function () {
+      var modal = document.getElementById("vektorModal");
+      if (!modal) return;
+
+      // Verifica se já mostramos o vídeo neste navegador
+      var jaMostrou = localStorage.getItem("vektorIntroShown");
+
+      if (!jaMostrou) {
+        // Nunca mostrou → exibe o modal e marca como exibido
+        modal.style.display = "flex";   // combina com as classes flex do Tailwind
+        localStorage.setItem("vektorIntroShown", "1");
+      } else {
+        // Já mostrou uma vez → garante que fique escondido
+        modal.style.display = "none";
+      }
+    })();
+
+      // ===== MODAL DO MANUAL CLARA =====
+  window.openManualClaraModal = function () {
+    const el = document.getElementById("manualClaraModal");
+    if (el) {
+      el.classList.remove("hidden");
+      // para garantir que fique centralizado como flex
+      el.classList.add("flex");
+    }
+  };
+
+  window.closeManualClaraModal = function () {
+    const el = document.getElementById("manualClaraModal");
+    if (el) {
+      el.classList.add("hidden");
+      el.classList.remove("flex");
+    }
+  };
 
 }); // fim DOMContentLoaded
 </script>
