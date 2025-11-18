@@ -2874,9 +2874,28 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
                 renderBotMessage("HTML:" + tabela);
 
                 estadoPendencias = "aguardando_confirmacao_email";
+
                 renderBotMessage(
-                    'HTML:<p class="text-sm text-slate-700 mt-2">Quer que eu envie esse resumo por e-mail também? (responda <b>"sim"</b> ou <b>"não"</b>).</p>'
+                  'HTML:' +
+                  '<div class="text-sm text-slate-700 mt-2">' +
+                    '<p>Quer que eu envie esse resumo por e-mail também?</p>' +
+                    '<div class="mt-2 flex gap-2">' +
+                      '<button type="button" ' +
+                        'onclick="vektorResponderConfirmacaoPendencias(\'sim\')" ' +
+                        'style="background:#ffffff;color:#000000;border:1px solid #cbd5e1;' +
+                              'padding:4px 10px;border-radius:999px;font-size:13px;cursor:pointer;">' +
+                        'Sim' +
+                      '</button>' +
+                      '<button type="button" ' +
+                        'onclick="vektorResponderConfirmacaoPendencias(\'não\')" ' +
+                        'style="background:#ffffff;color:#000000;border:1px solid #cbd5e1;' +
+                              'padding:4px 10px;border-radius:999px;font-size:13px;cursor:pointer;">' +
+                        'Não' +
+                      '</button>' +
+                    '</div>' +
+                  '</div>'
                 );
+                
             })
             .withFailureHandler(function(err) {
                 console.error("Erro getPendenciasPorLoja:", err);
@@ -2942,14 +2961,29 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
                     return;
                 }
 
-                // 🟢 CASO 2: loja válida + tem pendências → pergunta se quer e-mail
-                estadoPendencias = "aguardando_confirmacao_email";
+                   // 🟢 CASO 2: loja válida + tem pendências → pergunta se quer e-mail
+                    estadoPendencias = "aguardando_confirmacao_email";
 
-                renderBotMessage(
-                    `HTML:<p class="text-sm text-slate-700 mt-2">
-                Quer que eu envie esse resumo por e-mail também? (responda <b>"sim"</b> ou <b>"não"</b>).
-                </p>`
-                );
+                    renderBotMessage(
+                      'HTML:' +
+                      '<div class="text-sm text-slate-700 mt-2">' +
+                        '<p>Quer que eu envie esse resumo por e-mail também?</p>' +
+                        '<div class="mt-2 flex gap-2">' +
+                          '<button type="button" ' +
+                            'onclick="vektorResponderConfirmacaoPendencias(\'sim\')" ' +
+                            'style="background:#ffffff;color:#000000;border:1px solid #cbd5e1;' +
+                                  'padding:4px 10px;border-radius:999px;font-size:13px;cursor:pointer;">' +
+                            'Sim' +
+                          '</button>' +
+                          '<button type="button" ' +
+                            'onclick="vektorResponderConfirmacaoPendencias(\'não\')" ' +
+                            'style="background:#ffffff;color:#000000;border:1px solid #cbd5e1;' +
+                                  'padding:4px 10px;border-radius:999px;font-size:13px;cursor:pointer;">' +
+                            'Não' +
+                          '</button>' +
+                        '</div>' +
+                      '</div>'
+                    );
             })
             .withFailureHandler(err => {
                 estadoPendencias = "nenhum";
@@ -3185,7 +3219,7 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
 
 
 
-    
+
 
     // ====== MINI BOT DO MANUAL CLARA ======
 
@@ -5898,6 +5932,31 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
           userInput.focus();
           scrollToBottom();
         }
+
+        // ====== RESPOSTA DOS BOTÕES "SIM" / "NÃO" PARA PENDÊNCIAS ======
+        window.vektorResponderConfirmacaoPendencias = function (resposta) {
+  try {
+    // se não estiver aguardando confirmação, ignora
+    if (typeof estadoPendencias === "undefined" ||
+        estadoPendencias !== "aguardando_confirmacao_email") {
+      return;
+    }
+
+    // Garante que temos os elementos necessários
+    if (!window.userInput || typeof enviarMensagem !== "function") {
+      console.warn("userInput ou enviarMensagem não disponíveis.");
+      return;
+    }
+
+    // Preenche a caixa de texto com 'sim' ou 'não' e reaproveita todo o fluxo já existente
+    userInput.value = resposta;
+    enviarMensagem();
+  } catch (e) {
+    console.error("Erro em vektorResponderConfirmacaoPendencias:", e);
+  }
+};
+
+
 
     userInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
