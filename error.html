@@ -3599,8 +3599,8 @@ setTimeout(function () {
 // SUGESTÕES AUTOMÁTICAS DO MANUAL DA CLARA A PARTIR DE OUTROS ASSUNTOS
 // ---------------------------------------------------------------------
 
-const VEKTOR_TEMPO_SUGESTAO_MIN = 5;
-const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // 5 segundos
+const VEKTOR_TEMPO_SUGESTAO_MIN = 8;
+const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // 
 
 // Verifica se o usuário já abriu um tópico do manual há pouco tempo
 function usuarioViuTopicoManualRecentemente(secaoId, minutosJanela) {
@@ -3984,6 +3984,7 @@ function gerarRespostaDoBot(msgUsuario) {
   }
 
   // 🆕 TODAS AS LOJAS DO TIME XXXXX
+if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
   const detTodasLojasDoTime = detectarListarTodasLojasDoTime(msgUsuario, norm);
   if (detTodasLojasDoTime) {
     const grupo = detTodasLojasDoTime.grupo;
@@ -4025,6 +4026,7 @@ function gerarRespostaDoBot(msgUsuario) {
 
     return null;
   }
+}
 
   // Gatilho pendências (quando não há fluxo pendências em aberto)
 
@@ -4541,6 +4543,7 @@ if (detTimeCampeao) {
   }
 
   // 🆕 TODAS AS LOJAS NO PERÍODO (sem time)
+  if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
   const detTodasLojasPeriodo = detectarListarTodasLojasGeral(msgUsuario, norm);
   if (detTodasLojasPeriodo) {
     const periodo = detTodasLojasPeriodo.periodo;
@@ -4580,9 +4583,9 @@ if (detTimeCampeao) {
 
     // resposta vem via callback, então encerra aqui
     return null;
-  }
+  }}
 
-//f🆕 TODAS AS LOJAS DE VÁRIOS TIMES
+//🆕 TODAS AS LOJAS DE VÁRIOS TIMES
   const detLojasTimesMulti = detectarTodasLojasDosTimes(msgUsuario, norm);
   if (detLojasTimesMulti && detLojasTimesMulti.times.length > 0) {
     const listaTimes = detLojasTimesMulti.times;
@@ -6278,16 +6281,38 @@ function detectarTodasLojasDosTimes(msgOriginal, norm) {
 // =========== DETECTOR: "MAIS DE UMA LOJA NO PERÍODO" =========== //
 
 function detectarLojasEspecificasLista(msgOriginal, norm) {
-  const t = norm || "";
+  const texto = norm || "";
 
-  // tem que falar de loja(s)
-  if (!t.includes("loja")) return null;
+  // ⚠️ Se a frase fala de pendência, NÃO tratar como consulta de transações
+  // Isso evita conflitos com o fluxo de pendências (CLARA_PEND)
+  if (texto.includes("pendenc")) {
+    return null;
+  }
 
-  const codigos = extrairCodigosLojasDaMensagem(msgOriginal);
-  if (!codigos || codigos.length === 0) return null;
+  // precisa mencionar "loja" ou "lojas"
+  const mencionaLoja =
+    texto.includes("loja ") ||
+    texto.includes("lojas ");
 
+  if (!mencionaLoja) return null;
+
+  // extrai códigos numéricos de loja
+  const codigos = [];
+  const regexCodigos = /\b(\d{2,6})\b/g;
+  let m;
+  while ((m = regexCodigos.exec(msgOriginal)) !== null) {
+    const cod = m[1];
+    if (!codigos.includes(cod)) {
+      codigos.push(cod);
+    }
+  }
+
+  if (!codigos.length) return null;
+
+  // período
   const periodo = extrairIntervaloDatas(msgOriginal);
-  const tipo = extrairCriterioGeral(t) || "valor";
+  // tipo (valor ou quantidade)
+  const tipo = extrairCriterioGeral(texto) || "valor";
 
   return {
     codigosLojas: codigos,
@@ -6299,6 +6324,11 @@ function detectarLojasEspecificasLista(msgOriginal, norm) {
 // ========= DETECTOR: "lojas com maior valor/transações ..." (plural, sem 'top'/'ranking') =========
 function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
   const texto = norm || "";
+
+    // ⚠️ Se falar de pendência, não é consulta de ranking/lista de transações
+  if (texto.includes("pendenc")) {
+    return null;
+  }
 
   // precisa mencionar "lojas " (plural) + critério
   const mencionaLojasPlural = texto.includes("lojas ");
