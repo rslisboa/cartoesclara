@@ -3183,11 +3183,16 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
         return resposta;
     }
 
+
+
+    
+
     // ====== MINI BOT DO MANUAL CLARA ======
 
     
 const MANUAL_CLARA_LINK = "https://drive.google.com/file/d/1TYJ7x5Uxb5C47pNpUDWIzxXZb9lJfm8I/view?usp=sharing";
 const POLITICA_CARTOES_CLARA_LINK = "https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing";
+const LOOKER_RELATORIO_URL = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
 
 window.vektorManualClaraSecao = function (secaoId) {
   let html = "";
@@ -3421,10 +3426,124 @@ function vektorMostrarHistoricoManualSeExistir() {
 }
 
 // ---------------------------------------------------------------------
+// SUGESTÕES GERAIS DO VEKTOR (fora do Manual da Clara)
+// ---------------------------------------------------------------------
+
+function vektorSugerirTopicosGerais(msgOriginal) {
+  try {
+    if (!msgOriginal || typeof msgOriginal !== "string") return;
+
+    const norm = normalize(msgOriginal);
+    const blocos = [];
+
+    // 1) Dúvidas de PERMISSÃO DE COMPRA → sugerir Política de Uso
+    if (
+      (
+        norm.includes("pode comprar") ||
+        norm.includes("posso comprar") ||
+        norm.includes("pode usar") ||
+        norm.includes("posso usar") ||
+        norm.includes("pode pagar") ||
+        norm.includes("posso pagar") ||
+        norm.includes("permitido") ||
+        norm.includes("permitida") ||
+        norm.includes("proibido") ||
+        norm.includes("proibida")
+      ) &&
+      typeof POLITICA_CARTOES_CLARA_LINK === "string"
+    ) {
+      blocos.push(
+        "<div style='margin-top:6px;'>" +
+          "<p><b>Dica:</b> sempre que tiver dúvida se uma compra é permitida ou não, você pode consultar a <b>Política de Uso dos Cartões Clara</b>.</p>" +
+          "<button type='button' " +
+            "onclick=\"window.open('" + POLITICA_CARTOES_CLARA_LINK + "','_blank')\" " +
+            "style='margin-top:6px;background:#06167d;color:#fff;border:none;" +
+                   "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+            "Abrir Política de Uso dos Cartões Clara" +
+          "</button>" +
+        "</div>"
+      );
+    }
+
+    // 2) Pedidos de RELATÓRIO / RANKING / DASHBOARD → sugerir Looker Studio
+    if (
+      norm.includes("relatorio") ||
+      norm.includes("relatório") ||
+      norm.includes("dashboard") ||
+      norm.includes("painel") ||
+      norm.includes("top") ||
+      norm.includes("mais comprou") ||
+      norm.includes("mais gastos") ||
+      norm.includes("mais gastou") ||
+      norm.includes("mais compras") ||
+      orm.includes("maior valor") ||
+      norm.includes("mais transações") ||
+      orm.includes("mais transacoes") ||
+      norm.includes("ranking") ||
+      norm.includes("grafico") ||
+      norm.includes("gráfico") ||
+      norm.includes("analise") ||
+      norm.includes("análise") ||
+      norm.includes("looker")
+    ) {
+      blocos.push(
+        "<div style='margin-top:10px;'>" +
+          "<p>Se quiser uma visão visual completa (gráficos, filtros e detalhamentos), você pode abrir o relatório gerencial no <b>Looker Studio</b>:</p>" +
+          "<button type='button' " +
+            "onclick=\"window.open('" + LOOKER_RELATORIO_URL + "','_blank')\" " +
+            "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
+                   "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+            "Abrir relatório gerencial (Looker Studio)" +
+          "</button>" +
+        "</div>"
+      );
+    }
+
+    // 3) PENDÊNCIAS / JUSTIFICATIVAS → reforçar política e fluxo
+    if (
+      norm.includes("pendencia") ||
+      norm.includes("pendência") ||
+      norm.includes("pendencias") ||
+      norm.includes("pendências") ||
+      norm.includes("justificativa") ||
+      norm.includes("justificativas") ||
+      norm.includes("justificar")
+    ) {
+      blocos.push(
+        "<div style='margin-top:10px;'>" +
+          "<p>Além de anexar os comprovantes, existe uma política específica de prazos e regras para justificativas.</p>" +
+          "<p style='margin-top:4px;'>Em caso de dúvida, consulte a <b>Política de Uso dos Cartões Clara</b> ou acione o time de Conta a Receber.</p>" +
+        "</div>"
+      );
+    }
+
+    // Se nada acionou, não sugere nada
+    if (!blocos.length) return;
+
+    const html =
+  "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+    blocos.join("<hr style='margin:8px 0;border:none;border-top:1px solid #e2e8f0;'/>") +
+  "</div>";
+
+// 🔁 Aguarda para dar tempo da resposta "normal" aparecer antes
+setTimeout(function () {
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") {
+    scrollToBottom();
+  }
+}, VEKTOR_SUGESTAO_DELAY_MS);
+
+  } catch (e) {
+    console.warn("Erro ao sugerir tópicos gerais:", e);
+  }
+}
+
+// ---------------------------------------------------------------------
 // SUGESTÕES AUTOMÁTICAS DO MANUAL DA CLARA A PARTIR DE OUTROS ASSUNTOS
 // ---------------------------------------------------------------------
 
-const VEKTOR_TEMPO_SUGESTAO_MIN = 3;
+const VEKTOR_TEMPO_SUGESTAO_MIN = 5;
+const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // 5 segundos
 
 // Verifica se o usuário já abriu um tópico do manual há pouco tempo
 function usuarioViuTopicoManualRecentemente(secaoId, minutosJanela) {
@@ -3594,7 +3713,7 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
           secaoId: "duvidas",
           tituloBotao: "Ver orientações gerais e canais de suporte",
           textoIntro:
-            "Você falou sobre limite de cartão. Posso abrir a parte do Manual com orientações gerais e canais de suporte para esse tipo de dúvida:"
+            "Você falou sobre limite de cartão. Posso abrir a parte do Manual do usuário da Clara com orientações gerais e canais de suporte para esse tipo de dúvida:"
         };
       }
     }
@@ -3634,7 +3753,7 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
           secaoId: "duvidas",
           tituloBotao: "Ver orientações de contestação/estorno",
           textoIntro:
-            "Você comentou sobre transação desconhecida ou possível fraude. Posso abrir a parte do Manual que fala sobre contestação e estorno:"
+            "Você comentou sobre transação desconhecida ou possível fraude. Posso abrir a parte do Manual do usuário da Clara que fala sobre contestação e estorno:"
         };
       }
     }
@@ -3643,18 +3762,24 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
     if (!sugestao) return;
 
     const html =
-      "HTML:<div class='text-sm text-slate-700 mt-2'>" +
-        "<p>" + sugestao.textoIntro + "</p>" +
-        "<button type='button' " +
-          "onclick=\"vektorManualClaraSecao('" + sugestao.secaoId + "')\" " +
-          "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
-                 "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
-          sugestao.tituloBotao +
-        "</button>" +
-      "</div>";
+  "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+    "<p>" + sugestao.textoIntro + "</p>" +
+    "<button type='button' " +
+      "onclick=\"vektorManualClaraSecao('" + sugestao.secaoId + "')\" " +
+      "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
+             "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+      sugestao.tituloBotao +
+    "</button>" +
+  "</div>";
 
-    renderBotMessage(html);
-    if (typeof scrollToBottom === "function") scrollToBottom();
+// 🔁 Aguarda para dar tempo da resposta principal aparecer antes
+setTimeout(function () {
+  renderBotMessage(html);
+  if (typeof scrollToBottom === "function") {
+    scrollToBottom();
+  }
+}, VEKTOR_SUGESTAO_DELAY_MS);
+
   } catch (e) {
     console.warn("Erro ao sugerir tópico do Manual da Clara:", e);
   }
@@ -5753,19 +5878,26 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
         renderUserMessage(texto);
 
         const resposta = gerarRespostaDoBot(texto);
-        if (resposta) renderBotMessage(resposta);
+          if (resposta) renderBotMessage(resposta);
 
-        // Depois de responder normalmente, avalia se faz sentido sugerir um tópico do Manual da Clara
-    try {
-      vektorSugerirManualAPartirDaPergunta(texto);
-    } catch (e) {
-      console.warn("Erro ao tentar sugerir Manual da Clara:", e);
-    }
+          // Depois de responder normalmente, avalia se faz sentido sugerir algo do Manual da Clara
+          try {
+            vektorSugerirManualAPartirDaPergunta(texto);
+          } catch (e) {
+            console.warn("Erro ao tentar sugerir Manual da Clara:", e);
+          }
 
-        userInput.value = "";
-        userInput.focus();
-        scrollToBottom();
-    }
+          // E também sugestões gerais (política, relatórios, pendências, etc.)
+          try {
+            vektorSugerirTopicosGerais(texto);
+          } catch (e) {
+            console.warn("Erro ao tentar sugerir tópicos gerais:", e);
+          }
+
+          userInput.value = "";
+          userInput.focus();
+          scrollToBottom();
+        }
 
     userInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
