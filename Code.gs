@@ -27,8 +27,6 @@ function doGet(e) {
   // 👇 passa também o e-mail bruto
   template.userEmail = email;
 
-  // 👇 NOVO: passa também o e-mail bruto
-  template.userEmail = email;
 
   return template
     .evaluate()
@@ -744,6 +742,40 @@ function carregarLinhasBaseClara_() {
   return { header: header, linhas: linhas, error: null };
 }
 
+// Procura o índice de uma coluna no cabeçalho da BaseClara
+// usando uma lista de possíveis nomes (variações de texto).
+function encontrarIndiceColuna_(header, possiveisNomes) {
+  if (!header || !header.length) return -1;
+
+  if (!Array.isArray(possiveisNomes)) {
+    possiveisNomes = [possiveisNomes];
+  }
+
+  // normaliza os nomes que queremos achar
+  var nomesNorm = possiveisNomes.map(function (nome) {
+    return normalizarTexto_(nome);
+  });
+
+  for (var i = 0; i < header.length; i++) {
+    var hNorm = normalizarTexto_(header[i]);
+    if (!hNorm) continue;
+
+    for (var j = 0; j < nomesNorm.length; j++) {
+      var alvo = nomesNorm[j];
+      if (!alvo) continue;
+
+      // bate se for igual ou se um contém o outro
+      if (hNorm === alvo ||
+          hNorm.indexOf(alvo) !== -1 ||
+          alvo.indexOf(hNorm) !== -1) {
+        return i;
+      }
+    }
+  }
+
+  return -1; // não encontrou
+}
+
 // Filtra linhas pelo período [dataInicioStr, dataFimStr].
 // Se vier vazio, considera últimos 7 dias.
 function filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr) {
@@ -1007,4 +1039,724 @@ function getResumoTransacoesPorTime(dataInicioStr, dataFimStr, criterio) {
   } catch (e) {
     return { ok:false, error: "Falha em getResumoTransacoesPorTime: " + e };
   }
+}
+
+/**
+ * Resumo de transações por CATEGORIA DA COMPRA (BaseClara).
+ * 
+ * - dataInicioStr / dataFimStr: datas em ISO (como já usamos nas outras funções). 
+ *   Se vierem vazias, usa o comportamento padrão da filtrarLinhasPorPeriodo_ (últimos dias).
+ * - criterio: "valor" ou "quantidade" (qual critério será usado para ordenar).
+ *
+ * Retorna:
+ * {
+ *   ok: true,
+ *   criterio: "valor" ou "quantidade",
+ *   categorias: [
+ *     { categoria: "Alimentação", total: 10, valorTotal: 1234.56 },
+ *     ...
+ *   ],
+ *   top: { ... } // primeira posição da lista (maior valor ou maior quantidade)
+ * }
+ */
+function getResumoTransacoesPorCategoria(dataInicioStr, dataFimStr, criterio) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Descobre os índices das colunas dinamicamente pelo cabeçalho
+    var idxData = encontrarIndiceColuna_(header, [
+      "Data da Transação",
+      "Data Transação",
+      "Data"
+    ]);
+
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor em R$",
+      "Valor (R$)",
+      "Valor"
+    ]);
+
+    var idxCategoria = encontrarIndiceColuna_(header, [
+      "Categoria da Compra",
+      "Categoria da compra",
+      "Categoria",
+      "Categoria Compra"
+    ]);
+
+    if (idxData < 0 || idxValor < 0 || idxCategoria < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas necessárias em BaseClara (Data / Valor / Categoria)."
+      };
+    }
+
+    // normaliza critério
+    criterio = (criterio || "").toString().toLowerCase();
+    if (criterio !== "valor" && criterio !== "quantidade") {
+      criterio = "quantidade";
+    }
+
+    // filtra por período (usa mesma função que já existe)
+    var filtradas = filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr);
+
+    var mapa = {}; // chave = nome da categoria
+    for (var i = 0; i < filtradas.length; i++) {
+      var row = filtradas[i];
+
+      var cat = (row[idxCategoria] || "Sem categoria").toString().trim();
+      if (!cat) cat = "Sem categoria";
+
+      if (!mapa[cat]) {
+        mapa[cat] = {
+          categoria: cat,
+          total: 0,
+          valorTotal: 0
+        };
+      }
+
+      mapa[cat].total++;
+      var valor = Number(row[idxValor]) || 0;
+      mapa[cat].valorTotal += valor;
+    }
+
+    // transforma o mapa em array
+    var arr = [];
+    for (var chave in mapa) {
+      if (Object.prototype.hasOwnProperty.call(mapa, chave)) {
+        arr.push(mapa[chave]);
+      }
+    }
+
+    // ordena conforme o critério
+    if (criterio === "valor") {
+      arr.sort(function (a, b) {
+        if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal;
+        return b.total - a.total; // desempate pela quantidade
+      });
+    } else {
+      // "quantidade"
+      arr.sort(function (a, b) {
+        if (b.total !== a.total) return b.total - a.total;
+        return b.valorTotal - a.valorTotal; // desempate pelo valor
+      });
+    }
+
+    var top = arr.length ? arr[0] : null;
+
+    return {
+      ok: true,
+      criterio: criterio,
+      categorias: arr,
+      top: top
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : e
+    };
+  }
+}
+
+/**
+ * Resumo de categorias filtrando por TIME (grupo).
+ *
+ * @param {string} dataInicioStr ISO ou vazio
+ * @param {string} dataFimStr ISO ou vazio
+ * @param {string} criterio "valor" | "quantidade"
+ * @param {string} grupo Nome do time/grupo
+ */
+function getResumoTransacoesPorCategoriaTime(dataInicioStr, dataFimStr, criterio, grupo) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    var idxData = encontrarIndiceColuna_(header, [
+      "Data da Transação", "Data Transação", "Data"
+    ]);
+
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor em R$", "Valor (R$)", "Valor"
+    ]);
+
+    var idxCategoria = encontrarIndiceColuna_(header, [
+      "Categoria da Compra", "Categoria da compra", "Categoria", "Categoria Compra"
+    ]);
+
+    var idxGrupo = encontrarIndiceColuna_(header, [
+      "Grupos", "Grupo", "Time"
+    ]);
+
+    if (idxData < 0 || idxValor < 0 || idxCategoria < 0 || idxGrupo < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas necessárias em BaseClara (Data / Valor / Categoria / Grupo)."
+      };
+    }
+
+    criterio = (criterio || "").toString().toLowerCase();
+    if (criterio !== "valor" && criterio !== "quantidade") {
+      criterio = "quantidade";
+    }
+
+    var grupoOriginal = (grupo || "").toString().trim();
+    var grupoNorm = normalizarTexto_(grupoOriginal);
+
+    var filtradas = filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr);
+
+    var mapa = {}; // chave = categoria
+    for (var i = 0; i < filtradas.length; i++) {
+      var row = filtradas[i];
+
+      // filtro por grupo/time
+      var grupoLinhaOriginal = (row[idxGrupo] || "").toString();
+      var grupoLinhaNorm = normalizarTexto_(grupoLinhaOriginal);
+      if (grupoNorm && (!grupoLinhaNorm ||
+           (grupoLinhaNorm.indexOf(grupoNorm) === -1 &&
+            grupoNorm.indexOf(grupoLinhaNorm) === -1))) {
+        continue;
+      }
+
+      var cat = (row[idxCategoria] || "Sem categoria").toString().trim();
+      if (!cat) cat = "Sem categoria";
+
+      if (!mapa[cat]) {
+        mapa[cat] = { categoria: cat, total: 0, valorTotal: 0 };
+      }
+      mapa[cat].total++;
+      var valor = Number(row[idxValor]) || 0;
+      mapa[cat].valorTotal += valor;
+    }
+
+    var arr = [];
+    for (var k in mapa) {
+      if (Object.prototype.hasOwnProperty.call(mapa, k)) {
+        arr.push(mapa[k]);
+      }
+    }
+
+    if (criterio === "valor") {
+      arr.sort(function (a, b) {
+        if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal;
+        return b.total - a.total;
+      });
+    } else {
+      arr.sort(function (a, b) {
+        if (b.total !== a.total) return b.total - a.total;
+        return b.valorTotal - a.valorTotal;
+      });
+    }
+
+    var top = arr.length ? arr[0] : null;
+
+    return {
+      ok: true,
+      criterio: criterio,
+      grupoOriginal: grupoOriginal,
+      categorias: arr,
+      top: top
+    };
+
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : e };
+  }
+}
+
+/**
+ * Resumo de categorias filtrando por LOJA (LojaNum).
+ *
+ * @param {string} dataInicioStr ISO ou vazio
+ * @param {string} dataFimStr ISO ou vazio
+ * @param {string} criterio "valor" | "quantidade"
+ * @param {string} lojaCodigo Código da loja (com ou sem zeros à esquerda)
+ */
+function getResumoTransacoesPorCategoriaLoja(dataInicioStr, dataFimStr, criterio, lojaCodigo) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    var idxData = encontrarIndiceColuna_(header, [
+      "Data da Transação", "Data Transação", "Data"
+    ]);
+
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor em R$", "Valor (R$)", "Valor"
+    ]);
+
+    var idxCategoria = encontrarIndiceColuna_(header, [
+      "Categoria da Compra", "Categoria da compra", "Categoria", "Categoria Compra"
+    ]);
+
+    var idxLoja = encontrarIndiceColuna_(header, [
+      "LojaNum", "Loja Num", "Loja Número", "Loja Numero", "Loja"
+    ]);
+
+    if (idxData < 0 || idxValor < 0 || idxCategoria < 0 || idxLoja < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas necessárias em BaseClara (Data / Valor / Categoria / Loja)."
+      };
+    }
+
+    criterio = (criterio || "").toString().toLowerCase();
+    if (criterio !== "valor" && criterio !== "quantidade") {
+      criterio = "quantidade";
+    }
+
+    var lojaOriginal = (lojaCodigo || "").toString().trim();
+    var lojaDigits = lojaOriginal.replace(/\D/g, "");
+    var lojaNormalizada = lojaDigits ? ("0000" + lojaDigits).slice(-4) : "";
+
+    var filtradas = filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr);
+
+    var mapa = {};
+    for (var i = 0; i < filtradas.length; i++) {
+      var row = filtradas[i];
+
+      // filtro por loja
+      if (lojaNormalizada) {
+        var lojaLinha = (row[idxLoja] || "").toString();
+        var digitsLinha = lojaLinha.replace(/\D/g, "");
+        var cod4 = digitsLinha ? ("0000" + digitsLinha).slice(-4) : "";
+        if (cod4 !== lojaNormalizada) continue;
+      }
+
+      var cat = (row[idxCategoria] || "Sem categoria").toString().trim();
+      if (!cat) cat = "Sem categoria";
+
+      if (!mapa[cat]) {
+        mapa[cat] = { categoria: cat, total: 0, valorTotal: 0 };
+      }
+      mapa[cat].total++;
+      var valor = Number(row[idxValor]) || 0;
+      mapa[cat].valorTotal += valor;
+    }
+
+    var arr = [];
+    for (var k in mapa) {
+      if (Object.prototype.hasOwnProperty.call(mapa, k)) {
+        arr.push(mapa[k]);
+      }
+    }
+
+    if (criterio === "valor") {
+      arr.sort(function (a, b) {
+        if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal;
+        return b.total - a.total;
+      });
+    } else {
+      arr.sort(function (a, b) {
+        if (b.total !== a.total) return b.total - a.total;
+        return b.valorTotal - a.valorTotal;
+      });
+    }
+
+    var top = arr.length ? arr[0] : null;
+
+    return {
+      ok: true,
+      criterio: criterio,
+      lojaOriginal: lojaOriginal,
+      categorias: arr,
+      top: top
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : e
+    };
+  }
+}
+
+/**
+ * Resumo de transações por CATEGORIA, filtrando por LOJA específica.
+ *
+ * @param {string} dataInicioStr ISO ou vazio
+ * @param {string} dataFimStr    ISO ou vazio
+ * @param {string} criterio      "valor" | "quantidade"
+ * @param {string} loja          código da loja (ex.: "0297" ou "297")
+ */
+function getResumoTransacoesPorCategoriaLoja(dataInicioStr, dataFimStr, criterio, loja) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Índices das colunas
+    var idxData = encontrarIndiceColuna_(header, [
+      "Data da Transação",
+      "Data Transação",
+      "Data"
+    ]);
+
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor em R$",
+      "Valor (R$)",
+      "Valor"
+    ]);
+
+    var idxCategoria = encontrarIndiceColuna_(header, [
+      "Categoria da Compra",
+      "Categoria da compra",
+      "Categoria",
+      "Categoria Compra"
+    ]);
+
+    var idxLoja = encontrarIndiceColuna_(header, [
+      "LojaNum",
+      "Loja Num",
+      "Loja Número",
+      "Loja Numero",
+      "Loja"
+    ]);
+
+    if (idxData < 0 || idxValor < 0 || idxCategoria < 0 || idxLoja < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas necessárias em BaseClara (Data / Valor / Categoria / Loja)."
+      };
+    }
+
+    // normaliza critério
+    criterio = (criterio || "").toString().toLowerCase();
+    if (criterio !== "valor" && criterio !== "quantidade") {
+      criterio = "quantidade";
+    }
+
+    // normaliza loja informada
+    var lojaOriginal = (loja || "").toString().trim();
+    var lojaDigits = lojaOriginal.replace(/\D/g, "");
+    var lojaNormalizada = lojaDigits ? ("0000" + lojaDigits).slice(-4) : "";
+
+    // filtra por período
+    var filtradas = filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr);
+
+    var mapa = {}; // chave = categoria
+    for (var i = 0; i < filtradas.length; i++) {
+      var row = filtradas[i];
+
+      // filtro por loja (se veio parâmetro)
+      if (lojaNormalizada) {
+        var lojaLinha = (row[idxLoja] || "").toString();
+        var digitsLinha = lojaLinha.replace(/\D/g, "");
+        var cod4 = digitsLinha ? ("0000" + digitsLinha).slice(-4) : "";
+        if (cod4 !== lojaNormalizada) continue;
+      }
+
+      var cat = (row[idxCategoria] || "Sem categoria").toString().trim();
+      if (!cat) cat = "Sem categoria";
+
+      if (!mapa[cat]) {
+        mapa[cat] = {
+          categoria: cat,
+          total: 0,
+          valorTotal: 0
+        };
+      }
+
+      mapa[cat].total++;
+      var valor = Number(row[idxValor]) || 0;
+      mapa[cat].valorTotal += valor;
+    }
+
+    var arr = [];
+    for (var chave in mapa) {
+      if (Object.prototype.hasOwnProperty.call(mapa, chave)) {
+        arr.push(mapa[chave]);
+      }
+    }
+
+    // ordena conforme o critério
+    if (criterio === "valor") {
+      arr.sort(function (a, b) {
+        if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal;
+        return b.total - a.total;
+      });
+    } else {
+      arr.sort(function (a, b) {
+        if (b.total !== a.total) return b.total - a.total;
+        return b.valorTotal - a.valorTotal;
+      });
+    }
+
+    var top = arr.length ? arr[0] : null;
+
+    return {
+      ok: true,
+      criterio: criterio,
+      lojaOriginal: lojaOriginal,
+      categorias: arr,
+      top: top
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : e
+    };
+  }
+}
+
+/**
+ * Resumo de transações por ESTABELECIMENTO (coluna "Transação" da BaseClara).
+ *
+ * - dataInicioStr / dataFimStr: datas em ISO (como nas outras funções)
+ * - criterio: "valor" ou "quantidade"
+ * - grupo: nome do time/grupo (opcional) para filtrar
+ * - loja: código da loja (opcional) para filtrar
+ *
+ * Retorna:
+ * {
+ *   ok: true,
+ *   criterio: "valor" ou "quantidade",
+ *   grupoOriginal: "...",   // se informado
+ *   lojaOriginal:  "...",   // se informado
+ *   estabelecimentos: [
+ *     { estabelecimento: "IFood", total: 15, valorTotal: 2000.50 },
+ *     ...
+ *   ],
+ *   top: { ... } // estabelecimento campeão
+ * }
+ */
+function getResumoTransacoesPorEstabelecimento(
+  dataInicioStr,
+  dataFimStr,
+  criterio,
+  grupo,
+  loja
+) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Descobre índices dinamicamente
+    var idxData = encontrarIndiceColuna_(header, [
+      "Data da Transação",
+      "Data Transação",
+      "Data"
+    ]);
+
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor em R$",
+      "Valor (R$)",
+      "Valor"
+    ]);
+
+    // ========== COLUNA TRANSACAO ==========
+
+// A coluna C (Transação) é SEMPRE índice 2 → solução definitiva
+var idxTransacao = 2;
+
+
+// DEBUG PARA VERIFICAR
+Logger.log("IDX TRANSACAO = " + idxTransacao);
+Logger.log("VALOR TRANSACAO PRIMEIRA LINHA = " + linhas[0][idxTransacao]);
+
+
+    // Grupo e Loja são opcionais (só se quiser filtrar)
+    var idxGrupo = encontrarIndiceColuna_(header, [
+      "Grupos",
+      "Grupo",
+      "Time"
+    ]);
+
+    var idxLoja = encontrarIndiceColuna_(header, [
+      "LojaNum",
+      "Loja Num",
+      "Loja Número",
+      "Loja Numero",
+      "Loja"
+    ]);
+
+    if (idxData < 0 || idxValor < 0 || idxTransacao < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas necessárias em BaseClara (Data / Valor / Transação)."
+      };
+    }
+
+    criterio = (criterio || "").toString().toLowerCase();
+    if (criterio !== "valor" && criterio !== "quantidade") {
+      criterio = "quantidade";
+    }
+
+    // Normaliza filtros de grupo e loja
+    var grupoOriginal = (grupo || "").toString().trim();
+    var grupoNorm = normalizarTexto_(grupoOriginal);
+
+    var lojaOriginal = (loja || "").toString().trim();
+    var lojaDigits = lojaOriginal.replace(/\D/g, "");
+    var lojaNormalizada = lojaDigits ? ("0000" + lojaDigits).slice(-4) : "";
+
+    // Filtra período
+    var filtradas = filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr);
+
+    var mapa = {}; // chave = nome do estabelecimento
+    for (var i = 0; i < filtradas.length; i++) {
+      var row = filtradas[i];
+
+      // filtro por grupo/time (se informado e se a coluna existir)
+      if (grupoNorm && idxGrupo >= 0) {
+        var grupoLinhaOriginal = (row[idxGrupo] || "").toString();
+        var grupoLinhaNorm = normalizarTexto_(grupoLinhaOriginal);
+
+        if (!grupoLinhaNorm) continue;
+
+        var casaGrupo =
+          grupoLinhaNorm.indexOf(grupoNorm) !== -1 ||
+          grupoNorm.indexOf(grupoLinhaNorm) !== -1;
+
+        if (!casaGrupo) continue;
+      }
+
+      // filtro por loja (se informado e se a coluna existir)
+      if (lojaNormalizada && idxLoja >= 0) {
+        var lojaLinha = (row[idxLoja] || "").toString();
+        var digitsLinha = lojaLinha.replace(/\D/g, "");
+        var cod4 = digitsLinha ? ("0000" + digitsLinha).slice(-4) : "";
+        if (cod4 !== lojaNormalizada) continue;
+      }
+
+      var estab = (row[idxTransacao] || "Sem nome").toString().trim();
+      if (!estab) estab = "Sem nome";
+
+      if (!mapa[estab]) {
+        mapa[estab] = {
+          estabelecimento: estab,
+          total: 0,
+          valorTotal: 0
+        };
+      }
+
+      mapa[estab].total++;
+      var valor = Number(row[idxValor]) || 0;
+      mapa[estab].valorTotal += valor;
+    }
+
+    // transforma o mapa em array
+    var arr = [];
+    for (var k in mapa) {
+      if (Object.prototype.hasOwnProperty.call(mapa, k)) {
+        arr.push(mapa[k]);
+      }
+    }
+
+    // ordena pelo critério escolhido
+    if (criterio === "valor") {
+      arr.sort(function (a, b) {
+        if (b.valorTotal !== a.valorTotal) return b.valorTotal - a.valorTotal;
+        return b.total - a.total;
+      });
+    } else {
+      arr.sort(function (a, b) {
+        if (b.total !== a.total) return b.total - a.total;
+        return b.valorTotal - a.valorTotal;
+      });
+    }
+
+    var top = arr.length ? arr[0] : null;
+
+    return {
+      ok: true,
+      criterio: criterio,
+      grupoOriginal: grupoOriginal,
+      lojaOriginal: lojaOriginal,
+      estabelecimentos: arr,
+      top: top
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : e
+    };
+  }
+}
+
+function getResumoLojasPorEstabelecimento(estabelecimento, dataIni, dataFim) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID_CLARA);
+  const sh = ss.getSheetByName("BaseClara");
+  const valores = sh.getDataRange().getValues();
+  const header  = valores.shift();
+
+  const idxLoja = 0;
+  const idxEst  = 2;
+  const idxData = 3;
+  const idxVal  = 10;
+
+  const out = {};
+
+  valores.forEach(l => {
+    const est = l[idxEst];
+    if (!est || est.toString().trim() !== estabelecimento.toString().trim()) return;
+
+    const data = new Date(l[idxData]);
+    if (dataIni && data < dataIni) return;
+    if (dataFim && data > dataFim) return;
+
+    const loja = l[idxLoja];
+
+    if (!out[loja]) out[loja] = { loja, qtd: 0, valor: 0 };
+    out[loja].qtd++;
+    out[loja].valor += Number(l[idxVal]);
+  });
+
+  return Object.values(out).sort((a,b)=>b.valor-a.valor);
+}
+
+function getResumoLojasPorCategoria(categoria, dataIni, dataFim) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID_CLARA);
+  const sh = ss.getSheetByName("BaseClara");
+  const valores = sh.getDataRange().getValues();
+  const header  = valores.shift();
+
+  const idxLoja = 0;
+  const idxCat  = 8;
+  const idxData = 3;
+  const idxVal  = 10;
+
+  const out = {};
+
+  valores.forEach(l => {
+    const cat = l[idxCat];
+    if (!cat || cat.toString().trim() !== categoria.toString().trim()) return;
+
+    const data = new Date(l[idxData]);
+    if (dataIni && data < dataIni) return;
+    if (dataFim && data > dataFim) return;
+
+    const loja = l[idxLoja];
+
+    if (!out[loja]) out[loja] = { loja, qtd: 0, valor: 0 };
+    out[loja].qtd++;
+    out[loja].valor += Number(l[idxVal]);
+  });
+
+  return Object.values(out).sort((a,b)=>b.valor-a.valor);
 }
