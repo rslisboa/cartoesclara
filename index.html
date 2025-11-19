@@ -193,6 +193,58 @@
         .chat-header-area{border-radius:0;}
         .chat-footer{border-radius:0;}
     }
+
+    /* ===== Tooltips dos botões de pendências/justificativas ===== */
+.vektor-btn-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.vektor-tooltip-base {
+  position: absolute;
+  bottom: 110%;           /* aparece logo acima do botão */
+  right: 0;
+  z-index: 9999;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #FFFFFF;            /* texto SEMPRE branco, como você pediu */
+  background: rgba(0,0,0,0.85); /* será sobrescrito inline por botão */
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  box-shadow: 0 2px 6px rgba(15,23,42,0.25);
+}
+
+.vektor-btn-wrapper:hover .vektor-tooltip-base {
+  opacity: 1;
+}
+
+/* ===== Spinner de carregamento para pendências/justificativas ===== */
+.vektor-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.vektor-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #e5e7eb;
+  border-top-color: #0f172a;
+  animation: vektor-spin 0.7s linear infinite;
+}
+
+@keyframes vektor-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 </style>
 
 <style>
@@ -5584,12 +5636,13 @@ if (temFiltroTimes) {
   }
   var tabelaHtml = linhasTabela.join("");
 
-  // 🔽 Botões abaixo da tabela (CSV + Pendências + Justificativas)
+    // 🔽 Botões abaixo da tabela (CSV + Pendências + Justificativas)
   var botoesHtml = "";
   if (tabelaHtml) {
     botoesHtml =
       "<div style='margin-top:8px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;'>" +
-        // Exportar CSV (já existia)
+
+        // Exportar CSV (igual antes, sem tooltip personalizado)
         "<button type='button' " +
           "onclick=\"exportTableToCSV(this, 'transacoes_lojas')\" " +
           "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
@@ -5597,21 +5650,34 @@ if (temFiltroTimes) {
           "⬇ Exportar CSV" +
         "</button>" +
 
-        // 🆕 Verificar pendências
-        "<button type='button' " +
-          "onclick=\"vektorVerificarPendenciasLojas(this)\" " +
-          "style='background:#B91C1C;color:#fff;border:none;padding:6px 10px;" +
-                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-          "⚠ Verificar pendências" +
-        "</button>" +
+        // 🆕 Verificar pendências (com tooltip vermelho opaco)
+        "<span class='vektor-btn-wrapper'>" +
+          "<button type='button' " +
+            "onclick=\"vektorVerificarPendenciasLojas(this)\" " +
+            "style='background:#B91C1C;color:#fff;border:none;padding:6px 10px;" +
+                   "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+            "⚠ Verificar pendências" +
+          "</button>" +
+          "<span class='vektor-tooltip-base' " +
+                "style='background:rgba(185,28,28,0.92);'>" +
+            "Lista todas as pendências das lojas dessa tabela no período informado" +
+          "</span>" +
+        "</span>" +
 
-        // 🆕 Verificar justificativas
-        "<button type='button' " +
-          "onclick=\"vektorVerificarJustificativasLojas(this)\" " +
-          "style='background:#0F172A;color:#fff;border:none;padding:6px 10px;" +
-                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-          "✔ Verificar justificativas" +
-        "</button>" +
+        // 🆕 Verificar justificativas (com tooltip azul opaco)
+        "<span class='vektor-btn-wrapper'>" +
+          "<button type='button' " +
+            "onclick=\"vektorVerificarJustificativasLojas(this)\" " +
+            "style='background:#0F172A;color:#fff;border:none;padding:6px 10px;" +
+                   "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+            "✔ Verificar justificativas" +
+          "</button>" +
+          "<span class='vektor-tooltip-base' " +
+                "style='background:rgba(15,23,42,0.92);'>" +
+            "Lista todas as transações com justificativas feitas de forma correta" +
+          "</span>" +
+        "</span>" +
+
       "</div>";
   }
 
@@ -5630,84 +5696,212 @@ renderBotMessage("HTML:" + html);
 // ========= Botões "Verificar pendências / justificativas" (tabelas de LOJAS) ========= //
 
 function vektorMontarTabelaPendJust_(titulo, colunas, linhas) {
+    // Se não vier nenhuma linha, mostra mensagem
     if (!linhas || !linhas.length) {
         return "<p class='text-sm text-slate-700'>Não encontrei registros para " +
-               titulo.toLowerCase() + " nesse período/seleção.</p>";
+               (titulo || "").toLowerCase() + " nesse período/seleção.</p>";
     }
 
-    // Define cor do cabeçalho conforme o tipo
-    var lowerTitulo = (titulo || "").toLowerCase();
+    // Identifica se é tabela de pendências ou de justificativas pelo título
+    var lowerTitulo  = (titulo || "").toLowerCase();
     var isPendencias = lowerTitulo.indexOf("pend") >= 0;
-    var headerColor  = isPendencias ? "#B91C1C" : "#0F172A";
 
-    // Cor do botão CSV (igual às outras tabelas)
-    var botaoCsvColor = "#005E27";
+    // Cores
+    var headerColor   = isPendencias ? "#B91C1C" : "#0F172A"; // vermelho / azul escuro
+    var botaoCsvColor = "#005E27";                            // verde padrão Vektor
+
+    // Cabeçalhos que SERÃO exibidos
+    var colunasVisiveis;
+    if (isPendencias) {
+        // PENDÊNCIAS: Loja | Data | Valor | Pendências (coluna única)
+        colunasVisiveis = [
+            "Loja",
+            "Data da Transação",
+            "Valor (R$)",
+            "Pendências"
+        ];
+    } else {
+        // JUSTIFICATIVAS: formato original com 3 colunas separadas
+        // Loja | Data | Valor | Etiqueta | Descrição | Recibo
+        colunasVisiveis = [
+            "Loja",
+            "Data da Transação",
+            "Valor (R$)",
+            "Etiqueta",
+            "Descrição",
+            "Recibo"
+        ];
+    }
 
     var partes = [];
 
+    // Container + tabela
     partes.push(
-      "<div class='text-sm text-slate-700'>",
+      "<div class='text-sm text-slate-700' style='max-width:1000px;margin:auto;'>",
         "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>", titulo, "</p>",
         "<div style='overflow-x:auto;'>",
-
-        // Tabela com borda preta, padrão das outras tabelas
-        "<table border='1' cellspacing='0' cellpadding='6' " +
-        "style='border-collapse:collapse;width:100%;font-size:12px;border:1px solid #000;'>"
+          "<table border='1' cellspacing='0' cellpadding='8' " +
+          "style='border-collapse:collapse;width:100%;font-size:13px;border:1px solid #000;'>"
     );
 
-    // Cabeçalho com fundo colorido + borda preta
+    // ===== Cabeçalho =====
     partes.push("<thead><tr style='background:" + headerColor + ";color:#fff;'>");
-    for (var i = 0; i < colunas.length; i++) {
-      partes.push(
-        "<th style='border:1px solid #000;padding:6px;text-align:left;'>",
-        colunas[i],
-        "</th>"
-      );
-    }
-    partes.push("</tr></thead><tbody>");
 
-    // Linhas com borda preta fina
-    for (var r = 0; r < linhas.length; r++) {
-      var row = linhas[r];
-      partes.push("<tr>");
+    colunasVisiveis.forEach(function (col) {
 
-      for (var c = 0; c < colunas.length; c++) {
-        var val = (row[c] !== undefined && row[c] !== null) ? row[c] : "";
+        // Ajuste de larguras APENAS na tabela de JUSTIFICATIVAS
+        if (!isPendencias) {
 
-        // Coluna 2 = valor → formatar moeda
-        if (c === 2) {
-          var num = Number(val) || 0;
-          val = num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+            // Data da Transação — largura maior
+            if (col === "Data da Transação") {
+                partes.push(
+                  "<th style='border:1px solid #000;padding:6px;text-align:center;width:160px;'>",
+                  col,
+                  "</th>"
+                );
+                return;
+            }
+
+            // Etiqueta — maior que Data
+            if (col === "Etiqueta") {
+                partes.push(
+                  "<th style='border:1px solid #000;padding:6px;text-align:center;width:260px;'>",
+                  col,
+                  "</th>"
+                );
+                return;
+            }
+
+            // Descrição — maior que Etiqueta
+            if (col === "Descrição") {
+                partes.push(
+                  "<th style='border:1px solid #000;padding:6px;text-align:center;width:300px;'>",
+                  col,
+                  "</th>"
+                );
+                return;
+            }
         }
 
-        // Célula
+        // Default para todas as outras colunas
+        partes.push(
+          "<th style='border:1px solid #000;padding:6px;text-align:center;'>",
+          col,
+          "</th>"
+        );
+    });
+
+    partes.push("</tr></thead><tbody>");
+
+    // IMPORTANTE: backend (Code.gs) monta cada linha como:
+    // [0] Loja
+    // [1] Data da Transação
+    // [2] Valor (R$)
+    // [3] Etiqueta
+    // [4] Descrição
+    // [5] Recibo
+    linhas.forEach(function (row) {
+        var loja      = row[0] != null ? String(row[0]) : "";
+        var data      = row[1] != null ? String(row[1]) : "";
+        var valorNum  = row[2] != null ? Number(row[2]) || 0 : 0;
+        var etiqueta  = row[3] != null ? String(row[3]).trim() : "";
+        var descricao = row[4] != null ? String(row[4]).trim() : "";
+        var reciboRaw = row[5] != null ? String(row[5]).trim() : "";
+
+        var valorFmt = valorNum.toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+        });
+
+        // Normaliza recibo para ver se é "não/nao"
+        var reciboNorm = reciboRaw
+            ? reciboRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+            : "";
+
+        partes.push("<tr>");
+
+        // Loja
         partes.push(
           "<td style='border:1px solid #000;padding:6px;'>",
-          val,
+          loja,
           "</td>"
         );
-      }
 
-      partes.push("</tr>");
-    }
+        // Data
+        partes.push(
+          "<td style='border:1px solid #000;padding:6px;'>",
+          data,
+          "</td>"
+        );
+
+        // Valor
+        partes.push(
+          "<td style='border:1px solid #000;padding:6px;'>",
+          valorFmt,
+          "</td>"
+        );
+
+        if (isPendencias) {
+            // 🔴 TABELA DE PENDÊNCIAS: coluna única “Pendências”
+
+            var pendencias = [];
+            if (!etiqueta)  pendencias.push("Etiqueta");
+            if (!descricao) pendencias.push("Descrição");
+            if (reciboNorm === "nao" || reciboNorm === "não") {
+                pendencias.push("Nota fiscal/Recibo");
+            }
+
+            var pendTexto = pendencias.length ? pendencias.join(", ") : "";
+
+            partes.push(
+              "<td style='border:1px solid #000;padding:6px;'>",
+              pendTexto,
+              "</td>"
+            );
+
+        } else {
+            // 🔵 TABELA DE JUSTIFICATIVAS: colunas separadas
+
+            partes.push(
+              "<td style='border:1px solid #000;padding:6px;'>",
+              etiqueta,
+              "</td>"
+            );
+
+            partes.push(
+              "<td style='border:1px solid #000;padding:6px;'>",
+              descricao,
+              "</td>"
+            );
+
+            partes.push(
+              "<td style='border:1px solid #000;padding:6px;'>",
+              reciboRaw,
+              "</td>"
+            );
+        }
+
+        partes.push("</tr>");
+    });
 
     partes.push("</tbody></table></div>");
 
-    // Botão CSV (verde #005E27, igual ao padrão do sistema)
+    // Botão CSV (igual ao resto do sistema)
     var nomeArquivo = isPendencias ? "pendencias_lojas" : "justificativas_lojas";
 
     partes.push(
-      "<div style='margin-top:8px;text-align:right;'>",
+      "<div style='margin-top:10px;text-align:right;'>",
         "<button type='button' " +
           "onclick=\"exportTableToCSV(this, '" + nomeArquivo + "')\" " +
-          "style='background:" + botaoCsvColor + ";color:#fff;border:none;padding:6px 10px;" +
-                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "style='background:" + botaoCsvColor + ";color:#fff;border:none;padding:8px 12px;" +
+                 "border-radius:4px;font-size:12px;cursor:pointer;'>" +
           "⬇ Exportar CSV" +
         "</button>",
       "</div>"
     );
 
     partes.push("</div>");
+
     return partes.join("");
 }
 
@@ -5734,7 +5928,7 @@ function vektorChamarPendJustLojas_(tipo) {
 
         if (tipo === "pendencias") {
           html = vektorMontarTabelaPendJust_(
-            "PENDÊNCIAS DE JUSTIFICATIVA POR LOJA",
+            "PENDÊNCIAS DE JUSTIFICATIVAS POR LOJA",
             colunas,
             res.pendencias || []
           );
@@ -5764,12 +5958,28 @@ function vektorChamarPendJustLojas_(tipo) {
 
 // ⚠ Botão "Verificar pendências" – exposto no escopo global (window)
 window.vektorVerificarPendenciasLojas = function (btn) {
-    vektorChamarPendJustLojas_("pendencias");
+    renderBotMessage(
+      "HTML:" +
+      "<div class='vektor-loading'>" +
+        "<div class='vektor-spinner'></div>" +
+        "<span>Verificando pendências das lojas dessa tabela no período informado...</span>" +
+      "</div>"
+    );
+
+    vektorChamarPendJustLojas_('pendencias');
 };
 
 // ✔ Botão "Verificar justificativas" – exposto no escopo global (window)
 window.vektorVerificarJustificativasLojas = function (btn) {
-    vektorChamarPendJustLojas_("justificativas");
+    renderBotMessage(
+      "HTML:" +
+      "<div class='vektor-loading'>" +
+        "<div class='vektor-spinner'></div>" +
+        "<span>Verificando transações com justificativas feitas de forma correta...</span>" +
+      "</div>"
+    );
+
+    vektorChamarPendJustLojas_('justificativas');
 };
 
 
