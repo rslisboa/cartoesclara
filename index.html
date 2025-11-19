@@ -416,6 +416,10 @@ function closeVektorModal() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+
+    let grupoNome = "";
+    let grupo = "";
+
     const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png";
 
 
@@ -2083,7 +2087,7 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
             msgNorm.includes("oq vc faz?") ||
             msgNorm.includes("oq vc faz") ||
             msgNorm.includes("oq vc pode fazer") ||
-            msgNorm.includes("oq vc consegue responder) ||
+            msgNorm.includes("oq vc consegue responder") ||
             msgNorm.includes("quais perguntas vc consegue responder") ||
             msgNorm.includes("quais perguntas voce consegue responder") ||
             msgNorm.includes("quais perguntas você consegue responder") ||
@@ -2416,7 +2420,8 @@ Ele deve seguir o processo de requisição junto à área de Compras (se for rel
             }
         }
 
-        const alcool = ["cerveja","vodka","vinho","whisky","whiskey","cachaça","cachaca","gin","tequila"].map(normalize);
+        const alcool = ["cerveja","vodka", "gin", "tequila", "rum", "saque", "espumante", "conhaque", "51", "sidra", "brandy", "hidromel", "absinto", "champagne", "menta", "bitter", "vermute", "prosecco", "vinho do porto", "xerez", "marsala", "grappa", "pisco", "mezcal", "calvados", "amaretto", "ouzo", "jägermeister", "soju", "arac", "baijiu", "vinho","whisky","whiskey","cachaça", "licor", "cachaca","gin","tequila", "Skol", "Brahma", "Heineken", "Corona Extra", "Budweiser", "Bud Light", "Stella Artois", "stella", "itaipava", "devassa", "Guinness", "Pilsner Urquell", "Super Bock", "Asahi", "Tsingtao", "Yanjing", "Smirnoff", "Absolut", "Cîroc", "Grey Goose", "Belvedere", "Stolichnaya", "Ketel One", "Tito's Handmade Vodka", "Skyy", "Orloff", "Johnnie Walker", "Jack Daniel's", "Jameson", "Chivas Regal", "Jim Beam", "Ballantine's", "Grant's", "Macallan", "Glenfiddich", "Bulleit", "Suntory", "Tanqueray", "Beefeater", "Bombay Sapphire", "Gordon's", "Hendrick's", "Bulldog", "The Botanist", "Seagers", "Jose Cuervo", "Patrón", "Don Julio", "1800", "Casamigos", "Espolòn", "El Jimador", "Herradura", "Altos Tequila", "Bacardi", "Havana Club", "Captain Morgan", "Ron Zacapa", "Mount Gay", "Appleton Estate", "Diplomático", "Brugal", "Plantation", "Cachaça 51", "Seleta", "Salinas", "Velho Barreiro", "Pitú", "Weber Haus", "Magnífica", "Anísio Santiago (Havana)", "Moët & Chandon", "Dom Pérignon", "Veuve Clicquot", "Krug", "Chandon", "Casa Perini", "Salton", "Freixenet", "Baileys", "Licor 43", "Jägermeister", "Amarula", "Cointreau", "Grand Marnier", "Campari", "Aperol", "Frangelico", "Sheridan's", "Drambuie", "Fireball", "blue label", "gold label","black label", "green label", "ciroc", "absolut", "Cîroc", "Grey Goose", "Belvedere", "Stolichnaya", "Ketel One", "Tito's Handmade Vodka", "Skyy", "Orloff", "Russian Standard", "Żubrówka", "Finlandia", "Eristoff", "Beluga", "Svedka", "Wyborowa", "Crystal Head", 
+        "Hangar 1" ].map(normalize);
         for (const termo of alcool) {
             if (msgNorm.includes(termo)) {
                 return {
@@ -3550,7 +3555,7 @@ function vektorSugerirTopicosGerais(msgOriginal) {
       norm.includes("grafico") ||
       norm.includes("gráfico") ||
       norm.includes("analise") ||
-      norm.includes("análise") ||
+      norm.includes("análise") || 
       norm.includes("looker")
     ) {
       blocos.push(
@@ -3609,8 +3614,8 @@ setTimeout(function () {
 // SUGESTÕES AUTOMÁTICAS DO MANUAL DA CLARA A PARTIR DE OUTROS ASSUNTOS
 // ---------------------------------------------------------------------
 
-const VEKTOR_TEMPO_SUGESTAO_MIN = 8;
-const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // 
+const VEKTOR_TEMPO_SUGESTAO_MIN = 5000; // Depois uqe já sugeriu...
+const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // Primeira vez que sugeriu
 
 // Verifica se o usuário já abriu um tópico do manual há pouco tempo
 function usuarioViuTopicoManualRecentemente(secaoId, minutosJanela) {
@@ -4004,6 +4009,13 @@ if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
     const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
     const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
 
+    // 🆕 guarda período e grupo para os botões de pendência/justificativa
+    window.__vektorUltimoPeriodoIso = {
+      inicio: dataInicioStr || "",
+      fim:    dataFimStr    || ""
+    };
+    window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
+
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>" +
         "Montando a <b>relação de todas as lojas do time " + grupo + "</b>, " +
@@ -4033,6 +4045,13 @@ if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
         dataFimStr,
         tipo
       );
+
+      // 🆕 guarda período e grupo para os botões de pendência/justificativa
+      window.__vektorUltimoPeriodoIso = {
+        inicio: dataInicioStr || "",
+        fim:    dataFimStr    || ""
+      };
+      window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
 
     return null;
   }
@@ -4263,6 +4282,13 @@ if (detRankLoja) {
   const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
 
+  // 🆕 guarda período e grupo para os botões de pendência/justificativa
+window.__vektorUltimoPeriodoIso = {
+  inicio: dataInicioStr || "",
+  fim:    dataFimStr    || ""
+};
+window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
+
   google.script.run
     .withSuccessHandler(function (res) {
       renderResumoTransacoesSemana(res, {
@@ -4296,6 +4322,13 @@ if (detLojasPlural) {
 
   const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
   const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
+
+  // 🆕 guarda período e grupo para os botões de pendência/justificativa
+  window.__vektorUltimoPeriodoIso = {
+  inicio: dataInicioStr || "",
+  fim:    dataFimStr    || ""
+  };
+  window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
 
   google.script.run
     .withSuccessHandler(function (res) {
@@ -4499,6 +4532,13 @@ if (detTimeCampeao) {
     ? periodo.dataFim.toISOString()
     : "";
 
+    // 🆕 guarda período e grupo para os botões de pendência/justificativa
+window.__vektorUltimoPeriodoIso = {
+  inicio: dataInicioStr || "",
+  fim:    dataFimStr    || ""
+};
+window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
+
   google.script.run
     .withSuccessHandler(function (res) {
       renderResumoTransacoesSemana(res, { topN: 1, forGroup: !!grupoNome });
@@ -4524,6 +4564,13 @@ if (detTimeCampeao) {
 
     const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
     const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    // 🆕 guarda período e grupo para os botões de pendência/justificativa
+  window.__vektorUltimoPeriodoIso = {
+  inicio: dataInicioStr || "",
+  fim:    dataFimStr    || ""
+  };
+  window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
 
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>" +
@@ -4566,6 +4613,13 @@ if (detTimeCampeao) {
       ? periodo.dataFim.toISOString()
       : "";
 
+      // 🆕 guarda período e grupo para os botões de pendência/justificativa
+    window.__vektorUltimoPeriodoIso = {
+      inicio: dataInicioStr || "",
+      fim:    dataFimStr    || ""
+    };
+    window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
+
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>" +
         "Vou montar uma <b>relação de todas as lojas</b> com gastos " +
@@ -4591,6 +4645,13 @@ if (detTimeCampeao) {
         tipo             // "valor" (padrão) ou "quantidade"
       );
 
+      // 🆕 guarda período e grupo para os botões de pendência/justificativa
+      window.__vektorUltimoPeriodoIso = {
+        inicio: dataInicioStr || "",
+        fim:    dataFimStr    || ""
+      };
+      window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
+
     // resposta vem via callback, então encerra aqui
     return null;
   }}
@@ -4604,6 +4665,13 @@ if (detTimeCampeao) {
 
     const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
     const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+        // 🆕 guarda período e grupo para os botões de pendência/justificativa
+    window.__vektorUltimoPeriodoIso = {
+      inicio: dataInicioStr || "",
+      fim:    dataFimStr    || ""
+    };
+    window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
 
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>" +
@@ -5403,17 +5471,37 @@ if (temFiltroTimes) {
 
   var linhas;
 
+  var linhas;
+
   if (opts && (opts.topN === null)) {
-    // pedido explícito para listar TODAS as linhas
+    // Pedido explícito para listar TODAS as linhas
+    // Ex.: quando a lógica do front diz: "topN: null" = sem limite
     linhas = all;
+
   } else if (typeof opts.topN === "number") {
-    linhas = all.slice(0, Math.max(0, opts.topN)); // respeita top N
+    // Quando veio um TOP N (1, 3, 5, 7, etc.)
+    // Aqui SEMPRE respeitamos o N, mesmo se tiver time (forGroup = true)
+    linhas = all.slice(0, Math.max(0, opts.topN));
+
   } else if (opts && opts.forGroup) {
-    // sem top + filtrando por time -> TODAS as lojas do time
+    // Sem topN informado + filtrando por time
+    // => lista TODAS as lojas do(s) time(s)
     linhas = all;
+
   } else {
-    // ranking geral sem top -> 10 por padrão
-    linhas = all.slice(0, 10);
+    // Ranking geral sem topN definido
+    // Se quiser, pode limitar a 10 aqui (ou deixar todas)
+    // Hoje, segue a mesma lógica antiga (todas):
+    linhas = all;
+  }
+
+    // 🆕 guarda lista de lojas exibidas na última tabela
+  try {
+    window.__vektorUltimasLojasTabela = (linhas || []).map(function (l) {
+      return (l.loja || "").toString().trim();
+    }).filter(Boolean);
+  } catch (e) {
+    console.warn("Falha ao registrar lista de lojas da tabela:", e);
   }
 
 
@@ -5496,31 +5584,194 @@ if (temFiltroTimes) {
   }
   var tabelaHtml = linhasTabela.join("");
 
-  // 🔽 Botão de exportação em CSV (só aparece se tiver tabela)
-var botaoCsv = "";
-if (tabelaHtml) {
-  botaoCsv =
-    "<div style='margin-top:8px;text-align:right;'>" +
-      "<button type='button' " +
-        "onclick=\"exportTableToCSV(this, 'transacoes_lojas')\" " +
-        "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
-               "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-        "⬇ Exportar CSV" +
-      "</button>" +
-    "</div>";
-}
+  // 🔽 Botões abaixo da tabela (CSV + Pendências + Justificativas)
+  var botoesHtml = "";
+  if (tabelaHtml) {
+    botoesHtml =
+      "<div style='margin-top:8px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;'>" +
+        // Exportar CSV (já existia)
+        "<button type='button' " +
+          "onclick=\"exportTableToCSV(this, 'transacoes_lojas')\" " +
+          "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "⬇ Exportar CSV" +
+        "</button>" +
+
+        // 🆕 Verificar pendências
+        "<button type='button' " +
+          "onclick=\"vektorVerificarPendenciasLojas(this)\" " +
+          "style='background:#B91C1C;color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "⚠ Verificar pendências" +
+        "</button>" +
+
+        // 🆕 Verificar justificativas
+        "<button type='button' " +
+          "onclick=\"vektorVerificarJustificativasLojas(this)\" " +
+          "style='background:#0F172A;color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "✔ Verificar justificativas" +
+        "</button>" +
+      "</div>";
+  }
 
 var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
 var html = [
   "<div class='text-sm text-slate-700'>",
     "<p>", fraseResumo, "</p>",
     tabelaHtml,
-    botaoCsv,
+    botoesHtml,
   "</div>"
 ].join("");
 
 renderBotMessage("HTML:" + html);
 }
+
+// ========= Botões "Verificar pendências / justificativas" (tabelas de LOJAS) ========= //
+
+function vektorMontarTabelaPendJust_(titulo, colunas, linhas) {
+    if (!linhas || !linhas.length) {
+        return "<p class='text-sm text-slate-700'>Não encontrei registros para " +
+               titulo.toLowerCase() + " nesse período/seleção.</p>";
+    }
+
+    // Define cor do cabeçalho conforme o tipo
+    var lowerTitulo = (titulo || "").toLowerCase();
+    var isPendencias = lowerTitulo.indexOf("pend") >= 0;
+    var headerColor  = isPendencias ? "#B91C1C" : "#0F172A";
+
+    // Cor do botão CSV (igual às outras tabelas)
+    var botaoCsvColor = "#005E27";
+
+    var partes = [];
+
+    partes.push(
+      "<div class='text-sm text-slate-700'>",
+        "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>", titulo, "</p>",
+        "<div style='overflow-x:auto;'>",
+
+        // Tabela com borda preta, padrão das outras tabelas
+        "<table border='1' cellspacing='0' cellpadding='6' " +
+        "style='border-collapse:collapse;width:100%;font-size:12px;border:1px solid #000;'>"
+    );
+
+    // Cabeçalho com fundo colorido + borda preta
+    partes.push("<thead><tr style='background:" + headerColor + ";color:#fff;'>");
+    for (var i = 0; i < colunas.length; i++) {
+      partes.push(
+        "<th style='border:1px solid #000;padding:6px;text-align:left;'>",
+        colunas[i],
+        "</th>"
+      );
+    }
+    partes.push("</tr></thead><tbody>");
+
+    // Linhas com borda preta fina
+    for (var r = 0; r < linhas.length; r++) {
+      var row = linhas[r];
+      partes.push("<tr>");
+
+      for (var c = 0; c < colunas.length; c++) {
+        var val = (row[c] !== undefined && row[c] !== null) ? row[c] : "";
+
+        // Coluna 2 = valor → formatar moeda
+        if (c === 2) {
+          var num = Number(val) || 0;
+          val = num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        // Célula
+        partes.push(
+          "<td style='border:1px solid #000;padding:6px;'>",
+          val,
+          "</td>"
+        );
+      }
+
+      partes.push("</tr>");
+    }
+
+    partes.push("</tbody></table></div>");
+
+    // Botão CSV (verde #005E27, igual ao padrão do sistema)
+    var nomeArquivo = isPendencias ? "pendencias_lojas" : "justificativas_lojas";
+
+    partes.push(
+      "<div style='margin-top:8px;text-align:right;'>",
+        "<button type='button' " +
+          "onclick=\"exportTableToCSV(this, '" + nomeArquivo + "')\" " +
+          "style='background:" + botaoCsvColor + ";color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "⬇ Exportar CSV" +
+        "</button>",
+      "</div>"
+    );
+
+    partes.push("</div>");
+    return partes.join("");
+}
+
+function vektorChamarPendJustLojas_(tipo) {
+    var periodo  = window.__vektorUltimoPeriodoIso || {};
+    var grupo    = window.__vektorUltimoGrupoBaseClara || "";
+    var lojas    = window.__vektorUltimasLojasTabela || [];
+
+    var ini = periodo.inicio || "";
+    var fim = periodo.fim    || "";
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.ok) {
+          renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Não consegui consultar as " +
+            "pendências/justificativas na planilha BaseClara.</p>"
+          );
+          return;
+        }
+
+        var colunas = res.colunas || [];
+        var html = "";
+
+        if (tipo === "pendencias") {
+          html = vektorMontarTabelaPendJust_(
+            "PENDÊNCIAS DE JUSTIFICATIVA POR LOJA",
+            colunas,
+            res.pendencias || []
+          );
+        } else {
+          html = vektorMontarTabelaPendJust_(
+            "TRANSAÇÕES COM JUSTIFICATIVA COMPLETA POR LOJA",
+            colunas,
+            res.justificadas || []
+          );
+        }
+
+        renderBotMessage("HTML:" + html);
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Tive um erro ao consultar as " +
+          "pendências/justificativas na planilha.</p>"
+        );
+      })
+      .getPendenciasEJustificativasPorLojas(
+        grupo,
+        ini,
+        fim,
+        lojas
+      );
+}
+
+// ⚠ Botão "Verificar pendências" – exposto no escopo global (window)
+window.vektorVerificarPendenciasLojas = function (btn) {
+    vektorChamarPendJustLojas_("pendencias");
+};
+
+// ✔ Botão "Verificar justificativas" – exposto no escopo global (window)
+window.vektorVerificarJustificativasLojas = function (btn) {
+    vektorChamarPendJustLojas_("justificativas");
+};
+
 
 // RESUMO POR TIME INICIO //
 
@@ -6452,6 +6703,12 @@ function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
 function detectarListarTodasLojasDoTime(msgOriginal, norm) {
   const t = norm || "";
 
+  // 🚫 Se falar em "top", NÃO é "todas as lojas do time",
+  // e sim um ranking de lojas. Deixa para detectarRankingLojas tratar.
+  if (t.includes("top")) {
+    return null;
+  }
+
   // Gatilhos específicos para perguntas de "lojas do time"
   const pedeTodas =
     t.includes("todas as lojas do time") ||
@@ -6469,21 +6726,15 @@ function detectarListarTodasLojasDoTime(msgOriginal, norm) {
 
   if (!pedeTodas) return null;
 
-  // Usa o parser de times que já funciona
-  let listaTimes = [];
-  if (typeof encontrarListaTimesNaMensagem === "function") {
-    listaTimes = encontrarListaTimesNaMensagem(msgOriginal) || [];
-  }
+  // Usa o parser de times que você já tem
+  const grupoNomeOficial = encontrarTimeNaMensagem(msgOriginal) || "";
+  if (!grupoNomeOficial) return null;
 
-  if (!listaTimes.length) return null;
-
-  // pega só o primeiro time, pois a pergunta é "lojas do time X"
-  const grupo   = listaTimes[0];
   const periodo = extrairIntervaloDatas(msgOriginal);
   const tipo    = extrairCriterioGeral(t) || "valor";
 
   return {
-    grupo,
+    grupo: grupoNomeOficial,
     periodo,
     tipo
   };
