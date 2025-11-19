@@ -2083,6 +2083,13 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
             msgNorm.includes("oq vc faz?") ||
             msgNorm.includes("oq vc faz") ||
             msgNorm.includes("oq vc pode fazer") ||
+            msgNorm.includes("oq vc consegue responder) ||
+            msgNorm.includes("quais perguntas vc consegue responder") ||
+            msgNorm.includes("quais perguntas voce consegue responder") ||
+            msgNorm.includes("quais perguntas você consegue responder") ||
+            msgNorm.includes("quais perguntas você pode responder") ||
+            msgNorm.includes("quais perguntas você responder") ||
+            msgNorm.includes("quais perguntas você responde") ||
             msgNorm.includes("o que vc pode fazer") ||
             msgNorm.includes("oque vc pode fazer") ||
             msgNorm.includes("oq você pode fazer") ||
@@ -2349,7 +2356,7 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
     };
 
     const mensagensBrincadeiraPorGrupo = {
-        eletrodomesticos: "Front de loja não é cozinha planejada, né? 😅",
+        eletrodomesticos: "Interior de loja não é cozinha planejada, né? 😅",
         eletroportateis: "Vai montar uma cozinha gourmet aí na loja? 😂",
         climatizacao: "Climatizar a loja é importante, mas isso entra como patrimônio, não no cartão da Clara 😉",
         moveisUtensiliosCasa: "Parece mais compra de mobília do que despesa do dia a dia da loja 😬",
@@ -3138,13 +3145,14 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
             resposta = `HTML:<div class="text-sm text-slate-700">
           <p>Sou o <b>Vektor</b> 🤖 — Agente do <b>Grupo SBF</b> especializado no <b>cartão Clara</b>.
 
-          <p class="mt-2">Posso te ajudar com várias coisas, por exemplo:</p>
+          <p class="mt-2">Posso te ajudar com várias coisas, por exemplo:
           <ul class="list-disc ml-5 mt-1">
           <li>Explicar a <b>Política de Uso dos Cartões Clara</b>;</li>
           <li>Orientar sobre <b>o que pode e o que não pode ser comprado</b>;</li>
           <li>Indicar a <b>etiqueta correta</b> pra cada tipo de gasto (ex.: água, lanche, informática, manutenção...);</li>
           <li>Guiar sobre <b>bloqueio e desbloqueio</b> do cartão;</li>
           <li>Consultar <b>pendências da loja</b> e até <b>enviar o resumo por e-mail</b>;</li>
+          <li>Consultar <b>transações efetuadas</b> e também comparar com outras lojas ou times</b>;</li>
           <li>Mostrar <b>como solicitar novo cartão</b> (primeira ou segunda via);</li>
           <li>Explicar sobre o <b>Termo de Responsabilidade</b> e onde preencher;</li>
           <li>Responder dúvidas sobre <b>sangria, limite, reembolsos e prestação de contas</b>;</li>
@@ -3153,7 +3161,9 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
           <p class="mt-3">Basta me perguntar de forma natural, tipo:</p>
           <p>• “Qual etiqueta usar para lanche de treinamento?”<br/>
           • “Posso comprar mouse no cartão Clara?”<br/>
-          • “Quais pendências tem na loja 1234?”</p>
+          • “Quais lojas/times com maior valor/quantidade de transações?”<br/>
+          • “Times X, Y ou Z no periodo XXXXX”<br/>
+          • “Pendências da loja 1234?”</p>
 
           <p class="mt-3 italic text-slate-500">Estou aqui pra facilitar o dia a dia das lojas no uso do cartão Clara. 💜</p>
           </div>`;
