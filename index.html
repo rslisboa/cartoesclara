@@ -988,6 +988,33 @@ function encontrarTimeNaMensagem(msgOriginal) {
   return melhorNome;
 }
 
+function encontrarListaTimesNaMensagem(msgOriginal) {
+  const texto = normalize(msgOriginal || "");
+  const encontrados = [];
+
+  TIMES_OFICIAIS.forEach((nome) => {
+    const nomeNorm = normalize(nome);
+
+    // usa as mesmas regras do encontrarTimeNaMensagem,
+    // mas aqui a ideia é pegar TODOS os que apareçam
+    const tokens = nomeNorm
+      .split(" ")
+      .filter(t => !["do","da","de","dos","das","sp","sul"].includes(t));
+
+    let score = 0;
+    tokens.forEach((tk) => {
+      if (!tk) return;
+      if (texto.includes(tk)) score += 1;
+    });
+
+    if (score > 0) {
+      encontrados.push(nome);
+    }
+  });
+
+  return encontrados;
+}
+
 
     /* ========= DADOS / TABELAS ========= */
 
@@ -3024,7 +3051,7 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
 
     /* ========= MOTOR DA POLÍTICA ========= */
 
-    function gerarRespostaPolitica(msgUsuario) {
+ function gerarRespostaPolitica(msgUsuario) {
         const norm = normalize(msgUsuario);
         const intencao = detectarIntencaoPergunta(norm);
 
@@ -3216,10 +3243,6 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
 
         return resposta;
     }
-
-
-
-
 
     // ====== MINI BOT DO MANUAL CLARA ======
 
@@ -3576,8 +3599,8 @@ setTimeout(function () {
 // SUGESTÕES AUTOMÁTICAS DO MANUAL DA CLARA A PARTIR DE OUTROS ASSUNTOS
 // ---------------------------------------------------------------------
 
-const VEKTOR_TEMPO_SUGESTAO_MIN = 5;
-const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // 5 segundos
+const VEKTOR_TEMPO_SUGESTAO_MIN = 8;
+const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // 
 
 // Verifica se o usuário já abriu um tópico do manual há pouco tempo
 function usuarioViuTopicoManualRecentemente(secaoId, minutosJanela) {
@@ -3633,6 +3656,8 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
       norm.includes("justificativa") ||
       norm.includes("justificar") ||
       norm.includes("pendencia") ||
+      norm.includes("pendencias") ||
+      norm.includes("pendências") ||
       norm.includes("pendência")
     ) {
       if (!usuarioViuTopicoManualRecentemente("anexar_comprovante", VEKTOR_TEMPO_SUGESTAO_MIN)) {
@@ -3958,10 +3983,112 @@ function gerarRespostaDoBot(msgUsuario) {
     return "HTML:" + htmlFinal;
   }
 
-  // >>> TODAS AS LOJAS (geral) por valor
-const detTodasLojas = detectarListarTodasLojasGeral(msgUsuario, norm);
-if (detTodasLojas) {
-  const p = detTodasLojas.periodo;
+  // 🆕 TODAS AS LOJAS DO TIME XXXXX
+if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
+  const detTodasLojasDoTime = detectarListarTodasLojasDoTime(msgUsuario, norm);
+  if (detTodasLojasDoTime) {
+    const grupo = detTodasLojasDoTime.grupo;
+    const p = detTodasLojasDoTime.periodo;
+    const tipo = detTodasLojasDoTime.tipo || "valor";
+
+    const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Montando a <b>relação de todas as lojas do time " + grupo + "</b>, " +
+        "mostrando <b>valor total</b> e <b>quantidade de transações</b>" +
+        (p ? " no período solicitado." : ".") +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        // topN: null => todas as lojas do time
+        renderResumoTransacoesSemana(res, {
+          topN: null,
+          forGroup: true,   // já faz tabela de lojas por time
+          groupName: grupo
+        });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+          "Tive um problema ao consultar os dados para listar as lojas do time " + grupo + ".</p>"
+        );
+      })
+      .getResumoTransacoesPorGrupo(
+        grupo,          // time solicitado
+        dataInicioStr,
+        dataFimStr,
+        tipo
+      );
+
+    return null;
+  }
+}
+
+  // Gatilho pendências (quando não há fluxo pendências em aberto)
+
+    if (estadoPendencias === "nenhum" &&
+    termosPendencias.some(t => norm.includes(t))) {
+
+    // tenta extrair número de loja já presente na mensagem (2 a 6 dígitos)
+    const matchLoja = msgUsuario.match(/\b(\d{2,6})\b/);
+
+    if (matchLoja) {
+        const lojaBruta = matchLoja[1];
+        const lojaNormalizada = lojaBruta.replace(/\D/g, "");
+
+        lojaPendenciasAtual = lojaNormalizada;
+        ultimaPendenciaResumo = null;
+        estadoPendencias = "aguardando_confirmacao_email";
+
+        // 🆕 busca nome da loja antes de responder
+        google.script.run
+          .withSuccessHandler((res) => {
+            let nomeLojaTxt = "";
+            if (res && res.ok && res.nome) {
+              nomeLojaTxt = " - " + res.nome;
+            }
+
+            renderBotMessage(
+              `HTML:<p class="text-sm text-slate-700">
+              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}${nomeLojaTxt}</b> e já te mostro aqui no chat. ⏳
+              </p>`
+            );
+
+            consultarPendenciasNoServidor(lojaNormalizada);
+          })
+          .withFailureHandler((err) => {
+            // fallback se der erro no BigQuery
+            renderBotMessage(
+              `HTML:<p class="text-sm text-slate-700">
+              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}</b> e já te mostro aqui no chat. ⏳
+              </p>`
+            );
+            consultarPendenciasNoServidor(lojaNormalizada);
+          })
+          .obterNomeLojaBigQuery(lojaNormalizada);
+
+        return null; // não retorna outro texto (renderBotMessage já enviou)
+    }
+
+    // caso não tenha número na frase, segue fluxo normal pedindo a loja
+    estadoPendencias = "aguardando_loja";
+    lojaPendenciasAtual = "";
+    ultimaPendenciaResumo = null;
+
+    return `HTML:<p class="text-sm text-slate-700">
+    Consigo consultar as pendências Clara da sua loja.<br/>
+    Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
+    </p>`;
+}
+
+ /* // >>> TODAS AS LOJAS (geral) por valor
+const detTodasLojasResumo = detectarListarTodasLojasGeral(msgUsuario, norm);
+if (detTodasLojasResumo) {
+  const p = detTodasLojasResumo.periodo;
   const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
   const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
 
@@ -3976,41 +4103,43 @@ google.script.run
   .withFailureHandler(function () { renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>"); })
   .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, "valor");
   return;
-}
+} */
 
-// >>> TIME CAMPEÃO (singular): "qual time gastou mais ...", "qual time teve mais transações ..."
-(function() {
-  // bate em frases do tipo "qual time gastou mais ..." ou "qual time teve mais transações ..."
-  const mSingTime = norm.match(/\bqual\s+time\s+(gastou|teve)\s+mais\b/);
-  if (!mSingTime) return;
+  // 🆕 TIMES ESPECÍFICOS (ex.: "times Águias do Cerrado e Lobos SP no período ...")
 
-  // tipo: "valor" para "gastou"; "quantidade" para "teve mais transações"
-  const tipo = (mSingTime[1] === "gastou") ? "valor" : "quantidade";
+  const detTimesEspec = detectarTimesEspecificosLista(msgUsuario, norm);
+  if (detTimesEspec && detTimesEspec.times && detTimesEspec.times.length > 1) {
+    const listaTimes = detTimesEspec.times;
+    const p          = detTimesEspec.periodo;
+    const tipo       = detTimesEspec.tipo || "valor";
 
-  // período: usa seu parser existente (extrairIntervaloDatas) — ele já entende "outubro", "mês passado", "últimos 60 dias"
-  const p = extrairIntervaloDatas(msgUsuario) || {};
-  const dataInicioStr = p.dataInicio ? p.dataInicio.toISOString() : "";
-  const dataFimStr    = p.dataFim    ? p.dataFim.toISOString()    : "";
+    const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
 
-  renderBotMessage(
-    "HTML:<p class='text-sm text-slate-700'>Buscando o <b>time campeão</b> por " +
-    (tipo === "valor" ? "<b>valor</b>" : "<b>transações</b>") +
-    (p.dataInicio && p.dataFim ? " no período solicitado" : " no período padrão") +
-    "…</p>"
-  );
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou comparar apenas os times <b>" + listaTimes.join(", ") + "</b> " +
+        "por " + (tipo === "valor" ? "<b>valor total</b>" : "<b>quantidade de transações</b>") +
+        (p ? " no período solicitado." : ".") +
+      "</p>"
+    );
 
-  google.script.run
-    .withSuccessHandler(function(res) {
-      // singular => sempre Top 1
-      renderResumoTransacoesPorTime(res, { topN: 1 });
-    })
-    .withFailureHandler(function() {
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (times).</p>");
-    })
-    .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
+    google.script.run
+      .withSuccessHandler(function (res) {
+        renderResumoTransacoesPorTime(res, {
+          topN: null,
+          filtrarTimesNomes: listaTimes
+        });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui consultar os dados para esses times.</p>"
+        );
+      })
+      .getResumoTransacoesPorTime(dataInicioStr, dataFimStr, tipo);
 
-  return; // encerra aqui pra não cair nos fluxos genéricos
-})();
+    return null;
+  }
 
 
 // >>> RANKING DE TIMES (top N)
@@ -4065,6 +4194,33 @@ function detectarConsultasTimes(msgOriginal, norm) {
   return null;
 }
 
+// =========== DETECTOR: "TIMES X E Y NO PERÍODO" =========== //
+
+function detectarTimesEspecificosLista(msgOriginal, norm) {
+  const t = norm || "";
+
+  // se falar de LOJA(S), essa função NÃO deve tratar
+  if (!t.includes("time") || t.includes("loja") || t.includes("lojas")) {
+    return null;
+  }
+
+  const lista = (typeof encontrarListaTimesNaMensagem === "function"
+    ? (encontrarListaTimesNaMensagem(msgOriginal) || [])
+    : []);
+
+  if (!lista.length) return null;
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo    = extrairCriterioGeral(t) || "valor";
+
+  return {
+    times: lista,
+    periodo,
+    tipo
+  };
+}
+
+if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
 const detRankLoja = detectarRankingLojas(msgUsuario, norm);
 if (detRankLoja) {
   const periodo = detRankLoja.periodo;
@@ -4110,9 +4266,10 @@ if (detRankLoja) {
     .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
 
   return null;
-}
+}}
 
 // 2) LOJAS (plural) sem top/ranking  -> lista TODAS do time
+if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
 const detLojasPlural = detectarLojasMaisTransacoesPlural(msgUsuario, norm);
 if (detLojasPlural) {
   const periodo = detLojasPlural.periodo;
@@ -4141,7 +4298,7 @@ if (detLojasPlural) {
     .getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, tipo);
 
   return null;
-}
+}}
 
 // === NOVO: CONSULTAS POR CATEGORIA (BaseClara) ===
 const detCategorias = detectarPerguntaCategorias(msgUsuario, norm);
@@ -4258,6 +4415,47 @@ if (detTimeCampeao) {
   return; // encerra aqui
 }
 
+  // 🆕 TODOS OS TIMES NO PERÍODO / RELAÇÃO DE TIMES
+  const detTodosTimes = detectarTodosTimesPeriodo(msgUsuario, norm);
+  if (detTodosTimes) {
+    const p    = detTodosTimes.periodo;
+    const tipo = detTodosTimes.tipo || "valor";
+
+    const dataInicioStr = (p && p.dataInicio)
+      ? p.dataInicio.toISOString()
+      : "";
+    const dataFimStr = (p && p.dataFim)
+      ? p.dataFim.toISOString()
+      : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou listar <b>todos os times</b> com gasto " +
+        (tipo === "valor" ? "por <b>valor total</b>" : "por <b>número de transações</b>") +
+        (p ? " no período solicitado" : "") +
+        ". A tabela vai mostrar para cada time o <b>valor total</b> e a <b>quantidade</b> de transações." +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        // topN: null => todos os times
+        renderResumoTransacoesPorTime(res, { topN: null });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (todos os times).</p>"
+        );
+      })
+      .getResumoTransacoesPorTime(
+        dataInicioStr,
+        dataFimStr,
+        tipo
+      );
+
+    return null;
+  }
+
 
   // >>> NOVO BLOCO: perguntas de relatório (planilha Captura_Clara / BaseClara)
 
@@ -4306,6 +4504,125 @@ if (detTimeCampeao) {
   // resposta vem assíncrona (via renderBotMessage no callback), então aqui não devolve nada
   return null;
 }
+
+  // 🆕 LOJAS ESPECÍFICAS (ex.: "lojas XXXX e XXXX no período ...")
+  const detLojasEspec = detectarLojasEspecificasLista(msgUsuario, norm);
+  if (detLojasEspec && detLojasEspec.codigosLojas.length > 0) {
+    const p     = detLojasEspec.periodo;
+    const tipo  = detLojasEspec.tipo || "valor";
+    const lojas = detLojasEspec.codigosLojas;
+
+    const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou montar uma tabela apenas com as <b>lojas " + lojas.join(", ") + "</b>, " +
+        "mostrando <b>valor total</b> e <b>quantidade de transações</b>" +
+        (p ? " no período solicitado." : ".") +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        renderResumoTransacoesSemana(res, {
+          topN: null,
+          forGroup: false,
+          filtrarLojasCodigos: lojas
+        });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui consultar os dados para essas lojas específicas.</p>"
+        );
+      })
+      // grupo vazio => todas as lojas; vamos filtrar no front
+      .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, tipo);
+
+    return null;
+  }
+
+  // 🆕 TODAS AS LOJAS NO PERÍODO (sem time)
+  if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
+  const detTodasLojasPeriodo = detectarListarTodasLojasGeral(msgUsuario, norm);
+  if (detTodasLojasPeriodo) {
+    const periodo = detTodasLojasPeriodo.periodo;
+    const tipo    = detTodasLojasPeriodo.tipo || "valor";
+
+    const dataInicioStr = (periodo && periodo.dataInicio)
+      ? periodo.dataInicio.toISOString()
+      : "";
+    const dataFimStr = (periodo && periodo.dataFim)
+      ? periodo.dataFim.toISOString()
+      : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou montar uma <b>relação de todas as lojas</b> com gastos " +
+        (periodo ? "no período solicitado" : "no período completo disponível") +
+        ", mostrando <b>valor total</b> e <b>quantidade de transações</b>." +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        // topN: null => listar TODAS as lojas
+        renderResumoTransacoesSemana(res, { topN: null, forGroup: false });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Tive um problema ao consultar os dados da planilha para listar todas as lojas.</p>"
+        );
+      })
+      .getResumoTransacoesPorGrupo(
+        "",              // sem time (todas as lojas)
+        dataInicioStr,
+        dataFimStr,
+        tipo             // "valor" (padrão) ou "quantidade"
+      );
+
+    // resposta vem via callback, então encerra aqui
+    return null;
+  }}
+
+//🆕 TODAS AS LOJAS DE VÁRIOS TIMES
+  const detLojasTimesMulti = detectarTodasLojasDosTimes(msgUsuario, norm);
+  if (detLojasTimesMulti && detLojasTimesMulti.times.length > 0) {
+    const listaTimes = detLojasTimesMulti.times;
+    const p          = detLojasTimesMulti.periodo;
+    const tipo       = detLojasTimesMulti.tipo || "valor";
+
+    const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou listar <b>todas as lojas</b> dos times <b>" + listaTimes.join(", ") + "</b>, " +
+        "mostrando <b>valor total</b> e <b>quantidade de transações</b>" +
+        (p ? " no período solicitado." : ".") +
+      "</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        renderResumoTransacoesSemana(res, {
+          topN: null,
+          forGroup: false,
+          filtrarTimesNomes: listaTimes
+        });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui consultar os dados das lojas desses times.</p>"
+        );
+      })
+      // grupo vazio => todas as lojas; filtro por time será feito no front
+      .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, tipo);
+
+    return null;
+  }
+
+
 
 // <<< FIM DO BLOCO NOVO
 
@@ -4390,8 +4707,9 @@ if (detTimeCampeao) {
             return respPoliticaOficial();
         }
 
+
               // 5) Fluxo pendências - aguardando código da loja
-if (estadoPendencias === "aguardando_loja") {
+        if (estadoPendencias === "aguardando_loja") {
     const textoOriginal = msgUsuario.trim();
     const soDigitos = textoOriginal.replace(/\D/g, "");
 
@@ -4667,62 +4985,6 @@ Sem problemas, vamos falar de outro assunto então. 😉
             </p>`;
         }
 
-        // 9) Gatilho pendências (quando não há fluxo pendências em aberto)
-if (estadoPendencias === "nenhum" &&
-    termosPendencias.some(t => norm.includes(t))) {
-
-    // tenta extrair número de loja já presente na mensagem (2 a 6 dígitos)
-    const matchLoja = msgUsuario.match(/\b(\d{2,6})\b/);
-
-    if (matchLoja) {
-        const lojaBruta = matchLoja[1];
-        const lojaNormalizada = lojaBruta.replace(/\D/g, "");
-
-        lojaPendenciasAtual = lojaNormalizada;
-        ultimaPendenciaResumo = null;
-        estadoPendencias = "aguardando_confirmacao_email";
-
-        // 🆕 busca nome da loja antes de responder
-        google.script.run
-          .withSuccessHandler((res) => {
-            let nomeLojaTxt = "";
-            if (res && res.ok && res.nome) {
-              nomeLojaTxt = " - " + res.nome;
-            }
-
-            renderBotMessage(
-              `HTML:<p class="text-sm text-slate-700">
-              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}${nomeLojaTxt}</b> e já te mostro aqui no chat. ⏳
-              </p>`
-            );
-
-            consultarPendenciasNoServidor(lojaNormalizada);
-          })
-          .withFailureHandler((err) => {
-            // fallback se der erro no BigQuery
-            renderBotMessage(
-              `HTML:<p class="text-sm text-slate-700">
-              Beleza! Vou consultar as pendências Clara da loja <b>${lojaNormalizada}</b> e já te mostro aqui no chat. ⏳
-              </p>`
-            );
-            consultarPendenciasNoServidor(lojaNormalizada);
-          })
-          .obterNomeLojaBigQuery(lojaNormalizada);
-
-        return null; // não retorna outro texto (renderBotMessage já enviou)
-    }
-
-    // caso não tenha número na frase, segue fluxo normal pedindo a loja
-    estadoPendencias = "aguardando_loja";
-    lojaPendenciasAtual = "";
-    ultimaPendenciaResumo = null;
-
-    return `HTML:<p class="text-sm text-slate-700">
-    Consigo consultar as pendências Clara da sua loja.<br/>
-    Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
-    </p>`;
-}
-
 
         // 10) Gatilhos direto – primeira via
         if (termosPrimeiraViaDireta.some(t => norm.includes(t))) {
@@ -4776,11 +5038,29 @@ if (estadoPendencias === "nenhum" &&
         return { tipo: "hoje", dataInicio: d, dataFim: d };
     }
 
+    // 0b-a) Esta semana / nessa semana / nesta semana
+    if (
+        norm.includes("essa semana") ||
+        norm.includes("nesta semana") ||
+        norm.includes("nessa semana")
+    ) {
+        const fim = new Date(hoje);
+        const ini = new Date(hoje);
+
+        // volta até segunda-feira da semana atual
+        const diaSemana = fim.getDay();       // 0=Dom, 1=Seg, ..., 6=Sab
+        const diff = (diaSemana === 0 ? 6 : diaSemana - 1); // volta até segunda
+
+        ini.setDate(fim.getDate() - diff);
+
+        return { tipo: "semana_atual", dataInicio: ini, dataFim: fim };
+    }
+
     // 0b) Última semana
     if (norm.includes("ultima semana") || norm.includes("última semana")) {
         const fim = new Date(hoje);
         const ini = new Date(hoje);
-        ini.setDate(hoje.getDate() - 30);
+        ini.setDate(hoje.getDate() - 7);
         return { tipo: "ultima_semana", dataInicio: ini, dataFim: fim };
     }
 
@@ -4823,27 +5103,35 @@ if (norm.includes("neste trimestre") || norm.includes("este trimestre")) {
   return { tipo: "trimestre_atual", dataInicio: ini, dataFim: fim };
 }
 
-    // 0) Intervalo numérico "de 01/11/2025 a 15/11/2025"
-          m = norm.match(/de\s+(\d{1,2})\/(\d{1,2})\/(\d{4})\s+a\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-          if (m) {
-            const d1 = Number(m[1]);
-            const m1 = Number(m[2]) - 1;
-            const y1 = Number(m[3]);
-            const d2 = Number(m[4]);
-            const m2 = Number(m[5]) - 1;
-            const y2 = Number(m[6]);
+// 0) Intervalo numérico: aceita com/sem "de" e com/sem ano
+// Ex.: "de 01/11/2025 a 15/11/2025", "01/11/2025 a 15/11/2025",
+//      "de 01/11 a 15/11", "01/11 a 15/11"
+m = norm.match(/(?:de\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\s+a\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
+if (m) {
+    const d1 = Number(m[1]);
+    const m1 = Number(m[2]) - 1;
+    const y1 = m[3] ? Number(m[3]) : anoAtual;
 
-            const ini = new Date(y1, m1, d1);
-            const fim = new Date(y2, m2, d2, 23, 59, 59);
-            return { tipo: "intervalo_numerico", dataInicio: ini, dataFim: fim };
-          }
+    const d2 = Number(m[4]);
+    const m2 = Number(m[5]) - 1;
+    const y2 = m[6] ? Number(m[6]) : anoAtual;
 
+    const ini = new Date(y1, m1, d1);
+    const fim = new Date(y2, m2, d2, 23, 59, 59);
+
+    return { tipo: "intervalo_numerico", dataInicio: ini, dataFim: fim };
+}
 
     // 0d) Esse mês / neste mês
     if (
-        norm.includes("esse mes") || norm.includes("esse mês") ||
-        norm.includes("neste mes") || norm.includes("neste mês") ||
-        norm.includes("este mes") || norm.includes("este mês")
+        norm.includes("esse mes") || 
+        norm.includes("esse mês") ||
+        norm.includes("neste mes") || 
+        norm.includes("neste mês") ||
+        norm.includes("nesse mês") ||
+        norm.includes("nesse mes") ||
+        norm.includes("este mes") || 
+        norm.includes("este mês")
     ) {
         const ini = new Date(anoAtual, hoje.getMonth(), 1);
         const fim = hoje;
@@ -4868,28 +5156,31 @@ if (norm.includes("neste trimestre") || norm.includes("este trimestre")) {
     }
 
     // 2b) "entre 1 e 15 de novembro"
-m = norm.match(/entre\s+(\d{1,2})\s+e\s+(\d{1,2})\s+de\s+([a-zç]+)/);
-if (m) {
-  const dia1 = Number(m[1]);
-  const dia2 = Number(m[2]);
+    m = norm.match(/entre\s+(\d{1,2})\s+e\s+(\d{1,2})\s+de\s+([a-zç]+)/);
+    if (m) {
+      const dia1 = Number(m[1]);
+      const dia2 = Number(m[2]);
 
-  
-  const mesStr = m[3];
-  const mes = meses[mesStr];        // usa o "meses" já declarado no topo da função
-  if (mes !== undefined) {
-    const ano = anoAtual;           // reaproveita o anoAtual já calculado
-    const ini = new Date(ano, mes, dia1);
-    const fim = new Date(ano, mes, dia2, 23, 59, 59);
-    return { tipo: "intervalo_mes_texto", dataInicio: ini, dataFim: fim };
-  }}
+      const mesStr = m[3].normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const mes = meses[mesStr];
+      if (mes !== undefined) {
+        const ano = anoAtual;
+        const ini = new Date(ano, mes, dia1);
+        const fim = new Date(ano, mes, dia2, 23, 59, 59);
+        return { tipo: "intervalo_mes_texto", dataInicio: ini, dataFim: fim };
+      }
+    }
 
-    // 2) "no dia 10/11/2025" ou "dia 10/11"
-    m = norm.match(/dia\s+(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
+
+      // 2) Dia específico numérico
+    // Aceita: "no dia 10/11/2025", "dia 10/11", "10/11/2025", "10/11"
+    m = norm.match(/(?:no\s+dia\s+|dia\s+)?(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?/);
     if (m) {
         const dia = Number(m[1]);
         const mes = Number(m[2]) - 1;
         const ano = m[3] ? Number(m[3]) : anoAtual;
         const d = new Date(ano, mes, dia);
+
         return { tipo: "dia", dataInicio: d, dataFim: d };
     }
 
@@ -5039,21 +5330,69 @@ if (m) {
 
   opts = opts || {};
 
-  var grupo = resumo.grupoOriginal || resumo.grupo || "";
-  var grupoHtml = grupo ? (" para o time <b>" + grupo + "</b>") : "";
+  var criterioTxt = (resumo.tipo === "valor"
+  ? "maior <b>valor</b> de transações"
+  : "maior <b>número</b> de transações");
 
-  var criterioTxt = (resumo.criterio === "valor")
-    ? "maior <b>valor total</b> de transações"
-    : "maior <b>número</b> de transações";
+var grupoHtml = resumo.grupoNome
+  ? " no time <b>" + resumo.grupoNome + "</b>"
+  : "";
 
-  var fraseResumo = resumo.top
+// 🆕 verifica se veio filtro de lojas ou de times
+var temFiltroLojas = opts && Array.isArray(opts.filtrarLojasCodigos) && opts.filtrarLojasCodigos.length > 0;
+var temFiltroTimes = opts && Array.isArray(opts.filtrarTimesNomes) && opts.filtrarTimesNomes.length > 0;
+
+var fraseResumo;
+if (temFiltroLojas) {
+  // Quando o usuário pediu algo tipo "lojas 316 e 39 neste mês"
+  fraseResumo = "Comparando as lojas <b>" +
+    opts.filtrarLojasCodigos.join(", ") +
+    "</b> no período selecionado" + grupoHtml + ".";
+} else if (temFiltroTimes) {
+  // Quando o usuário pediu algo tipo "todas as lojas dos times Falcões e Lobos"
+  fraseResumo = "Mostrando lojas dos times <b>" +
+    opts.filtrarTimesNomes.join(", ") +
+    "</b> no período selecionado" + grupoHtml + ".";
+} else {
+  // Comportamento antigo padrão (sem filtro específico)
+  fraseResumo = resumo.top
     ? "A loja <b>" + resumo.top.loja + "</b> foi a que teve " + criterioTxt + " no período selecionado" + grupoHtml + "."
     : "Não encontrei transações" + grupoHtml + " no período selecionado.";
+}
 
   // Quantas linhas exibir
-  
-  var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
+var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
+
+// 🆕 aplica filtros de LOJAS e TIMES antes de cortar por topN
+if (temFiltroLojas) {
+  var codSet = {};
+  opts.filtrarLojasCodigos.forEach(function (c) {
+    var key = String(c).replace(/\D/g, "");
+    codSet[key] = true;
+  });
+
+  all = all.filter(function (linha) {
+    var codLinha = String(
+      linha.loja || linha.Loja || linha.codigoLoja || linha.CodigoLoja || ""
+    ).replace(/\D/g, "");
+    return codSet[codLinha];
+  });
+}
+
+if (temFiltroTimes) {
+  var timesSet = {};
+  opts.filtrarTimesNomes.forEach(function (nome) {
+    timesSet[String(nome).toLowerCase()] = true;
+  });
+
+  all = all.filter(function (linha) {
+    var g = String(linha.grupo || linha.Grupo || "").toLowerCase();
+    return !!timesSet[g];
+  });
+}
+
   var linhas;
+
   if (opts && (opts.topN === null)) {
     // pedido explícito para listar TODAS as linhas
     linhas = all;
@@ -5185,16 +5524,37 @@ function renderResumoTransacoesPorTime(resumo, opts) {
 
   opts = opts || {};
 
+  // Texto base do critério (valor x quantidade)
   var criterioTxt = (resumo.criterio === "valor")
     ? "maior <b>valor total</b> de transações"
     : "maior <b>número</b> de transações";
 
-  var fraseResumo = resumo.top
-    ? "O <b>time " + resumo.top.time + "</b> foi o que teve " + criterioTxt + " no período selecionado."
-    : "Não encontrei transações no período selecionado.";
+  // Lista completa de times vinda do back-end
+  var all = Array.isArray(resumo.times) ? resumo.times : [];
+
+  // Há filtro explícito de times na pergunta? (ex.: "times X e Y")
+  var temFiltroTimes = opts && Array.isArray(opts.filtrarTimesNomes) && opts.filtrarTimesNomes.length > 0;
+
+  // 🔎 Filtro opcional por lista de times (nomes)
+if (temFiltroTimes) {
+  var alvoNorms = opts.filtrarTimesNomes.map(function (n) {
+    return normalize(String(n));
+  });
+
+  all = all.filter(function (t) {
+    var nomeNorm = normalize(String(t.time || ""));
+
+    // Mantém o time se QUALQUER alvo “bater” como parte do nome
+    return alvoNorms.some(function (alvo) {
+      return (
+        nomeNorm.indexOf(alvo) >= 0 ||   // ex.: "furacao sul csc" contém "furacao sul"
+        alvo.indexOf(nomeNorm) >= 0      // ou o contrário, se o alvo for mais longo
+      );
+    });
+  });
+}
 
   // Quantas linhas exibir (para time: sem top => TODOS)
-  var all = Array.isArray(resumo.times) ? resumo.times : [];
   var linhas = (typeof opts.topN === "number") ? all.slice(0, opts.topN) : all;
 
   // Somatórios com base no que será exibido
@@ -5204,22 +5564,57 @@ function renderResumoTransacoesPorTime(resumo, opts) {
     totalQtd   += Number(linhas[i].total) || 0;
   }
 
+  // ===== Recalcula o "top time" somente com base nas linhas filtradas =====
+  var campoCriterio = (resumo.criterio === "quantidade") ? "total" : "valorTotal";
+  var topItem = null;
+  var topValor = -Infinity;
+
+  for (var j = 0; j < linhas.length; j++) {
+    var item = linhas[j];
+    var v = Number(item[campoCriterio]) || 0;
+    if (v > topValor) {
+      topValor = v;
+      topItem = item;
+    }
+  }
+
+  // Monta a fraseResumo usando APENAS os times considerados na tabela
+  var fraseResumo;
+  if (!linhas.length || !topItem || topValor <= 0) {
+    fraseResumo = temFiltroTimes
+      ? "Não encontrei transações para os times informados no período selecionado."
+      : "Não encontrei transações no período selecionado.";
+  } else if (temFiltroTimes) {
+    fraseResumo =
+      "Entre os times <b>" +
+      opts.filtrarTimesNomes.join(", ") +
+      "</b>, o <b>time " + (topItem.time || "") +
+      "</b> foi o que teve " + criterioTxt + " no período selecionado.";
+  } else {
+    // Comportamento padrão quando não há filtro de times (ranking geral)
+    fraseResumo =
+      "O <b>time " + (topItem.time || "") +
+      "</b> foi o que teve " + criterioTxt + " no período selecionado.";
+  }
+
+  // ===== Montagem da tabela (mesmo padrão visual das outras) =====
   var linhasTabela = [];
   if (linhas.length) {
 
-     // 🔽 Dropdown de drilldown para a tabela de TIMES
-        linhasTabela.push(
-          "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
-            "Expandir a tabela por: " +
-            "<select class='vektor-drill-select' data-base='time' " +
-                   "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
-              "<option value='loja'>Lojas</option>" +
-              "<option value='estabelecimento'>Estabelecimentos</option>" +
-              "<option value='categoria'>Categorias</option>" +
-            "</select>" +
-          "</div>"
-        ); 
+    // 🔽 Dropdown de drilldown para a tabela de TIMES
+    linhasTabela.push(
+      "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
+        "Expandir a tabela por: " +
+        "<select class='vektor-drill-select' data-base='time' " +
+               "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
+          "<option value='loja'>Lojas</option>" +
+          "<option value='estabelecimento'>Estabelecimentos</option>" +
+          "<option value='categoria'>Categorias</option>" +
+        "</select>" +
+      "</div>"
+    );
 
+    // Tabela no padrão azul / borda igual às demais
     linhasTabela.push(
       "<table border='1' cellspacing='0' cellpadding='6' " +
       "style='border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;" +
@@ -5235,31 +5630,32 @@ function renderResumoTransacoesPorTime(resumo, opts) {
       "</tr>"
     );
 
-    for (var j = 0; j < linhas.length; j++) {
-      var t = linhas[j];
+    // Linhas de times
+    for (var k = 0; k < linhas.length; k++) {
+      var t = linhas[k];
       var qtd = Number(t.total) || 0;
       var val = Number(t.valorTotal) || 0;
+
       var pctQtd = (totalQtd > 0)   ? ((qtd / totalQtd)   * 100).toFixed(1) + "%" : "—";
       var pctVal = (totalValor > 0) ? ((val / totalValor) * 100).toFixed(1) + "%" : "—";
 
-      var hint = "Clique para detalhar pelo filtro escolhido  " + t.time;
+      var hint =
+        "Clique para detalhar este time pela dimensão selecionada (lojas, categorias ou estabelecimentos), " +
+        "respeitando o mesmo período da pergunta inicial.";
 
-    //var hint = "Clique para detalhar pelo filtro escolhido  " + t.time;
-
-  linhasTabela.push(
-    "<tr onclick=\"vektorExpandirLinha(this,'time')\" " +
-      "style='cursor:pointer;' " +
-      "title=\"" + hint + "\">" +
-      "<td style='border:1px solid #000;'>" + t.time + "</td>" +
-      "<td style='border:1px solid #000;'>" + qtd + "</td>" +
-      "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
-      "<td style='border:1px solid #000;'>" +
-        val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
-      "</td>" +
-      "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
-    "</tr>"
-  );
-
+      linhasTabela.push(
+        "<tr onclick=\"vektorExpandirLinha(this, 'time')\" " +
+            "style='cursor:pointer;' " +
+            "title=\"" + hint + "\">" +
+          "<td style='border:1px solid #000;'>" + (t.time || "") + "</td>" +
+          "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+          "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+          "<td style='border:1px solid #000;'>" +
+            val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+          "</td>" +
+          "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+        "</tr>"
+      );
     }
 
     // TOTAL
@@ -5277,33 +5673,36 @@ function renderResumoTransacoesPorTime(resumo, opts) {
 
     linhasTabela.push("</table>");
   }
+
   var tabelaHtml = linhasTabela.join("");
 
   // 🔽 Botão de exportação em CSV para o resumo por TIME
-var botaoCsv = "";
-if (tabelaHtml) {
-  botaoCsv =
-    "<div style='margin-top:8px;text-align:right;'>" +
-      "<button type='button' " +
-        "onclick=\"exportTableToCSV(this, 'transacoes_times')\" " +
-        "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
-               "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-        "⬇ Exportar CSV" +
-      "</button>" +
-    "</div>";
-}
+  var botaoCsv = "";
+  if (tabelaHtml) {
+    botaoCsv =
+      "<div style='margin-top:8px;text-align:right;'>" +
+        "<button type='button' " +
+          "onclick=\"exportTableToCSV(this, 'transacoes_times')\" " +
+          "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "⬇ Exportar CSV" +
+        "</button>" +
+      "</div>";
+  }
 
-var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
-var html = [
-  "<div class='text-sm text-slate-700'>",
-    "<p>", fraseResumo, //"</p>",
-    //"<p style='font-size:13px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>",
-    tabelaHtml,
-    botaoCsv,
-  "</div>"
-].join("");
+  // Mantendo o lookerUrl como no seu código original (se quiser usar depois)
+  var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
 
-renderBotMessage("HTML:" + html);
+  var html = [
+    "<div class='text-sm text-slate-700'>",
+      "<p>", fraseResumo, "</p>",
+      //"<p style='font-size:13px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>",
+      tabelaHtml,
+      botaoCsv,
+    "</div>"
+  ].join("");
+
+  renderBotMessage("HTML:" + html);
 }
 
 
@@ -5552,6 +5951,71 @@ function extrairCriterioGeral(texto) {
   return "valor";
 }
 
+function extrairGrupo(msgOriginal, norm) {
+  const textoOriginal = msgOriginal || "";
+  const lower = (norm || textoOriginal.toLowerCase());
+
+  // procura a palavra "time "
+  let idx = lower.indexOf("time ");
+  if (idx === -1) {
+    // se quiser, pode tentar "time:" também
+    idx = lower.indexOf("time:");
+  }
+  if (idx === -1) {
+    return "";
+  }
+
+  // pega o que vem depois de "time "
+  let parte = textoOriginal.substring(idx + 5); // 5 = len("time ")
+
+  // corta quando começar alguma palavra de período
+  const marcadores = [
+    " no ", " neste ", " nesse ", " nesta ", " nessa ",
+    " em ", " no período", " no periodo",
+    " neste mes", " nesse mes", " neste mês", " nesse mês",
+    " na semana", " nesta semana", " nessa semana"
+  ];
+
+  let corte = parte.length;
+  const parteLower = parte.toLowerCase();
+
+  marcadores.forEach(m => {
+    const j = parteLower.indexOf(m);
+    if (j !== -1 && j < corte) {
+      corte = j;
+    }
+  });
+
+  parte = parte.substring(0, corte).trim();
+
+  // remove "do", "da", "de" do começo, se tiver
+  parte = parte.replace(/^(do|da|de)\s+/i, "").trim();
+
+  return parte;
+}
+
+// FILTRAR POR MAIS DE UMA LOJA
+
+function extrairCodigosLojasDaMensagem(msgOriginal) {
+  const texto = normalize(msgOriginal || "");
+
+  // localiza a partir da palavra "loja" ou "lojas"
+  let idx = texto.indexOf("lojas");
+  if (idx < 0) idx = texto.indexOf("loja");
+  if (idx < 0) return [];
+
+  const trecho = texto.slice(idx); // parte da frase a partir de "loja(s)"
+
+  // pega números com 2 a 4 dígitos (311, 145, 023, 1020 etc.)
+  const encontrados = trecho.match(/\b\d{2,4}\b/g);
+  if (!encontrados) return [];
+
+  // normaliza tirando zeros à esquerda
+  return encontrados.map(function (c) {
+    return c.replace(/^0+/, "") || c;
+  });
+}
+
 // ========= DETECTOR: CATEGORIAS ========= //
 function detectarPerguntaCategorias(msgOriginal, norm) {
   const t = norm || "";
@@ -5758,6 +6222,39 @@ function detectarRankingTimes(msgOriginal, norm) {
   return { periodo, tipo, topN };
 }
 
+// ========= DETECTOR: "TODOS OS TIMES / RELAÇÃO DE TIMES" ========= //
+
+function detectarTodosTimesPeriodo(msgOriginal, norm) {
+  const t = norm || "";
+
+  // Frases chave:
+  // - "todos os times no período ..."
+  // - "relação de times no período ..."
+  const pedeTodosTimes =
+    t.includes("todos os times") ||
+    t.startsWith("todos os times") ||
+    t.startsWith("relacao de times") ||
+    t.includes("relacao de times no periodo") ||
+    t.includes("relação de times") ||
+    t.includes("relação de times no período");
+
+  if (!pedeTodosTimes) return null;
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  let tipo = extrairCriterioGeral(t); // "valor" ou "quantidade"
+
+  // se não especificar critério, assume valor
+  if (!tipo) {
+    tipo = "valor";
+  }
+
+  return {
+    periodo,
+    tipo,
+    topN: null // null => queremos TODOS os times
+  };
+}
+
 // ========= DETECTOR: "ranking/top N de LOJAS" (opcional: do time X) =========
 
 function detectarRankingLojas(msgOriginal, norm) {
@@ -5794,20 +6291,119 @@ function detectarRankingLojas(msgOriginal, norm) {
   return { grupo: grupoNomeOficial, periodo, tipo, topN };
 }
 
-// "listar todas as lojas por valor ..." (geral, sem time, sem top)
+// ========= DETECTOR: "TODAS AS LOJAS" GERAL (sem time) ========= //
+
 function detectarListarTodasLojasGeral(msgOriginal, norm) {
   const t = norm || "";
-  const pedeTodas = t.includes("listar todas as lojas") || t.startsWith("todas as lojas");
-  const falaValor = t.includes("por valor") || t.includes("valor");
-  if (!(pedeTodas && falaValor)) return null;
+
+  // Aceita pedidos do tipo:
+  // - "todas as lojas com gastos no período ..."
+  // - "todas as lojas com valor no período ..."
+  // - "relação de lojas no período ..."
+  const pedeTodas =
+    t.includes("listar todas as lojas") ||
+    t.startsWith("todas as lojas") ||
+    t.includes("todas as lojas com gastos") ||
+    t.includes("todas as lojas com gasto") ||
+    t.includes("todas as lojas com valor") ||
+    t.startsWith("relacao de lojas") ||
+    t.includes("relacao de lojas no periodo") ||
+    t.includes("relação de lojas") ||
+    t.includes("relação de lojas no período");
+
+  if (!pedeTodas) return null;
+
+  // critério: por padrão ordena por valor, mas a tabela mostra valor e quantidade
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo = "valor"; // mantém padrão por valor
+
+  return {
+    grupo: "",      // sem time
+    periodo,
+    tipo,
+    topN: null      // null => queremos TODAS as lojas
+  };
+}
+
+// =========== DETECTOR: "TODAS AS LOJAS DOS TIMES X E Y" =========== //
+
+function detectarTodasLojasDosTimes(msgOriginal, norm) {
+  const t = norm || "";
+
+  const falaLojas = t.includes("todas as lojas dos times") ||
+                    t.includes("todas as lojas dos time")  ||
+                    t.includes("todas as lojas do time")   ||
+                    t.includes("lojas do time")   ||
+                    t.includes("loja do time")   ||
+                    t.includes("todas as lojas do grupo")  ||
+                    t.includes("todas as lojas dos grupos");
+
+  if (!falaLojas) return null;
+
+  const listaTimes = encontrarListaTimesNaMensagem(msgOriginal) || [];
+  if (!listaTimes.length) return null;
 
   const periodo = extrairIntervaloDatas(msgOriginal);
-  return { periodo, tipo: "valor", topN: null, grupo: "" }; // grupo vazio = geral
+  const tipo    = extrairCriterioGeral(t) || "valor";
+
+  return {
+    times: listaTimes,
+    periodo,
+    tipo
+  };
+}
+
+// =========== DETECTOR: "MAIS DE UMA LOJA NO PERÍODO" =========== //
+
+function detectarLojasEspecificasLista(msgOriginal, norm) {
+  const texto = norm || "";
+
+  // ⚠️ Se a frase fala de pendência, NÃO tratar como consulta de transações
+  // Isso evita conflitos com o fluxo de pendências (CLARA_PEND)
+  if (texto.includes("pendenc")) {
+    return null;
+  }
+
+  // precisa mencionar "loja" ou "lojas"
+  const mencionaLoja =
+    texto.includes("loja ") ||
+    texto.includes("lojas ");
+
+  if (!mencionaLoja) return null;
+
+  // extrai códigos numéricos de loja
+  const codigos = [];
+  const regexCodigos = /\b(\d{2,6})\b/g;
+  let m;
+  while ((m = regexCodigos.exec(msgOriginal)) !== null) {
+    const cod = m[1];
+    if (!codigos.includes(cod)) {
+      codigos.push(cod);
+    }
+  }
+
+  if (!codigos.length) return null;
+
+  // período
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  // tipo (valor ou quantidade)
+  const tipo = extrairCriterioGeral(texto) || "valor";
+
+  return {
+    codigosLojas: codigos,
+    periodo,
+    tipo
+  };
 }
 
 // ========= DETECTOR: "lojas com maior valor/transações ..." (plural, sem 'top'/'ranking') =========
 function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
   const texto = norm || "";
+
+    // ⚠️ Se falar de pendência, não é consulta de ranking/lista de transações
+  if (texto.includes("pendenc")) {
+    return null;
+  }
 
   // precisa mencionar "lojas " (plural) + critério
   const mencionaLojasPlural = texto.includes("lojas ");
@@ -5839,6 +6435,48 @@ function detectarLojasMaisTransacoesPlural(msgOriginal, norm) {
   // sem 'top' => queremos listar TODAS as lojas do time (se grupo vier),
   // ou o default que você preferir para "todas as lojas gerais" (vamos deixar limitado se não houver time)
   return { grupo, periodo, tipo, topN: null }; // topN=null => deixe o renderer decidir "listar todas"
+}
+
+// =========== DETECTOR: "TODAS AS LOJAS DO TIME XXXXX" =========== //
+
+function detectarListarTodasLojasDoTime(msgOriginal, norm) {
+  const t = norm || "";
+
+  // Gatilhos específicos para perguntas de "lojas do time"
+  const pedeTodas =
+    t.includes("todas as lojas do time") ||
+    t.includes("todas as loja do time") ||   // tolera sem 's'
+    t.includes("lojas do time") ||
+    t.includes("loja do time") ||            // tolera sem 's'
+    t.includes("lojas da regional") ||
+    t.includes("loja da regional") ||
+    t.includes("todas as lojas do grupo") ||
+    t.includes("todas as loja do grupo") ||  // tolera sem 's'
+    t.includes("relacao de lojas do time") ||
+    t.includes("relação de lojas do time") ||
+    t.includes("relacao de lojas do grupo") ||
+    t.includes("relação de lojas do grupo");
+
+  if (!pedeTodas) return null;
+
+  // Usa o parser de times que já funciona
+  let listaTimes = [];
+  if (typeof encontrarListaTimesNaMensagem === "function") {
+    listaTimes = encontrarListaTimesNaMensagem(msgOriginal) || [];
+  }
+
+  if (!listaTimes.length) return null;
+
+  // pega só o primeiro time, pois a pergunta é "lojas do time X"
+  const grupo   = listaTimes[0];
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const tipo    = extrairCriterioGeral(t) || "valor";
+
+  return {
+    grupo,
+    periodo,
+    tipo
+  };
 }
 
 // ========= DETECTOR: "time com maior número/valor de transações ..." ========= //
