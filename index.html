@@ -308,7 +308,7 @@
   <!-- Botão: Feedback -->
   <button
     type="button"
-    onclick= "window.open('https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF/edit','_blank')"
+    onclick= "window.open('https://forms.gle/QSAS9VN4HSws78W99')"
     class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
   >
     📝 Feedback
@@ -466,6 +466,8 @@ function closeVektorModal() {
     modal.style.display = "none";
   }
 }
+
+let __vektorJaSugeriuLooker = false;
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -3590,26 +3592,30 @@ function vektorSugerirTopicosGerais(msgOriginal) {
     }
 
     // 2) Pedidos de RELATÓRIO / RANKING / DASHBOARD → sugerir Looker Studio
+    
     if (
-      norm.includes("relatorio") ||
-      norm.includes("relatório") ||
-      norm.includes("dashboard") ||
-      norm.includes("painel") ||
-      norm.includes("top") ||
-      norm.includes("mais comprou") ||
-      norm.includes("mais gastos") ||
-      norm.includes("mais gastou") ||
-      norm.includes("mais compras") ||
-      orm.includes("maior valor") ||
-      norm.includes("mais transações") ||
-      orm.includes("mais transacoes") ||
-      norm.includes("ranking") ||
-      norm.includes("grafico") ||
-      norm.includes("gráfico") ||
-      norm.includes("analise") ||
-      norm.includes("análise") || 
-      norm.includes("looker")
-    ) {
+  !__vektorJaSugeriuLooker &&   // 👈 impõe limite de 1 vez por sessão
+  (
+    norm.includes("relatorio") ||
+    norm.includes("relatório") ||
+    norm.includes("dashboard") ||
+    norm.includes("painel") ||
+    norm.includes("top") ||
+    norm.includes("mais comprou") ||
+    norm.includes("mais gastos") ||
+    norm.includes("mais gastou") ||
+    norm.includes("mais compras") ||
+    norm.includes("maior valor") ||
+    norm.includes("mais transações") ||
+    norm.includes("mais transacoes") ||
+    norm.includes("ranking") ||
+    norm.includes("grafico") ||
+    norm.includes("gráfico") ||
+    norm.includes("analise") ||
+    norm.includes("análise") || 
+    norm.includes("looker")
+  )
+) {
       blocos.push(
         "<div style='margin-top:10px;'>" +
           "<p>Se quiser uma visão completa (gráficos, filtros e detalhamentos), você pode abrir o relatório gerencial no <b>Looker Studio</b>:</p>" +
@@ -3622,6 +3628,9 @@ function vektorSugerirTopicosGerais(msgOriginal) {
         "</div>"
       );
     }
+
+    __vektorJaSugeriuLooker = true;
+
 
     // 3) PENDÊNCIAS / JUSTIFICATIVAS → reforçar política e fluxo
     if (
@@ -3666,7 +3675,7 @@ setTimeout(function () {
 // SUGESTÕES AUTOMÁTICAS DO MANUAL DA CLARA A PARTIR DE OUTROS ASSUNTOS
 // ---------------------------------------------------------------------
 
-const VEKTOR_TEMPO_SUGESTAO_MIN = 5000; // Depois uqe já sugeriu...
+const VEKTOR_TEMPO_SUGESTAO_MIN = 5000; // Depois que já sugeriu...
 const VEKTOR_SUGESTAO_DELAY_MS = 15000;   // Primeira vez que sugeriu
 
 // Verifica se o usuário já abriu um tópico do manual há pouco tempo
@@ -5920,6 +5929,20 @@ function vektorChamarPendJustLojas_(tipo) {
             "HTML:<p class='text-sm text-slate-700'>Não consegui consultar as " +
             "pendências/justificativas na planilha BaseClara.</p>"
           );
+
+          // 🆕 Mesmo com erro → troca spinner por check
+          try {
+            var statusId = (tipo === "pendencias")
+              ? "vektor-status-pendencias"
+              : "vektor-status-justificativas";
+
+            var statusEl = document.getElementById(statusId);
+            if (statusEl) {
+              statusEl.innerHTML =
+                "<span style='font-size:13px;'>✅ Verificação concluída.</span>";
+            }
+          } catch (e) {}
+
           return;
         }
 
@@ -5940,13 +5963,42 @@ function vektorChamarPendJustLojas_(tipo) {
           );
         }
 
+        // Envia tabela
         renderBotMessage("HTML:" + html);
+
+        // 🆕 Troca spinner por check (caso de sucesso)
+        try {
+          var statusId = (tipo === "pendencias")
+            ? "vektor-status-pendencias"
+            : "vektor-status-justificativas";
+
+          var statusEl = document.getElementById(statusId);
+          if (statusEl) {
+            statusEl.innerHTML =
+              "<span style='font-size:13px;'>✅ Verificação concluída.</span>";
+          }
+        } catch (e) {}
+
       })
       .withFailureHandler(function () {
         renderBotMessage(
           "HTML:<p class='text-sm text-slate-700'>Tive um erro ao consultar as " +
           "pendências/justificativas na planilha.</p>"
         );
+
+        // 🆕 Mesmo no erro → spinner vira check
+        try {
+          var statusId = (tipo === "pendencias")
+            ? "vektor-status-pendencias"
+            : "vektor-status-justificativas";
+
+          var statusEl = document.getElementById(statusId);
+          if (statusEl) {
+            statusEl.innerHTML =
+              "<span style='font-size:13px;'>✅ Verificação concluída.</span>";
+          }
+        } catch (e) {}
+
       })
       .getPendenciasEJustificativasPorLojas(
         grupo,
@@ -5956,11 +6008,11 @@ function vektorChamarPendJustLojas_(tipo) {
       );
 }
 
-// ⚠ Botão "Verificar pendências" – exposto no escopo global (window)
+// ⚠ Botão "Verificar pendências"
 window.vektorVerificarPendenciasLojas = function (btn) {
     renderBotMessage(
       "HTML:" +
-      "<div class='vektor-loading'>" +
+      "<div id='vektor-status-pendencias' class='vektor-loading'>" +
         "<div class='vektor-spinner'></div>" +
         "<span>Verificando pendências das lojas dessa tabela no período informado...</span>" +
       "</div>"
@@ -5969,11 +6021,11 @@ window.vektorVerificarPendenciasLojas = function (btn) {
     vektorChamarPendJustLojas_('pendencias');
 };
 
-// ✔ Botão "Verificar justificativas" – exposto no escopo global (window)
+// ✔ Botão "Verificar justificativas"
 window.vektorVerificarJustificativasLojas = function (btn) {
     renderBotMessage(
       "HTML:" +
-      "<div class='vektor-loading'>" +
+      "<div id='vektor-status-justificativas' class='vektor-loading'>" +
         "<div class='vektor-spinner'></div>" +
         "<span>Verificando transações com justificativas feitas de forma correta...</span>" +
       "</div>"
