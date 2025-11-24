@@ -923,6 +923,179 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, criterio)
   };
 }
 
+/**
+ * Para um determinado grupo/time (opcional) e período,
+ * devolve as transações por LOJA com:
+ *  - pendências de justificativa (Etiqueta / Descrição vazias ou Recibo = "Não")
+ *  - justificativas OK      (Etiqueta e Descrição preenchidas e Recibo = "Sim")
+ *
+ * É chamada pelo front via google.script.run.getPendenciasEJustificativasPorLojas(...)
+ *
+ * @param {string} grupo           Nome do time (pode ser vazio)
+ * @param {string} dataInicioStr   Data início em ISO (pode ser vazio)
+ * @param {string} dataFimStr      Data fim em ISO (pode ser vazio)
+ * @param {Array}  lojasFiltro     Lista de códigos de loja (strings). Se vazio, considera todas.
+ */
+function getPendenciasEJustificativasPorLojas(
+  grupo,
+  dataInicioStr,
+  dataFimStr,
+  lojasFiltro
+) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Índices fixos já usados no seu getResumoTransacoesPorGrupo
+    var IDX_DATA  = 0;   // "Data da Transação"
+    var IDX_VALOR = 5;   // "Valor em R$"
+    var IDX_GRUPO = 17;  // "Grupos"
+    var IDX_LOJA  = 21;  // "LojaNum"
+
+    // Índices dinâmicos para as colunas de justificativa
+    var idxRecibo = encontrarIndiceColuna_(header, [
+      "Recibo",
+      "NF / Recibo",
+      "NF/Recibo"
+    ]);
+
+    var idxEtiqueta = encontrarIndiceColuna_(header, [
+      "Etiquetas",
+      "Etiqueta"
+    ]);
+
+    var idxDescricao = encontrarIndiceColuna_(header, [
+      "Descrição",
+      "Descricao",
+      "Comentário"
+    ]);
+
+    if (idxRecibo < 0 || idxEtiqueta < 0 || idxDescricao < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas de Recibo/Etiquetas/Descrição na BaseClara."
+      };
+    }
+
+    // Normaliza grupo (time) informado
+    var grupoOriginal = (grupo || "").toString().trim();
+    var grupoNorm = normalizarTexto_(grupoOriginal);
+
+    // Normaliza lista de lojas (filtro é opcional)
+    var lojasSet = {};
+    if (Array.isArray(lojasFiltro)) {
+      lojasFiltro.forEach(function (cod) {
+        if (!cod) return;
+        var c = cod.toString().trim();
+        if (c) lojasSet[c] = true;
+      });
+    }
+
+    // Aplica filtro de período usando função já existente
+    var filtradas = filtrarLinhasPorPeriodo_(
+      linhas,
+      IDX_DATA,
+      dataInicioStr,
+      dataFimStr
+    );
+
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+    var pendencias   = []; // [loja, data, valor, etiqueta, descricao, recibo]
+    var justificadas = []; // idem
+
+    filtradas.forEach(function (row) {
+      var loja = (row[IDX_LOJA] || "").toString().trim();
+      if (!loja) return;
+
+      // Se recebeu filtro de lista de lojas, respeita
+      if (Object.keys(lojasSet).length > 0 && !lojasSet[loja]) {
+        return;
+      }
+
+      // Filtro por grupo/time, se informado
+      if (grupoNorm) {
+        var grupoLinhaNorm = normalizarTexto_(row[IDX_GRUPO] || "");
+        var casaGrupo =
+          grupoLinhaNorm.indexOf(grupoNorm) !== -1 ||
+          grupoNorm.indexOf(grupoLinhaNorm) !== -1;
+
+        if (!casaGrupo) return;
+      }
+
+      // Data da transação formatada
+      var d = parseDateClara_(row[IDX_DATA]);
+      var dataStr = d
+        ? Utilities.formatDate(d, tz, "dd/MM/yyyy")
+        : (row[IDX_DATA] || "");
+
+      var valor = Number(row[IDX_VALOR]) || 0;
+
+      var etiqueta  = (row[idxEtiqueta] || "").toString().trim();
+      var descricao = (row[idxDescricao] || "").toString().trim();
+      var recibo    = (row[idxRecibo] || "").toString().trim();
+
+      var reciboNorm = normalizarTexto_(recibo);
+
+      // Regras:
+      // Pendência  -> etiqueta vazia OU descricao vazia OU recibo = "não"
+      // Justificada-> etiqueta preenchida E descricao preenchida E recibo = "sim"
+      var temPendencia =
+        (!etiqueta) ||
+        (!descricao) ||
+        (reciboNorm === "nao" || reciboNorm === "não");
+
+      var temJustificativa =
+        (!!etiqueta) &&
+        (!!descricao) &&
+        (reciboNorm === "sim");
+
+      var linhaArr = [
+        loja,
+        dataStr,
+        valor,
+        etiqueta,
+        descricao,
+        recibo
+      ];
+
+      if (temPendencia) {
+        pendencias.push(linhaArr);
+      }
+
+      if (temJustificativa) {
+        justificadas.push(linhaArr);
+      }
+    });
+
+    return {
+      ok: true,
+      grupoOriginal: grupoOriginal,
+      colunas: [
+        "Loja",
+        "Data da Transação",
+        "Valor (R$)",
+        "Etiqueta",
+        "Descrição",
+        "Recibo"
+      ],
+      pendencias: pendencias,
+      justificadas: justificadas
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : e
+    };
+  }
+}
+
 function enviarResumoPorEmail(grupo) {
   try {
     const emailDestino = Session.getActiveUser().getEmail();
@@ -1759,4 +1932,168 @@ function getResumoLojasPorCategoria(categoria, dataIni, dataFim) {
   });
 
   return Object.values(out).sort((a,b)=>b.valor-a.valor);
+}
+
+/**
+ * Converte o texto da coluna "Extrato da conta"
+ * (ex.: "06 Nov 2025 - 05 Dec 2025")
+ * em datas de início/fim.
+ */
+function parseExtratoContaPeriodo_(texto) {
+  if (!texto) return null;
+
+  var m = texto.match(
+    /(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,})\s+(\d{4})\s*-\s*(\d{1,2})\s+([A-Za-zÀ-ÿ]{3,})\s+(\d{4})/
+  );
+  if (!m) return null;
+
+  var dia1 = Number(m[1]);
+  var mes1Str = m[2];
+  var ano1 = Number(m[3]);
+
+  var dia2 = Number(m[4]);
+  var mes2Str = m[5];
+  var ano2 = Number(m[6]);
+
+  function mesFromStr(str) {
+    var s = str.toLowerCase();
+    s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    var mapa = {
+      jan: 0, janeiro: 0,
+      feb: 1, fev: 1, fevereiro: 1,
+      mar: 2, marco: 2, marcoo: 2,
+      apr: 3, abr: 3, abril: 3,
+      may: 4, mai: 4, maio: 4,
+      jun: 5, junho: 5,
+      jul: 6, julho: 6,
+      aug: 7, ago: 7, agosto: 7,
+      sep: 8, set: 8, setembro: 8,
+      oct: 9, out: 9, outubro: 9,
+      nov: 10, novembro: 10,
+      dec: 11, dez: 11, dezembro: 11
+    };
+
+    // normaliza para 3 letras pra funcionar com "Nov", "Dec", "Dez"
+    var chave3 = s.slice(0, 3);
+    if (mapa.hasOwnProperty(chave3)) return mapa[chave3];
+
+    if (mapa.hasOwnProperty(s)) return mapa[s];
+
+    return null;
+  }
+
+  var mes1 = mesFromStr(mes1Str);
+  var mes2 = mesFromStr(mes2Str);
+
+  if (mes1 === null || mes2 === null) return null;
+
+  return {
+    inicio: new Date(ano1, mes1, dia1),
+    fim:    new Date(ano2, mes2, dia2)
+  };
+}
+
+/**
+ * Lê a BaseClara, agrupa por "Extrato da conta" (coluna B)
+ * e devolve a soma de valor por fatura.
+ *
+ * Retorno:
+ * {
+ *   ok: true,
+ *   faturas: [
+ *     {
+ *       extrato: "06 Nov 2025 - 05 Dec 2025",
+ *       valorTotal: 12345.67,
+ *       dataInicioIso: "2025-11-06T03:00:00.000Z",
+ *       dataFimIso:    "2025-12-05T03:00:00.000Z"
+ *     },
+ *     ...
+ *   ]
+ * }
+ */
+function getResumoFaturasClara() {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Índice da coluna "Extrato da conta"
+    var idxExtrato = encontrarIndiceColuna_(header, [
+      "Extrato da conta",
+      "Extrato conta",
+      "Extrato"
+    ]);
+
+    // Índice da coluna de valor (mesmo critério que você já usa)
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor em R$",
+      "Valor (R$)",
+      "Valor"
+    ]);
+
+    if (idxExtrato < 0 || idxValor < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas 'Extrato da conta' e 'Valor' na BaseClara."
+      };
+    }
+
+    var mapa = {}; // chave = texto do extrato
+    linhas.forEach(function (row) {
+      var extrato = (row[idxExtrato] || "").toString().trim();
+      if (!extrato) return;
+
+      var valor = Number(row[idxValor]) || 0;
+      if (!mapa[extrato]) {
+        var periodo = parseExtratoContaPeriodo_(extrato);
+        mapa[extrato] = {
+          extrato: extrato,
+          totalValor: 0,
+          dataInicio: periodo ? periodo.inicio : null,
+          dataFim:    periodo ? periodo.fim    : null
+        };
+      }
+      mapa[extrato].totalValor += valor;
+    });
+
+    var faturas = [];
+    for (var k in mapa) {
+      if (!Object.prototype.hasOwnProperty.call(mapa, k)) continue;
+      var f = mapa[k];
+      faturas.push({
+        extrato: k,
+        valorTotal: f.totalValor,
+        dataInicioIso: f.dataInicio ? f.dataInicio.toISOString() : "",
+        dataFimIso:    f.dataFim    ? f.dataFim.toISOString()    : ""
+      });
+    }
+
+    // Ordena por data de início (ou fim) crescente
+    faturas.sort(function (a, b) {
+      var da = a.dataInicioIso || a.dataFimIso || "";
+      var db = b.dataInicioIso || b.dataFimIso || "";
+      if (da && db) {
+        if (da < db) return -1;
+        if (da > db) return 1;
+        return 0;
+      }
+      return a.extrato.localeCompare(b.extrato);
+    });
+
+    return {
+      ok: true,
+      faturas: faturas
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : e
+    };
+  }
 }
