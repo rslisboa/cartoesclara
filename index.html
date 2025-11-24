@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0" />
 <title>Grupo CBF | Agente Clara</title>
 <script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Chart.js + plugin de data labels para o gráfico de faturas -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -469,6 +475,11 @@ function closeVektorModal() {
 
 let __vektorJaSugeriuLooker = false;
 
+// Registro do plugin de rótulos do Chart.js (se estiver carregado)
+if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
+  Chart.register(ChartDataLabels);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
 
     let grupoNome = "";
@@ -484,6 +495,23 @@ document.addEventListener("DOMContentLoaded", () => {
     // E-mail vindo do Apps Script (Code.gs → template.userEmail)
     const USER_EMAIL = <?= JSON.stringify(userEmail || "") ?>;
     const USER_EMAIL_REPLACED = USER_EMAIL.replace(/^"+|"+$/g, "").trim();
+    
+// 🔹 Mensagem inicial: exemplos do que o Vektor faz
+renderBotMessage(
+  "HTML:" +
+  "<p class='text-sm text-slate-700' style='margin-top:8px;'>" +
+    "Antes de começarmos, aqui estão alguns exemplos do que eu posso fazer por você:" +
+  "</p>" +
+  "<ul class='text-sm text-slate-700' style='margin-left:14px;margin-top:4px;line-height:1.45;'>" +
+    "<li>• Consultar <b>pendências</b> e <b>justificativas</b> das lojas.</li>" +
+    "<li>• Exibir <b>tabelas detalhadas</b> com pendências ou justificativas completas.</li>" +
+    "<li>• Mostrar <b>valor da fatura atual</b>, do mês passado ou das últimas faturas.</li>" +
+    "<li>• Gerar <b>ranking</b> por loja, por time, por categoria ou por estabelecimento.</li>" +
+    "<li>• Explicar regras da <b>Política de Uso dos Cartões Clara</b>.</li>" +
+    "<li>• Ajudar com informações de <b>desbloqueio</b>, <b>perda</b>, <b>regras de compra</b>, NF/Recibo e uso correto do cartão.</li>" +
+    "<li>• Enviar <b>pendências por e-mail</b>, e muito mais!</li>" +
+  "</ul>"
+);
 
 // 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
 setTimeout(() => {
@@ -4519,6 +4547,7 @@ if (detTimeCampeao) {
   return; // encerra aqui
 }
 
+
   // 🆕 TODOS OS TIMES NO PERÍODO / RELAÇÃO DE TIMES
   const detTodosTimes = detectarTodosTimesPeriodo(msgUsuario, norm);
   if (detTodosTimes) {
@@ -4560,6 +4589,71 @@ if (detTimeCampeao) {
     return null;
   }
 
+    // >>> BLOCO: perguntas de FATURA (Extrato da conta / BaseClara)
+  const detFatura = detectarPerguntaFaturaClara(msgUsuario, norm);
+  if (detFatura) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou consultar o <b>valor das faturas</b> da Clara " +
+        "de acordo com o período solicitado...</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.ok || !Array.isArray(res.faturas) || !res.faturas.length) {
+          renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Não consegui encontrar " +
+            "informações de fatura na BaseClara.</p>"
+          );
+          return;
+        }
+
+        var todas = res.faturas || [];
+        var selecionadas = vektorFiltrarFaturasPeloModo_(
+          todas,
+          detFatura.modo,
+          detFatura.qtd
+        );
+
+        if (!selecionadas.length) {
+          renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Não encontrei faturas para " +
+            "o critério informado.</p>"
+          );
+          return;
+        }
+
+        var titulo = "RESUMO DE FATURAS CLARA";
+
+        if (detFatura.modo === "atual") {
+          titulo = "VALOR DA FATURA ATUAL";
+        } else if (detFatura.modo === "anterior") {
+          titulo = "VALOR DA FATURA DO MÊS PASSADO";
+        } else if (detFatura.modo === "ultimas") {
+          var n = detFatura.qtd || 2;
+          // se pediu 3 mas só existem 2, mostra "2"
+          var usado = Math.min(n, selecionadas.length);
+          titulo = "VALOR DAS ÚLTIMAS " + usado + " FATURAS";
+        } else if (detFatura.modo === "todas") {
+          titulo = "VALOR DE TODAS AS FATURAS";
+        }
+
+        var html = vektorMontarTabelaFaturas_(titulo, selecionadas);
+        renderBotMessage("HTML:" + html);
+
+    let __vektorChartFaturas = null;
+
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Tive um erro ao consultar " +
+          "os dados de fatura na BaseClara.</p>"
+        );
+      })
+      .getResumoFaturasClara();
+
+    return;
+  }
 
   // >>> NOVO BLOCO: perguntas de relatório (planilha Captura_Clara / BaseClara)
 
@@ -5914,6 +6008,184 @@ function vektorMontarTabelaPendJust_(titulo, colunas, linhas) {
     return partes.join("");
 }
 
+function vektorMontarTabelaFaturas_(titulo, faturas) {
+    if (!faturas || !faturas.length) {
+        return "<p class='text-sm text-slate-700'>Não encontrei faturas na BaseClara.</p>";
+    }
+
+    var partes = [];
+
+    partes.push(
+      "<div class='text-sm text-slate-700' style='max-width:1000px;margin:12px auto 0;'>",
+        "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>",
+        "<div style='overflow-x:auto;'>",
+          "<table border='1' cellspacing='0' cellpadding='8' " +
+          "style='border-collapse:collapse;width:100%;font-size:13px;border:2px double #000;'>",
+            "<thead>",
+              "<tr style='background:#0F172A;color:#fff;'>",
+                "<th style='border:2px double #000;padding:6px;text-align:center;'>Fatura (período / extrato da conta)</th>",
+                "<th style='border:2px double #000;padding:6px;text-align:center;'>Valor total (R$)</th>",
+                "<th style='border:2px double #000;padding:6px;text-align:center;'>Variação</th>",
+              "</tr>",
+            "</thead>",
+            "<tbody>"
+    );
+
+    var somaTotal = 0;
+    var valorAnterior = null;
+
+    faturas.forEach(function (f) {
+        var valor = Number(f.valorTotal) || 0;
+        somaTotal += valor;
+
+        var valorFmt = valor.toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+        });
+
+        // Calcula variação em relação à fatura anterior
+        var variacaoTexto = "—";
+        if (valorAnterior !== null && valorAnterior !== 0) {
+            var variacao = ((valor - valorAnterior) / valorAnterior) * 100;
+            var variacaoFmt = variacao.toFixed(1).replace(".", ",") + "%";
+            if (variacao > 0) {
+                variacaoTexto = "+" + variacaoFmt;
+            } else {
+                variacaoTexto = variacaoFmt;
+            }
+        }
+
+        partes.push(
+          "<tr>",
+            "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+              (f.extrato || "") +
+            "</td>",
+            "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+              valorFmt +
+            "</td>",
+            "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+              variacaoTexto +
+            "</td>",
+          "</tr>"
+        );
+
+        valorAnterior = valor;
+    });
+
+    // Linha de TOTAL
+    var somaFmt = somaTotal.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL"
+    });
+
+    partes.push(
+      "<tr style='background:#f1f5f9;font-weight:bold;'>",
+        "<td style='border:2px double #000;padding:6px;text-align:center;'>TOTAL</td>",
+        "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+          somaFmt +
+        "</td>",
+        "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
+      "</tr>"
+    );
+
+    partes.push(
+            "</tbody>",
+          "</table>",
+        "</div>",
+      "</div>"
+    );
+
+    return partes.join("");
+}
+
+
+/**
+ * Filtra a lista completa de faturas segundo o modo de pergunta.
+ * modo: "atual" | "anterior" | "ultimas" | "todas"
+ * qtd: número de faturas (quando modo = "ultimas")
+ */
+
+function vektorFiltrarFaturasPeloModo_(todas, modo, qtd) {
+    if (!Array.isArray(todas) || !todas.length) return [];
+
+    // ---------------------------------------------------------
+    // Função para converter "06 Nov 2025" → Date real
+    // ---------------------------------------------------------
+    function parseDataExt(dstr) {
+        if (!dstr || typeof dstr !== "string") return null;
+        // ex.: "06 Nov 2025"
+        var m = dstr.trim().split(/\s+/);  // ["06","Nov","2025"]
+        if (m.length !== 3) return null;
+
+        var dia = Number(m[0]);
+        var mes = m[1].toLowerCase();
+        var ano = Number(m[2]);
+
+        var mapaMes = {
+            jan:0, feb:1, mar:2, apr:3, apr:3, mai:4, jun:5,
+            jul:6, aug:7, set:8, sep:8, oct:9, out:9, nov:10, dec:11, dez:11
+        };
+
+        var mm = mapaMes[mes.substring(0,3)];
+        if (mm === undefined) return null;
+
+        return new Date(ano, mm, dia);
+    }
+
+    // ---------------------------------------------------------
+    // Ordenar faturas REALMENTE por data de início
+    // ---------------------------------------------------------
+    var lista = todas.slice().sort(function (a, b) {
+        var da = parseDataExt(a.dataInicio);
+        var db = parseDataExt(b.dataInicio);
+        if (!da || !db) return 0;
+        return da - db;
+    });
+
+    var agora = new Date();
+
+    // ---------------------------------------------------------
+    // Identificar fatura "atual"
+    // ---------------------------------------------------------
+    var idxAtual = -1;
+    for (var i = 0; i < lista.length; i++) {
+        var ini = parseDataExt(lista[i].dataInicio);
+        var fim = parseDataExt(lista[i].dataFim);
+        if (ini && fim && ini <= agora && agora <= fim) {
+            idxAtual = i;
+            break;
+        }
+    }
+
+    // fallback
+    if (idxAtual === -1) idxAtual = lista.length - 1;
+
+    // ---------------------------------------------------------
+    // Modos
+    // ---------------------------------------------------------
+    if (modo === "todas") {
+        return lista;
+    }
+
+    if (modo === "ultimas") {
+        var n = Number(qtd) || 2;
+        if (n >= lista.length) return lista;
+        return lista.slice(lista.length - n);
+    }
+
+    if (modo === "anterior") {
+        if (idxAtual > 0) {
+            return [lista[idxAtual - 1]];
+        } else {
+            return [lista[idxAtual]];
+        }
+    }
+
+    // padrão → atual
+    return [lista[idxAtual]];
+}
+
+
 function vektorChamarPendJustLojas_(tipo) {
     var periodo  = window.__vektorUltimoPeriodoIso || {};
     var grupo    = window.__vektorUltimoGrupoBaseClara || "";
@@ -6647,6 +6919,86 @@ function detectarPerguntaEstabelecimentos(msgOriginal, norm) {
     grupo,
     loja
   };
+}
+
+// ========= DETECTOR: PERGUNTAS DE FATURA (Extrato da conta) =========
+
+function detectarPerguntaFaturaClara(msgOriginal, norm) {
+    const t = norm || "";
+    // precisa citar "fatura"
+    if (!t.includes("fatura")) return null;
+
+    // Só consideramos casos relacionados a valor
+    const falaValor =
+        t.includes("valor da fatura") ||
+        t.includes("valor dessa fatura") ||
+        t.includes("valor de fatura") ||
+        t.includes("valor total da fatura");
+
+    if (
+      !falaValor &&
+      !t.includes("fatura atual") &&
+      !t.includes("fatura do mes") &&
+      !t.includes("fatura do mês") &&
+      !t.includes("fatura") &&
+      !t.includes("faturas") &&
+      !t.includes("ultimas faturas") &&
+      !t.includes("últimas faturas") &&
+      !t.includes("todas as faturas")
+    ) {
+        // se não tiver nenhum indicativo de valor ou período, ignora
+        return null;
+    }
+
+    let modo = "atual";  // padrão
+    let qtd  = null;
+
+    // fatura do mês passado / anterior
+    if (
+      t.includes("mes passado") ||
+      t.includes("mês passado") ||
+      t.includes("fatura anterior")
+    ) {
+        modo = "anterior";
+    }
+
+    // últimas N faturas  → pega tanto "ultimas 3" quanto "3 ultimas"
+    if (t.includes("ultimas") || t.includes("últimas")) {
+        modo = "ultimas";
+
+        // casos tipo "ultimas 3 faturas"
+        let m = t.match(/ultimas?\s+(\d+)/);
+        // casos tipo "3 ultimas faturas"
+        if (!m) m = t.match(/(\d+)\s+ultimas?/);
+
+        if (m && m[1]) {
+            qtd = parseInt(m[1], 10);
+        } else {
+            qtd = 2; // padrão se não achar número
+        }
+    }
+
+    // todas as faturas
+    if (t.includes("todas as faturas") || t.includes("todas faturas")) {
+        modo = "todas";
+    }
+
+    // reforça "atual" se mencionar explicitamente
+    if (
+      t.includes("fatura atual") ||
+      t.includes("fatura deste mes") ||
+      t.includes("fatura desse mes") ||
+      t.includes("fatura deste mês") ||
+      t.includes("fatura desse mês")
+    ) {
+        modo = "atual";
+    }
+
+    return {
+        tipo: "fatura",
+        modo: modo,
+        qtd: qtd
+    };
 }
 
 // ========= DETECTOR: "loja e time com maior número/valor de transações..." ========= //
