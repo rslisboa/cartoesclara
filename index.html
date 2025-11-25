@@ -251,6 +251,34 @@
   }
 }
 
+/* === VEKTOR AUTOCOMPLETE === */
+#vektor-autocomplete-box {
+  margin-top: 4px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  z-index: 9999;
+  display: none;
+  font-size: 13px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.vektor-autocomplete-item {
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.vektor-autocomplete-item:hover {
+  background: #B5FF20;
+}
+
+.vektor-autocomplete-item.is-active {
+  background: #B5FF20;
+}
+
+
 </style>
 
 <style>
@@ -447,16 +475,23 @@
   </div>
 </div>
 
+<!-- AUTOCOMPLETE BOX -->
+<div id="vektor-autocomplete-box"></div>
 
-                  <!-- FOOTER / INPUT -->
-                  <footer class="chat-footer">
-                      <form id="chatForm" class="w-full">
-                          <div class="input-shell">
-                              <textarea id="userInput" placeholder="Digite aqui..."></textarea>
-                              <button type="submit" id="sendBtn">Enviar</button>
-                          </div>
-                      </form>
-                  </footer>
+<!-- FOOTER / INPUT -->
+<footer class="chat-footer">
+    <form id="chatForm" class="w-full">
+        <div class="input-shell">
+            
+            <textarea id="userInput" placeholder="Digite aqui..."></textarea>
+
+            <!-- AUTOCOMPLETE VEKTOR -->
+            <div id="vektor-autocomplete-box"></div>
+
+            <button type="submit" id="sendBtn">Enviar</button>
+        </div>
+    </form>
+</footer>
 
 </div> <!-- fecha .chat-wrapper -->
 </div>   <!-- fecha coluna direita -->
@@ -545,6 +580,268 @@ setTimeout(() => {
     const chatWindow = document.getElementById("chatWindow");
     const chatForm   = document.getElementById("chatForm");
     const userInput  = document.getElementById("userInput");
+
+    // =========================
+// AUTOCOMPLETE VEKTOR
+// =========================
+
+// 1) Lista de intenções (VOCÊ JÁ TEM — basta mover pra cá)
+const VEKTOR_INTENTS = [
+  "Consultar pendências de uma loja",
+  "Ver pendências por período",
+  "Ver pendências por time",
+  "Pendências que causam bloqueio",
+  "Ver justificativas completas de uma loja",
+  "Ver justificativas completas de um time",
+  "Pendências de etiqueta / descrição / nota fiscal",
+  "Verificar pendências de NF/Recibo",
+  "Como justificar uma transação da Clara",
+  "Loja com maior valor de transações neste mês",
+  "Loja com mais transações neste mês",
+  "Ranking de categorias por valor",
+  "Lista de categorias por valor",
+  "Treinamento Clara",
+  "Treinamento política Clara",
+  "Termo de responsabilidade Clara",
+  "Valor da fatura atual",
+  "Valor da fatura do mês passado",
+  "Valor das últimas 3 faturas",
+  "Valor das últimas 6 faturas",
+  "Valor de todas as faturas",
+  "Ver extrato da conta da Clara",
+  "Qual é o ciclo da fatura da Clara?",
+  "Ranking de lojas com mais transações",
+  "Ranking de lojas com maior valor",
+  "Ranking de times com mais transações",
+  "Ranking de times com maior valor",
+  "Top 3 lojas de um time",
+  "Top 5 lojas do período",
+  "Lojas que mais gastaram no período",
+  "Lojas que mais fizeram compras",
+  "Resumo de uma loja neste mês",
+  "Resumo de uma loja na última semana",
+  "Transações de uma loja no período",
+  "Quais lojas fazem parte de um time?",
+  "Resumo de um time neste mês",
+  "Resumo de um time no período",
+  "Times com maior valor de transações",
+  "Times com maior número de transações",
+  "Categoria que mais gastou no período",
+  "Categorias por loja",
+  "Categorias por time",
+  "Ranking de categorias",
+  "Gastos por categoria no período",
+  "Estabelecimentos mais usados",
+  "Ranking de estabelecimentos por valor",
+  "Ranking de estabelecimentos por quantidade",
+  "Gastos por estabelecimento no período",
+  "O que posso comprar com o cartão Clara?",
+  "Tipos de compra permitidos",
+  "Tipos de compra proibidos",
+  "Regras da Política de Uso dos Cartões Clara",
+  "Quando o cartão é bloqueado?",
+  "Perdi meu cartão Clara, o que fazer?",
+  "Cartão Clara bloqueado, como resolver?",
+  "Como desbloquear o cartão Clara?",
+  "Meu cartão não passou, o que pode ser?",
+  "Enviar pendências por e-mail",
+  "Receber pendências da loja por e-mail",
+  "Abrir relatório gerencial da Clara",
+  "Ver dashboard no Looker Studio",
+  "Como aumento o limite do cartão?",
+  "Quero gráficos das transações",
+  "O que o Vektor pode fazer?",
+  "Como anexar nota fiscal na Clara?",
+  "Como justificar compras na Clara?"
+];
+
+// 2) Normalização
+function vektorNormAutocomplete(str) {
+  if (!str) return "";
+  return str
+    .toString()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+// 3) Campos HTML
+const vektorInput = document.getElementById("userInput");
+const vektorBox   = document.getElementById("vektor-autocomplete-box");
+
+// Estado atual do autocomplete
+let vektorCurrentSuggestions = [];
+let vektorSelectedIndex = -1;
+
+// Atualiza visualmente qual item está selecionado
+function vektorHighlightSelected() {
+  const items = vektorBox.querySelectorAll(".vektor-autocomplete-item");
+  items.forEach((el, idx) => {
+    if (idx === vektorSelectedIndex) {
+      el.classList.add("is-active");
+      // Garante que o item visível seja mostrado
+      el.scrollIntoView({ block: "nearest" });
+    } else {
+      el.classList.remove("is-active");
+    }
+  });
+}
+
+// Aplica a sugestão substituindo apenas o último "bloco" digitado
+function vektorApplySuggestion(textoSugestao) {
+  const raw = vektorInput.value || "";
+
+  // casa tudo até o último espaço em grupo 1
+  // e a última "palavra" (sem espaço) em grupo 2
+  const m = raw.match(/^(.*\s)(\S+)?$/);
+
+  let novoTexto;
+
+  if (!raw.trim()) {
+    // campo vazio -> vira apenas a sugestão
+    novoTexto = textoSugestao;
+  } else if (m) {
+    const prefixo = m[1] || "";
+    novoTexto = prefixo + textoSugestao;
+  } else {
+    // fallback: se não bater o regex, substitui tudo
+    novoTexto = textoSugestao;
+  }
+
+  vektorInput.value = novoTexto;
+}
+
+// 4) Carregar lista de LOJAS vinda do back-end
+window.__VEKTOR_LOJAS = [];
+google.script.run.withSuccessHandler(function(lista){
+    if (Array.isArray(lista)) window.__VEKTOR_LOJAS = lista;
+}).getListaLojas();
+
+// 5) Lista de times reais (você ajusta aqui)
+const VEKTOR_TIMES = [
+  "Águias de Elite",
+  "Águias do Cerrado",
+  "Guardiões da Fronteira",
+  "Esquadrão 40 graus",
+  "Esquadrão Valente",
+  "Falcões SP",
+  "Flechas do Norte",
+  "Furacão Sul",
+  "Ultra High",
+  "Fúria do Interior",
+  "Gigante Paulista",
+  "Lobos SP",
+  "Guerreiros do Cangaço",
+  "Legião de Elite",
+  "Sulcesso"
+];
+
+// 6) Renderizar sugestões
+
+function vektorRenderSugestoes(lista) {
+  if (!lista.length) {
+    vektorBox.style.display = "none";
+    vektorCurrentSuggestions = [];
+    vektorSelectedIndex = -1;
+    return;
+  }
+
+  vektorCurrentSuggestions = lista.slice(0, 8);
+  vektorSelectedIndex = -1;
+
+  vektorBox.innerHTML = vektorCurrentSuggestions
+    .map((s, idx) => 
+      `<div class="vektor-autocomplete-item" data-index="${idx}">${s}</div>`
+    )
+    .join("");
+
+  vektorBox.style.display = "block";
+}
+
+// 7) Lógica do autocomplete
+vektorInput.addEventListener("input", function () {
+  const raw  = vektorInput.value || "";
+
+  // texto inteiro normalizado (para intents)
+  const norm = vektorNormAutocomplete(raw);
+
+  // pega apenas o último "bloco" digitado (depois do último espaço)
+  const lastMatch = raw.match(/(\S+)$/);
+  const lastRaw   = lastMatch ? lastMatch[1] : "";
+  const lastNorm  = vektorNormAutocomplete(lastRaw);
+
+  // se o último bloco tem menos de 2 caracteres, não sugere nada
+  if (!lastNorm || lastNorm.length < 2) {
+    vektorBox.style.display = "none";
+    vektorCurrentSuggestions = [];
+    vektorSelectedIndex = -1;
+    return;
+  }
+
+  let suggestions = [];
+
+  // a) frases do VEKTOR_INTENTS -> usa a frase inteira normalizada
+  if (norm.length >= 2) {
+    suggestions.push(
+      ...VEKTOR_INTENTS.filter(x => vektorNormAutocomplete(x).includes(norm))
+    );
+  }
+
+  // b) autocomplete de LOJAS -> usa só os dígitos do último bloco
+ if (window.__VEKTOR_LOJAS && window.__VEKTOR_LOJAS.length) {
+  const digits = (lastRaw || "").replace(/\D/g, "");
+  if (digits && digits.length <= 4) {
+    const padded = ("0000" + digits).slice(-4);
+
+    window.__VEKTOR_LOJAS.forEach((l) => {
+      const cod = String(l.codigo || "").padStart(4, "0");
+
+      if (cod.startsWith(padded)) {
+        const nomeFinal = l.nome || l.nomeLojaTxt || "";
+        let label = cod;
+
+        if (nomeFinal) {
+          label += " - " + nomeFinal;
+        }
+
+        suggestions.push(label);
+      }
+    });
+  }
+}
+
+  // c) autocomplete de TIMES -> compara contra o último termo digitado
+  if (lastNorm.length >= 2) {
+    suggestions.push(
+      ...VEKTOR_TIMES.filter(t => vektorNormAutocomplete(t).includes(lastNorm))
+    );
+  }
+
+  // remover duplicados
+  suggestions = [...new Set(suggestions)];
+
+  vektorRenderSugestoes(suggestions);
+});
+
+// clique do mouse
+vektorBox.addEventListener("mousedown", (e)=>{
+  const item = e.target.closest(".vektor-autocomplete-item");
+  if (!item) return;
+
+  const idx = item.dataset.index ? parseInt(item.dataset.index, 10) : -1;
+  const textoSugestao =
+    (idx >= 0 && vektorCurrentSuggestions[idx])
+      ? vektorCurrentSuggestions[idx]
+      : item.innerText;
+
+  vektorApplySuggestion(textoSugestao);
+
+  vektorBox.style.display = "none";
+  vektorSelectedIndex = -1;
+  vektorCurrentSuggestions = [];
+});
+
     const sendBtn    = document.getElementById("sendBtn");
 
     /* ========= FUNÇÕES DE UI ========= */
@@ -1547,9 +1844,6 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
             function notificarNovaMensagem(text) {
               if (!("Notification" in window)) return;
               if (Notification.permission !== "granted") return;
-
-              // ❌ REMOVIDO: esse cara bloqueava tudo quando a aba estava em foco
-              // if (document.hasFocus()) return;
 
               let conteudo = "";
 
@@ -3624,6 +3918,7 @@ function vektorSugerirTopicosGerais(msgOriginal) {
     if (
   !__vektorJaSugeriuLooker &&   // 👈 impõe limite de 1 vez por sessão
   (
+    // termos genéricos de relatório / ranking / dashboard
     norm.includes("relatorio") ||
     norm.includes("relatório") ||
     norm.includes("dashboard") ||
@@ -3640,7 +3935,19 @@ function vektorSugerirTopicosGerais(msgOriginal) {
     norm.includes("grafico") ||
     norm.includes("gráfico") ||
     norm.includes("analise") ||
-    norm.includes("análise") || 
+    norm.includes("análise") ||
+
+    // frases mais “naturais” que você citou
+    norm.includes("abrir relatorio") ||
+    norm.includes("abrir relatório") ||
+    norm.includes("abrir relatorio gerencial") ||
+    norm.includes("abrir relatório gerencial") ||
+    norm.includes("relatorio gerencial da clara") ||
+    norm.includes("relatório gerencial da clara") ||
+    norm.includes("ver dashboard no looker") ||
+    norm.includes("dashboard da clara") ||
+
+    // referência explícita ao looker
     norm.includes("looker")
   )
 ) {
@@ -3662,13 +3969,20 @@ function vektorSugerirTopicosGerais(msgOriginal) {
 
     // 3) PENDÊNCIAS / JUSTIFICATIVAS → reforçar política e fluxo
     if (
-      norm.includes("pendencia") ||
-      norm.includes("pendência") ||
-      norm.includes("pendencias") ||
-      norm.includes("pendências") ||
-      norm.includes("justificativa") ||
-      norm.includes("justificativas") ||
-      norm.includes("justificar")
+        norm.includes("pendencia") ||
+        norm.includes("pendência") ||
+        norm.includes("pendencias") ||
+        norm.includes("pendências") ||
+        norm.includes("justificativa") ||
+        norm.includes("justificativas") ||
+        norm.includes("justificar") ||
+
+        // você comentou frases tipo:
+        // "ver justificativas completas de uma loja" / "de um time"
+        norm.includes("justificativas completas") ||
+        norm.includes("ver justificativas completas") ||
+        norm.includes("justificativas de uma loja") ||
+        norm.includes("justificativas de um time")
     ) {
       blocos.push(
         "<div style='margin-top:10px;'>" +
@@ -4012,6 +4326,23 @@ window.vektorIgnorarSugestaoPolitica = function () {
 
 function gerarRespostaDoBot(msgUsuario) {
   const norm = normalize(msgUsuario || "");
+
+  // 🆕 Resposta específica para o ciclo da fatura da Clara
+  if (
+    norm.includes("ciclo da fatura") ||
+    norm.includes("ciclo de fatura") ||
+    norm.includes("ciclo da fatura da clara") ||
+    norm.includes("periodo da fatura") ||
+    norm.includes("período da fatura")
+  ) {
+    return "HTML:<p class='text-sm text-slate-700'>" +
+      "O <b>ciclo da fatura da Clara</b> funciona assim:<br><br>" +
+      "• As compras realizadas entre <b>o dia 6</b> de cada mês e <b>o dia 5</b> do mês seguinte são " +
+      "agrupadas na mesma fatura.<br>" +
+      "• Tudo o que for gasto dentro desse intervalo entra para pagamento nessa fatura do período.<br><br>" +
+      "Em resumo: o ciclo vai sempre de <b>06</b> a <b>05</b>, e todas as compras feitas nesse período " +
+      "entram juntas na mesma fatura.</p>";
+  }
 
   // === Gatilho para o MINI MANUAL DA CLARA ===
   if (
@@ -7469,14 +7800,63 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
   }
 };
 
+userInput.addEventListener("keydown", (e) => {
+    const boxVisivel   = vektorBox && vektorBox.style.display === "block";
+    const haSugestoes  = vektorCurrentSuggestions && vektorCurrentSuggestions.length > 0;
 
-
-    userInput.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && !e.shiftKey) {
+    // ESC fecha o autocomplete
+    if (e.key === "Escape") {
+        if (boxVisivel) {
             e.preventDefault();
-            enviarMensagem();
+            vektorBox.style.display = "none";
+            vektorSelectedIndex = -1;
+            vektorCurrentSuggestions = [];
         }
-    });
+        return;
+    }
+
+    // Se o autocomplete estiver aberto e tiver sugestões
+    if (boxVisivel && haSugestoes) {
+
+        // TAB ou seta para baixo -> próxima sugestão
+        if (e.key === "ArrowDown" || (e.key === "Tab" && !e.shiftKey)) {
+            e.preventDefault();
+            vektorSelectedIndex = (vektorSelectedIndex + 1) % vektorCurrentSuggestions.length;
+            vektorHighlightSelected();
+            return;
+        }
+
+        // Shift+TAB ou seta para cima -> sugestão anterior
+        if (e.key === "ArrowUp" || (e.key === "Tab" && e.shiftKey)) {
+            e.preventDefault();
+            vektorSelectedIndex = (vektorSelectedIndex - 1 + vektorCurrentSuggestions.length) % vektorCurrentSuggestions.length;
+            vektorHighlightSelected();
+            return;
+        }
+
+        // ENTER com item selecionado -> aplica sugestão
+        if (e.key === "Enter") {
+            if (vektorSelectedIndex >= 0 && vektorCurrentSuggestions[vektorSelectedIndex]) {
+                e.preventDefault();
+
+                const textoSugestao = vektorCurrentSuggestions[vektorSelectedIndex];
+                vektorApplySuggestion(textoSugestao);
+
+                vektorBox.style.display = "none";
+                vektorSelectedIndex = -1;
+                vektorCurrentSuggestions = [];
+                return; // usuário aperta Enter de novo se quiser enviar
+            }
+            // se não tiver item selecionado, cai no fluxo padrão mais abaixo
+        }
+    }
+
+    // Fluxo padrão: Enter envia a mensagem (sem Shift)
+    if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        enviarMensagem();
+    }
+});
 
     sendBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -7525,6 +7905,7 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
   };
 
 }); // fim DOMContentLoaded
+
 </script>
 </body>
 </html>
