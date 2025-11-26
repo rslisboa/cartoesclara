@@ -360,7 +360,7 @@
             <div class="chat-header-left">
                 <h1>Grupo SBF | Vektor</h1>
 
-                <p>Pergunte sobre o uso do cartão Clara nas lojas.</p>
+                <p>Pergunte tudo sobre o uso do cartão Clara nas lojas.</p>
 
                 <div class="examples"></div>
                 <div class="policy-note text-[12px] mt-2"></div>
@@ -610,6 +610,7 @@ const VEKTOR_INTENTS = [
   "Valor de todas as faturas",
   "Ver extrato da conta da Clara",
   "Qual é o ciclo da fatura da Clara?",
+  "Listagem de etiquetas cadastradas na Clara",
   "Ranking de lojas com mais transações",
   "Ranking de lojas com maior valor",
   "Ranking de times com mais transações",
@@ -4327,6 +4328,18 @@ window.vektorIgnorarSugestaoPolitica = function () {
 function gerarRespostaDoBot(msgUsuario) {
   const norm = normalize(msgUsuario || "");
 
+  // INTENÇÃO: listar etiquetas da Clara (BaseClara, coluna T)
+  if (
+    norm.includes("listagem de etiquetas") ||
+    norm.includes("lista de etiquetas") ||
+    norm.includes("etiquetas disponiveis") ||
+    norm.includes("etiquetas disponíveis") ||
+    norm.includes("etiquetas da clara") ||
+    norm.includes("etiquetas na clara")
+  ) {
+    return "ACAO_LISTAR_ETIQUETAS_CLARA";
+  }
+
   // 🆕 Resposta específica para o ciclo da fatura da Clara
   if (
     norm.includes("ciclo da fatura") ||
@@ -7737,6 +7750,122 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
   return { periodo, tipo };
 }
 
+// Lista as etiquetas disponíveis na BaseClara (coluna T) e mostra no chat
+
+function listarEtiquetasClara() {
+  // Mensagem inicial do bot
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>" +
+    "Vou buscar a lista de etiquetas e o resumo de uso e já te mostro aqui. ⏳" +
+    "</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(function(resumo) {
+      if (!resumo || !Array.isArray(resumo.itens) || !resumo.itens.length) {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+          "Não encontrei dados suficientes para montar o resumo de etiquetas (coluna T e valor). " +
+          "Verifique se a BaseClara tem a coluna de <b>Etiquetas</b> e a coluna de <b>Valor</b> preenchidas." +
+          "</p>"
+        );
+        return;
+      }
+
+      var itens = resumo.itens;
+      var totalGeral = resumo.totalGeral || 0;
+
+      // formatações
+      function formatBRL(n) {
+        if (!n || isNaN(n)) n = 0;
+        return n.toLocaleString("pt-BR", {
+          style: "currency",
+          currency: "BRL",
+          minimumFractionDigits: 2
+        });
+      }
+
+      function formatPct(p) {
+        if (!p || isNaN(p)) p = 0;
+        return p.toLocaleString("pt-BR", {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1
+        }) + " %";
+      }
+
+      // soma novamente por segurança (caso venha alguma inconsistência)
+      var somaValores = 0;
+      itens.forEach(function (it) {
+        var v = (it.valorTotal || 0);
+        if (!isNaN(v)) somaValores += v;
+      });
+
+ // Monta a tabela HTML
+      var html = "<div class='text-sm text-slate-700 mt-2'>" +
+                 "<p class='mb-2'>Resumo de uso das etiquetas na Clara:</p>" +
+                 "<div class='overflow-x-auto'>" +
+                 "<table id='tabela-etiquetas-clara' style='border-collapse:collapse;width:100%; font-size:12px; border:2px solid #000;'>";  // borda externa preta
+
+      // Cabeçalho
+      html += "<thead>" +
+              "<tr>" +
+              "<th style='background:#003366;color:#ffffff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;text-align:left;'>Etiqueta</th>" +
+              "<th style='background:#003366;color:#ffffff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;text-align:right;'>% de uso (valor)</th>" +
+              "<th style='background:#003366;color:#ffffff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;text-align:right;'>Valor total</th>" +
+              "</tr>" +
+              "</thead>";
+
+      // Corpo
+      html += "<tbody>";
+
+      itens.forEach(function (it) {
+        var etiqueta = it.etiqueta || "";
+        var perc = formatPct(it.percentual || 0);
+        var val = formatBRL(it.valorTotal || 0);
+
+        etiqueta = etiqueta
+          .toString()
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+
+        html += "<tr>" +
+                "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;'>" + etiqueta + "</td>" +
+                "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;'>" + perc + "</td>" +
+                "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;'>" + val + "</td>" +
+                "</tr>";
+      });
+
+      html += "</tbody>";
+
+      // Rodapé (TOTAL)
+      html += "<tfoot>" +
+              "<tr>" +
+              "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;font-weight:bold;'>TOTAL</td>" +
+              "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;text-align:right;font-weight:bold;'>100,0 %</td>" +
+              "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;text-align:right;font-weight:bold;'>" + formatBRL(somaValores) + "</td>" +
+              "</tr>" +
+              "</tfoot>";
+
+      html += "</table>";
+
+      // Botão CSV no final, canto inferior direito
+      html += "<div style='text-align:right; margin-top:8px;'>" +
+              "<button type='button' " +
+                "onclick=\"exportTableToCSV(this, 'etiquetas_clara')\" " +
+                "style='background:#005E27;color:#fff;border:none;padding:6px 12px;" +
+                       "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+                "⬇ Exportar CSV" +
+              "</button>" +
+              "</div>";
+
+      html += "</div></div>";
+
+      renderBotMessage("HTML:" + html);
+    })
+    .getResumoEtiquetasClara(); // <-- nova função no Code.gs
+}
+
     /* ========= ENVIO (ENTER / BOTÃO) ========= */
 
     function enviarMensagem() {
@@ -7754,8 +7883,32 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
         if (!texto) return;
 
         renderUserMessage(texto);
+        userInput.value = "";  // limpa aqui, sempre
+
+        // Normaliza o texto para busca de intenção
+    const norm = normalize(texto || "");
+
+    // Se o usuário pedir listagem de etiquetas, chama a ação específica
+    if (
+      norm.includes("listagem de etiquetas") ||
+      norm.includes("lista de etiquetas") ||
+      norm.includes("etiquetas disponiveis") ||
+      norm.includes("etiquetas disponíveis") ||
+      norm.includes("etiquetas da clara") ||
+      norm.includes("etiquetas na clara")
+    ) {
+      listarEtiquetasClara();
+      return; // não segue para gerarRespostaDoBot
+    }
 
         const resposta = gerarRespostaDoBot(texto);
+
+          // Se a intenção for listar etiquetas, chama a função específica e para aqui
+  if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
+    listarEtiquetasClara();
+    return;
+  }
+
           if (resposta) renderBotMessage(resposta);
 
           // Depois de responder normalmente, avalia se faz sentido sugerir algo do Manual da Clara
