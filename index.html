@@ -3999,6 +3999,21 @@ setTimeout(function () {
   } catch (e) {
     console.warn("Erro ao sugerir tópicos gerais:", e);
   }
+
+  // Sugestão quando o usuário fala de ciclo de fatura
+if (
+  norm.includes("ciclo da fatura") ||
+  norm.includes("ciclo de fatura") ||
+  norm.includes("ciclo da fatura da clara") ||
+  norm.includes("periodo da fatura") ||
+  norm.includes("período da fatura")
+) {
+  vektorMostrarSugestao(
+    "Quer ver a tabela completa das faturas?",
+    "Quero ver a tabela de faturas da Clara"
+  );
+}
+
 }
 
 // ---------------------------------------------------------------------
@@ -4309,6 +4324,31 @@ window.vektorIgnorarSugestaoPolitica = function () {
   renderBotMessage(html);
   if (typeof scrollToBottom === "function") scrollToBottom();
 };
+
+// ================= VEKTOR_STATE – memória leve da conversa =================
+window.VEKTOR_STATE = {
+  ultimaIntencao: null,         // ex: "ranking_lojas", "resumo_times", "fatura_times"
+  ultimoPeriodo: null,          // { dataInicioIso, dataFimIso }
+  ultimoGrupo: null,            // nome do time / grupo
+  ultimaLoja: null,             // código da loja
+  ultimaAcaoExplicavel: null,   // meta da última tabela gerada
+  sugestoesMostradas: []        // controle de sugestões proativas para não repetir
+};
+
+function vektorRegistrarContexto(evento) {
+  try {
+    if (!evento || typeof evento !== "object") return;
+
+    window.VEKTOR_STATE = window.VEKTOR_STATE || {};
+    Object.assign(window.VEKTOR_STATE, evento);
+  } catch (e) {
+    console.warn("Erro ao registrar contexto:", e);
+  }
+}
+
+function vektorObterContexto() {
+  return window.VEKTOR_STATE || {};
+}
 
     /* ========= GERADOR FINAL ========= */
 
@@ -6432,94 +6472,178 @@ function vektorMontarTabelaPendJust_(titulo, colunas, linhas) {
 }
 
 function vektorMontarTabelaFaturas_(titulo, faturas) {
-    if (!faturas || !faturas.length) {
-        return "<p class='text-sm text-slate-700'>Não encontrei faturas na BaseClara.</p>";
+  if (!faturas || !faturas.length) {
+    return "<p class='text-sm text-slate-700'>Não encontrei faturas na BaseClara.</p>";
+  }
+
+  var partes = [];
+
+  partes.push(
+    "<div class='text-sm text-slate-700' style='max-width:1000px;margin:12px auto 0;'>",
+      "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>",
+      "<div style='overflow-x:auto;'>",
+        "<table border='1' cellspacing='0' cellpadding='8' " +
+        "style='border-collapse:collapse;width:100%;font-size:13px;border:2px double #000;'>",
+          "<thead>",
+            "<tr style='background:#0F172A;color:#fff;'>",
+              "<th style='border:2px double #000;padding:6px;text-align:center;'>Fatura (período / extrato da conta)</th>",
+              "<th style='border:2px double #000;padding:6px;text-align:center;'>Valor total (R$)</th>",
+              "<th style='border:2px double #000;padding:6px;text-align:center;'>Variação</th>",
+            "</tr>",
+          "</thead>",
+          "<tbody>"
+  );
+
+  var somaTotal = 0;
+  var valorAnterior = null;
+
+  faturas.forEach(function (f) {
+    var valor = Number(f.valorTotal) || 0;
+    somaTotal += valor;
+
+    var valorFmt = valor.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    });
+
+    // Calcula variação em relação à fatura anterior
+    var variacaoTexto = "—";
+    if (valorAnterior !== null && valorAnterior !== 0) {
+      var variacao = ((valor - valorAnterior) / valorAnterior) * 100;
+      var variacaoFmt = variacao.toFixed(1).replace(".", ",") + "%";
+      if (variacao > 0) {
+        variacaoTexto = "+" + variacaoFmt;
+      } else {
+        variacaoTexto = variacaoFmt;
+      }
     }
 
-    var partes = [];
+    var extrato = (f.extrato || "").toString();
+    // evita quebrar o atributo se tiver aspas simples
+    var extratoAttr = extrato.replace(/'/g, "&#39;");
 
+    // 🔽 linha "clicável" com dados da fatura
     partes.push(
-      "<div class='text-sm text-slate-700' style='max-width:1000px;margin:12px auto 0;'>",
-        "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>",
-        "<div style='overflow-x:auto;'>",
-          "<table border='1' cellspacing='0' cellpadding='8' " +
-          "style='border-collapse:collapse;width:100%;font-size:13px;border:2px double #000;'>",
-            "<thead>",
-              "<tr style='background:#0F172A;color:#fff;'>",
-                "<th style='border:2px double #000;padding:6px;text-align:center;'>Fatura (período / extrato da conta)</th>",
-                "<th style='border:2px double #000;padding:6px;text-align:center;'>Valor total (R$)</th>",
-                "<th style='border:2px double #000;padding:6px;text-align:center;'>Variação</th>",
-              "</tr>",
-            "</thead>",
-            "<tbody>"
-    );
-
-    var somaTotal = 0;
-    var valorAnterior = null;
-
-    faturas.forEach(function (f) {
-        var valor = Number(f.valorTotal) || 0;
-        somaTotal += valor;
-
-        var valorFmt = valor.toLocaleString("pt-BR", {
-            style: "currency",
-            currency: "BRL"
-        });
-
-        // Calcula variação em relação à fatura anterior
-        var variacaoTexto = "—";
-        if (valorAnterior !== null && valorAnterior !== 0) {
-            var variacao = ((valor - valorAnterior) / valorAnterior) * 100;
-            var variacaoFmt = variacao.toFixed(1).replace(".", ",") + "%";
-            if (variacao > 0) {
-                variacaoTexto = "+" + variacaoFmt;
-            } else {
-                variacaoTexto = variacaoFmt;
-            }
-        }
-
-        partes.push(
-          "<tr>",
-            "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-              (f.extrato || "") +
-            "</td>",
-            "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-              valorFmt +
-            "</td>",
-            "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-              variacaoTexto +
-            "</td>",
-          "</tr>"
-        );
-
-        valorAnterior = valor;
-    });
-
-    // Linha de TOTAL
-    var somaFmt = somaTotal.toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL"
-    });
-
-    partes.push(
-      "<tr style='background:#f1f5f9;font-weight:bold;'>",
-        "<td style='border:2px double #000;padding:6px;text-align:center;'>TOTAL</td>",
+      "<tr onclick=\"window.vektorDrillTimesFatura(this)\" " +
+        "style='cursor:pointer;' " +
+        "data-extrato-fatura='" + extratoAttr + "' " +
+        "data-inicio-fatura='" + (f.dataInicioIso || "") + "' " +
+        "data-fim-fatura='" + (f.dataFimIso || "") + "' " +
+        "title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\">",
         "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-          somaFmt +
+          extrato +
         "</td>",
-        "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
+        "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+          valorFmt +
+        "</td>",
+        "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+          variacaoTexto +
+        "</td>",
       "</tr>"
     );
 
-    partes.push(
-            "</tbody>",
-          "</table>",
-        "</div>",
-      "</div>"
+    valorAnterior = valor;
+  });
+
+  // Linha de TOTAL
+  var somaFmt = somaTotal.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+
+  partes.push(
+    "<tr style='background:#f1f5f9;font-weight:bold;'>",
+      "<td style='border:2px double #000;padding:6px;text-align:center;'>TOTAL</td>",
+      "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+        somaFmt +
+      "</td>",
+      "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
+    "</tr>"
+  );
+
+  partes.push(
+          "</tbody>",
+        "</table>",
+      "</div>",
+
+      // 🔽 Botão de Exportar CSV para a tabela de faturas
+      "<div style='margin-top:8px;text-align:right;'>",
+        "<button type='button' " +
+          "onclick=\"exportTableToCSV(this, 'faturas_clara')\" " +
+          "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>",
+          "⬇ Exportar CSV",
+        "</button>",
+      "</div>",
+
+    "</div>"
+  );
+
+  return partes.join("");
+}
+
+// Drilldown: ao clicar numa fatura, detalha por TIME
+window.vektorDrillTimesFatura = function (tr) {
+  try {
+    if (!tr) return;
+
+    var extrato = tr.getAttribute("data-extrato-fatura") || "";
+    var dataInicioIso = tr.getAttribute("data-inicio-fatura") || "";
+    var dataFimIso = tr.getAttribute("data-fim-fatura") || "";
+
+    extrato = extrato.trim();
+
+    if (!extrato) {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o extrato dessa fatura para detalhar por time.</p>"
+      );
+      return;
+    }
+
+    var periodoTexto = "";
+    if (dataInicioIso || dataFimIso) {
+      var ini = dataInicioIso ? new Date(dataInicioIso).toLocaleDateString("pt-BR") : "";
+      var fim = dataFimIso ? new Date(dataFimIso).toLocaleDateString("pt-BR") : "";
+      if (ini || fim) {
+        periodoTexto = "Período: " + ini + (fim ? " até " + fim : "");
+      }
+    }
+
+    // Mensagem de contexto no chat
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Detalhando a fatura <b>" + extrato +
+        "</b> por <b>time</b>, considerando o mesmo ciclo do 'Extrato da conta'." +
+        (periodoTexto ? "<br><span class='text-xs text-slate-500'>" + periodoTexto + "</span>" : "") +
+      "</p>"
     );
 
-    return partes.join("");
-}
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.ok || !Array.isArray(res.times) || !res.times.length) {
+          renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Não encontrei transações por time para essa fatura.</p>"
+          );
+          return;
+        }
+
+        // Reaproveita o renderizador padrão de resumo por time
+        renderResumoTransacoesPorTime(res, {
+          titulo: "Times dessa fatura",
+          periodoTexto: periodoTexto
+        });
+      })
+      .withFailureHandler(function (err) {
+        console.error("Erro ao detalhar fatura por time:", err);
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Ocorreu um erro ao buscar o detalhamento por time para essa fatura.</p>"
+        );
+      })
+      .getResumoTransacoesPorTimeExtrato(extrato, "valor");  // usa EXTRATO
+  } catch (e) {
+    console.error("Erro em vektorDrillTimesFatura:", e);
+  }
+};
 
 
 /**
@@ -6923,6 +7047,76 @@ if (temFiltroTimes) {
   renderBotMessage("HTML:" + html);
 }
 
+// 🔽 Drilldown da fatura para TIMES, respeitando o período da fatura
+window.vektorDetalharFaturaPorTime = function (tr) {
+  try {
+    if (!tr) return;
+
+    var inicioIso = tr.getAttribute("data-inicio") || "";
+    var fimIso    = tr.getAttribute("data-fim") || "";
+
+    // Pega o texto da fatura para mostrar na mensagem
+    var extrato = "";
+    if (tr.cells && tr.cells.length > 0) {
+      extrato = (tr.cells[0].innerText || tr.cells[0].textContent || "").trim();
+    }
+
+    // Se não tiver período, não faz sentido puxar times
+    if (!inicioIso || !fimIso) {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>" +
+          "Não consegui identificar o período dessa fatura para detalhar por time. " +
+          "Verifique se o campo <b>Extrato da conta</b> está no formato esperado na BaseClara." +
+        "</p>"
+      );
+      return;
+    }
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Vou detalhar a fatura <b>" + extrato + "</b> " +
+        "por <b>time</b>, considerando apenas as transações desse período." +
+      "</p>"
+    );
+
+    // Chama o Apps Script para montar o resumo por time
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.ok) {
+          renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>" +
+              "Não consegui montar o resumo por time para esse período de fatura." +
+            "</p>"
+          );
+          return;
+        }
+
+        // Reutiliza o renderizador geral de times
+        // topN: null -> lista todos os times
+        renderResumoTransacoesPorTime(res, { topN: null });
+      })
+      .withFailureHandler(function () {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+            "Tive um problema ao detalhar esta fatura por time." +
+          "</p>"
+        );
+      })
+      .getResumoTransacoesPorTime(
+        inicioIso, // data início da fatura
+        fimIso,    // data fim da fatura
+        "valor"    // critério: agrupar por VALOR da fatura
+      );
+
+  } catch (e) {
+    console.error("Erro em vektorDetalharFaturaPorTime:", e);
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Tive um problema ao detalhar esta fatura por time." +
+      "</p>"
+    );
+  }
+};
 
 // ========= RENDER GENÉRICO: CATEGORIAS / ESTABELECIMENTOS ========= //
 
