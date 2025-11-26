@@ -602,6 +602,7 @@ const VEKTOR_INTENTS = [
   "Lista de categorias por valor",
   "Treinamento Clara",
   "Treinamento política Clara",
+  "Treinamento sobre uso do cartão Clara",
   "Termo de responsabilidade Clara",
   "Valor da fatura atual",
   "Valor da fatura do mês passado",
@@ -650,6 +651,7 @@ const VEKTOR_INTENTS = [
   "Abrir relatório gerencial da Clara",
   "Ver dashboard no Looker Studio",
   "Como aumento o limite do cartão?",
+  "Como usar bem o limite do cartão Clara?",
   "Quero gráficos das transações",
   "O que o Vektor pode fazer?",
   "Como anexar nota fiscal na Clara?",
@@ -3142,21 +3144,28 @@ O prazo de entrega do cartão é de até <b>7 dias úteis</b>, conforme a polít
 </div>`;
     }
 
-    function respNovoCartaoSegundaVia() {
-        return `HTML:<div class="text-sm text-slate-700">
-<p><b>Segunda via de cartão Clara (cartão já existia)</b></p>
-<p class="mt-1">
-A solicitação de <b>segunda via</b> (perda, roubo, dano ou troca de portador) deve seguir o fluxo previsto na Política de Uso dos Cartões Clara:
-</p>
-<ul class="list-disc ml-5 mt-1">
-  <li>Bloquear imediatamente o cartão antigo na plataforma / app da Clara através da funcionalidade de <b>"Congelar"</b>;</li>
-  <li>Registrar o motivo (perda, roubo, quebra, etc.) conforme orientações internas;</li>
-  <li>Abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"target="_blank" rel="noopener noreferrer"><b>ServiceNow</b></a> solicitando a emissão de segunda via do cartão Clara.
-<p class="mt-2">
-Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clara</b> para casos de reemissão/segunda via.
-</p>
+function respNovoCartaoSegundaVia() {
+  return `HTML:
+<div class="text-sm text-slate-700">
+
+  <b>Segunda via de cartão Clara (cartão já existia)</b>
+
+  <p style="margin-top:6px;">
+    A solicitação de <b>segunda via</b> (perda, roubo, dano ou troca de portador)
+    deve seguir o fluxo previsto na Política de Uso dos Cartões Clara:
+
+  <p style="margin-top:6px; margin-bottom:4px;">
+    • Bloquear imediatamente o cartão antigo na plataforma / app da Clara
+    através da funcionalidade de <b>"Congelar"</b>;<br>
+    • Registrar o motivo (perda, roubo, quebra, etc.) conforme orientações internas;<br>
+    • Abrir chamado no <b>ServiceNow</b> solicitando a emissão de segunda via do cartão Clara.
+
+  <p style="margin-top:6px;">
+    Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clara</b>
+    para casos de reemissão/segunda via.
+
 </div>`;
-    }
+}
 
     function respGenerica(msgNorm) {
         const avaliacao = avaliarCompraEspecifica(msgNorm);
@@ -3920,10 +3929,6 @@ function vektorSugerirTopicosGerais(msgOriginal) {
   !__vektorJaSugeriuLooker &&   // 👈 impõe limite de 1 vez por sessão
   (
     // termos genéricos de relatório / ranking / dashboard
-    norm.includes("relatorio") ||
-    norm.includes("relatório") ||
-    norm.includes("dashboard") ||
-    norm.includes("painel") ||
     norm.includes("top") ||
     norm.includes("mais comprou") ||
     norm.includes("mais gastos") ||
@@ -3931,25 +3936,7 @@ function vektorSugerirTopicosGerais(msgOriginal) {
     norm.includes("mais compras") ||
     norm.includes("maior valor") ||
     norm.includes("mais transações") ||
-    norm.includes("mais transacoes") ||
-    norm.includes("ranking") ||
-    norm.includes("grafico") ||
-    norm.includes("gráfico") ||
-    norm.includes("analise") ||
-    norm.includes("análise") ||
-
-    // frases mais “naturais” que você citou
-    norm.includes("abrir relatorio") ||
-    norm.includes("abrir relatório") ||
-    norm.includes("abrir relatorio gerencial") ||
-    norm.includes("abrir relatório gerencial") ||
-    norm.includes("relatorio gerencial da clara") ||
-    norm.includes("relatório gerencial da clara") ||
-    norm.includes("ver dashboard no looker") ||
-    norm.includes("dashboard da clara") ||
-
-    // referência explícita ao looker
-    norm.includes("looker")
+    norm.includes("mais transacoes")
   )
 ) {
       blocos.push(
@@ -4327,6 +4314,98 @@ window.vektorIgnorarSugestaoPolitica = function () {
 
 function gerarRespostaDoBot(msgUsuario) {
   const norm = normalize(msgUsuario || "");
+
+  // Treinamento Clara - apresentação em Slides
+if (
+  norm.includes("treinamento clara") ||
+  norm.includes("treinamento do cartao clara") ||
+  norm.includes("treinamento do cartão clara") ||
+  norm.includes("treinamento sobre uso do cartao") ||
+  norm.includes("treinamento sobre uso do cartão")
+) {
+  const htmlTreinamento = `HTML:
+<div class="text-sm text-slate-700">
+
+  <h2 style="font-size: 1.1rem; font-weight: 700; text-align: center; margin-top: -8px; margin-bottom: 8px;">
+    Treinamento oficial sobre o uso do cartão Clara
+  </h2>
+
+  <p class="mb-2" style="text-align:center; margin-top: -4px;">
+    Use esta apresentação para reforçar boas práticas com o time da loja:
+  </p>
+
+  <div style="position:relative;padding-bottom:62%;height:0;overflow:hidden;max-width:100%;
+              border-radius:8px;border:1px solid #ddd;">
+    <iframe
+      src="https://docs.google.com/presentation/d/e/2PACX-1vRTlL30pbq4rkyBlo0cLHgE3Tqeg_bLaWlIBY20tSzEdIS5QlIuWRjIv4A1j_Lfnb9_gaZ6woWJ7SDh/pubembed?start=false&loop=false&delayms=3000"
+      frameborder="0"
+      style="position:absolute;top:0;left:0;width:100%;height:100%;"
+      allowfullscreen="true"
+      mozallowfullscreen="true"
+      webkitallowfullscreen="true">
+    </iframe>
+  </div>
+
+  <p class="mt-2 text-xs text-slate-500" style="text-align:center;">
+    Se preferir, abra em tela cheia pelo botão disponível na apresentação.
+  </p>
+
+</div>`;
+
+  return htmlTreinamento;
+}
+
+// Relatório Gerencial / Dashboard Looker Studio
+if (
+  norm.includes("relatorio gerencial") ||
+  norm.includes("relatório gerencial") ||
+  norm.includes("abrir relatorio gerencial") ||
+  norm.includes("abrir relatório gerencial") ||
+  norm.includes("ver dashboard") ||
+  norm.includes("dashboard looker") ||
+  norm.includes("looker studio")
+) {
+  return "HTML:" +
+    "<div style='margin-top:10px;'>" +
+      "<p>Para uma visão completa (gráficos, filtros e detalhamentos), acesse o relatório gerencial da Clara:</p>" +
+      "<button type='button' " +
+        "onclick=\"window.open('" + LOOKER_RELATORIO_URL + "', '_blank')\" " +
+        "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
+               "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+        "Abrir relatório gerencial (Looker Studio)" +
+      "</button>" +
+    "</div>";
+}
+  
+
+    // Uso responsável do limite do cartão Clara
+  if (
+    norm.includes("usar bem o limite") ||
+    (norm.includes("limite") && norm.includes("usar")) ||
+    norm.includes("uso do limite do cartao") ||
+    norm.includes("uso do limite do cartão")
+  ) {
+    return "HTML:<div class='text-sm text-slate-700'>"
+      + "<p class='mb-2'>"
+      + "O limite do cartão Clara foi definido para cobrir, com segurança, os gastos previstos do ciclo de fatura "
+      + "(de <b>06</b> até <b>05</b> do mês seguinte). Para usar bem esse limite, sem precisar aumentar durante o mês, "
+      + "considere estas práticas:"
+      + "</p>"
+      + "<ul class='list-disc ml-4 space-y-1'>"
+      + "<li><b>Planeje o mês pelo ciclo da fatura:</b> some os gastos previstos entre os dias 06 e 05 e verifique se cabem no limite disponível.</li>"
+      + "<li><b>Priorize despesas operacionais essenciais:</b> use o cartão principalmente para despesas previstas na política (ex.: material de escritório, manutenção, marketing autorizado, etc.).</li>"
+      + "<li><b>Evite concentrar grandes compras no início do ciclo:</b> isso pode travar o limite e impedir compras importantes mais para o fim do mês.</li>"
+      + "<li><b>Prefira compras à vista ou com poucos parcelamentos:</b> parcelamentos longos consomem o limite pelos próximos ciclos e reduzem a flexibilidade da loja.</li>"
+      + "<li><b>Acompanhe o uso do limite ao longo do mês:</b> consulte o extrato da Clara e os relatórios do Vektor para ver quanto já foi utilizado e o que ainda está disponível.</li>"
+      + "<li><b>Reserve uma margem para imprevistos:</b> evite usar 100% do limite com despesas previsíveis; mantenha uma folga para emergências dentro da política.</li>"
+      + "<li><b>Evite compras fora da política:</b> gastos não permitidos podem ser bloqueados ou precisar de reembolso, além de consumir o limite de forma indevida.</li>"
+      + "</ul>"
+      + "<p class='mt-2'>"
+      + "Se mesmo seguindo essas orientações o limite estiver sempre no máximo, vale revisar o planejamento de gastos da loja "
+      + "e, se for o caso, discutir um ajuste de limite com o time responsável, com base em dados de uso recorrente."
+      + "</p>"
+      + "</div>";
+  }
 
   // INTENÇÃO: listar etiquetas da Clara (BaseClara, coluna T)
   if (
