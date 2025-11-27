@@ -3628,16 +3628,6 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
                 resposta = respostaForaEscopo();
                 break;
 
-            case "cartaoGeral":
-            ultimaIntencao = "cartaoGeral";
-                resposta = `HTML:<div class="text-sm text-slate-700">
-            <p>O <b>cartão Clara</b> é o meio oficial de pagamento das despesas operacionais das lojas.</p>
-            <p class="mt-1">Com ele, você pode pagar itens de uso diário como materiais de limpeza, escritório, informática, água e lanches para ações internas autorizadas.</p>
-            <p class="mt-1">Todas as compras devem ser justificadas na plataforma Clara em até 48 horas, com etiqueta, nota e descrição correta.</p>
-            <p class="mt-1">Quer ver a <b>Política completa de uso</b>?<a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer"> Clique aqui.
-            </a></p>
-            </div>`;
-                break;
 
              // 🔹 NOVO: transação negada / categoria bloqueada
             case "transacaoNegadaCategoria":
@@ -4709,6 +4699,148 @@ function aplicarRegraDeIntencao(msgOriginal) {
   return null;
 }
 
+// 🧠 Engine simples de insights em cima de faturas
+function analisarFaturas(faturas) {
+  try {
+    if (!Array.isArray(faturas) || faturas.length === 0) {
+      return "";
+    }
+
+    // Normaliza estrutura e garante que temos valor numérico e um rótulo
+    const lista = faturas
+      .map(function (f, idx) {
+        // tenta achar um campo de valor numérico entre algumas possibilidades
+        const valorRaw =
+          f.valorFatura ??
+          f.valor_fatura ??
+          f.valor_total ??
+          f.valor ??
+          f.total ??
+          0;
+
+        const valor = Number(valorRaw) || 0;
+
+        // tenta achar um rótulo amigável
+        const rotulo =
+          f.rotulo ||
+          f.label ||
+          f.referencia ||
+          f.mesReferencia ||
+          f.mes ||
+          f.periodo ||
+          f.descricao ||
+          ("Fatura " + (idx + 1));
+
+        // tenta achar algo que represente "ordem temporal"
+        const chaveOrdenacao =
+          f.dataReferencia ||
+          f.data_fatura ||
+          f.dataVencimento ||
+          f.data_vencimento ||
+          f.mesReferencia ||
+          f.periodo ||
+          rotulo;
+
+        return {
+          original: f,
+          valor: valor,
+          rotulo: String(rotulo),
+          chave: String(chaveOrdenacao)
+        };
+      })
+      .filter(function (f) {
+        return f.valor > 0;
+      });
+
+    if (lista.length === 0) {
+      return "";
+    }
+
+    // Ordena por chave (como proxy de tempo)
+    lista.sort(function (a, b) {
+      if (a.chave < b.chave) return -1;
+      if (a.chave > b.chave) return 1;
+      return 0;
+    });
+
+    const total = lista.reduce(function (acc, f) {
+      return acc + f.valor;
+    }, 0);
+
+    const media = total / lista.length;
+
+    // maior e menor fatura
+    var maior = lista[0];
+    var menor = lista[0];
+
+    for (var i = 1; i < lista.length; i++) {
+      if (lista[i].valor > maior.valor) maior = lista[i];
+      if (lista[i].valor < menor.valor) menor = lista[i];
+    }
+
+    // variação da última em relação à anterior, se houver pelo menos 2
+    var variacaoTexto = "";
+    if (lista.length >= 2) {
+      const penultima = lista[lista.length - 2];
+      const ultima = lista[lista.length - 1];
+
+      if (penultima.valor > 0) {
+        const dif = ultima.valor - penultima.valor;
+        const perc = (dif / penultima.valor) * 100;
+
+        if (Math.abs(perc) >= 3) { // ignora variação muito pequena
+          const direcao = perc > 0 ? "aumento" : "queda";
+          variacaoTexto =
+            "A fatura mais recente (" +
+            ultima.rotulo +
+            ") teve um " +
+            direcao +
+            " de aproximadamente " +
+            perc.toFixed(1).replace(".", ",") +
+            "% em relação à anterior (" +
+            penultima.rotulo +
+            ").";
+        } else {
+          variacaoTexto =
+            "A fatura mais recente (" +
+            ultima.rotulo +
+            ") ficou em linha com a anterior (" +
+            penultima.rotulo +
+            "), sem variação relevante de valor.";
+        }
+      }
+    }
+
+    // texto de resumo
+    var html =
+      "<div class='mt-3 p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700'>" +
+      "<p class='font-semibold mb-1'>Observações automáticas sobre essas faturas:</p>" +
+      "<ul class='list-disc ml-4 space-y-1'>" +
+      "<li>Foram consideradas <b>" + lista.length + "</b> faturas, com valor médio de aproximadamente <b>R$ " +
+      media.toFixed(2).replace(".", ",") +
+      "</b>.</li>" +
+      "<li>A fatura de <b>" + maior.rotulo + "</b> foi a de <b>maior valor</b> no conjunto exibido.</li>" +
+      "<li>A fatura de <b>" + menor.rotulo + "</b> foi a de <b>menor valor</b>.</li>";
+
+    if (variacaoTexto) {
+      html += "<li>" + variacaoTexto + "</li>";
+    }
+
+    html +=
+      "</ul>" +
+      "<p class='mt-2 text-[11px] text-slate-500'>" +
+      "Essas observações são um resumo automático em cima das faturas mostradas na tabela, " +
+      "para te ajudar a identificar rapidamente extremos e tendências.</p>" +
+      "</div>";
+
+    return html;
+  } catch (e) {
+    // se der qualquer problema, não quebra o chat; só não mostra insight
+    console.error("Erro em analisarFaturas:", e);
+    return "";
+  }
+}
+
     /* ========= GERADOR FINAL ========= */
 
 function gerarRespostaDoBot(msgUsuario) {
@@ -5051,26 +5183,6 @@ if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
     Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
     </p>`;
 }
-
- /* // >>> TODAS AS LOJAS (geral) por valor
-const detTodasLojasResumo = detectarListarTodasLojasGeral(msgUsuario, norm);
-if (detTodasLojasResumo) {
-  const p = detTodasLojasResumo.periodo;
-  const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
-  const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
-
-  renderBotMessage("HTML:<p class='text-sm text-slate-700'>Listando <b>todas as lojas</b> por <b>valor</b>" +
-    (p ? " no período solicitado" : "") + "…</p>");
-
-google.script.run
-  .withSuccessHandler(function (res) {
-  renderResumoTransacoesSemana(res, { topN: 10, forGroup: false });
-  renderBotMessage("HTML:<p class='text-xs text-slate-500 italic'>Mostrando top 10 por padrão.</p>");
-})
-  .withFailureHandler(function () { renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados (loja).</p>"); })
-  .getResumoTransacoesPorGrupo("", dataInicioStr, dataFimStr, "valor");
-  return;
-} */
 
   // 🆕 TIMES ESPECÍFICOS (ex.: "times Águias do Cerrado e Lobos SP no período ...")
 
@@ -5505,7 +5617,13 @@ if (detTimeCampeao) {
         var html = vektorMontarTabelaFaturas_(titulo, selecionadas);
         renderBotMessage("HTML:" + html);
 
-    let __vektorChartFaturas = null;
+        // 🧠 Chama a engine de insights automáticos em cima das faturas exibidas
+      var htmlInsights = analisarFaturas(selecionadas);
+      if (htmlInsights && typeof htmlInsights === "string") {
+        renderBotMessage("HTML:" + htmlInsights);
+      }
+
+      let __vektorChartFaturas = null;
 
       })
       .withFailureHandler(function () {
