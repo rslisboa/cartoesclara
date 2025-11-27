@@ -1335,7 +1335,7 @@ function vektorBlocoRaciocinioPolitica(explicacao, risco, referencia) {
   // Monta o “cartão” de raciocínio
   var html =
     "<div style='margin-top:6px;padding:8px;border-radius:6px;border:1px dashed #cbd5e1;background:#f8fafc;'>" +
-      "<p style='font-size:14px;color:#0f172a;'><b>Segue minha análise para o seu questionamento:</b></p>";
+      "<p style='font-size:14px;color:#0f172a;'><b>Segue minha análise para o seu questionamento:</b></p><br>";
 
   // Aqui a explicação já pode ser HTML completo (ex.: o bloco da categoria)
   html += explicacao;
@@ -1990,654 +1990,747 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
     /* ========= INTENÇÃO ========= */
 
     function detectarIntencaoPergunta(msgNorm) {
-        const foraEscopoPadroes = [
-            "palmeiras","corinthians","bolsonaro","lula","eleicao","eleição",
-            "presidente","futebol","time joga","campeonato","xing","vai tomar",
-            "conta de matematica","conta de matemática","2+2","raiz quadrada",
-            "piada","xingar","palavrão","palavrao"
-        ];
-        for (const termo of foraEscopoPadroes) {
-            if (msgNorm.includes(normalize(termo))) {
-                return "foraEscopo";
-            }
-        }
-
-        if (msgNorm.includes("etiqueta") ||
-            msgNorm.includes("etiquetas") ||
-            msgNorm.includes("qual etiqueta") ||
-            msgNorm.includes("que etiqueta")) {
-            return "etiqueta";
-        }
-
-        if (msgNorm.includes("aumentar limite") ||
-            msgNorm.includes("aumento de limite") ||
-            msgNorm.includes("limite maior") ||
-            msgNorm.includes("limite do cartao") ||
-            msgNorm.includes("limite do cartão") ||
-            msgNorm.includes("limite nao basta") ||
-            msgNorm.includes("limite não basta") ||
-            msgNorm.includes("limite acabou") ||
-            msgNorm.includes("limite estourou") ||
-            msgNorm.includes("quero mais limite") ||
-            msgNorm.includes("preciso de mais limite") ||
-            msgNorm.includes("como aumentar meu limite") ||
-            msgNorm.includes("solicitar aumento de limite") ||
-            msgNorm.includes("limite baixo") ||
-            msgNorm.includes("qual o limite do cartao") ||
-            msgNorm.includes("qual o limite do cartão") ||
-            msgNorm.includes("meu limite") ||
-            msgNorm.includes("consultar limite") ||
-            msgNorm.includes("ver limite") ||
-            msgNorm.includes("quanto tenho de limite") ||
-            msgNorm.includes("limite disponivel") ||
-            msgNorm.includes("limite disponível") ||
-            msgNorm.includes("baixar limite") ||
-            msgNorm.includes("diminuir limite") ||
-            msgNorm.includes("limite de credito") ||
-            msgNorm.includes("limite de crédito") ||
-            msgNorm.includes("limite total") ||
-            msgNorm.includes("limite nao liberado") ||
-            msgNorm.includes("limite não liberado") ||
-            msgNorm.includes("limite acabou de novo") ||
-            msgNorm.includes("por que meu limite nao aumenta") ||
-            msgNorm.includes("por que meu limite não aumenta") ||
-            msgNorm.includes("limite esgotado") ||
-            msgNorm.includes("gastei o limite todo") ||
-            msgNorm.includes("aumento de credito") ||
-            msgNorm.includes("aumento de crédito") ||
-            msgNorm.includes("ajustar limite") ||
-            msgNorm.includes("liberar mais limite") ||
-            msgNorm.includes("limite")) {
-            return "limite";
-        }
-
-                // 🔹 Transação negada / categoria bloqueada para compra
-        if (
-            msgNorm.includes("transacao negada") ||
-            msgNorm.includes("transação negada") ||
-            msgNorm.includes("transacao recusada") ||
-            msgNorm.includes("transação recusada") ||
-            msgNorm.includes("compra negada") ||
-            msgNorm.includes("compra recusada") ||
-            msgNorm.includes("compra rejeitada") ||
-            msgNorm.includes("compra nao passou") ||
-            msgNorm.includes("compra não passou") ||
-            msgNorm.includes("compra nao autorizada") ||
-            msgNorm.includes("compra não autorizada") ||
-            msgNorm.includes("transacao nao autorizada") ||
-            msgNorm.includes("transação não autorizada") ||
-            msgNorm.includes("transacao bloqueada") ||
-            msgNorm.includes("transação bloqueada") ||
-            msgNorm.includes("cartao nao passou") ||
-            msgNorm.includes("cartão não passou") ||
-            msgNorm.includes("cartao recusado") ||
-            msgNorm.includes("cartão recusado") ||
-            msgNorm.includes("cartao negado") ||
-            msgNorm.includes("cartão negado") ||
-            msgNorm.includes("cartao nao autorizou") ||
-            msgNorm.includes("cartão não autorizou") ||
-            msgNorm.includes("cartao travou na maquininha") ||
-            msgNorm.includes("cartao travou na máquina") ||
-            msgNorm.includes("cartao travou") ||
-            msgNorm.includes("cartão travou") ||
-            msgNorm.includes("nao passou o cartao") ||
-            msgNorm.includes("não passou o cartão") ||
-            msgNorm.includes("nao autorizou a compra") ||
-            msgNorm.includes("não autorizou a compra") ||
-            msgNorm.includes("recusou a compra") ||
-            msgNorm.includes("recusou o pagamento") ||
-            msgNorm.includes("falha na compra") ||
-            msgNorm.includes("falha de pagamento") ||
-            msgNorm.includes("erro na compra") ||
-            msgNorm.includes("erro de pagamento") ||
-            msgNorm.includes("erro no cartao") ||
-            msgNorm.includes("erro no cartão") ||
-            msgNorm.includes("compra deu erro") ||
-            msgNorm.includes("pagamento negado") ||
-            msgNorm.includes("pagamento recusado") ||
-            msgNorm.includes("pagamento bloqueado") ||
-            msgNorm.includes("categoria bloqueada") ||
-            msgNorm.includes("categoria bloqueado") ||
-            msgNorm.includes("categoria nao liberada") ||
-            msgNorm.includes("tentando usar o cartão") ||
-            msgNorm.includes("tentando usar o cartao") ||
-            msgNorm.includes("categoria não liberada") ||
-            msgNorm.includes("liberar categoria") ||
-            msgNorm.includes("liberacao de categoria") ||
-            msgNorm.includes("tentei passar o cartão e deu erro") ||
-            msgNorm.includes("tentar passar o cartão") ||
-            msgNorm.includes("tentar passar o cartao") ||
-            msgNorm.includes("tentar usar o cartao") ||
-            msgNorm.includes("tentar usar o cartão") ||
-            msgNorm.includes("tentei passar o cartao e deu erro") ||
-            msgNorm.includes("a compra foi recusada na maquininha") ||
-            msgNorm.includes("não consegui usar o cartão") ||
-            msgNorm.includes("não consegui usar o cartao") ||
-            msgNorm.includes("nao consegui usar o cartao") ||
-            msgNorm.includes("liberação de categoria") ||
-            msgNorm.includes("mcc bloqueado") ||
-            msgNorm.includes("codigo bloqueado") ||
-            msgNorm.includes("código bloqueado") ||
-            msgNorm.includes("nao liberou") ||
-            msgNorm.includes("não liberou") ||
-            msgNorm.includes("nao conseguiu passar") ||
-            msgNorm.includes("não conseguiu passar") ||
-            msgNorm.includes("nao consegui usar") ||
-            msgNorm.includes("não consegui usar") ||
-            msgNorm.includes("tentei usar e nao foi") ||
-            msgNorm.includes("tentei usar e não foi") ||
-            msgNorm.includes("tentei comprar e deu erro") ||
-            msgNorm.includes("tentou passar e nao foi") ||
-            msgNorm.includes("tentou passar e não foi") ||
-            msgNorm.includes("nao aceitou") ||
-            msgNorm.includes("não aceitou") ||
-            msgNorm.includes("nao deu certo a compra") ||
-            msgNorm.includes("não deu certo a compra") ||
-            msgNorm.includes("bloqueou a compra") ||
-            msgNorm.includes("bloqueou a transacao") ||
-            msgNorm.includes("bloqueou a transação") ||
-            msgNorm.includes("compra nao permitida") ||
-            msgNorm.includes("compra não permitida") ||
-            msgNorm.includes("transacao nao permitida") ||
-            msgNorm.includes("transação não permitida")) 
-
-          {
-            return "  ";}
-
-
-        if (msgNorm.includes("bloqueou") ||
-            msgNorm.includes("bloqueado") ||
-            msgNorm.includes("desbloquear") ||
-            msgNorm.includes("cartao travou") ||
-            msgNorm.includes("cartão travou") ||
-            msgNorm.includes("travou o cartao") ||
-            msgNorm.includes("travou o cartão") ||
-            msgNorm.includes("bloquear cartao") ||
-            msgNorm.includes("bloquear cartão") ||
-            msgNorm.includes("queria bloquear") ||
-            msgNorm.includes("quero bloquear") ||
-            msgNorm.includes("como bloquear") ||
-            msgNorm.includes("cartao bloqueado") ||
-            msgNorm.includes("cartão bloqueado") ||
-            msgNorm.includes("meu cartao nao funciona") ||
-            msgNorm.includes("meu cartão não funciona") ||
-            msgNorm.includes("meu cartão tá bloqueado") ||
-            msgNorm.includes("pq meu cartão tá bloqueadp") ||
-            msgNorm.includes("pq meu cartão tá bloqueado") ||
-            msgNorm.includes("meu cartao ta bloqueado") ||
-            msgNorm.includes("nao consigo usar o cartao") ||
-            msgNorm.includes("não consigo usar o cartão") ||
-            msgNorm.includes("problema no cartao") ||
-            msgNorm.includes("problema no cartão") ||
-            msgNorm.includes("suspender cartao") ||
-            msgNorm.includes("suspender cartão") ||
-            msgNorm.includes("suspender o uso") ||
-            msgNorm.includes("o cartao parou") ||
-            msgNorm.includes("o cartão parou") ||
-            msgNorm.includes("ativar cartao") ||
-            msgNorm.includes("ativar cartão") ||
-            msgNorm.includes("reativar cartao") ||
-            msgNorm.includes("reativar cartão") ||
-            msgNorm.includes("travamento") ||
-            msgNorm.includes("por que nao funciona") ||
-            msgNorm.includes("por que não funciona") ||
-            msgNorm.includes("desliguei o cartao") ||
-            msgNorm.includes("desliguei o cartão") ||
-            msgNorm.includes("bloqueio preventivo")) {
-            return "bloqueio";
-      }
-
-        if (msgNorm.includes("como justificar") ||
-            msgNorm.includes("justificar compra") ||
-            msgNorm.includes("prestar contas") ||
-            msgNorm.includes("prestacao de contas") ||
-            msgNorm.includes("prestação de contas") ||
-            msgNorm.includes("colocar nota") ||
-            msgNorm.includes("inserir nota") ||
-            msgNorm.includes("anexar nota") ||
-            msgNorm.includes("descricao na clara") ||
-            msgNorm.includes("como inserir nota") ||
-            msgNorm.includes("nota fiscal") ||
-            msgNorm.includes("nota da compra") ||
-            msgNorm.includes("escrever justificativa") ||
-            msgNorm.includes("como colocar justificativa") ||
-            msgNorm.includes("comprovante") ||
-            msgNorm.includes("comprovantes") ||
-            msgNorm.includes("comprovante de compra") ||
-            msgNorm.includes("comprovacao de despesa") ||
-            msgNorm.includes("comprovação de despesa") ||
-            msgNorm.includes("registro de despesa") ||
-            msgNorm.includes("lançar despesa") ||
-            msgNorm.includes("lancamento de despesa") ||
-            msgNorm.includes("lançamento de despesa") ||
-            msgNorm.includes("reembolso sem nota") ||
-            msgNorm.includes("perdi a nota") ||
-            msgNorm.includes("despesa sem comprovante") ||
-            msgNorm.includes("colocar comprovante") ||
-            msgNorm.includes("como declarar") ||
-            msgNorm.includes("declarar despesa") ||
-            msgNorm.includes("como finalizar prestacao") ||
-            msgNorm.includes("como finalizar prestação") ||
-            msgNorm.includes("relatorio de despesa") ||
-            msgNorm.includes("relatório de despesa") ||
-            msgNorm.includes("enviar nota") ||
-            msgNorm.includes("falta a nota") ||
-            msgNorm.includes("despesa sem nota") ||
-            msgNorm.includes("finalizar contas") ||
-            msgNorm.includes("minhas prestacoes") ||
-            msgNorm.includes("minhas prestações") ||
-            msgNorm.includes("descrição na clara")) {
-            return "prestacao";
-        }
-
-        if (msgNorm.includes("lanche") ||
-            msgNorm.includes("lanche pro time") ||
-            msgNorm.includes("lanche para o time") ||
-            msgNorm.includes("cafe pro time") ||
-            msgNorm.includes("café pro time") ||
-            msgNorm.includes("coffee break") ||
-            msgNorm.includes("agua") ||
-            msgNorm.includes("água") ||
-            msgNorm.includes("galão") ||
-            msgNorm.includes("galao") ||
-            msgNorm.includes("premiacao") ||
-            msgNorm.includes("premiação")) {
-            return "alimentoTime";
-        }
-
-        if (msgNorm.includes("uber") ||
-            msgNorm.includes("iber") ||
-            msgNorm.includes(" 99") ||
-            msgNorm.includes("taxi") ||
-            msgNorm.includes("táxi") ||
-            msgNorm.includes("taxí") ||
-            msgNorm.includes("cabify") ||
-            msgNorm.includes("transporte") ||
-            msgNorm.includes("aplicativo de transporte") ||
-            msgNorm.includes("motorista de aplicativo") ||
-            msgNorm.includes("carro por app") ||
-            msgNorm.includes("carona") ||
-            msgNorm.includes("como chamar um carro") ||
-            msgNorm.includes("como pedir um carro") ||
-            msgNorm.includes("uber black") ||
-            msgNorm.includes("uber x") ||
-            msgNorm.includes("99 pop") ||
-            msgNorm.includes("99taxi") ||
-            msgNorm.includes("uber drive") ||
-            msgNorm.includes("uber motorista") ||
-            msgNorm.includes("uber pass") ||
-            msgNorm.includes("uber eats") ||
-            msgNorm.includes("serviço de transporte") ||
-            msgNorm.includes("qual app de carro") ||
-            msgNorm.includes("motorista particular") ||
-            msgNorm.includes("drive") ||
-            msgNorm.includes("drivi") ||
-            msgNorm.includes("indriver") ||
-            msgNorm.includes("in driver") ||
-            msgNorm.includes("waze carpool") ||
-            msgNorm.includes("waze car pool") ||
-            msgNorm.includes("taxi particular") ||
-            msgNorm.includes("taxi 99") ||
-            msgNorm.includes("app de taxi") ||
-            msgNorm.includes("app de táxi") ||
-            msgNorm.includes("app de transporte")) {
-            return "transportePessoal";
-        }
-
-        if (msgNorm.includes("mudar de loja") ||
-            msgNorm.includes("troca de loja") ||
-            msgNorm.includes("trocar de loja") ||
-            msgNorm.includes("mudança de loja") ||
-            msgNorm.includes("mudanca de loja") ||
-            msgNorm.includes("vou mudar de loja") ||
-            msgNorm.includes("fui transferido") ||
-            msgNorm.includes("transferido de loja") ||
-            msgNorm.includes("transferencia de loja") ||
-            msgNorm.includes("transferência de loja") ||
-            msgNorm.includes("gerente desligado") ||
-            msgNorm.includes("sem gerente") ||
-            msgNorm.includes("gerente saiu") ||
-            msgNorm.includes("gerente saiu da loja") ||
-            msgNorm.includes("cartao de outra loja") ||
-            msgNorm.includes("cartão de outra loja") ||
-            msgNorm.includes("usar cartao de outra loja") ||
-            msgNorm.includes("trocar minha loja") ||
-            msgNorm.includes("mudar minha loja") ||
-            msgNorm.includes("sair da loja") ||
-            msgNorm.includes("qual minha loja") ||
-            msgNorm.includes("quero mudar a loja") ||
-            msgNorm.includes("mudei de unidade") ||
-            msgNorm.includes("trocar de unidade") ||
-            msgNorm.includes("como troco de loja") ||
-            msgNorm.includes("troquei de loja") ||
-            msgNorm.includes("sou de outra loja") ||
-            msgNorm.includes("sou de outra unidade") ||
-            msgNorm.includes("cartao de loja diferente") ||
-            msgNorm.includes("cartão de loja diferente") ||
-            msgNorm.includes("gerente novo") ||
-            msgNorm.includes("novo gerente") ||
-            msgNorm.includes("cadastro de gerente") ||
-            msgNorm.includes("tirar gerente") ||
-            msgNorm.includes("excluir gerente") ||
-            msgNorm.includes("quem e o gerente") ||
-            msgNorm.includes("quem é o gerente") ||
-            msgNorm.includes("problema com gerente") ||
-            msgNorm.includes("gerente nao esta na loja") ||
-            msgNorm.includes("gerente não está na loja") ||
-            msgNorm.includes("minha loja esta sem gerente") ||
-            msgNorm.includes("gerente demitido") ||
-            msgNorm.includes("colocar cartao de outra loja") ||
-            msgNorm.includes("habilitar cartao de outra loja") ||
-            msgNorm.includes("como uso o cartao em outra loja") ||
-            msgNorm.includes("cartao nao funciona em outra loja") ||
-            msgNorm.includes("cartão não funciona em outra loja") ||
-            msgNorm.includes("usar cartão de outra loja")) {
-            return "trocaGerente";
-        }
-
-        if (msgNorm.includes("sangria") ||
-            msgNorm.includes("sangrias") ||
-            msgNorm.includes("fazer sangria") ||
-            msgNorm.includes("puxar dinheiro do caixa") ||
-            msgNorm.includes("retirar dinheiro do caixa") ||
-            msgNorm.includes("tirar dinheiro do caixa") ||
-            msgNorm.includes("retirada de dinheiro do caixa") ||
-            msgNorm.includes("movimentacao de dinheiro no caixa") ||
-            msgNorm.includes("movimentação de dinheiro no caixa") ||
-            msgNorm.includes("fechar o caixa") ||
-            msgNorm.includes("como fechar o caixa") ||
-            msgNorm.includes("retirar valor do caixa") ||
-            msgNorm.includes("como fazer sangria") ||
-            msgNorm.includes("registrar saida de dinheiro") ||
-            msgNorm.includes("registrar saída de dinheiro") ||
-            msgNorm.includes("saida de dinheiro do caixa") ||
-            msgNorm.includes("saída de dinheiro do caixa") ||
-            msgNorm.includes("suprimento") ||
-            msgNorm.includes("suprimentos") ||
-            msgNorm.includes("fazer suprimento") ||
-            msgNorm.includes("colocar dinheiro no caixa") ||
-            msgNorm.includes("registro de suprimento") ||
-            msgNorm.includes("registro de retirada") ||
-            msgNorm.includes("registrando sangria") ||
-            msgNorm.includes("registro de sangria") ||
-            msgNorm.includes("tirar troco do caixa") ||
-            msgNorm.includes("depositar dinheiro no caixa") ||
-            msgNorm.includes("deposito no caixa") ||
-            msgNorm.includes("depósito no caixa") ||
-            msgNorm.includes("remocao de dinheiro") ||
-            msgNorm.includes("remoção de dinheiro") ||
-            msgNorm.includes("retirar excesso") ||
-            msgNorm.includes("dinheiro a mais no caixa") ||
-            msgNorm.includes("ajuste de caixa") ||
-            msgNorm.includes("retirar dinheiro do caixa")) {
-            return "sangria";
-        }
-
-        if (msgNorm.includes("nao reconheco") ||
-            msgNorm.includes("não reconheço") ||
-            msgNorm.includes("fraude") ||
-            msgNorm.includes("compra indevida") ||
-            msgNorm.includes("contestar compra") ||
-            msgNorm.includes("contestacao") ||
-            msgNorm.includes("compra que nao fiz") ||
-            msgNorm.includes("compra que não fiz") ||
-            msgNorm.includes("nao fiz essa compra") ||
-            msgNorm.includes("não fiz essa compra") ||
-            msgNorm.includes("compra desconhecida") ||
-            msgNorm.includes("uso indevido") ||
-            msgNorm.includes("estorno") ||
-            msgNorm.includes("quero estornar") ||
-            msgNorm.includes("quero cancelar compra") ||
-            msgNorm.includes("cancelar compra indevida") ||
-            msgNorm.includes("compra suspeita") ||
-            msgNorm.includes("transacao nao reconhecida") ||
-            msgNorm.includes("transação não reconhecida") ||
-            msgNorm.includes("cartao clonado") ||
-            msgNorm.includes("clonaram meu cartao") ||
-            msgNorm.includes("clonaram meu cartão") ||
-            msgNorm.includes("roubaram meu cartao") ||
-            msgNorm.includes("roubaram meu cartão") ||
-            msgNorm.includes("uso nao autorizado") ||
-            msgNorm.includes("uso não autorizado") ||
-            msgNorm.includes("quero o dinheiro de volta") ||
-            msgNorm.includes("reembolso") ||
-            msgNorm.includes("solicitar estorno") ||
-            msgNorm.includes("transacao suspeita") ||
-            msgNorm.includes("tentativa de fraude") ||
-            msgNorm.includes("estorno da compra") ||
-            msgNorm.includes("cai em golpe") ||
-            msgNorm.includes("golpe no cartao") ||
-            msgNorm.includes("golpe no cartão") ||
-            msgNorm.includes("fui roubado") ||
-            msgNorm.includes("contestação")) {
-            return "fraudeContestacao";
-        }
-
-
-        // assunto geral sobre o cartão
-        if (
-          msgNorm.includes("cartao clara") ||
-          msgNorm.includes("cartão clara") ||
-          msgNorm.includes("cartao") && msgNorm.includes("clara") ||
-          msgNorm.includes("cartao das lojas") ||
-          msgNorm.includes("cartao nas lojas") ||
-          msgNorm.includes("cartão das lojas") ||
-          msgNorm.includes("detalhe cartão clara") ||
-          msgNorm.includes("detalhes cartao clara") ||
-          msgNorm.includes("como funciona a clara") ||
-          msgNorm.includes("oq é a clara") ||
-          msgNorm.includes("falar sobre o cartao") ||
-          msgNorm.includes("falar sobre o cartão") ||
-          msgNorm.includes("cartao corporativo") ||
-          msgNorm.includes("cartão nas lojas") ||
-          msgNorm.includes("informações sobre o cartao") ||
-          msgNorm.includes("informações sobre o cartão") ||
-          msgNorm.includes("duvida sobre o cartao") ||
-          msgNorm.includes("dúvida sobre o cartão") ||
-          msgNorm.includes("tudo sobre a clara") ||
-          msgNorm.includes("o que é a clara") ||
-          msgNorm.includes("como funciona o cartao") ||
-          msgNorm.includes("como funciona o cartão") ||
-          msgNorm.includes("cartao das lojas") ||
-          msgNorm.includes("cartão das lojas") ||
-          msgNorm.includes("regras do cartao") ||
-          msgNorm.includes("regras do cartão") ||
-          msgNorm.includes("detalhes sobre a clara") ||
-          msgNorm.includes("como usar o cartao") ||
-          msgNorm.includes("como usar o cartão") ||
-          msgNorm.includes("duvidas sobre a clara") ||
-          msgNorm.includes("dúvidas sobre a clara") ||
-          msgNorm.includes("detalhes do cartao") ||
-          msgNorm.includes("detalhes do cartão") ||
-          msgNorm.includes("tudo sobre o cartao") ||
-          msgNorm.includes("tudo sobre o cartão") ||
-          msgNorm.includes("o que e a clara") ||
-          msgNorm.includes("o q e a clara") ||
-          msgNorm.includes("cartao de credito corporativo") ||
-          msgNorm.includes("cartão de crédito corporativo") ||
-          msgNorm.includes("informacao cartao") ||
-          msgNorm.includes("informação cartão") ||
-          msgNorm.includes("duvida clara") ||
-          msgNorm.includes("dúvida clara") ||
-          msgNorm.includes("cartão corporativo")
-        ) {
-          return "cartaoGeral";
-        }
-
-
-        if (msgNorm.includes("posso comprar") ||
-            msgNorm.includes("posso usar") ||
-            msgNorm.includes("pode usar") ||
-            msgNorm.includes("pode pagar") ||
-            msgNorm.includes("pode gastar") ||
-            msgNorm.includes("pode comprar") ||
-            msgNorm.includes("o que pode comprar") ||
-            msgNorm.includes("oq eu posso comprar com o cartão") ||
-            msgNorm.includes("oq pode comprar") ||
-            msgNorm.includes("pode no cartao") ||
-            msgNorm.includes("pode no cartão") ||
-            msgNorm.includes("pode colocar no cartao") ||
-            msgNorm.includes("pode colocar no cartão") ||
-            msgNorm.includes("posso usar o cartao para") ||
-            msgNorm.includes("posso usar o cartão para") ||
-            msgNorm.includes("para que posso usar") ||
-            msgNorm.includes("o que da pra pagar") ||
-            msgNorm.includes("oq da pra pagar") ||
-            msgNorm.includes("o que da para pagar") ||
-            msgNorm.includes("posso pagar") ||
-            msgNorm.includes("oq pagar") ||
-            msgNorm.includes("pagar com o cartao") ||
-            msgNorm.includes("pagar com o cartão") ||
-            msgNorm.includes("oque posso pagar") ||
-            msgNorm.includes("o q posso pagar") ||
-            msgNorm.includes("oq eu posso pagar") ||
-            msgNorm.includes("eu posso pagar") ||
-            msgNorm.includes("posso passar o cartao") ||
-            msgNorm.includes("posso passar o cartão") ||
-            msgNorm.includes("oq eu gasto") ||
-            msgNorm.includes("o que posso gastar") ||
-            msgNorm.includes("posso usar cartao") ||
-            msgNorm.includes("posso usar cartão") ||
-            msgNorm.includes("o que posso fazer") ||
-            msgNorm.includes("oq da pra fazer") ||
-            msgNorm.includes("posso adquirir") ||
-            msgNorm.includes("que da pra adquirir") ||
-            msgNorm.includes("para que serve o cartao") ||
-            msgNorm.includes("para que serve o cartão") ||
-            msgNorm.includes("em que posso usar") ||
-            msgNorm.includes("em que eu posso usar") ||
-            msgNorm.includes("oq pode pagar") ||
-            msgNorm.includes("pode ser pago") ||
-            perguntasGeraisOquePosso.some(f => msgNorm.includes(f))) {
-            return "podeNaoPode";
-        }
-
-        // BOT: SOBRE O QUE ELE PODE FAZER
-        if (
-            msgNorm.includes("o que voce faz") ||
-            msgNorm.includes("qual o seu nome") ||
-            msgNorm.includes("qual seu nome") ||
-            msgNorm.includes("qual é o seu nome") ||
-            msgNorm.includes("qual eh o seu nome") ||
-            msgNorm.includes("qual eh seu nome") ||
-            msgNorm.includes("como vc se chama") ||
-            msgNorm.includes("como voce se chama") ||
-            msgNorm.includes("como você se chama") ||
-            msgNorm.includes("como vc chama") ||
-            msgNorm.includes("como voce chama") ||
-            msgNorm.includes("como você chama") ||
-            msgNorm.includes("o que você faz") ||
-            msgNorm.includes("o que vc faz") ||
-            msgNorm.includes("pra que serve") ||
-            msgNorm.includes("qual sua função") ||
-            msgNorm.includes("qual é sua função") ||
-            msgNorm.includes("qual e sua função") ||
-            msgNorm.includes("qual sua funcao") ||
-            msgNorm.includes("qual é sua funcao") ||
-            msgNorm.includes("quem é você") ||
-            msgNorm.includes("quem e voce") ||
-            msgNorm.includes("quem é vc") ||
-            msgNorm.includes("qm é vc") ||
-            msgNorm.includes("qm e vc") ||
-            msgNorm.includes("qm eh vc") ||
-            msgNorm.includes("qm eh voce") ||
-            msgNorm.includes("qm eh você") ||
-            msgNorm.includes("quem e vc") ||
-            msgNorm.includes("quem é você clara") ||
-            msgNorm.includes("quem é o vektor") ||
-            msgNorm.includes("quem é você vektor") ||
-            msgNorm.includes("qual seu papel") ||
-            msgNorm.includes("como pode me ajudar") ||
-            msgNorm.includes("o que pode fazer") ||
-            msgNorm.includes("o que voce pode fazer") ||
-            msgNorm.includes("o que você pode fazer") ||
-            msgNorm.includes("sobre o que voce fala") ||
-            msgNorm.includes("sobre o que você fala") ||
-            msgNorm.includes("o que pode me orientar")||
-            msgNorm.includes("pra que fui criado") ||
-            msgNorm.includes("qual e meu proposito") ||
-            msgNorm.includes("qual é o seu proposito") ||
-            msgNorm.includes("qual eh o seu proposito") ||
-            msgNorm.includes("qual eh o seu fim") ||
-            msgNorm.includes("meu proposito") ||  
-            msgNorm.includes("diga o que sabe")	||  
-            msgNorm.includes("me fale sobre voce") ||
-            msgNorm.includes("me fale o que faz") ||	  
-            msgNorm.includes("qual a sua utilidade") ||  
-            msgNorm.includes("função") ||
-            msgNorm.includes("sua função") ||
-            msgNorm.includes("utilidade") ||
-            msgNorm.includes("quais suas funcoes") ||
-            msgNorm.includes("o q c faz") ||
-            msgNorm.includes("o q faz") ||
-            msgNorm.includes("o que é isso") ||
-            msgNorm.includes("oque é isso") ||
-            msgNorm.includes("oq é isso") ||
-            msgNorm.includes("oq eh isso") ||
-            msgNorm.includes("o que você pode responder") ||
-            msgNorm.includes("o que você pode responde") ||
-            msgNorm.includes("oq vc faz?") ||
-            msgNorm.includes("oq vc faz") ||
-            msgNorm.includes("oq vc pode fazer") ||
-            msgNorm.includes("oq vc consegue responder") ||
-            msgNorm.includes("quais perguntas vc consegue responder") ||
-            msgNorm.includes("quais perguntas voce consegue responder") ||
-            msgNorm.includes("quais perguntas você consegue responder") ||
-            msgNorm.includes("quais perguntas você pode responder") ||
-            msgNorm.includes("quais perguntas você responder") ||
-            msgNorm.includes("quais perguntas você responde") ||
-            msgNorm.includes("o que vc pode fazer") ||
-            msgNorm.includes("oque vc pode fazer") ||
-            msgNorm.includes("oq você pode fazer") ||
-            msgNorm.includes("oq voce pode fazer") ||
-            msgNorm.includes("oq voce faz?") ||
-            msgNorm.includes("o que voce faz?") ||
-            msgNorm.includes("o que vc faz?") ||
-            msgNorm.includes("o que vc pode fazer") ||
-            msgNorm.includes("o que vc sabe fazer") ||
-            msgNorm.includes("pra que voce serve") ||
-            msgNorm.includes("pra que você serve") ||
-            msgNorm.includes("pra que vc serve") ||
-            msgNorm.includes("me explica o que faz") ||
-            msgNorm.includes("me diga o que faz") ||
-            msgNorm.includes("explica sua função")
-    ) 
-    {
-        return "sobreBot";
+  const foraEscopoPadroes = [
+    "palmeiras","corinthians","bolsonaro","lula","eleicao","eleição",
+    "presidente","futebol","time joga","campeonato","xing","vai tomar",
+    "conta de matematica","conta de matemática","2+2","raiz quadrada",
+    "piada","xingar","palavrão","palavrao"
+  ];
+  for (const termo of foraEscopoPadroes) {
+    if (msgNorm.includes(normalize(termo))) {
+      return "foraEscopo";
     }
+  }
 
-            // ✅ Intenção: conversa geral sobre o cartão Clara
-    if (
-        msgNorm.includes("cartao clara") ||
-        msgNorm.includes("cartão clara") ||
-        (msgNorm.includes("cartao") && msgNorm.includes("clara")) ||
-        (msgNorm.includes("cartão") && msgNorm.includes("clara")) ||
-        msgNorm.includes("cartao das lojas") ||
-        msgNorm.includes("cartão das lojas") ||
-        msgNorm.includes("cartao nas lojas") ||
-        msgNorm.includes("cartão nas lojas") ||
-        msgNorm.includes("falar sobre o cartao") ||
-        msgNorm.includes("falar sobre o cartão") ||
-        msgNorm.includes("informacoes sobre o cartao") ||
-        msgNorm.includes("informações sobre o cartão") ||
-        msgNorm.includes("duvida sobre o cartao") ||
-        msgNorm.includes("dúvida sobre o cartão") ||
-        msgNorm.includes("tudo sobre a clara") ||
-        msgNorm.includes("como funciona a clara") ||
-        msgNorm.includes("o que é a clara") ||
-        msgNorm.includes("o que e a clara") ||
-        msgNorm.includes("o q e a clara") ||
-        msgNorm.includes("cartao corporativo") ||
-        msgNorm.includes("cartão corporativo") ||
-        msgNorm.includes("cartao de credito corporativo") ||
-        msgNorm.includes("cartão de crédito corporativo") ||
-        msgNorm.includes("duvida clara") ||
-        msgNorm.includes("dúvida clara")
-    ) {
-        return "cartaoGeral";
-    }
+  if (
+    msgNorm.includes("etiqueta") ||
+    msgNorm.includes("etiquetas") ||
+    msgNorm.includes("qual etiqueta") ||
+    msgNorm.includes("que etiqueta")
+  ) {
+    return "etiqueta";
+  }
 
-    return "generica";
+    // 🔹 Perguntas sobre "quais chamados / procedimentos existem no ServiceNow para a Clara"
+  const falaServiceNow =
+    msgNorm.includes("servicenow") ||
+    msgNorm.includes("service now");
+
+  const falaChamado =
+    msgNorm.includes("chamado") ||
+    msgNorm.includes("chamados") ||
+    msgNorm.includes("ticket") ||
+    msgNorm.includes("solicitacao") ||
+    msgNorm.includes("solicitação") ||
+    msgNorm.includes("solicitacoes") ||
+    msgNorm.includes("solicitações") ||
+    msgNorm.includes("procedimento") ||
+    msgNorm.includes("procedimentos");
+
+  const falaClara =
+    msgNorm.includes("clara");
+
+  if (
+    (falaServiceNow && falaChamado && falaClara) ||
+    // NOVO IF (Condição OU): Service Now E Chamado
+    (falaServiceNow && falaChamado) ||
+    
+
+    // alguns atalhos mais diretos, caso a pessoa não escreva "clara"
+    msgNorm.includes("procedimentos servicenow") ||
+    msgNorm.includes("tipos de chamado da clara") ||
+    msgNorm.includes("tipos de chamado clara") ||
+    msgNorm.includes("chamados da clara no servicenow")
+  ) {
+    return "procedimentosServiceNow";
+  }
+
+
+  if (
+    msgNorm.includes("aumentar limite") ||
+    msgNorm.includes("aumento de limite") ||
+    msgNorm.includes("limite maior") ||
+    msgNorm.includes("limite do cartao") ||
+    msgNorm.includes("limite do cartão") ||
+    msgNorm.includes("limite nao basta") ||
+    msgNorm.includes("limite não basta") ||
+    msgNorm.includes("limite acabou") ||
+    msgNorm.includes("limite estourou") ||
+    msgNorm.includes("quero mais limite") ||
+    msgNorm.includes("preciso de mais limite") ||
+    msgNorm.includes("como aumentar meu limite") ||
+    msgNorm.includes("solicitar aumento de limite") ||
+    msgNorm.includes("limite baixo") ||
+    msgNorm.includes("qual o limite do cartao") ||
+    msgNorm.includes("qual o limite do cartão") ||
+    msgNorm.includes("meu limite") ||
+    msgNorm.includes("consultar limite") ||
+    msgNorm.includes("ver limite") ||
+    msgNorm.includes("quanto tenho de limite") ||
+    msgNorm.includes("limite disponivel") ||
+    msgNorm.includes("limite disponível") ||
+    msgNorm.includes("baixar limite") ||
+    msgNorm.includes("diminuir limite") ||
+    msgNorm.includes("limite de credito") ||
+    msgNorm.includes("limite de crédito") ||
+    msgNorm.includes("limite total") ||
+    msgNorm.includes("limite nao liberado") ||
+    msgNorm.includes("limite não liberado") ||
+    msgNorm.includes("limite acabou de novo") ||
+    msgNorm.includes("por que meu limite nao aumenta") ||
+    msgNorm.includes("por que meu limite não aumenta") ||
+    msgNorm.includes("limite esgotado") ||
+    msgNorm.includes("gastei o limite todo") ||
+    msgNorm.includes("aumento de credito") ||
+    msgNorm.includes("aumento de crédito") ||
+    msgNorm.includes("ajustar limite") ||
+    msgNorm.includes("liberar mais limite") ||
+    msgNorm.includes("limite")
+  ) {
+    return "limite";
+  }
+
+  // 🔹 Transação negada / categoria bloqueada para compra
+  if (
+    msgNorm.includes("transacao negada") ||
+    msgNorm.includes("transação negada") ||
+    msgNorm.includes("transacao recusada") ||
+    msgNorm.includes("transação recusada") ||
+    msgNorm.includes("compra negada") ||
+    msgNorm.includes("compra recusada") ||
+    msgNorm.includes("compra rejeitada") ||
+    msgNorm.includes("compra nao passou") ||
+    msgNorm.includes("compra não passou") ||
+    msgNorm.includes("compra nao autorizada") ||
+    msgNorm.includes("compra não autorizada") ||
+    msgNorm.includes("transacao nao autorizada") ||
+    msgNorm.includes("transação não autorizada") ||
+    msgNorm.includes("transacao bloqueada") ||
+    msgNorm.includes("transação bloqueada") ||
+    msgNorm.includes("cartao nao passou") ||
+    msgNorm.includes("cartão não passou") ||
+    msgNorm.includes("cartao recusado") ||
+    msgNorm.includes("cartão recusado") ||
+    msgNorm.includes("cartao negado") ||
+    msgNorm.includes("cartão negado") ||
+    msgNorm.includes("cartao nao autorizou") ||
+    msgNorm.includes("cartão não autorizou") ||
+    msgNorm.includes("cartao travou na maquininha") ||
+    msgNorm.includes("cartao travou na máquina") ||
+    msgNorm.includes("cartao travou") ||
+    msgNorm.includes("cartão travou") ||
+    msgNorm.includes("nao passou o cartao") ||
+    msgNorm.includes("não passou o cartão") ||
+    msgNorm.includes("nao autorizou a compra") ||
+    msgNorm.includes("não autorizou a compra") ||
+    msgNorm.includes("recusou a compra") ||
+    msgNorm.includes("recusou o pagamento") ||
+    msgNorm.includes("falha na compra") ||
+    msgNorm.includes("falha de pagamento") ||
+    msgNorm.includes("erro na compra") ||
+    msgNorm.includes("erro de pagamento") ||
+    msgNorm.includes("erro no cartao") ||
+    msgNorm.includes("erro no cartão") ||
+    msgNorm.includes("compra deu erro") ||
+    msgNorm.includes("pagamento negado") ||
+    msgNorm.includes("pagamento recusado") ||
+    msgNorm.includes("pagamento bloqueado") ||
+    msgNorm.includes("categoria bloqueada") ||
+    msgNorm.includes("categoria bloqueado") ||
+    msgNorm.includes("categoria nao liberada") ||
+    msgNorm.includes("tentando usar o cartão") ||
+    msgNorm.includes("tentando usar o cartao") ||
+    msgNorm.includes("categoria não liberada") ||
+    msgNorm.includes("liberar categoria") ||
+    msgNorm.includes("liberacao de categoria") ||
+    msgNorm.includes("tentei passar o cartão e deu erro") ||
+    msgNorm.includes("tentar passar o cartão") ||
+    msgNorm.includes("tentar passar o cartao") ||
+    msgNorm.includes("tentar usar o cartao") ||
+    msgNorm.includes("tentar usar o cartão") ||
+    msgNorm.includes("tentei passar o cartao e deu erro") ||
+    msgNorm.includes("a compra foi recusada na maquininha") ||
+    msgNorm.includes("não consegui usar o cartão") ||
+    msgNorm.includes("não consegui usar o cartao") ||
+    msgNorm.includes("nao consegui usar o cartao") ||
+    msgNorm.includes("liberação de categoria") ||
+    msgNorm.includes("mcc bloqueado") ||
+    msgNorm.includes("codigo bloqueado") ||
+    msgNorm.includes("código bloqueado") ||
+    msgNorm.includes("nao liberou") ||
+    msgNorm.includes("não liberou") ||
+    msgNorm.includes("nao conseguiu passar") ||
+    msgNorm.includes("não conseguiu passar") ||
+    msgNorm.includes("nao consegui usar") ||
+    msgNorm.includes("não consegui usar") ||
+    msgNorm.includes("tentei usar e nao foi") ||
+    msgNorm.includes("tentei usar e não foi") ||
+    msgNorm.includes("tentei comprar e deu erro") ||
+    msgNorm.includes("tentou passar e nao foi") ||
+    msgNorm.includes("tentou passar e não foi") ||
+    msgNorm.includes("nao aceitou") ||
+    msgNorm.includes("não aceitou") ||
+    msgNorm.includes("nao deu certo a compra") ||
+    msgNorm.includes("não deu certo a compra") ||
+    msgNorm.includes("bloqueou a compra") ||
+    msgNorm.includes("bloqueou a transacao") ||
+    msgNorm.includes("bloqueou a transação") ||
+    msgNorm.includes("compra nao permitida") ||
+    msgNorm.includes("compra não permitida") ||
+    msgNorm.includes("transacao nao permitida") ||
+    msgNorm.includes("transação não permitida")
+  ) {
+    return "transacaoNegadaCategoria";
+  }
+
+  if (
+    msgNorm.includes("bloqueou") ||
+    msgNorm.includes("bloqueado") ||
+    msgNorm.includes("desbloquear") ||
+    msgNorm.includes("cartao travou") ||
+    msgNorm.includes("cartão travou") ||
+    msgNorm.includes("travou o cartao") ||
+    msgNorm.includes("travou o cartão") ||
+    msgNorm.includes("bloquear cartao") ||
+    msgNorm.includes("bloquear cartão") ||
+    msgNorm.includes("queria bloquear") ||
+    msgNorm.includes("quero bloquear") ||
+    msgNorm.includes("como bloquear") ||
+    msgNorm.includes("cartao bloqueado") ||
+    msgNorm.includes("cartão bloqueado") ||
+    msgNorm.includes("meu cartao nao funciona") ||
+    msgNorm.includes("meu cartão não funciona") ||
+    msgNorm.includes("meu cartão tá bloqueado") ||
+    msgNorm.includes("pq meu cartão tá bloqueadp") ||
+    msgNorm.includes("pq meu cartão tá bloqueado") ||
+    msgNorm.includes("meu cartao ta bloqueado") ||
+    msgNorm.includes("nao consigo usar o cartao") ||
+    msgNorm.includes("não consigo usar o cartão") ||
+    msgNorm.includes("problema no cartao") ||
+    msgNorm.includes("problema no cartão") ||
+    msgNorm.includes("suspender cartao") ||
+    msgNorm.includes("suspender cartão") ||
+    msgNorm.includes("suspender o uso") ||
+    msgNorm.includes("o cartao parou") ||
+    msgNorm.includes("o cartão parou") ||
+    msgNorm.includes("ativar cartao") ||
+    msgNorm.includes("ativar cartão") ||
+    msgNorm.includes("reativar cartao") ||
+    msgNorm.includes("reativar cartão") ||
+    msgNorm.includes("travamento") ||
+    msgNorm.includes("por que nao funciona") ||
+    msgNorm.includes("por que não funciona") ||
+    msgNorm.includes("desliguei o cartao") ||
+    msgNorm.includes("desliguei o cartão") ||
+    msgNorm.includes("bloqueio preventivo")
+  ) {
+    return "bloqueio";
+  }
+
+  if (
+    msgNorm.includes("como justificar") ||
+    msgNorm.includes("justificar compra") ||
+    msgNorm.includes("prestar contas") ||
+    msgNorm.includes("prestacao de contas") ||
+    msgNorm.includes("prestação de contas") ||
+    msgNorm.includes("colocar nota") ||
+    msgNorm.includes("inserir nota") ||
+    msgNorm.includes("anexar nota") ||
+    msgNorm.includes("descricao na clara") ||
+    msgNorm.includes("como inserir nota") ||
+    msgNorm.includes("nota fiscal") ||
+    msgNorm.includes("nota da compra") ||
+    msgNorm.includes("escrever justificativa") ||
+    msgNorm.includes("como colocar justificativa") ||
+    msgNorm.includes("comprovante") ||
+    msgNorm.includes("comprovantes") ||
+    msgNorm.includes("comprovante de compra") ||
+    msgNorm.includes("comprovacao de despesa") ||
+    msgNorm.includes("comprovação de despesa") ||
+    msgNorm.includes("registro de despesa") ||
+    msgNorm.includes("lançar despesa") ||
+    msgNorm.includes("lancamento de despesa") ||
+    msgNorm.includes("lançamento de despesa") ||
+    msgNorm.includes("reembolso sem nota") ||
+    msgNorm.includes("perdi a nota") ||
+    msgNorm.includes("despesa sem comprovante") ||
+    msgNorm.includes("colocar comprovante") ||
+    msgNorm.includes("como declarar") ||
+    msgNorm.includes("declarar despesa") ||
+    msgNorm.includes("como finalizar prestacao") ||
+    msgNorm.includes("como finalizar prestação") ||
+    msgNorm.includes("relatorio de despesa") ||
+    msgNorm.includes("relatório de despesa") ||
+    msgNorm.includes("enviar nota") ||
+    msgNorm.includes("falta a nota") ||
+    msgNorm.includes("despesa sem nota") ||
+    msgNorm.includes("finalizar contas") ||
+    msgNorm.includes("minhas prestacoes") ||
+    msgNorm.includes("minhas prestações") ||
+    msgNorm.includes("descrição na clara")
+  ) {
+    return "prestacao";
+  }
+
+  if (
+    msgNorm.includes("lanche") ||
+    msgNorm.includes("lanche pro time") ||
+    msgNorm.includes("lanche para o time") ||
+    msgNorm.includes("cafe pro time") ||
+    msgNorm.includes("café pro time") ||
+    msgNorm.includes("coffee break") ||
+    msgNorm.includes("agua") ||
+    msgNorm.includes("água") ||
+    msgNorm.includes("galão") ||
+    msgNorm.includes("galao") ||
+    msgNorm.includes("premiacao") ||
+    msgNorm.includes("premiação")
+  ) {
+    return "alimentoTime";
+  }
+
+  if (
+    msgNorm.includes("uber") ||
+    msgNorm.includes("iber") ||
+    msgNorm.includes(" 99") ||
+    msgNorm.includes("taxi") ||
+    msgNorm.includes("táxi") ||
+    msgNorm.includes("taxí") ||
+    msgNorm.includes("cabify") ||
+    msgNorm.includes("transporte") ||
+    msgNorm.includes("aplicativo de transporte") ||
+    msgNorm.includes("motorista de aplicativo") ||
+    msgNorm.includes("carro por app") ||
+    msgNorm.includes("carona") ||
+    msgNorm.includes("como chamar um carro") ||
+    msgNorm.includes("como pedir um carro") ||
+    msgNorm.includes("uber black") ||
+    msgNorm.includes("uber x") ||
+    msgNorm.includes("99 pop") ||
+    msgNorm.includes("99taxi") ||
+    msgNorm.includes("uber drive") ||
+    msgNorm.includes("uber motorista") ||
+    msgNorm.includes("uber pass") ||
+    msgNorm.includes("uber eats") ||
+    msgNorm.includes("serviço de transporte") ||
+    msgNorm.includes("qual app de carro") ||
+    msgNorm.includes("motorista particular") ||
+    msgNorm.includes("drive") ||
+    msgNorm.includes("drivi") ||
+    msgNorm.includes("indriver") ||
+    msgNorm.includes("in driver") ||
+    msgNorm.includes("waze carpool") ||
+    msgNorm.includes("waze car pool") ||
+    msgNorm.includes("taxi particular") ||
+    msgNorm.includes("taxi 99") ||
+    msgNorm.includes("app de taxi") ||
+    msgNorm.includes("app de táxi") ||
+    msgNorm.includes("app de transporte")
+  ) {
+    return "transportePessoal";
+  }
+
+  // 🔹 Troca / afastamento / demissão de gerente e uso de cartão de outra loja
+  if (
+    msgNorm.includes("mudar de loja") ||
+    msgNorm.includes("troca de loja") ||
+    msgNorm.includes("trocar de loja") ||
+    msgNorm.includes("mudança de loja") ||
+    msgNorm.includes("mudanca de loja") ||
+    msgNorm.includes("vou mudar de loja") ||
+    msgNorm.includes("fui transferido") ||
+    msgNorm.includes("transferido de loja") ||
+    msgNorm.includes("transferencia de loja") ||
+    msgNorm.includes("transferência de loja") ||
+    msgNorm.includes("gerente desligado") ||
+    msgNorm.includes("sem gerente") ||
+    msgNorm.includes("gerente saiu") ||
+    msgNorm.includes("gerente saiu da loja") ||
+    msgNorm.includes("cartao de outra loja") ||
+    msgNorm.includes("cartão de outra loja") ||
+    msgNorm.includes("usar cartao de outra loja") ||
+    msgNorm.includes("trocar minha loja") ||
+    msgNorm.includes("mudar minha loja") ||
+    msgNorm.includes("sair da loja") ||
+    msgNorm.includes("qual minha loja") ||
+    msgNorm.includes("quero mudar a loja") ||
+    msgNorm.includes("mudei de unidade") ||
+    msgNorm.includes("trocar de unidade") ||
+    msgNorm.includes("como troco de loja") ||
+    msgNorm.includes("troquei de loja") ||
+    msgNorm.includes("sou de outra loja") ||
+    msgNorm.includes("sou de outra unidade") ||
+    msgNorm.includes("cartao de loja diferente") ||
+    msgNorm.includes("cartão de loja diferente") ||
+    msgNorm.includes("gerente novo") ||
+    msgNorm.includes("novo gerente") ||
+    msgNorm.includes("cadastro de gerente") ||
+    msgNorm.includes("tirar gerente") ||
+    msgNorm.includes("excluir gerente") ||
+    msgNorm.includes("quem e o gerente") ||
+    msgNorm.includes("quem é o gerente") ||
+    msgNorm.includes("gestor estiver de férias") ||
+    msgNorm.includes("gerente de férias") ||
+    msgNorm.includes("problema com gerente") ||
+    msgNorm.includes("gerente nao esta na loja") ||
+    msgNorm.includes("gerente não está na loja") ||
+    msgNorm.includes("minha loja esta sem gerente") ||
+    msgNorm.includes("gerente demitido") ||
+    msgNorm.includes("colocar cartao de outra loja") ||
+    msgNorm.includes("habilitar cartao de outra loja") ||
+    msgNorm.includes("como uso o cartao em outra loja") ||
+    msgNorm.includes("cartao nao funciona em outra loja") ||
+    msgNorm.includes("cartão não funciona em outra loja") ||
+    msgNorm.includes("gerente afastado") ||
+    msgNorm.includes("gerente afastada") ||
+    msgNorm.includes("afastamento do gerente") ||
+    msgNorm.includes("gerente demitida") ||
+    msgNorm.includes("gerente foi desligado") ||
+    msgNorm.includes("gerente foi desligada") ||
+    msgNorm.includes("novo gerente da loja") ||
+    msgNorm.includes("troca de gerente") ||
+    msgNorm.includes("troca do gerente") ||
+    msgNorm.includes("usar cartão de outra loja") ||
+
+    // férias + gerente/gestor/gestora
+    (
+      msgNorm.includes("ferias") &&
+      (msgNorm.includes("gerente") ||
+       msgNorm.includes("gestor")  ||
+       msgNorm.includes("gestora"))
+    )
+  ) {
+    return "trocaGerente";
+  }
+
+  if (
+    msgNorm.includes("sangria") ||
+    msgNorm.includes("sangrias") ||
+    msgNorm.includes("fazer sangria") ||
+    msgNorm.includes("puxar dinheiro do caixa") ||
+    msgNorm.includes("retirar dinheiro do caixa") ||
+    msgNorm.includes("tirar dinheiro do caixa") ||
+    msgNorm.includes("retirada de dinheiro do caixa") ||
+    msgNorm.includes("movimentacao de dinheiro no caixa") ||
+    msgNorm.includes("movimentação de dinheiro no caixa") ||
+    msgNorm.includes("fechar o caixa") ||
+    msgNorm.includes("como fechar o caixa") ||
+    msgNorm.includes("retirar valor do caixa") ||
+    msgNorm.includes("como fazer sangria") ||
+    msgNorm.includes("registrar saida de dinheiro") ||
+    msgNorm.includes("registrar saída de dinheiro") ||
+    msgNorm.includes("saida de dinheiro do caixa") ||
+    msgNorm.includes("saída de dinheiro do caixa") ||
+    msgNorm.includes("suprimento") ||
+    msgNorm.includes("suprimentos") ||
+    msgNorm.includes("fazer suprimento") ||
+    msgNorm.includes("colocar dinheiro no caixa") ||
+    msgNorm.includes("registro de suprimento") ||
+    msgNorm.includes("registro de retirada") ||
+    msgNorm.includes("registrando sangria") ||
+    msgNorm.includes("registro de sangria") ||
+    msgNorm.includes("tirar troco do caixa") ||
+    msgNorm.includes("depositar dinheiro no caixa") ||
+    msgNorm.includes("deposito no caixa") ||
+    msgNorm.includes("depósito no caixa") ||
+    msgNorm.includes("remocao de dinheiro") ||
+    msgNorm.includes("remoção de dinheiro") ||
+    msgNorm.includes("retirar excesso") ||
+    msgNorm.includes("dinheiro a mais no caixa") ||
+    msgNorm.includes("ajuste de caixa") ||
+    msgNorm.includes("retirar dinheiro do caixa")
+  ) {
+    return "sangria";
+  }
+
+  if (
+    msgNorm.includes("nao reconheco") ||
+    msgNorm.includes("não reconheço") ||
+    msgNorm.includes("fraude") ||
+    msgNorm.includes("compra indevida") ||
+    msgNorm.includes("contestar compra") ||
+    msgNorm.includes("contestacao") ||
+    msgNorm.includes("compra que nao fiz") ||
+    msgNorm.includes("compra que não fiz") ||
+    msgNorm.includes("nao fiz essa compra") ||
+    msgNorm.includes("não fiz essa compra") ||
+    msgNorm.includes("compra desconhecida") ||
+    msgNorm.includes("uso indevido") ||
+    msgNorm.includes("estorno") ||
+    msgNorm.includes("quero estornar") ||
+    msgNorm.includes("quero cancelar compra") ||
+    msgNorm.includes("cancelar compra indevida") ||
+    msgNorm.includes("compra suspeita") ||
+    msgNorm.includes("transacao nao reconhecida") ||
+    msgNorm.includes("transação não reconhecida") ||
+    msgNorm.includes("cartao clonado") ||
+    msgNorm.includes("clonaram meu cartao") ||
+    msgNorm.includes("clonaram meu cartão") ||
+    msgNorm.includes("roubaram meu cartao") ||
+    msgNorm.includes("roubaram meu cartão") ||
+    msgNorm.includes("uso nao autorizado") ||
+    msgNorm.includes("uso não autorizado") ||
+    msgNorm.includes("quero o dinheiro de volta") ||
+    msgNorm.includes("reembolso") ||
+    msgNorm.includes("solicitar estorno") ||
+    msgNorm.includes("transacao suspeita") ||
+    msgNorm.includes("tentativa de fraude") ||
+    msgNorm.includes("estorno da compra") ||
+    msgNorm.includes("cai em golpe") ||
+    msgNorm.includes("golpe no cartao") ||
+    msgNorm.includes("golpe no cartão") ||
+    msgNorm.includes("fui roubado") ||
+    msgNorm.includes("contestação")
+  ) {
+    return "fraudeContestacao";
+  }
+
+  // aqui você PODE manter um único bloco de cartaoGeral (não dois)
+
+  if (
+    msgNorm.includes("posso comprar") ||
+    msgNorm.includes("posso usar") ||
+    msgNorm.includes("pode usar") ||
+    msgNorm.includes("pode pagar") ||
+    msgNorm.includes("pode gastar") ||
+    msgNorm.includes("pode comprar") ||
+    msgNorm.includes("o que pode comprar") ||
+    msgNorm.includes("oq eu posso comprar com o cartão") ||
+    msgNorm.includes("oq pode comprar") ||
+    msgNorm.includes("pode no cartao") ||
+    msgNorm.includes("pode no cartão") ||
+    msgNorm.includes("pode colocar no cartao") ||
+    msgNorm.includes("pode colocar no cartão") ||
+    msgNorm.includes("posso usar o cartao para") ||
+    msgNorm.includes("posso usar o cartão para") ||
+    msgNorm.includes("para que posso usar") ||
+    msgNorm.includes("o que da pra pagar") ||
+    msgNorm.includes("oq da pra pagar") ||
+    msgNorm.includes("o que da para pagar") ||
+    msgNorm.includes("posso pagar") ||
+    msgNorm.includes("oq pagar") ||
+    msgNorm.includes("pagar com o cartao") ||
+    msgNorm.includes("pagar com o cartão") ||
+    msgNorm.includes("oque posso pagar") ||
+    msgNorm.includes("o q posso pagar") ||
+    msgNorm.includes("oq eu posso pagar") ||
+    msgNorm.includes("eu posso pagar") ||
+    msgNorm.includes("posso passar o cartao") ||
+    msgNorm.includes("posso passar o cartão") ||
+    msgNorm.includes("oq eu gasto") ||
+    msgNorm.includes("o que posso gastar") ||
+    msgNorm.includes("posso usar cartao") ||
+    msgNorm.includes("posso usar cartão") ||
+    msgNorm.includes("o que posso fazer") ||
+    msgNorm.includes("oq da pra fazer") ||
+    msgNorm.includes("posso adquirir") ||
+    msgNorm.includes("que da pra adquirir") ||
+    msgNorm.includes("para que serve o cartao") ||
+    msgNorm.includes("para que serve o cartão") ||
+    msgNorm.includes("em que posso usar") ||
+    msgNorm.includes("em que eu posso usar") ||
+    msgNorm.includes("oq pode pagar") ||
+    msgNorm.includes("pode ser pago") ||
+    (typeof perguntasGeraisOquePosso !== "undefined" &&
+     perguntasGeraisOquePosso.some(f => msgNorm.includes(f)))
+  ) {
+    return "podeNaoPode";
+  }
+
+  // BOT: SOBRE O QUE ELE PODE FAZER
+  if (
+    msgNorm.includes("o que voce faz") ||
+    msgNorm.includes("qual o seu nome") ||
+    msgNorm.includes("qual seu nome") ||
+    msgNorm.includes("qual é o seu nome") ||
+    msgNorm.includes("qual eh o seu nome") ||
+    msgNorm.includes("qual eh seu nome") ||
+    msgNorm.includes("como vc se chama") ||
+    msgNorm.includes("como voce se chama") ||
+    msgNorm.includes("como você se chama") ||
+    msgNorm.includes("como vc chama") ||
+    msgNorm.includes("como voce chama") ||
+    msgNorm.includes("como você chama") ||
+    msgNorm.includes("o que você faz") ||
+    msgNorm.includes("o que vc faz") ||
+    msgNorm.includes("pra que serve") ||
+    msgNorm.includes("qual sua função") ||
+    msgNorm.includes("qual é sua função") ||
+    msgNorm.includes("qual e sua função") ||
+    msgNorm.includes("qual sua funcao") ||
+    msgNorm.includes("qual é sua funcao") ||
+    msgNorm.includes("quem é você") ||
+    msgNorm.includes("quem e voce") ||
+    msgNorm.includes("quem é vc") ||
+    msgNorm.includes("qm é vc") ||
+    msgNorm.includes("qm e vc") ||
+    msgNorm.includes("qm eh vc") ||
+    msgNorm.includes("qm eh voce") ||
+    msgNorm.includes("qm eh você") ||
+    msgNorm.includes("quem e vc") ||
+    msgNorm.includes("quem é você clara") ||
+    msgNorm.includes("quem é o vektor") ||
+    msgNorm.includes("quem é você vektor") ||
+    msgNorm.includes("qual seu papel") ||
+    msgNorm.includes("como pode me ajudar") ||
+    msgNorm.includes("o que pode fazer") ||
+    msgNorm.includes("o que voce pode fazer") ||
+    msgNorm.includes("o que você pode fazer") ||
+    msgNorm.includes("sobre o que voce fala") ||
+    msgNorm.includes("sobre o que você fala") ||
+    msgNorm.includes("o que pode me orientar")||
+    msgNorm.includes("pra que fui criado") ||
+    msgNorm.includes("qual e meu proposito") ||
+    msgNorm.includes("qual é o seu proposito") ||
+    msgNorm.includes("qual eh o seu proposito") ||
+    msgNorm.includes("qual eh o seu fim") ||
+    msgNorm.includes("meu proposito") ||
+    msgNorm.includes("diga o que sabe")	||
+    msgNorm.includes("me fale sobre voce") ||
+    msgNorm.includes("me fale o que faz") ||
+    msgNorm.includes("qual a sua utilidade") ||
+    msgNorm.includes("função") ||
+    msgNorm.includes("sua função") ||
+    msgNorm.includes("utilidade") ||
+    msgNorm.includes("quais suas funcoes") ||
+    msgNorm.includes("o q c faz") ||
+    msgNorm.includes("o q faz") ||
+    msgNorm.includes("o que é isso") ||
+    msgNorm.includes("oque é isso") ||
+    msgNorm.includes("oq é isso") ||
+    msgNorm.includes("oq eh isso") ||
+    msgNorm.includes("o que você pode responder") ||
+    msgNorm.includes("o que você pode responde") ||
+    msgNorm.includes("oq vc faz?") ||
+    msgNorm.includes("oq vc faz") ||
+    msgNorm.includes("oq vc pode fazer") ||
+    msgNorm.includes("oq vc consegue responder") ||
+    msgNorm.includes("quais perguntas vc consegue responder") ||
+    msgNorm.includes("quais perguntas voce consegue responder") ||
+    msgNorm.includes("quais perguntas você consegue responder") ||
+    msgNorm.includes("quais perguntas você pode responder") ||
+    msgNorm.includes("quais perguntas você responder") ||
+    msgNorm.includes("quais perguntas você responde") ||
+    msgNorm.includes("o que vc pode fazer") ||
+    msgNorm.includes("oque vc pode fazer") ||
+    msgNorm.includes("oq você pode fazer") ||
+    msgNorm.includes("oq voce pode fazer") ||
+    msgNorm.includes("oq voce faz?") ||
+    msgNorm.includes("o que voce faz?") ||
+    msgNorm.includes("o que vc faz?") ||
+    msgNorm.includes("o que vc pode fazer") ||
+    msgNorm.includes("o que vc sabe fazer") ||
+    msgNorm.includes("pra que voce serve") ||
+    msgNorm.includes("pra que você serve") ||
+    msgNorm.includes("pra que vc serve") ||
+    msgNorm.includes("me explica o que faz") ||
+    msgNorm.includes("me diga o que faz") ||
+    msgNorm.includes("explica sua função")
+  ) {
+    return "sobreBot";
+  }
+
+  // Conversa geral sobre cartão Clara
+  if (
+    msgNorm.includes("cartao clara") ||
+    msgNorm.includes("cartão clara") ||
+    (msgNorm.includes("cartao") && msgNorm.includes("clara")) ||
+    (msgNorm.includes("cartão") && msgNorm.includes("clara")) ||
+    msgNorm.includes("cartao das lojas") ||
+    msgNorm.includes("cartão das lojas") ||
+    msgNorm.includes("cartao nas lojas") ||
+    msgNorm.includes("cartão nas lojas") ||
+    msgNorm.includes("falar sobre o cartao") ||
+    msgNorm.includes("falar sobre o cartão") ||
+    msgNorm.includes("informacoes sobre o cartao") ||
+    msgNorm.includes("informações sobre o cartão") ||
+    msgNorm.includes("duvida sobre o cartao") ||
+    msgNorm.includes("dúvida sobre o cartão") ||
+    msgNorm.includes("tudo sobre a clara") ||
+    msgNorm.includes("como funciona a clara") ||
+    msgNorm.includes("o que é a clara") ||
+    msgNorm.includes("o que e a clara") ||
+    msgNorm.includes("o q e a clara") ||
+    msgNorm.includes("cartao corporativo") ||
+    msgNorm.includes("cartão corporativo") ||
+    msgNorm.includes("cartao de credito corporativo") ||
+    msgNorm.includes("cartão de crédito corporativo") ||
+    msgNorm.includes("duvida clara") ||
+    msgNorm.includes("dúvida clara")
+  ) {
+    return "cartaoGeral";
+  }
+
+  return "generica";
+}
+
+function respProcedimentosServiceNow() {
+  var corpo =
+    '<div class="text-sm text-slate-700">' +
+      '<p><b>Principais procedimentos de Cartão Clara no ServiceNow (Anexo II da Política)</b></p>' +
+
+      '<p class="mt-2">' +
+        'O Anexo II da política organiza os principais fluxos de chamado no <b>ServiceNow</b> para temas de cartão Clara.' +
+        ' De forma resumida, os tipos mais importantes são:' +
+      '</p>' +
+
+      '<ul class="list-disc ml-4 mt-2 space-y-1">' +
+        '<li>' +
+          '<b>Fraude / contestação de transação</b><br>' +
+          'Usado quando há suspeita de fraude ou lançamento indevido pelo estabelecimento.' +
+          ' Normalmente exige anexar boletim de ocorrência ou evidências e detalhar data, valor e loja.' +
+        '</li>' +
+
+        '<li>' +
+          '<b>Desbloqueio de cartão após atraso de comprovantes</b><br>' +
+          'Quando o cartão foi bloqueado porque a loja deixou de anexar nota/comprovante dentro do prazo.' +
+          ' O chamado é usado para comprovar que as pendências foram regularizadas e solicitar o desbloqueio.' +
+        '</li>' +
+
+        '<li>' +
+          '<b>Ajuste excepcional de limite</b><br>' +
+          'Para situações pontuais em que o limite padrão do cartão não cobre uma demanda específica' +
+          ' (ex.: obra emergencial autorizada, ação oficial maior). Sempre exige justificativa e aprovação.' +
+        '</li>' +
+
+        '<li>' +
+          '<b>Troca de gerente / mudança de loja do portador</b><br>' +
+          'Usado quando o gerente muda de loja ou há substituição definitiva do responsável.' +
+          ' O fluxo pede BU (Centauro/Fisia), loja anterior, nova loja, data da troca e quem assume a titularidade.' +
+          ' É esse procedimento que formaliza a situação descrita na seção de afastamento/demissão de gerente.' +
+        '</li>' +
+
+        '<li>' +
+          '<b>Inserção ou ajuste de etiqueta</b><br>' +
+          'Chamado para incluir nova etiqueta na Clara ou ajustar etiqueta existente,' +
+          ' quando um tipo de gasto recorrente não se encaixa bem nas opções atuais.' +
+        '</li>' +
+
+        '<li>' +
+          '<b>Gasto indevido (pessoal) / ressarcimento</b><br>' +
+          'Quando o cartão foi usado para despesa pessoal ou fora da política.' +
+          ' O chamado registra o caso, a forma de ressarcimento e o acompanhamento pelo Financeiro.' +
+        '</li>' +
+      '</ul>' +
+
+      '<p class="mt-3">' +
+        'Eu não abro o chamado por você, mas te ajudo a escolher <b>qual tipo de solicitação</b> faz sentido' +
+        ' e a chegar com o texto certo no ServiceNow.' +
+      '</p>' +
+
+      '<p class="mt-3 text-xs text-slate-500">' +
+        'Estrutura baseada no Anexo II – Solicitações no ServiceNow da Política de Utilização dos Cartões Clara.' +
+        ' Sempre siga os caminhos e nomes exatos de categoria que estiverem atualizados no catálogo do ServiceNow.' +
+      '</p>' +
+    '</div>';
+
+  return vektorBlocoRaciocinioPolitica(
+    corpo,
+    "",
+    typeof POLITICA_CARTOES_CLARA_LINK !== "undefined"
+      ? POLITICA_CARTOES_CLARA_LINK
+      : ""
+  );
 }
 
 
@@ -3046,15 +3139,14 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
                 // 🔹 NOVA RESPOSTA – transação negada / categoria bloqueada
                 function respTransacaoNegadaCategoria() {
                     return `HTML:<div class="text-sm text-slate-700">
-            <p>Algumas compras podem ser <b>negadas</b> mesmo com limite disponível e cartão ativo (<i>É importante que você verifique que seu cartão não está bloqueado</i>), porque a <b>categoria do estabelecimento</b> (MCC) está bloqueada pela política de uso dos cartões Clara.</p>
+            <p>Algumas compras podem ser <b>negadas</b> mesmo com limite disponível e cartão ativo (<i>É importante que você verifique que seu cartão não está bloqueado</i>), porque a <b>categoria do estabelecimento</b> (MCC) está bloqueada pela política de uso dos cartões Clara.
 
-            <p class="mt-2">Nesses casos, siga estes passos:</p>
+            <p class="mt-2">Nesses casos, siga estes passos:
             <ol class="list-decimal ml-4 mt-1">
             <li>Verifique no app/plataforma da Clara o motivo da recusa e a categoria da compra (MCC);</li>
             <li>Se a despesa for necessária para a operação da loja, abra um chamado no <b>ServiceNow</b> em:<br/>
             <b>Contas a Receber &gt; Cartão Clara &gt; Solicitação de Liberação de Categoria para Compra</b>;</li>
             <li>Explique o contexto da compra, qual tipo de serviço/produto precisa ser liberado e se a liberação é pontual ou recorrente.</li>
-            </ol>
 
             <p class="mt-2">Depois da liberação pelo Financeiro no ServiceNow, você pode tentar a compra novamente com o cartão Clara.</p>
             </div>`;
@@ -3150,22 +3242,62 @@ Se já usou de forma pessoal (pagando do próprio bolso) e quer o reembolso:<br/
 </p>`;
     }
 
-    function respTrocaGerente() {
-        return `HTML:<p class="text-sm text-slate-700">
-Troca de gerente / mudança de loja segue assim:<br/><br/>
-1. Se o gerente titular saiu e ainda não tem novo cartão da nova gestão:<br/>
-   • O Financeiro pode autorizar uso TEMPORÁRIO do cartão de outra loja;<br/>
-   • Cada compra precisa ter na descrição da Clara algo como:<br/>
-     "Uso temporário do cartão na loja 1234";<br/>
-   • Isso garante que o custo vá pra loja certa no fechamento.<br/><br/>
-2. Se é só férias/afastamento curto do gerente:<br/>
-   • o cartão da própria loja continua sendo usado pelo líder/supervisor autorizado;<br/>
-   • não é pra circular cartão entre lojas sem autorização financeira.<br/><br/>
-Se tiver caso especial, fale com o Financeiro e, se preciso, abra chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">
-ServiceNow.
-</a>.
-</p>`;
-    }
+function respTrocaGerente() {
+  var corpo =
+    '<div class="text-sm text-slate-700">' +
+      '<p><b>Quando o gerente é afastado ou desligado, o que fazer com o cartão Clara?</b></p>' +
+
+      '<p class="mt-2">' +
+        'A política traz dois cenários principais para lojas físicas:' +
+      '</p>' +
+
+      '<ol class="list-decimal ml-5 mt-2 space-y-2">' +
+        '<li>' +
+          '<b>Gerente em férias ou afastamento temporário (licença, atestado etc.)</b><br>' +
+          '<ul class="list-disc ml-4 mt-1">' +
+            '<li>O cartão da loja continua sendo o <b>cartão da própria loja</b>, não de outra.</li>' +
+            '<li>Durante o afastamento, um <b>líder / supervisor</b> indicado pela regional assume a guarda e o uso operacional do cartão.</li>' +
+            '<li>A loja não deve usar o cartão de outra unidade só porque o gerente está afastado.</li>' +
+          '</ul>' +
+        '</li>' +
+
+        '<li>' +
+          '<b>Gerente desligado e ainda não há novo gerente nomeado</b><br>' +
+          '<ul class="list-disc ml-4 mt-1">' +
+            '<li>O cartão do gerente desligado deve ser <b>bloqueado</b> e recolhido.</li>' +
+            '<li>Em casos específicos, a política permite uso <b>temporário</b> do cartão de outra loja, sempre com validação do Financeiro.</li>' +
+            '<li>Quando isso acontecer, a <b>descrição da transação</b> deve deixar claro qual loja está sendo atendida, por exemplo:<br>' +
+              '<span class="italic">"Uso temporário do cartão da loja 0123 para despesas operacionais da loja 0456 – gerente em transição"</span>.' +
+            '</li>' +
+            '<li>O responsável pela prestação de contas passa a ser o <b>gerente temporário / responsável indicado</b> pela regional.</li>' +
+          '</ul>' +
+        '</li>' +
+      '</ol>' +
+
+      '<p class="mt-3">' +
+        'Em qualquer cenário de troca, afastamento ou demissão, a orientação é sempre:' +
+      '</p>' +
+      '<ul class="list-disc ml-4 mt-1">' +
+        '<li>Garantir que o cartão do gerente desligado seja recolhido e bloqueado;</li>' +
+        '<li>Formalizar a situação abrindo chamado no <b>ServiceNow</b>, informando loja, BU, data e quem assume a responsabilidade;</li>' +
+        '<li>Registrar na descrição das compras qualquer uso temporário de cartão de outra loja;</li>' +
+        '<li>Em caso de <b>férias do gerente</b>, a loja deve abrir chamado no ServiceNow informando o período e quem ficará responsável pela guarda do cartão, para que o Financeiro acompanhe e, quando necessário, faça o tratamento dos comprovantes em nome do responsável temporário.</li>' +
+      '</ul>' +
+
+      '<p class="mt-3 text-xs text-slate-500">' +
+        'Resumo baseado no item 8.4 e no Anexo II da Política de Utilização dos Cartões Clara.' +
+        ' Em caso de dúvida ou situações não previstas, valide com o Financeiro.' +
+      '</p>' +
+    '</div>';
+
+  return vektorBlocoRaciocinioPolitica(
+    corpo,
+    "",
+    typeof POLITICA_CARTOES_CLARA_LINK !== "undefined"
+      ? POLITICA_CARTOES_CLARA_LINK
+      : ""
+  );
+}
 
     function respCartaoGeral() {
     return `HTML:<div class="text-sm text-slate-700">
@@ -3219,14 +3351,41 @@ Só em caso de exceção real (cartão sem funcionar e gasto urgente da operaç�
     }
 
     function respFraudeContestacao() {
-        return `HTML:<p class="text-sm text-slate-700">
-Se apareceu uma compra que você <b>não reconhece</b> no cartão Clara:<br/><br/>
-1. Avise o Financeiro imediatamente;<br/>
-2. Abrir contestação com o suporte da Clara em até 2 dias úteis após a transação;<br/>
-3. Durante a análise a operadora pode bloquear o cartão preventivamente.<br/><br/>
-Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal). Se a compra foi pessoal, aí precisa ressarcir em até 2 dias úteis; não é contestação.
-</p>`;
-    }
+  return `HTML:<div class="text-sm text-slate-700">
+    <p><b>Suspeita de fraude ou transação não reconhecida no cartão Clara</b>
+
+    <p class="mt-2">
+      Quando aparece uma compra que você <b>não reconhece</b> no extrato da Clara, a orientação básica é:
+
+    <ul class="list-disc ml-4 mt-2 space-y-1">
+      <li>Conferir se não foi uma compra legítima feita por outro responsável da loja;</li>
+      <li>Verificar se não é uma assinatura ou cobrança recorrente que passou despercebida;</li>
+      <li>Confirmar se o valor, data e estabelecimento realmente não fazem sentido para a operação da loja.</ul>
+ 
+    <p class="mt-3">
+      Se, depois dessa checagem, continuar parecendo <b>fraude ou uso indevido</b>, siga estes passos:
+ 
+    <ul class="list-disc ml-4 mt-2 space-y-1">
+      <li>Bloqueie o cartão na própria Clara, se ainda houver risco de novas cobranças;</li>
+      <li>Levante todas as informações da transação: data, valor, estabelecimento e descrição;</li>
+      <li>Se houver indício de golpe ou roubo, registre um <b>Boletim de Ocorrência</b> (quando aplicável).
+
+    <p class="mt-3">
+      <b>Formalização no ServiceNow:</b>
+    </p>
+      Para seguir o fluxo oficial, abra um chamado de <b>Fraude / Contestação de transação – Cartão Clara</b> no <b>ServiceNow</b>, informando: (Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal etc. Se a compra foi pessoal, aí precisa ressarcir em até 2 dias úteis em outro fluxo; não é contestação.)
+
+    <ul class="list-disc ml-4 mt-2 space-y-1">
+      <li>Loja, BU (Centauro / Fisia) e código da unidade;</li>
+      <li>Dados completos da transação (data, valor, estabelecimento, descrição);</li>
+      <li>Contexto do ocorrido e, se houver, anexos como prints e boletim de ocorrência;</li>
+      <li>Telefone ou contato de referência da loja para retorno.
+  
+    <p class="mt-3 text-xs text-slate-500">
+      Resumo alinhado ao Anexo II (Fraude / Contestação) da Política de Utilização dos Cartões Clara. Sempre acompanhe o retorno pelo próprio ServiceNow e pelos canais oficiais do Financeiro.
+    </p>
+  </div>`;
+}
 
     function respTermoResponsabilidade() {
         return `HTML:<div class="text-sm text-slate-700">
@@ -3743,6 +3902,12 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
                 ultimaIntencao = "trocaGerente";
                 resposta = respTrocaGerente();
                 break;
+
+            case "procedimentosServiceNow":
+                ultimaIntencao = "procedimentosServiceNow";
+                resposta = respProcedimentosServiceNow();
+                break;
+
 
             case "sangria":
                 ultimaIntencao = "sangria";
@@ -4841,6 +5006,135 @@ function analisarFaturas(faturas) {
   }
 }
 
+// 🔎 Tenta extrair um array de linhas padrão (categoria/estabelecimento) do resultado do Apps Script
+function vektorExtrairListaResumoChave(res) {
+  if (!res) return [];
+
+  // Se já vier um array direto
+  if (Array.isArray(res)) return res;
+
+  // Tenta achar propriedades comuns
+  const possiveis = [
+    "dados",
+    "itens",
+    "linhas",
+    "registros",
+    "categorias",
+    "estabelecimentos",
+    "lista"
+  ];
+
+  for (const nome of possiveis) {
+    if (Array.isArray(res[nome])) {
+      return res[nome];
+    }
+  }
+
+  return [];
+}
+
+// 💡 Gera insights automáticos para categoria/estabelecimento (média por transação)
+function gerarInsightsResumoChaveCategoriaEstab(res, opcoes) {
+  try {
+    const tipoChave = (opcoes && opcoes.tipoChave) || "";
+    // Só faz sentido para Categoria ou Estabelecimento
+    if (tipoChave !== "Categoria" && tipoChave !== "Estabelecimento") {
+      return "";
+    }
+
+    const listaBruta = vektorExtrairListaResumoChave(res);
+    if (!Array.isArray(listaBruta) || listaBruta.length < 2) {
+      return "";
+    }
+
+    // Normaliza: tenta achar chave (nome), valor total e quantidade
+    const itens = listaBruta
+      .map(function (item, idx) {
+        const nome =
+          item.chave ||
+          item.nome ||
+          item.descricao ||
+          item.descricaoChave ||
+          item.categoria ||
+          item.estabelecimento ||
+          ("Item " + (idx + 1));
+
+        const valorRaw =
+          item.valorTotal ||
+          item.totalValor ||
+          item.valor_total ||
+          item.valor ||
+          item.total ||
+          0;
+
+        const qtdRaw =
+          item.qtdTransacoes ||
+          item.qtd_transacoes ||
+          item.quantidade ||
+          item.qtd ||
+          item.numTransacoes ||
+          0;
+
+        const valor = Number(valorRaw) || 0;
+        const qtd = Number(qtdRaw) || 0;
+
+        // Se não tiver quantidade, não dá pra falar de "média por transação"
+        if (valor <= 0 || qtd <= 0) {
+          return null;
+        }
+
+        return {
+          nome: String(nome),
+          valor: valor,
+          qtd: qtd,
+          media: valor / qtd
+        };
+      })
+      .filter(function (x) {
+        return x !== null;
+      });
+
+    if (itens.length < 2) {
+      return "";
+    }
+
+    // Acha maior e menor média
+    let maior = itens[0];
+    let menor = itens[0];
+
+    for (let i = 1; i < itens.length; i++) {
+      const it = itens[i];
+      if (it.media > maior.media) maior = it;
+      if (it.media < menor.media) menor = it;
+    }
+
+    const labelColecao =
+      tipoChave === "Categoria" ? "categorias" : "estabelecimentos";
+    const labelSingular =
+      tipoChave === "Categoria" ? "categoria" : "estabelecimento";
+
+    const mediaMaior = maior.media.toFixed(2).replace(".", ",");
+    const mediaMenor = menor.media.toFixed(2).replace(".", ",");
+
+    let html =
+      "<div class='mt-3 p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700'>" +
+      "<p class='font-semibold mb-1'>Insights automáticos sobre os " + labelColecao + ":</p>" +
+      "<ul class='list-disc ml-4 space-y-1'>" +
+      "<li>O " + labelSingular + " <b>" + maior.nome + "</b> apresenta a <b>maior média de valor por transação</b> no período, em torno de <b>R$ " + mediaMaior + "</b>.</li>" +
+      "<li>O " + labelSingular + " <b>" + menor.nome + "</b> apresenta a <b>menor média de valor por transação</b> no período, em torno de <b>R$ " + mediaMenor + "</b>.</li>" +
+      "</ul>" +
+      "<p class='mt-2 text-[11px] text-slate-500'>" +
+      "Essa média é calculada dividindo o valor total gasto pela quantidade de transações de cada " + labelSingular +
+      " no período consultado.</p>" +
+      "</div>";
+
+    return html;
+  } catch (e) {
+    console.error("Erro em gerarInsightsResumoChaveCategoriaEstab:", e);
+    return "";
+  }
+}
+
     /* ========= GERADOR FINAL ========= */
 
 function gerarRespostaDoBot(msgUsuario) {
@@ -5426,7 +5720,8 @@ if (detCategorias) {
   );
 
   google.script.run
-    .withSuccessHandler(function (res) {
+        .withSuccessHandler(function (res) {
+      // 1) Monta a tabela normal (como já fazia)
       renderResumoPorChaveGenerico(res, {
         tipoChave: "Categoria",
         titulo: (tipo === "valor"
@@ -5434,7 +5729,18 @@ if (detCategorias) {
           : "Categorias com maior quantidade de transações"),
         topN: topN
       });
+
+      // 2) Se estiver olhando para VALOR, gera insight de média por transação
+      if (tipo === "valor") {
+        const htmlInsights = gerarInsightsResumoChaveCategoriaEstab(res, {
+          tipoChave: "Categoria"
+        });
+        if (htmlInsights) {
+          renderBotMessage("HTML:" + htmlInsights);
+        }
+      }
     })
+
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados por categoria.</p>");
     })
@@ -5472,7 +5778,8 @@ if (detEstab) {
   );
 
   google.script.run
-    .withSuccessHandler(function (res) {
+          .withSuccessHandler(function (res) {
+      // 1) Monta a tabela normal (como já fazia)
       renderResumoPorChaveGenerico(res, {
         tipoChave: "Estabelecimento",
         titulo: (tipo === "valor"
@@ -5480,7 +5787,18 @@ if (detEstab) {
           : "Locais com maior quantidade de transações"),
         topN: topN
       });
+
+      // 2) Se estiver olhando para VALOR, gera insight de média por transação
+      if (tipo === "valor") {
+        const htmlInsights = gerarInsightsResumoChaveCategoriaEstab(res, {
+          tipoChave: "Estabelecimento"
+        });
+        if (htmlInsights) {
+          renderBotMessage("HTML:" + htmlInsights);
+        }
+      }
     })
+
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados por estabelecimento.</p>");
     })
@@ -7372,6 +7690,137 @@ function vektorGerarInsightsRankingLojas(lojas) {
   return html;
 }
 
+// ===================================================================
+// TÓPICO 4 – Insights automáticos: CATEGORIAS (tíquete médio)
+// ===================================================================
+function vektorGerarInsightsResumoCategorias(itens) {
+  if (!Array.isArray(itens) || !itens.length) return "";
+
+  // filtra só quem tem valor e quantidade
+  var lista = itens
+    .map(function (l) {
+      return {
+        nome: l.nome || "Categoria sem nome",
+        valor: Number(l.valor || 0),
+        qtd: Number(l.qtd || 0)
+      };
+    })
+    .filter(function (l) {
+      return l.valor > 0 && l.qtd > 0;
+    });
+
+  if (lista.length < 2) return "";
+
+  // calcula tíquete médio
+  lista.forEach(function (l) {
+    l.media = l.valor / l.qtd;
+  });
+
+  // ordena por média (maior -> menor)
+  lista.sort(function (a, b) {
+    return b.media - a.media;
+  });
+
+  var top = lista[0];
+  var bottom = lista[lista.length - 1];
+
+  var comentarios = [];
+
+  comentarios.push(
+    "A categoria com <b>maior tíquete médio</b> (valor médio por transação) é <b>" +
+      top.nome +
+      "</b>, com cerca de <b>" +
+      top.media.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</b> por transação."
+  );
+
+  comentarios.push(
+    "A categoria com <b>menor tíquete médio</b> é <b>" +
+      bottom.nome +
+      "</b>, com cerca de <b>" +
+      bottom.media.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</b> por transação."
+  );
+
+  var html =
+    "<div style='margin-top:8px;font-size:12px;color:#0F172A;" +
+      "background:#F8FAFC;border-radius:4px;padding:6px;" +
+      "border:1px solid #E2E8F0;'>" +
+      "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre as categorias:</b></p>" +
+      "<ul style='margin:0;padding-left:16px;'>" +
+        comentarios.map(function (c) {
+          return "<li>" + c + "</li>";
+        }).join("") +
+      "</ul>" +
+    "</div>";
+
+  return html;
+}
+
+// ===================================================================
+// TÓPICO 5 – Insights automáticos: ESTABELECIMENTOS (tíquete médio)
+// ===================================================================
+function vektorGerarInsightsResumoEstabelecimentos(itens) {
+  if (!Array.isArray(itens) || !itens.length) return "";
+
+  var lista = itens
+    .map(function (l) {
+      return {
+        nome: l.nome || "Estabelecimento sem nome",
+        valor: Number(l.valor || 0),
+        qtd: Number(l.qtd || 0)
+      };
+    })
+    .filter(function (l) {
+      return l.valor > 0 && l.qtd > 0;
+    });
+
+  if (lista.length < 2) return "";
+
+  lista.forEach(function (l) {
+    l.media = l.valor / l.qtd;
+  });
+
+  lista.sort(function (a, b) {
+    return b.media - a.media;
+  });
+
+  var top = lista[0];
+  var bottom = lista[lista.length - 1];
+
+  var comentarios = [];
+
+  comentarios.push(
+    "O estabelecimento com <b>maior tíquete médio</b> é <b>" +
+      top.nome +
+      "</b>, com cerca de <b>" +
+      top.media.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</b> por transação."
+  );
+
+  comentarios.push(
+    "O estabelecimento com <b>menor tíquete médio</b> é <b>" +
+      bottom.nome +
+      "</b>, com cerca de <b>" +
+      bottom.media.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</b> por transação."
+  );
+
+  var html =
+    "<div style='margin-top:8px;font-size:12px;color:#0F172A;" +
+      "background:#F8FAFC;border-radius:4px;padding:6px;" +
+      "border:1px solid #E2E8F0;'>" +
+      "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre os estabelecimentos:</b></p>" +
+      "<ul style='margin:0;padding-left:16px;'>" +
+        comentarios.map(function (c) {
+          return "<li>" + c + "</li>";
+        }).join("") +
+      "</ul>" +
+    "</div>";
+
+  return html;
+}
+
 // Drilldown: ao clicar numa fatura, detalha por TIME
 window.vektorDrillTimesFatura = function (tr) {
   try {
@@ -8136,6 +8585,47 @@ function renderResumoPorChaveGenerico(resumo, opts) {
     "</div>";
 
   renderBotMessage("HTML:" + html);
+
+  // 🔎 Insights automáticos adicionais para Categoria / Estabelecimento (tíquete médio)
+  var tipoLower = tipoChaveLower;
+  if (tipoLower === "categoria" || tipoLower === "estabelecimento") {
+    var listaInsights = lista
+      .map(function (l) {
+        return {
+          nome: l.estabelecimento || l.categoria || l.chave || "—",
+          valor: Number(l.valorTotal || l.valor || 0),
+          qtd: Number(l.total || l.qtd || 0)
+        };
+      })
+      .filter(function (l) {
+        return l.qtd > 0 && l.valor > 0;
+      });
+
+    var insightsHtml = "";
+    if (tipoLower === "categoria") {
+      insightsHtml = vektorGerarInsightsResumoCategorias(listaInsights);
+    } else {
+      insightsHtml = vektorGerarInsightsResumoEstabelecimentos(listaInsights);
+    }
+
+    if (insightsHtml) {
+      renderBotMessage("HTML:" + insightsHtml);
+    }
+  }
+
+  // 🧠 NOVO: insights automáticos específicos para Categoria / Estabelecimento
+  if (
+    opts &&
+    (opts.tipoChave === "Categoria" || opts.tipoChave === "Estabelecimento")
+  ) {
+    const htmlInsightsExtra = gerarInsightsResumoChaveCategoriaEstab(res, {
+      tipoChave: opts.tipoChave
+    });
+
+    if (htmlInsightsExtra) {
+      renderBotMessage("HTML:" + htmlInsightsExtra);
+    }
+  }
 }
 
 // Extrai "top N" (ex.: "top 5", "top5"). Se não houver "top", retorna null.
@@ -8252,6 +8742,11 @@ function detectarPerguntaCategorias(msgOriginal, norm) {
     tipo = "quantidade";
   }
 
+  // se ainda não tiver tipo, assume "valor" como padrão
+  if (!tipo) {
+    tipo = "valor";
+  }
+
   const falaCategoria =
     t.includes("categoria") ||
     t.includes("categorias");
@@ -8262,6 +8757,8 @@ function detectarPerguntaCategorias(msgOriginal, norm) {
     t.includes("mais uso") ||
     t.includes("mais gasto") ||
     t.includes("mais gastos") ||
+    t.includes("mais valor") ||      // NOVO
+    t.includes("mais valores") ||    // NOVO
     t.includes("mais transacoes") ||
     t.includes("mais transacao") ||
     t.includes("maior valor") ||
