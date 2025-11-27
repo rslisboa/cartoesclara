@@ -3062,13 +3062,11 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
 
               function respPoliticaOficial() {
         return `HTML:<div class="text-sm text-slate-700">
-          <p>Seguem as regras oficiais de referência da empresa.</p>
-          <p>
+          <p>Este documento contém as diretrizes e padrões oficiais de referência da Companhia. Ele deve ser consultado e seguido como a fonte de autoridade final para todos os assuntos que lhe são pertinentes.</p>
           <a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer">
-          <strong>Política de Uso dos Cartões Clara (documento oficial)</strong>
-          </a>.
-          </p>
-          <p>Use sempre esse documento como fonte final.</p>
+          <strong>Política de Uso dos Cartões Clara (documento oficial).</strong>
+          </a>
+          <p>O não cumprimento das disposições aqui estabelecidas sujeitará o infrator às medidas disciplinares e legais cabíveis.</p>
           </div>`;
               }
 
@@ -5802,8 +5800,25 @@ window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
         }
 
         // 4) Política (PDF oficial)
-        if (frasesPolitica.some(f => norm.includes(f))) {
-            return respPoliticaOficial();
+        if (frasesPolitica.some(f => norm.includes(f))) 
+        
+        {
+              // ✅ Primeiro: tenta responder RESUMO de categorias
+  if (typeof tentarResponderResumoCategoriasPolitica === "function") {
+    const resultadoResumo = tentarResponderResumoCategoriasPolitica(norm);
+    if (resultadoResumo) {
+      return vektorBlocoRaciocinioPolitica(
+        resultadoResumo.mensagemUsuario,
+        "",
+        typeof POLITICA_CARTOES_CLARA_LINK !== "undefined"
+          ? POLITICA_CARTOES_CLARA_LINK
+          : ""
+      );
+    }
+  }
+
+  // ✅ Se não for sobre categorias, mantém a política oficial genérica
+  return respPoliticaOficial();
         }
 
 
