@@ -497,6 +497,7 @@
 </div>   <!-- fecha coluna direita -->
 </div>     <!-- fecha layout com menu + chat -->
 
+<?!= include('politica_dados'); ?>
 
 <script>
 
@@ -1319,15 +1320,25 @@ window.vektorExpandirLinha = function (tr, base) {
     }
 
     // ================= VEKTOR – bloco de raciocínio da política =================
+
 function vektorBlocoRaciocinioPolitica(explicacao, risco, referencia) {
   explicacao = explicacao || "Essa decisão segue as regras da política de uso dos cartões Clara.";
   risco = risco || "";
-  referencia = referencia || POLITICA_CARTOES_CLARA_LINK || "#";
 
+  // Garante referência com fallback seguro
+  if (typeof POLITICA_CARTOES_CLARA_LINK !== "undefined") {
+    referencia = referencia || POLITICA_CARTOES_CLARA_LINK;
+  } else {
+    referencia = referencia || "#";
+  }
+
+  // Monta o “cartão” de raciocínio
   var html =
     "<div style='margin-top:6px;padding:8px;border-radius:6px;border:1px dashed #cbd5e1;background:#f8fafc;'>" +
-      "<p style='font-size:12px;color:#0f172a;'><b>Como cheguei nessa orientação:</b></p>" +
-      "<p style='font-size:12px;color:#334155;margin-top:4px;'>" + explicacao + "</p>";
+      "<p style='font-size:14px;color:#0f172a;'><b>Segue minha análise para o seu questionamento:</b></p>";
+
+  // Aqui a explicação já pode ser HTML completo (ex.: o bloco da categoria)
+  html += explicacao;
 
   if (risco) {
     html +=
@@ -1341,8 +1352,84 @@ function vektorBlocoRaciocinioPolitica(explicacao, risco, referencia) {
       "</p>" +
     "</div>";
 
-  return html;
+  // ⚠️ IMPORTANTE: prefixo "HTML:" para o renderBotMessage usar innerHTML
+  return "HTML:" + html;
 }
+
+    // =============== MOTOR DE POLÍTICA POR CATEGORIA (SEM MCC AINDA) ===============
+
+    // Encontra uma categoria de política a partir do nome
+    function classificarCategoriaPolitica(nomeCategoria) {
+      if (!nomeCategoria) return null;
+
+      const normCat = normalize(nomeCategoria);
+      if (!Array.isArray(POLITICA_CATEGORIA)) return null;
+
+      // Busca por match exato no nome normalizado
+      for (const regra of POLITICA_CATEGORIA) {
+        if (!regra || !regra.categoria) continue;
+        const normRegra = normalize(regra.categoria);
+        if (normRegra === normCat) {
+          return regra;
+        }
+      }
+
+      return null;
+    }
+
+    // Avalia se uma categoria é permitida / condicional / proibida
+    function avaliarCategoriaPolitica(categoriaPolitica) {
+      const regra = classificarCategoriaPolitica(categoriaPolitica);
+
+      if (!regra) {
+        return {
+          decisao: "indefinido",
+          idRegra: null,
+          motivoTecnico: "Nenhuma regra específica encontrada para essa categoria na matriz POLITICA_CATEGORIA.",
+          mensagemUsuario:
+            "Essa categoria não está mapeada automaticamente no Vektor. Consulte a política oficial ou abra chamado no financeiro para análise."
+        };
+      }
+
+      if (regra.status === "permitido") {
+        return {
+          decisao: "permitido",
+          idRegra: regra.idRegra,
+          motivoTecnico: "Categoria listada como liberada na política (grupo: " + regra.categoria + ").",
+          mensagemUsuario:
+            "Essa categoria de compra é permitida pela política de uso dos cartões Clara, desde que o gasto seja necessário para a operação da loja."
+        };
+      }
+
+      if (regra.status === "condicional") {
+        return {
+          decisao: "condicional",
+          idRegra: regra.idRegra,
+          motivoTecnico: "Categoria listada como sujeita à análise/liberação prévia do financeiro (grupo: " + regra.categoria + ").",
+          mensagemUsuario:
+            "Essa categoria exige análise e liberação prévia do financeiro. Abra chamado no ServiceNow explicando a necessidade antes de concluir a compra."
+        };
+      }
+
+      if (regra.status === "proibido") {
+        return {
+          decisao: "proibido",
+          idRegra: regra.idRegra,
+          motivoTecnico: "Categoria listada como proibida na política (grupo: " + regra.categoria + ").",
+          mensagemUsuario:
+            "Essa categoria é proibida pela política de uso dos cartões Clara. Não use o cartão Clara para esse tipo de despesa."
+        };
+      }
+
+      // fallback defensivo
+      return {
+        decisao: "indefinido",
+        idRegra: regra.idRegra,
+        motivoTecnico: "Status de regra não reconhecido: " + regra.status,
+        mensagemUsuario:
+          "Não consegui classificar essa categoria automaticamente. Consulte o financeiro ou a política oficial."
+      };
+    }
 
     // ===== TIMES OFICIAIS (para identificar "time X" / "grupo X") =====
 const TIMES_OFICIAIS = [
@@ -2783,7 +2870,7 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
     };
 
     function avaliarCompraEspecifica(msgNorm) {
-        const baseMsg = `Esse tipo de item <b>NÃO</b> pode ser comprado com o cartão.<br>
+        const baseMsg = `Esse tipo de item <b>NÃO</b> pode ser comprado/utilizado com o cartão.<br>
 Ele deve seguir o processo de requisição junto à área de Compras (se for relevante e apto de acordo com o negócio e estiver dentro da política da área), com aprovação formal, não o cartão da loja.`;
 
         // 1) Checa os GRUPOS de proibidos primeiro
@@ -3478,6 +3565,32 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
  function gerarRespostaPolitica(msgUsuario) {
         const norm = normalize(msgUsuario);
         const intencao = detectarIntencaoPergunta(norm);
+
+    // 1) Primeiro tenta responder usando o motor de categorias da política
+  const resultadoCategoria = tentarResponderPorCategoriaPolitica(msgUsuario, norm);
+  if (resultadoCategoria) {
+    return vektorBlocoRaciocinioPolitica(
+      resultadoCategoria.mensagemUsuario,
+      "",
+      typeof POLITICA_CARTOES_CLARA_LINK !== "undefined"
+        ? POLITICA_CARTOES_CLARA_LINK
+        : ""
+    );
+  }
+
+  // 2) Se não bateu em uma categoria específica, tenta ver se é pedido de RESUMO de categorias
+  if (typeof tentarResponderResumoCategoriasPolitica === "function") {
+    const resultadoResumo = tentarResponderResumoCategoriasPolitica(norm);
+    if (resultadoResumo) {
+      return vektorBlocoRaciocinioPolitica(
+        resultadoResumo.mensagemUsuario,
+        "",
+        typeof POLITICA_CARTOES_CLARA_LINK !== "undefined"
+          ? POLITICA_CARTOES_CLARA_LINK
+          : ""
+      );
+    }
+  }
 
         // gasto pessoal alimentação
         const padroesGastoPessoalAlimentacao = [
