@@ -1318,6 +1318,32 @@ window.vektorExpandirLinha = function (tr, base) {
             .trim();
     }
 
+    // ================= VEKTOR – bloco de raciocínio da política =================
+function vektorBlocoRaciocinioPolitica(explicacao, risco, referencia) {
+  explicacao = explicacao || "Essa decisão segue as regras da política de uso dos cartões Clara.";
+  risco = risco || "";
+  referencia = referencia || POLITICA_CARTOES_CLARA_LINK || "#";
+
+  var html =
+    "<div style='margin-top:6px;padding:8px;border-radius:6px;border:1px dashed #cbd5e1;background:#f8fafc;'>" +
+      "<p style='font-size:12px;color:#0f172a;'><b>Como cheguei nessa orientação:</b></p>" +
+      "<p style='font-size:12px;color:#334155;margin-top:4px;'>" + explicacao + "</p>";
+
+  if (risco) {
+    html +=
+      "<p style='font-size:12px;color:#b91c1c;margin-top:4px;'><b>Risco:</b> " + risco + "</p>";
+  }
+
+  html +=
+      "<p style='font-size:11px;color:#64748b;margin-top:6px;'>" +
+        "Para detalhes completos, consulte a Política de Uso dos Cartões Clara: " +
+        "<a href='" + referencia + "' target='_blank' style='color:#005E27;font-weight:600;'>abrir política</a>." +
+      "</p>" +
+    "</div>";
+
+  return html;
+}
+
     // ===== TIMES OFICIAIS (para identificar "time X" / "grupo X") =====
 const TIMES_OFICIAIS = [
   "Águias de Elite",
@@ -4272,6 +4298,12 @@ window.vektorSugerirTopicoRelacionadoManual = function (secaoId) {
   // Por enquanto vamos tratar apenas o caso "anexar_comprovante"
   if (secaoId !== "anexar_comprovante") return;
 
+  // 🔹 NÃO repetir essa sugestão várias vezes na mesma sessão
+  if (vektorSugestaoJaMostrada("politica_justificativas")) {
+    return;
+  }
+  vektorMarcarSugestaoMostrada("politica_justificativas");
+
   const html =
     "HTML:<div class='text-sm text-slate-700 mt-2'>" +
       "<p><b>Sugestão:</b> Quer ver também como funciona a <b>política de justificativas</b>?</p>" +
@@ -4350,10 +4382,253 @@ function vektorObterContexto() {
   return window.VEKTOR_STATE || {};
 }
 
+function vektorExplicarUltimaTabela() {
+  const st = vektorObterContexto();
+  const info = st.ultimaAcaoExplicavel;
+
+  if (!info || !info.tipo) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Ainda não tenho uma tabela recente para explicar. Tente pedir um ranking ou um resumo primeiro.</p>"
+    );
+    return;
+  }
+
+  let html = "HTML:<div class='text-sm text-slate-700'>";
+
+  if (info.tipo === "tabela_ranking_lojas") {
+    const m = info.meta || {};
+    html +=
+      "<p><b>Como essa tabela foi montada:</b></p>" +
+      "<ul style='margin-left:16px;margin-top:4px;'>" +
+        "<li>• Foram consideradas todas as transações da BaseClara no período filtrado.</li>" +
+        "<li>• Agrupei os valores por <b>loja</b> e somei " +
+          (m.criterio === "quantidade"
+            ? "a quantidade de transações"
+            : "o valor total em R$.") +
+        "</li>" +
+        (m.grupo
+          ? "<li>• Limitei somente às lojas do time <b>" + m.grupo + "</b>.</li>"
+          : "") +
+        (m.topN
+          ? "<li>• Mostrei apenas o <b>top " + m.topN + "</b> lojas, em ordem decrescente.</li>"
+          : "<li>• Listei todas as lojas com movimentação nesse período.</li>") +
+      "</ul>";
+  } else if (info.tipo === "tabela_times") {
+    const m = info.meta || {};
+    html +=
+      "<p><b>Como essa tabela de times foi montada:</b></p>" +
+      "<ul style='margin-left:16px;margin-top:4px;'>" +
+        "<li>• Usei as transações da BaseClara no período selecionado.</li>" +
+        "<li>• Agrupei pelo campo <b>Grupo / Time</b> da planilha.</li>" +
+        "<li>• Para cada time, calculei quantidade de transações e valor total em R$.</li>" +
+        "<li>• Também calculei o percentual de participação de cada time, em relação ao total do período.</li>" +
+      "</ul>";
+  } else if (info.tipo === "tabela_times_fatura") {
+    const m = info.meta || {};
+    html +=
+      "<p><b>Como a tabela de times dessa fatura foi montada:</b></p>" +
+      "<ul style='margin-left:16px;margin-top:4px;'>" +
+        "<li>• Primeiro filtrei as transações que pertencem ao <b>extrato</b> '" +
+          (m.extrato || "") + "'.</li>" +
+        "<li>• Em seguida agrupei por <b>time</b>, somando o valor em R$ de cada um.</li>" +
+        "<li>• O período usado é o mesmo do ciclo de fatura mostrado na tabela anterior.</li>" +
+      "</ul>";
+  } else {
+    html +=
+      "<p>Ainda não tenho uma explicação específica para esse tipo de tabela (" +
+      info.tipo +
+      "), mas posso te ajudar a interpretar os números se você quiser.</p>";
+  }
+
+  html += "</div>";
+
+  renderBotMessage(html);
+}
+
+function vektorSugestaoJaMostrada(id) {
+  const st = vektorObterContexto();
+  const lista = Array.isArray(st.sugestoesMostradas) ? st.sugestoesMostradas : [];
+  return lista.indexOf(id) >= 0;
+}
+
+function vektorMarcarSugestaoMostrada(id) {
+  if (!id) return;
+  const st = vektorObterContexto();
+  if (!Array.isArray(st.sugestoesMostradas)) {
+    st.sugestoesMostradas = [];
+  }
+  if (st.sugestoesMostradas.indexOf(id) < 0) {
+    st.sugestoesMostradas.push(id);
+  }
+}
+
+var criterio = "quantidade";
+
+// ========= MOTOR DE INTENÇÕES POR REGRAS =========
+
+// Cada regra tem:
+// - id: identificador da intenção
+// - minScore: pontuação mínima para considerar a regra "ganhadora"
+// - score(norm, msgOriginal): função que calcula um score com base no texto normalizado
+// - run(msgOriginal, norm): função que retorna o "resultado" da intenção
+const INTENT_RULES = [
+  {
+    id: "ACAO_LISTAR_ETIQUETAS_CLARA",
+    minScore: 3,
+      score: function (norm, msgOriginal) {
+    if (!norm) return 0;
+    let s = 0;
+
+    const temEtiqueta =
+      norm.includes("etiqueta") || norm.includes("etiquetas");
+
+    if (!temEtiqueta) {
+      // Se nem fala em etiqueta, essa intenção não faz sentido
+      return 0;
+    }
+
+    // 1) Base: mencionou etiqueta → 1 ponto (mas isso sozinho não dispara a tabela)
+    s += 1;
+
+    // 2) Sinais de "visão em tabela / lista consolidada"
+    const falaTabela =
+      norm.includes("tabela de etiquetas") ||
+      norm.includes("tabela com as etiquetas") ||
+      norm.includes("tabela das etiquetas") ||
+      norm.includes("tabela") && temEtiqueta; // ex: "tabela por etiqueta"
+
+    const falaLista =
+      norm.includes("lista de etiquetas") ||
+      norm.includes("listagem de etiquetas") ||
+      norm.includes("listagem das etiquetas") ||
+      norm.includes("ver todas as etiquetas") ||
+      norm.includes("todas as etiquetas");
+
+    if (falaTabela) s += 2;
+    if (falaLista) s += 2;
+
+    // 3) Sinais de análise de gasto/percentual/valor
+    const falaGasto =
+      norm.includes("gasto por etiqueta") ||
+      norm.includes("gastos por etiqueta") ||
+      norm.includes("gastos por etiquetas") ||
+      norm.includes("despesa por etiqueta") ||
+      norm.includes("despesas por etiqueta") ||
+      norm.includes("resumo por etiqueta") ||
+      norm.includes("resumo de etiquetas") ||
+      norm.includes("consolidado por etiqueta");
+
+    const falaPercentual =
+      norm.includes("percentual por etiqueta") ||
+      norm.includes("porcentagem por etiqueta") ||
+      norm.includes("percentual de uso das etiquetas") ||
+      norm.includes("porcentagem de uso das etiquetas");
+
+    const falaValor =
+      norm.includes("valor por etiqueta") ||
+      norm.includes("valores por etiqueta") ||
+      norm.includes("quanto foi gasto em cada etiqueta");
+
+    if (falaGasto) s += 2;
+    if (falaPercentual) s += 2;
+    if (falaValor) s += 2;
+
+    // 4) Frases “pedindo visão gerencial”
+    const falaVisao =
+      norm.includes("visao por etiqueta") ||
+      norm.includes("visão por etiqueta") ||
+      norm.includes("relatorio por etiqueta") ||
+      norm.includes("relatório por etiqueta") ||
+      norm.includes("ranking de etiquetas");
+
+    if (falaVisao) s += 2;
+
+    return s;
+  },
+  run: function (msgOriginal, norm) {
+    return "ACAO_LISTAR_ETIQUETAS_CLARA";
+  }}
+];
+
+  // ➜ Futuro: aqui você adiciona novas regras:
+  // {
+  //   id: "INTENT_FATURA_ATUAL",
+  //   minScore: 2,
+  //   score: function (norm, msgOriginal) { ... },
+  //   run: function (msgOriginal, norm) { ... }
+  // }
+// ];
+
+// Função que escolhe a melhor regra com base em score
+function aplicarRegraDeIntencao(msgOriginal) {
+  const norm = normalize(msgOriginal || "");
+  if (!INTENT_RULES || !INTENT_RULES.length) return null;
+
+  let melhorRegra = null;
+  let melhorScore = 0;
+
+  for (const regra of INTENT_RULES) {
+    try {
+      const s = typeof regra.score === "function"
+        ? Number(regra.score(norm, msgOriginal) || 0)
+        : 0;
+
+      if (s > melhorScore) {
+        melhorScore = s;
+        melhorRegra = regra;
+      }
+    } catch (e) {
+      console.warn("Erro ao calcular score de intenção:", regra && regra.id, e);
+    }
+  }
+
+  if (!melhorRegra) return null;
+
+  const min = typeof melhorRegra.minScore === "number" ? melhorRegra.minScore : 1;
+  if (melhorScore < min) {
+    // Nenhuma regra atingiu o limiar mínimo
+    return null;
+  }
+
+  // Executa a ação da regra encontrada
+  if (typeof melhorRegra.run === "function") {
+    return melhorRegra.run(msgOriginal, norm);
+  }
+
+  return null;
+}
+
     /* ========= GERADOR FINAL ========= */
 
 function gerarRespostaDoBot(msgUsuario) {
   const norm = normalize(msgUsuario || "");
+
+    // 🔹 1ª camada: motor de intenções por regras
+  const resultadoIntencao = aplicarRegraDeIntencao(msgUsuario);
+
+  // Se alguma regra reconheceu a intenção e retornou algo, usamos isso.
+  // Exemplos de retorno:
+  // - "ACAO_LISTAR_ETIQUETAS_CLARA" (token para ação externa)
+  // - "HTML:..." (resposta pronta)
+  // - texto simples
+  if (resultadoIntencao !== null && resultadoIntencao !== undefined) {
+    return resultadoIntencao;
+  }
+
+  // 🔹 2ª camada: fallback para os gatilhos antigos baseados em includes
+    // Gatilho: usuário quer entender a última tabela
+  if (
+          norm.includes("explica essa tabela") ||
+          norm.includes("explica essa fatura") ||
+          norm.includes("como voce calculou") ||
+          norm.includes("como vc calculou") ||
+          norm.includes("como foi calculado") ||
+          norm.includes("como foi gerado") ||
+          norm.includes("de onde veio essa tabela")
+  ) {
+    vektorExplicarUltimaTabela();
+    return null; // mantém padrão: função já renderiza no chat
+  }
 
   // Treinamento Clara - apresentação em Slides
 if (
@@ -4823,6 +5098,21 @@ if (detRankLoja) {
       "HTML:<p class='text-xs text-slate-600 italic'>Obs.: Como o número de lojas é grande, mostrarei as <b>10 primeiras</b> por padrão. Você pode pedir, por exemplo, <b>top 20 lojas</b>.</p>"
     );
   }
+
+  vektorRegistrarContexto({
+  ultimaIntencao: "ranking_lojas",
+  ultimoPeriodo: periodo || null,
+  ultimoGrupo: grupo || null,
+  ultimaLoja: null,
+  ultimaAcaoExplicavel: {
+    tipo: "tabela_ranking_lojas",
+    meta: {
+      criterio: criterio,
+      grupo: grupo || null,
+      topN: topNFinal || null
+    }
+  }
+});
 
   renderBotMessage(
     "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de lojas</b> por " +
@@ -5983,27 +6273,31 @@ if (m) {
   // Sobrescreve a função usada no restante do código
   extrairIntervaloDatas = function (msgOriginal) {
     try {
+      const st = vektorObterContexto();
       // 1) Se a mensagem falar "mesmo período da pergunta anterior"
       //    e já tivermos um período salvo, devolve direto o cache
       if (msgOriginal && typeof msgOriginal === "string") {
         const norm = normalize(msgOriginal);
         if (
-          norm.includes("mesmo periodo da pergunta anterior") &&
-          window.__vektorUltimoPeriodo &&
-          window.__vektorUltimoPeriodo.dataInicio &&
-          window.__vektorUltimoPeriodo.dataFim
-        ) {
-          return window.__vektorUltimoPeriodo;
+        norm.includes("mesmo periodo da pergunta anterior") &&
+        st.ultimoPeriodo &&
+        st.ultimoPeriodo.dataInicio &&
+        st.ultimoPeriodo.dataFim
+      ) {
+        return st.ultimoPeriodo;
         }
       }
 
       // 2) Caso contrário, usa a função original
       const periodo = _extrairOriginal(msgOriginal);
 
-      // 3) Se a função original achou um período, salva no cache global
-      if (periodo && periodo.dataInicio && periodo.dataFim) {
-        window.__vektorUltimoPeriodo = periodo;
-      }
+        // 3) Se achou período, salva tanto em __vektorUltimoPeriodo quanto no VEKTOR_STATE
+    if (periodo && periodo.dataInicio && periodo.dataFim) {
+      window.__vektorUltimoPeriodo = periodo;
+      vektorRegistrarContexto({
+        ultimoPeriodo: periodo
+      });
+    }
 
       return periodo;
     } catch (e) {
@@ -6016,7 +6310,7 @@ if (m) {
 
 // ========= RESUMO LOJA x TIME (GRÁFICO) ========= //
 
-    function renderResumoTransacoesSemana(resumo, opts) {
+function renderResumoTransacoesSemana(resumo, opts) {
   if (!resumo || !resumo.ok) {
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>Não consegui encontrar informações de transações para esse filtro. Verifique se o time e o período estão corretos.</p>"
@@ -6026,124 +6320,118 @@ if (m) {
 
   opts = opts || {};
 
+  // Texto do critério (valor x quantidade)
   var criterioTxt = (resumo.tipo === "valor"
-  ? "maior <b>valor</b> de transações"
-  : "maior <b>número</b> de transações");
+    ? "maior <b>valor</b> de transações"
+    : "maior <b>número</b> de transações");
 
-var grupoHtml = resumo.grupoNome
-  ? " no time <b>" + resumo.grupoNome + "</b>"
-  : "";
+  var grupoHtml = resumo.grupoNome
+    ? " no time <b>" + resumo.grupoNome + "</b>"
+    : "";
 
-// 🆕 verifica se veio filtro de lojas ou de times
-var temFiltroLojas = opts && Array.isArray(opts.filtrarLojasCodigos) && opts.filtrarLojasCodigos.length > 0;
-var temFiltroTimes = opts && Array.isArray(opts.filtrarTimesNomes) && opts.filtrarTimesNomes.length > 0;
+  // Filtros recebidos
+  var temFiltroLojas = opts && Array.isArray(opts.filtrarLojasCodigos) && opts.filtrarLojasCodigos.length > 0;
+  var temFiltroTimes = opts && Array.isArray(opts.filtrarTimesNomes) && opts.filtrarTimesNomes.length > 0;
 
-var fraseResumo;
-if (temFiltroLojas) {
-  // Quando o usuário pediu algo tipo "lojas 316 e 39 neste mês"
-  fraseResumo = "Comparando as lojas <b>" +
-    opts.filtrarLojasCodigos.join(", ") +
-    "</b> no período selecionado" + grupoHtml + ".";
-} else if (temFiltroTimes) {
-  // Quando o usuário pediu algo tipo "todas as lojas dos times Falcões e Lobos"
-  fraseResumo = "Mostrando lojas dos times <b>" +
-    opts.filtrarTimesNomes.join(", ") +
-    "</b> no período selecionado" + grupoHtml + ".";
-} else {
-  // Comportamento antigo padrão (sem filtro específico)
-  fraseResumo = resumo.top
-    ? "A loja <b>" + resumo.top.loja + "</b> foi a que teve " + criterioTxt + " no período selecionado" + grupoHtml + "."
-    : "Não encontrei transações" + grupoHtml + " no período selecionado.";
-}
-
-  // Quantas linhas exibir
-var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
-
-// 🆕 aplica filtros de LOJAS e TIMES antes de cortar por topN
-if (temFiltroLojas) {
-  var codSet = {};
-  opts.filtrarLojasCodigos.forEach(function (c) {
-    var key = String(c).replace(/\D/g, "");
-    codSet[key] = true;
-  });
-
-  all = all.filter(function (linha) {
-    var codLinha = String(
-      linha.loja || linha.Loja || linha.codigoLoja || linha.CodigoLoja || ""
-    ).replace(/\D/g, "");
-    return codSet[codLinha];
-  });
-}
-
-if (temFiltroTimes) {
-  var timesSet = {};
-  opts.filtrarTimesNomes.forEach(function (nome) {
-    timesSet[String(nome).toLowerCase()] = true;
-  });
-
-  all = all.filter(function (linha) {
-    var g = String(linha.grupo || linha.Grupo || "").toLowerCase();
-    return !!timesSet[g];
-  });
-}
-
-  var linhas;
-
-  var linhas;
-
-  if (opts && (opts.topN === null)) {
-    // Pedido explícito para listar TODAS as linhas
-    // Ex.: quando a lógica do front diz: "topN: null" = sem limite
-    linhas = all;
-
-  } else if (typeof opts.topN === "number") {
-    // Quando veio um TOP N (1, 3, 5, 7, etc.)
-    // Aqui SEMPRE respeitamos o N, mesmo se tiver time (forGroup = true)
-    linhas = all.slice(0, Math.max(0, opts.topN));
-
-  } else if (opts && opts.forGroup) {
-    // Sem topN informado + filtrando por time
-    // => lista TODAS as lojas do(s) time(s)
-    linhas = all;
-
+  var fraseResumo;
+  if (temFiltroLojas) {
+    // Ex.: "lojas 316 e 39 neste mês"
+    fraseResumo = "Comparando as lojas <b>" +
+      opts.filtrarLojasCodigos.join(", ") +
+      "</b> no período selecionado" + grupoHtml + ".";
+  } else if (temFiltroTimes) {
+    // Ex.: "todas as lojas dos times Falcões e Lobos"
+    fraseResumo = "Mostrando lojas dos times <b>" +
+      opts.filtrarTimesNomes.join(", ") +
+      "</b> no período selecionado" + grupoHtml + ".";
   } else {
-    // Ranking geral sem topN definido
-    // Se quiser, pode limitar a 10 aqui (ou deixar todas)
-    // Hoje, segue a mesma lógica antiga (todas):
+    // Comportamento padrão (sem filtro específico)
+    fraseResumo = resumo.top
+      ? "A loja <b>" + resumo.top.loja + "</b> foi a que teve " + criterioTxt + " no período selecionado" + grupoHtml + "."
+      : "Não encontrei transações" + grupoHtml + " no período selecionado.";
+  }
+
+  // Base de lojas
+  var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
+
+  // Aplica filtros de LOJAS
+  if (temFiltroLojas) {
+    var codSet = {};
+    opts.filtrarLojasCodigos.forEach(function (c) {
+      var key = String(c).replace(/\D/g, "");
+      codSet[key] = true;
+    });
+
+    all = all.filter(function (linha) {
+      var codLinha = String(
+        linha.loja || linha.Loja || linha.codigoLoja || linha.CodigoLoja || ""
+      ).replace(/\D/g, "");
+      return codSet[codLinha];
+    });
+  }
+
+  // Aplica filtros de TIMES
+  if (temFiltroTimes) {
+    var timesSet = {};
+    opts.filtrarTimesNomes.forEach(function (nome) {
+      timesSet[String(nome).toLowerCase()] = true;
+    });
+
+    all = all.filter(function (linha) {
+      var g = String(linha.grupo || linha.Grupo || "").toLowerCase();
+      return !!timesSet[g];
+    });
+  }
+
+  // Decide quantas linhas exibir
+  var linhas;
+  if (opts && (opts.topN === null)) {
+    // topN: null => listar TODAS
+    linhas = all;
+  } else if (typeof opts.topN === "number") {
+    // top N explícito
+    linhas = all.slice(0, Math.max(0, opts.topN));
+  } else if (opts && opts.forGroup) {
+    // Sem topN + filtrando por time => todas as lojas desse(s) time(s)
+    linhas = all;
+  } else {
+    // Ranking geral sem topN => todas (comportamento antigo)
     linhas = all;
   }
 
-    // 🆕 guarda lista de lojas exibidas na última tabela
+  // Guarda lista de lojas exibidas na última tabela (para outras funções usarem)
   try {
-    window.__vektorUltimasLojasTabela = (linhas || []).map(function (l) {
-      return (l.loja || "").toString().trim();
-    }).filter(Boolean);
+    window.__vektorUltimasLojasTabela = (linhas || [])
+      .map(function (l) {
+        return (l.loja || "").toString().trim();
+      })
+      .filter(Boolean);
   } catch (e) {
     console.warn("Falha ao registrar lista de lojas da tabela:", e);
   }
 
-
-  // Somatórios com base no que será exibido
+  // Somatórios
   var totalValor = 0, totalQtd = 0;
   for (var i = 0; i < linhas.length; i++) {
     totalValor += Number(linhas[i].valorTotal) || 0;
     totalQtd   += Number(linhas[i].total) || 0;
   }
 
+  // Monta tabela
   var linhasTabela = [];
   if (linhas.length) {
 
-    // 🔽 Dropdown de drilldown para a tabela de LOJAS
-        linhasTabela.push(
-          "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
-            "Expandir a tabela por: " +
-            "<select class='vektor-drill-select' data-base='loja' " +
-                   "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
-              "<option value='estabelecimento'>Estabelecimentos</option>" +
-              "<option value='categoria'>Categorias</option>" +
-            "</select>" +
-          "</div>"
-        );  
+    // Dropdown de drilldown
+    linhasTabela.push(
+      "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
+        "Expandir a tabela por: " +
+        "<select class='vektor-drill-select' data-base='loja' " +
+               "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
+          "<option value='estabelecimento'>Estabelecimentos</option>" +
+          "<option value='categoria'>Categorias</option>" +
+        "</select>" +
+      "</div>"
+    );
 
     linhasTabela.push(
       "<table border='1' cellspacing='0' cellpadding='6' " +
@@ -6170,19 +6458,18 @@ if (temFiltroTimes) {
       var hint = "Clique para detalhar pelo filtro escolhido " + l.loja;
 
       linhasTabela.push(
-    "<tr onclick=\"vektorExpandirLinha(this,'loja')\" " +
-      "style='cursor:pointer;' " +
-      "title=\"" + hint + "\">" +
-      "<td style='border:1px solid #000;'>" + l.loja + "</td>" +
-      "<td style='border:1px solid #000;'>" + qtd + "</td>" +
-      "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
-      "<td style='border:1px solid #000;'>" +
-        val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
-      "</td>" +
-      "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
-    "</tr>"
-  );
-
+        "<tr onclick=\"vektorExpandirLinha(this,'loja')\" " +
+          "style='cursor:pointer;' " +
+          "title=\"" + hint + "\">" +
+          "<td style='border:1px solid #000;'>" + l.loja + "</td>" +
+          "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+          "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+          "<td style='border:1px solid #000;'>" +
+            val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+          "</td>" +
+          "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+        "</tr>"
+      );
     }
 
     // TOTAL
@@ -6200,15 +6487,19 @@ if (temFiltroTimes) {
 
     linhasTabela.push("</table>");
   }
+
   var tabelaHtml = linhasTabela.join("");
 
-    // 🔽 Botões abaixo da tabela (CSV + Pendências + Justificativas)
+  // 🆕 Insights automáticos sobre as LOJAS (TÓPICO 3)
+  var insightsLojasHtml = vektorGerarInsightsRankingLojas(linhas || []);
+
+  // Botões (CSV + Pendências + Justificativas)
   var botoesHtml = "";
   if (tabelaHtml) {
     botoesHtml =
       "<div style='margin-top:8px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;'>" +
 
-        // Exportar CSV (igual antes, sem tooltip personalizado)
+        // Exportar CSV
         "<button type='button' " +
           "onclick=\"exportTableToCSV(this, 'transacoes_lojas')\" " +
           "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
@@ -6216,7 +6507,7 @@ if (temFiltroTimes) {
           "⬇ Exportar CSV" +
         "</button>" +
 
-        // 🆕 Verificar pendências (com tooltip vermelho opaco)
+        // Verificar pendências
         "<span class='vektor-btn-wrapper'>" +
           "<button type='button' " +
             "onclick=\"vektorVerificarPendenciasLojas(this)\" " +
@@ -6230,7 +6521,7 @@ if (temFiltroTimes) {
           "</span>" +
         "</span>" +
 
-        // 🆕 Verificar justificativas (com tooltip azul opaco)
+        // Verificar justificativas
         "<span class='vektor-btn-wrapper'>" +
           "<button type='button' " +
             "onclick=\"vektorVerificarJustificativasLojas(this)\" " +
@@ -6247,16 +6538,37 @@ if (temFiltroTimes) {
       "</div>";
   }
 
-var lookerUrl = "https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF";
-var html = [
-  "<div class='text-sm text-slate-700'>",
-    "<p>", fraseResumo, "</p>",
-    tabelaHtml,
-    botoesHtml,
-  "</div>"
-].join("");
+  var html = [
+    "<div class='text-sm text-slate-700'>",
+      "<p>", fraseResumo, "</p>",
+      tabelaHtml,
+      insightsLojasHtml || "",
+      botoesHtml,
+    "</div>"
+  ].join("");
 
-renderBotMessage("HTML:" + html);
+  // TÓPICO 2 – memória de contexto (corrigido para ranking_lojas)
+  try {
+    vektorRegistrarContexto({
+      ultimaIntencao: "ranking_lojas",
+      ultimoPeriodo: {
+        dataInicioIso: typeof dataInicioIso !== "undefined" ? dataInicioIso : "",
+        dataFimIso: typeof dataFimIso !== "undefined" ? dataFimIso : ""
+      },
+      ultimoGrupo: resumo && resumo.grupoNome ? resumo.grupoNome : null,
+      ultimaAcaoExplicavel: {
+        tipo: "tabela_ranking_lojas",
+        meta: {
+          tipoResumo: resumo ? resumo.tipo : null,
+          grupo: resumo ? resumo.grupoNome : null
+        }
+      }
+    });
+  } catch (e) {
+    console.warn("Falha ao registrar contexto de ranking_lojas:", e);
+  }
+
+  renderBotMessage("HTML:" + html);
 }
 
 // ========= Botões "Verificar pendências / justificativas" (tabelas de LOJAS) ========= //
@@ -6497,7 +6809,11 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
   var somaTotal = 0;
   var valorAnterior = null;
 
-  faturas.forEach(function (f) {
+  // ─ Insights: vamos guardar a MAIOR ALTA e a MAIOR QUEDA de uma fatura para a seguinte
+  var maiorAumento = null; // { faturaAtual, variacao }
+  var maiorQueda   = null; // { faturaAtual, variacao }
+
+  faturas.forEach(function (f, idx) {
     var valor = Number(f.valorTotal) || 0;
     somaTotal += valor;
 
@@ -6511,27 +6827,40 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
     if (valorAnterior !== null && valorAnterior !== 0) {
       var variacao = ((valor - valorAnterior) / valorAnterior) * 100;
       var variacaoFmt = variacao.toFixed(1).replace(".", ",") + "%";
+
       if (variacao > 0) {
         variacaoTexto = "+" + variacaoFmt;
       } else {
         variacaoTexto = variacaoFmt;
       }
+
+      // Atualiza maior aumento
+      if (!maiorAumento || variacao > maiorAumento.variacao) {
+        maiorAumento = {
+          faturaAtual: f,
+          variacao: variacao
+        };
+      }
+
+      // Atualiza maior queda
+      if (!maiorQueda || variacao < maiorQueda.variacao) {
+        maiorQueda = {
+          faturaAtual: f,
+          variacao: variacao
+        };
+      }
     }
 
-    var extrato = (f.extrato || "").toString();
-    // evita quebrar o atributo se tiver aspas simples
-    var extratoAttr = extrato.replace(/'/g, "&#39;");
-
-    // 🔽 linha "clicável" com dados da fatura
+    // 🔽 linha clicável para drilldown por time (usando EXTRATO e período)
     partes.push(
       "<tr onclick=\"window.vektorDrillTimesFatura(this)\" " +
-        "style='cursor:pointer;' " +
-        "data-extrato-fatura='" + extratoAttr + "' " +
-        "data-inicio-fatura='" + (f.dataInicioIso || "") + "' " +
-        "data-fim-fatura='" + (f.dataFimIso || "") + "' " +
-        "title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\">",
+          "style='cursor:pointer;' " +
+          "data-extrato-fatura='" + (f.extrato || "") + "' " +
+          "data-inicio-fatura='" + (f.dataInicioIso || "") + "' " +
+          "data-fim-fatura='" + (f.dataFimIso || "") + "' " +
+          "title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\">",
         "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-          extrato +
+          (f.extrato || "") +
         "</td>",
         "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
           valorFmt +
@@ -6558,28 +6887,243 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
         somaFmt +
       "</td>",
       "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
-    "</tr>"
+    "</tr>",
+    "</tbody>",
+    "</table>",
+    "</div>"
   );
 
-  partes.push(
-          "</tbody>",
-        "</table>",
-      "</div>",
+  // ─────────────────────────────────────────────────────────────
+  // BLOCO NOVO: comentários automáticos (insights) sobre as faturas
+  // ─────────────────────────────────────────────────────────────
+  var comentarios = [];
 
-      // 🔽 Botão de Exportar CSV para a tabela de faturas
-      "<div style='margin-top:8px;text-align:right;'>",
-        "<button type='button' " +
-          "onclick=\"exportTableToCSV(this, 'faturas_clara')\" " +
-          "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
-                 "border-radius:4px;font-size:11px;cursor:pointer;'>",
-          "⬇ Exportar CSV",
-        "</button>",
-      "</div>",
+  // Só faz sentido falar de variação se tiver pelo menos 2 faturas
+  if (faturas.length >= 2) {
+    if (maiorAumento && maiorAumento.variacao > 0) {
+      var pctAlta = Math.abs(maiorAumento.variacao).toFixed(1).replace(".", ",") + "%";
+      var extratoAlta = maiorAumento.faturaAtual.extrato || "uma das faturas";
+
+      comentarios.push(
+        "A fatura <b>" + extratoAlta +
+        "</b> teve o ⬆️ <b>maior aumento</b> em relação ao ciclo anterior, em torno de <b>" +
+        pctAlta + "</b>."
+      );
+    }
+
+    if (maiorQueda && maiorQueda.variacao < 0) {
+      var pctQueda = Math.abs(maiorQueda.variacao).toFixed(1).replace(".", ",") + "%";
+      var extratoQueda = maiorQueda.faturaAtual.extrato || "uma das faturas";
+
+      comentarios.push(
+        "A fatura <b>" + extratoQueda +
+        "</b> teve a ⬇️ <b>maior redução</b> em relação ao ciclo anterior, cerca de <b>" +
+        pctQueda + "</b>."
+      );
+    }
+  }
+
+  if (comentarios.length) {
+    partes.push(
+      "<div style='margin-top:8px;font-size:12px;color:#0F172A;" +
+             "background:#F8FAFC;border-radius:4px;padding:6px;" +
+             "border:1px solid #E2E8F0;'>",
+        "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre as faturas:</b></p>",
+        "<ul style='margin:0;padding-left:16px;'>",
+          comentarios.map(function (c) {
+            return "<li>" + c + "</li>";
+          }).join(""),
+        "</ul>",
+      "</div>"
+    );
+  }
+
+  // Botão de Exportar CSV (já existia)
+  partes.push(
+    "<div style='margin-top:8px;text-align:right;'>",
+      "<button type='button' " +
+        "onclick=\"exportTableToCSV(this, 'faturas_clara')\" " +
+        "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+               "border-radius:4px;font-size:11px;cursor:pointer;'>",
+        "⬇ Exportar CSV",
+      "</button>",
+    "</div>",
 
     "</div>"
   );
 
   return partes.join("");
+}
+
+// ===================================================================
+// TÓPICO 3 – Insights automáticos: TIMES
+// ===================================================================
+function vektorGerarInsightsTimes(times) {
+  if (!Array.isArray(times) || !times.length) return "";
+
+  // Espera itens do tipo: { time: "Águias do Cerrado", valorTotal: 1234.56, total: 10 }
+  // Se os nomes de campos forem outros, ajuste aqui.
+  var lista = times
+    .map(function (t) {
+      return {
+        nome: t.time || t.grupo || t.nome || "Time sem nome",
+        valor: Number(t.valorTotal || t.valor || 0),
+        qtd: Number(t.total || t.qtd || 0)
+      };
+    })
+    .filter(function (t) {
+      return t.valor > 0 || t.qtd > 0;
+    });
+
+  if (!lista.length) return "";
+
+  var totalGeral = 0;
+  lista.forEach(function (t) {
+    totalGeral += t.valor;
+  });
+  if (!totalGeral) return "";
+
+  // Ordena por valor desc
+  lista.sort(function (a, b) {
+    return b.valor - a.valor;
+  });
+
+  var top1 = lista[0];
+  var top2 = lista[1] || null;
+  var top3 = lista[2] || null;
+
+  var comentarios = [];
+
+  // Comentário 1: campeão de gastos
+  var percTop1 = (top1.valor / totalGeral) * 100;
+  comentarios.push(
+    "O time <b>" + top1.nome +
+    "</b> é o que mais gastou no período, com cerca de <b>" +
+    percTop1.toFixed(1).replace(".", ",") + "%</b> do total."
+  );
+
+  // Comentário 2: concentração alta
+  if (percTop1 >= 40) {
+    comentarios.push(
+      "Há uma <b>forte concentração</b> de gastos no time <b>" +
+      top1.nome +
+      "</b>. Vale avaliar se esse padrão faz sentido para o momento da operação."
+    );
+  }
+
+  // Comentário 3: top 3
+  if (top2 || top3) {
+    var nomesTop = [top1.nome];
+    if (top2) nomesTop.push(top2.nome);
+    if (top3) nomesTop.push(top3.nome);
+
+    comentarios.push(
+      "Os principais responsáveis pelo volume de gastos são: <b>" +
+      nomesTop.join("</b>, <b>") +
+      "</b>."
+    );
+  }
+
+  if (!comentarios.length) return "";
+
+  var html =
+    "<div style='margin-top:8px;font-size:12px;color:#0F172A;" +
+           "background:#F8FAFC;border-radius:4px;padding:6px;" +
+           "border:1px solid #E2E8F0;'>" +
+      "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre os times:</b></p>" +
+      "<ul style='margin:0;padding-left:16px;'>" +
+        comentarios.map(function (c) {
+          return "<li>" + c + "</li>";
+        }).join("") +
+      "</ul>" +
+    "</div>";
+
+  return html;
+}
+
+// ===================================================================
+// TÓPICO 3 – Insights automáticos: LOJAS
+// ===================================================================
+function vektorGerarInsightsRankingLojas(lojas) {
+  if (!Array.isArray(lojas) || !lojas.length) return "";
+
+  // Espera itens do tipo: { loja: "123 - SHOPPING X", valorTotal: 1234.56, total: 10 }
+  // Ajuste os nomes dos campos se necessário.
+  var lista = lojas
+    .map(function (l) {
+      return {
+        nome: l.loja || l.nome || l.codigo || "Loja sem nome",
+        valor: Number(l.valorTotal || l.valor || 0),
+        qtd: Number(l.total || l.qtd || 0)
+      };
+    })
+    .filter(function (l) {
+      return l.valor > 0 || l.qtd > 0;
+    });
+
+  if (!lista.length) return "";
+
+  var totalGeral = 0;
+  lista.forEach(function (l) {
+    totalGeral += l.valor;
+  });
+  if (!totalGeral) return "";
+
+  // Ordena por valor desc
+  lista.sort(function (a, b) {
+    return b.valor - a.valor;
+  });
+
+  var top1 = lista[0];
+  var top2 = lista[1] || null;
+  var top3 = lista[2] || null;
+
+  var comentarios = [];
+
+  // Comentário 1: campeã
+  var percTop1 = (top1.valor / totalGeral) * 100;
+  comentarios.push(
+    "A loja <b>" + top1.nome +
+    "</b> concentra o maior volume de gastos no período, com cerca de <b>" +
+    percTop1.toFixed(1).replace(".", ",") + "%</b> do total."
+  );
+
+  // Comentário 2: concentração alta
+  if (percTop1 >= 35) {
+    comentarios.push(
+      "O nível de concentração em <b>" + top1.nome +
+      "</b> é elevado. Pode valer a pena revisitar as despesas dessa unidade com mais atenção."
+    );
+  }
+
+  // Comentário 3: top 3 lojas
+  if (top2 || top3) {
+    var nomesTop = [top1.nome];
+    if (top2) nomesTop.push(top2.nome);
+    if (top3) nomesTop.push(top3.nome);
+
+    comentarios.push(
+      "As lojas que mais impactam o resultado desse período são: <b>" +
+      nomesTop.join("</b>, <b>") +
+      "</b>."
+    );
+  }
+
+  if (!comentarios.length) return "";
+
+  var html =
+    "<div style='margin-top:8px;font-size:12px;color:#0F172A;" +
+           "background:#F8FAFC;border-radius:4px;padding:6px;" +
+           "border:1px solid #E2E8F0;'>" +
+      "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre as lojas:</b></p>" +
+      "<ul style='margin:0;padding-left:16px;'>" +
+        comentarios.map(function (c) {
+          return "<li>" + c + "</li>";
+        }).join("") +
+      "</ul>" +
+    "</div>";
+
+  return html;
 }
 
 // Drilldown: ao clicar numa fatura, detalha por TIME
@@ -6635,6 +7179,23 @@ window.vektorDrillTimesFatura = function (tr) {
       })
       .withFailureHandler(function (err) {
         console.error("Erro ao detalhar fatura por time:", err);
+
+              vektorRegistrarContexto({
+                  ultimaIntencao: "fatura_times",
+                  ultimoPeriodo: {
+                    dataInicioIso: dataInicioIso || "",
+                    dataFimIso: dataFimIso || ""
+                  },
+                  ultimaLoja: null,
+                  ultimaAcaoExplicavel: {
+                    tipo: "tabela_times_fatura",
+                    meta: {
+                      extrato: extrato,
+                      periodoTexto: periodoTexto
+                    }
+                  }
+                });
+
         renderBotMessage(
           "HTML:<p class='text-sm text-slate-700'>Ocorreu um erro ao buscar o detalhamento por time para essa fatura.</p>"
         );
@@ -7018,6 +7579,10 @@ if (temFiltroTimes) {
 
   var tabelaHtml = linhasTabela.join("");
 
+    // 🆕 Insights automáticos sobre os times (TÓPICO 3)
+  var insightsTimesHtml = vektorGerarInsightsTimes(linhas || []);
+
+
   // 🔽 Botão de exportação em CSV para o resumo por TIME
   var botaoCsv = "";
   if (tabelaHtml) {
@@ -7040,6 +7605,7 @@ if (temFiltroTimes) {
       "<p>", fraseResumo, "</p>",
       //"<p style='font-size:13px;color:#555;margin:4px 0 8px;'>Clique em uma linha para detalhar (drill-down) no chat.</p>",
       tabelaHtml,
+      insightsTimesHtml || "",
       botaoCsv,
     "</div>"
   ].join("");
@@ -8160,21 +8726,7 @@ function listarEtiquetasClara() {
 
         // Normaliza o texto para busca de intenção
     const norm = normalize(texto || "");
-
-    // Se o usuário pedir listagem de etiquetas, chama a ação específica
-    if (
-      norm.includes("listagem de etiquetas") ||
-      norm.includes("lista de etiquetas") ||
-      norm.includes("etiquetas disponiveis") ||
-      norm.includes("etiquetas disponíveis") ||
-      norm.includes("etiquetas da clara") ||
-      norm.includes("etiquetas na clara")
-    ) {
-      listarEtiquetasClara();
-      return; // não segue para gerarRespostaDoBot
-    }
-
-        const resposta = gerarRespostaDoBot(texto);
+    const resposta = gerarRespostaDoBot(texto);
 
           // Se a intenção for listar etiquetas, chama a função específica e para aqui
   if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
