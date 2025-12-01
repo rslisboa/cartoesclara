@@ -310,6 +310,13 @@
 
 </head>
  <body class="text-slate-800">
+
+    <!-- Topbar com login, tipo de acesso e relógio -->
+  <div id="vektor-topbar" 
+       class="w-full flex items-center justify-start gap-6 px-6 pt-3 pb-1 text-[11px] text-slate-600">
+    <div id="vektor-user-info" class="font-medium"></div>
+    <div id="vektor-clock" class="font-normal"></div>
+  </div>
  
  <div class="h-screen flex px-4 py-6 gap-4 items-stretch">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
@@ -516,6 +523,23 @@ if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
   Chart.register(ChartDataLabels);
 }
 
+// ===== DADOS DO USUÁRIO (globais, vindos do Apps Script) =====
+
+// Nome vindo do template Apps Script (Code.gs → tmpl.userName)
+const USER_NAME_RAW = <?= JSON.stringify(userName || "") ?>;
+const displayName = (USER_NAME_RAW || "")
+  .replace(/^"+|"+$/g, "")
+  .trim();
+const USER_ROLE_RAW  = <?= JSON.stringify(userRole  || "") ?>;
+
+// E-mail vindo do Apps Script (Code.gs → template.userEmail)
+const USER_EMAIL_RAW = <?= JSON.stringify(userEmail || "") ?>;
+const USER_EMAIL_REPLACED = (USER_EMAIL_RAW || "")
+  .replace(/^"+|"+$/g, "")
+  .trim();
+const USER_ROLE_CLEAN     = (USER_ROLE_RAW  || "").replace(/^"+|"+$/g, "").trim();
+
+
 document.addEventListener("DOMContentLoaded", () => {
 
     let grupoNome = "";
@@ -523,14 +547,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const ROBOT_IMG_URL = "https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png";
 
+    // >>> NOVO: preencher barra de usuário
+    const topUserEl = document.getElementById("vektor-user-info");
+    const topClockEl = document.getElementById("vektor-clock");
 
-        // Nome vindo do template Apps Script (Code.gs → tmpl.userName)
-    const userName = <?= JSON.stringify(userName || "") ?>;
-    const displayName = userName.replace(/^"+|"+$/g, "").trim();
+    const nomeParaMostrar = displayName || USER_EMAIL_REPLACED || "Usuário";
+    const roleParaMostrar = USER_ROLE_CLEAN || "Acesso padrão";
 
-    // E-mail vindo do Apps Script (Code.gs → template.userEmail)
-    const USER_EMAIL = <?= JSON.stringify(userEmail || "") ?>;
-    const USER_EMAIL_REPLACED = USER_EMAIL.replace(/^"+|"+$/g, "").trim();
+    if (topUserEl) {
+      topUserEl.textContent = `Login: ${nomeParaMostrar} (${roleParaMostrar})`;
+    }
+
+    function atualizarRelogio() {
+      const agora = new Date();
+      const data = agora.toLocaleDateString("pt-BR", {
+        weekday: "short",
+        day:    "2-digit",
+        month:  "2-digit",
+        year:   "numeric"
+      });
+      const hora = agora.toLocaleTimeString("pt-BR", {
+        hour:   "2-digit",
+        minute: "2-digit",
+        hour12: false
+      });
+
+      if (topClockEl) {
+        topClockEl.textContent = `${data} · ${hora}`;
+      }
+    };
+
+    atualizarRelogio();               // primeira atualização
+    setInterval(atualizarRelogio, 1000);  // atualiza todo segundo
+
     
 // 🔹 Mensagem inicial: exemplos do que o Vektor faz
 renderBotMessage(
@@ -3105,36 +3154,63 @@ Sou um agente especializado na Política de Uso dos Cartões Clara nas lojas. N�
     }
 
     function respEtiquetaDireta(et) {
-        return `HTML:<div class="text-sm text-slate-700">
-<p><b>Etiqueta correta:</b> "${et.nome}".</p>
-<p class="mt-1"><b>O que cobre:</b> ${et.descricao}</p>
-${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i></p>` : ""}
+  return `HTML:<div class="text-sm text-slate-700">
+    <p><b>Etiqueta identificada: ${et.nome}</b></p>
+    <p class="mt-2">${et.descricao || "Essa etiqueta é usada para classificar despesas relacionadas a este tipo de gasto na operação da loja."}</p>
 
-<p class="mt-2">
-<b>Como lançar na Clara (até 48h):</b><br/>
-1. Anexar nota fiscal/recibo (foto legível);<br/>
-2. Selecionar a etiqueta: "${et.nome}";<br/>
-3. Descrever objetivamente o gasto no campo <b>Comentário</b> (ex.: "Compra de xxxx para ____");<br/>
-4. Guardar o documento físico na loja pelo prazo indicado pela política.
-</p>
-</div>`;
-    }
+    <details class="mt-3">
+      <summary class="cursor-pointer underline">Ver orientação completa no ServiceNow / política</summary>
+      <div class="mt-2">
+        <p>Se você identificar que essa etiqueta não representa corretamente o tipo de compra ou está gerando confusão recorrente no uso, a orientação é solicitar ajuste formal.</p>
+        <p class="mt-2">Abra um chamado no ServiceNow do tipo <b>Inserção ou ajuste de etiqueta – Cartão Clara</b>, explicando o problema encontrado, como a etiqueta é usada hoje e qual seria o cenário ideal.</p>
+        <p class="mt-2">Evite adaptar etiquetas por conveniência, pois isso afeta indicadores financeiros, auditorias e controles internos.</p>
+        <p class="mt-3 text-xs text-slate-500">Orientação alinhada ao Anexo II da Política de Utilização dos Cartões Clara.</p>
+      </div>
+    </details>
+  </div>`;
+}
 
     function respLimite() {
-        return 'HTML:Se o limite mensal do cartão não cobre a necessidade operacional da loja, o responsável deve abrir chamado no <a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6" target="_blank" rel="noopener noreferrer">ServiceNow</a>, explicando:<br><br>• Qual gasto precisa fazer,<br>• Urgência,<br>• Por que o limite atual não atende,<br>• Novo limite requerido.<br><br>A aprovação ou ajuste de limite é feita pelo Financeiro.<br><br>Lembrando que o limite foi definido conforme o histórico de gastos de cada loja, é um valor individual e diferente para cada uma. <b>O limite é reestabelecido todo dia 06 de cada mês</b>, fique atento! 😉';
-    }
+  return `HTML:<div class="text-sm text-slate-700">
+    <p><b>Limite do cartão Clara nas lojas</b></p>
+    <p class="mt-2">O limite do cartão Clara é definido para cobrir os gastos previstos do ciclo de fatura (de 06 até 05 do mês seguinte), considerando o padrão de despesas operacionais da loja.</p>
+    <p class="mt-2">Para visualizar o limite, ali na parte do menu de <b>Açoes</b>, arraste pro lado e vai em <b>Ajustar limite</b>. Lá vai aparecer de forma mais simples o valor atual do limite, de forma integral.</p>
+    <p class="mt-2">Planeje as compras para não estourar o limite logo no início do ciclo, priorize gastos essenciais e evite despesas de alto valor.</p>
+    <details class="mt-3">
+      <summary class="cursor-pointer underline">Ver orientação completa no ServiceNow / política</summary>
+      <div class="mt-2">
+        <p><b>Ajuste excepcional de limite:</b></p>
+        <p>Quando o limite que foi estabelecido não é suficiente para uma situação pontual (como algo emergencial ou ação oficial maior já autorizada), não é para “forçar” o uso do cartão a qualquer custo.</p>
+        <p class="mt-2">Nesses casos, alinhe previamente com a regional ou área responsável, organize a justificativa e então abra chamado no ServiceNow do tipo <b>Ajuste excepcional de limite – Cartão Clara</b>, informando loja, BU, limite atual, limite solicitado, período e motivo detalhado.</p>
+        <p class="mt-2">Pedidos sem justificativa aderente à política ou sem alinhamento com a liderança podem ser negados, mesmo que existam demandas locais.</p>
+        <p class="mt-3 text-xs text-slate-500">Orientação alinhada à Política de Utilização dos Cartões Clara. Limite não é ferramenta para cobrir qualquer gasto, mas sim o que é essencial para a operação dentro da política.</p>
+      </div>
+    </details>
+  </div>`;
+}
 
     function respBloqueio() {
-        return `HTML:<p class="text-sm text-slate-700">
-            Geralmente quando você não consegue usar o cartão pode ser devido ao bloqueio preventivo, que acontece quando tem alguma compra sem justificar na Clara dentro do prazo (até 48h):<br/>
-            • faltou nota fiscal/recibo;<br/>
-            • não colocou etiqueta correta;<br/>
-            • descrição não explica o uso operacional.<br/><br/>
-            Passos pra desbloquear:<br/>
-            1. Regulariza a transação na plataforma (anexa nota, escolher etiqueta certa, descrever o motivo real).<br/>
-            2. Encaminhar chamado via <b>ServiceNow</b> para desbloqueio, caminho: <b>Contas a Receber &gt; Cartão Clara &gt; Solicitação de Desbloqueio</b>.<br/><br/>
-            </p>`;
-                }
+  return `HTML:<div class="text-sm text-slate-700">
+    <p><b>Bloqueio de cartão Clara (preventivo ou por pendências)</b></p>
+    <p class="mt-2">O cartão Clara pode ser bloqueado preventivamente principalmente por pendências de comprovantes (nota, etiqueta ou descrição fora do prazo) ou por uso fora da política que exige análise do Financeiro.</p>
+    <p class="mt-2">Antes de qualquer coisa, entre na Clara e verifique se existem transações pendentes ou compras fora do padrão que possam ter motivado o bloqueio.</p>
+    <details class="mt-3">
+      <summary class="cursor-pointer underline">Ver orientação completa no ServiceNow / política</summary>
+      <div class="mt-2">
+        <p><b>Passos básicos quando o cartão está bloqueado:</b></p>
+        <ul class="list-disc ml-4 mt-2 space-y-1">
+          <li>Regularize todas as transações pendentes na Clara com nota, comprovante, etiqueta correta e descrição clara;</li>
+          <li>Cheque se não há compras claramente fora da política que precisem ser corrigidas ou ressarcidas;</li>
+          <li>Evite tentar insistir em novas compras enquanto o motivo do bloqueio não estiver claro.</li>
+        </ul>
+        <p class="mt-3"><b>Quando o bloqueio estiver ligado à prestação de contas ou pendências já regularizadas:</b></p>
+        <p>Se você já resolveu todas as pendências na Clara e o cartão continua bloqueado, a orientação é abrir chamado no ServiceNow do tipo <b>Desbloqueio de cartão Clara por pendências / bloqueio preventivo</b>.</p>
+        <p class="mt-2">No chamado, informe loja, BU, código do cartão e nome do responsável, além de quais pendências foram regularizadas (faturas e período) e, se solicitado, anexos ou prints que comprovem a regularização.</p>
+        <p class="mt-3 text-xs text-slate-500">Fluxo alinhado à Política de Utilização dos Cartões Clara e aos procedimentos de bloqueio/desbloqueio via ServiceNow. Em situações fora do padrão, consulte o Financeiro antes de tentar liberar novas compras.</p>
+      </div>
+    </details>
+  </div>`;
+}
 
                 // 🔹 NOVA RESPOSTA – transação negada / categoria bloqueada
                 function respTransacaoNegadaCategoria() {
@@ -3163,62 +3239,49 @@ ${et.observacaoUso ? `<p class="mt-1 text-slate-700"><i>${et.observacaoUso}</i><
               }
 
     function respCatalogoEtiquetas() {
-        return `HTML:<div class="text-sm text-slate-700">
-            <p><b>Etiquetas oficiais e quando usar:</b></p>
+  // Sugestão para listar todas as etiquetas (entra no fluxo de sugestões existente)
+  if (typeof vektorSugerirTopicoRelacionadoManual === "function") {
+    vektorSugerirTopicoRelacionadoManual(
+      "catalogo_etiquetas_listar",
+      "Ver lista completa de etiquetas Clara",
+      "Quero ver a lista de etiquetas da Clara"
+    );
+  }
 
-            <p class="mt-2"><b>MATERIAL DE INFORMÁTICA</b><br/>
-            Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (baixo valor, sem controle patrimonial).<br/>
-            Exemplo de descrição: "Teclado PDV loja 1234".</p>
+  return `HTML:<div class="text-sm text-slate-700">
+    <p><b>Etiquetas na Clara</b></p>
+    <p class="mt-2">As etiquetas servem para classificar corretamente cada gasto feito com o cartão Clara e facilitar o controle financeiro e a prestação de contas.
+    <p class="mt-2">Sempre escolha a etiqueta que mais represente o tipo real de despesa, evitando classificar tudo em categorias genéricas.
 
-            <p class="mt-2"><b>MATERIAL DE ESCRITÓRIO</b><br/>
-            Caneta, pasta, bloco de anotação, grampeador, etiqueta adesiva, organizador de mesa, papelaria básica da operação administrativa da loja.</p>
-
-            <p class="mt-2"><b>AGUA POTÁVEL</b><br/>
-            Galão de água mineral / garrafas de água para abastecimento da equipe ou uso da loja, quando previsto e autorizado operacionalmente.</p>
-
-            <p class="mt-2"><b>LANCHES DE REFEIÇÕES</b><br/>
-            Coffee break ou lanche para treinamento interno autorizado, ação oficial da área (VM, regional, diretoria) ou premiação operacional da equipe (não vale refeição pessoal).</p>
-
-            <p class="mt-2"><b>TRANSPORTE SERVIÇOS EMERGENCIAS</b><br/>
-            Motoboy emergencial / frete local urgente para levar ou buscar material importante entre lojas ou matriz.</p>
-
-            <p class="mt-2"><b>CORREIOS_SEDEX/AR/POSTAGEM</b><br/>
-            Envio de documentos oficiais da loja via Sedex/AR/postagem. Também serve para devoluções pequenas quando for processo formal.</p>
-
-            <p class="mt-2"><b>CHAVEIRO EMERGENCIAL</b><br/>
-            Abertura urgente de cofre / estoque / sala administrativa quando houve perda de chave ou travamento, só em situação emergencial.</p>
-
-            <p class="mt-2"><b>MANUTENÇÃO CIVIL</b><br/>
-            Pequenos reparos estruturais internos de baixa complexidade: ajuste em porta, troca de vidro quebrado, fixar prateleira, ajuste de revestimento etc.</p>
-
-            <p class="mt-2"><b>MANUTENÇÃO ELÉTRICA</b><br/>
-            Troca de tomada, disjuntor, interruptor, soquete, reator, extensão, pequenos reparos de baixa tensão necessários pro funcionamento da loja.</p>
-
-            <p class="mt-2"><b>MANUTENÇÃO AR-CONDICIONADO</b><br/>
-            Limpeza de filtro, troca de controle remoto, carga de gás simples, pequenos ajustes que mantenham o ar funcionando.</p>
-
-            <p class="mt-2"><b>BOBINA ECF</b><br/>
-            Bobina fiscal / bobina de impressora obrigatória pro PDV, quando não há fornecimento centralizado.</p>
-
-            <p class="mt-2"><b>SERVIÇOS GRÁFICOS E DE COPIADORAS</b><br/>
-            Impressão de banner, adesivo de campanha, plotagem promocional, encadernação de material de comunicação da loja.</p>
-
-            <p class="mt-2"><b>MANUTENÇÃO EQUIPAMENTOS</b><br/>
-            Ajustes/reparos em máquinas de estampar, impressoras de etiqueta, computadores fora de garantia e de baixo valor etc. (nada de compra de equipamento grande).</p>
-
-            <p class="mt-4">Se você não encontrou nada que encaixa no seu caso, abra chamado no<a class="service-link" href="https://sn.gruposbf.com.br/sp?id=ticket&is_new_order=true&table=incident&sys_id=52d2e0ef1b06e1907540a6cae54bcbe6"target="_blank" rel="noopener noreferrer"><strong>ServiceNow</strong></a>pedindo criação ou liberação de etiqueta.</p>
-            </div>`;
-                }
+    <details class="mt-3">
+      <summary class="cursor-pointer underline">Ver orientação completa no ServiceNow / política</summary>
+      <div class="mt-2">
+        <p>Se não existir uma etiqueta adequada para o tipo de gasto recorrente da sua loja, não improvise usando algo que não represente a realidade da compra.</p>
+        <p class="mt-2">Nesse caso, a orientação é abrir chamado no ServiceNow do tipo <b>Inserção ou ajuste de etiqueta – Cartão Clara</b>, informando loja, BU, tipo de despesa, justificativa e exemplos de uso.</p>
+        <p class="mt-2">O Financeiro avaliará a solicitação e, se aprovado, criará ou ajustará a etiqueta no catálogo oficial da Clara.</p>
+        <p class="mt-3 text-xs text-slate-500">Fluxo baseado no Anexo II da Política de Utilização dos Cartões Clara. A escolha correta de etiquetas impacta diretamente indicadores e controles da companhia.</p>
+      </div>
+    </details>
+  </div>`;
+}
 
     function respPrestacaoContas() {
-        return `HTML:<p class="text-sm text-slate-700">
-Toda compra no cartão Clara precisa ser lançada na plataforma Clara em até 48h:<br/>
-1. Anexar nota fiscal ou recibo;<br/>
-2. Selecionar a etiqueta correta (ex.: "MATERIAL DE INFORMÁTICA", "AGUA POTÁVEL");<br/>
-3. Preencher a descrição objetiva, dizendo o que foi comprado e para quê.<br/><br/>
-Os comprovantes físicos devem ficar guardados na loja por pelo menos 180 dias corridos. Não justificar no prazo =&gt; risco de bloqueio preventivo.
-</p>`;
-    }
+  return `HTML:<div class="text-sm text-slate-700">
+    <p><b>Prestação de contas na Clara (notas, comprovantes e justificativas)</b></p>
+    <p class="mt-2">Toda compra feita com o cartão Clara precisa de <b>nota ou comprovante anexado</b>, <b>etiqueta correta</b> e <b>descrição</b> dentro do prazo de 48 horas após a compra, senão vira pendência de prestação de contas.</p>
+    <p class="mt-2">Pendências em aberto podem levar a bloqueio preventivo do cartão até que a loja regularize as informações.</p>
+    <details class="mt-3">
+      <summary class="cursor-pointer underline">Ver orientação completa no ServiceNow / política</summary>
+      <div class="mt-2">
+        <p><b>Quando faltar nota, tiver erro de comprovante ou um caso atípico:</b></p>
+        <p>Se a nota foi perdida, o fornecedor não emitiu NF corretamente, ou existe alguma irregularidade que você não consegue resolver apenas pela Clara, registre o máximo possível na descrição e organize as evidências que tiver (pedido, orçamento, recibos, prints etc.).</p>
+        <p class="mt-2">Nesses casos, a orientação é abrir um chamado no ServiceNow de <b>Apoio à prestação de contas / regularização de comprovantes – Cartão Clara</b>.</p>
+        <p class="mt-2">No chamado, informe loja, BU, dados da transação (data, valor, estabelecimento), print da tela da Clara se possível e explique o que aconteceu (perda de nota, NF em CPF, NF recusada, erro do fornecedor etc.), além da solução proposta.</p>
+        <p class="mt-3 text-xs text-slate-500">Fluxo baseado no Anexo II da Política de Utilização dos Cartões Clara. Pendências não tratadas podem manter o cartão bloqueado ou gerar apontamentos para a loja.</p>
+      </div>
+    </details>
+  </div>`;
+}
 
     function respAlimentoTime() {
         return `HTML:<p class="text-sm text-slate-700">
@@ -3352,38 +3415,24 @@ Só em caso de exceção real (cartão sem funcionar e gasto urgente da operaç�
 
     function respFraudeContestacao() {
   return `HTML:<div class="text-sm text-slate-700">
-    <p><b>Suspeita de fraude ou transação não reconhecida no cartão Clara</b>
-
-    <p class="mt-2">
-      Quando aparece uma compra que você <b>não reconhece</b> no extrato da Clara, a orientação básica é:
-
-    <ul class="list-disc ml-4 mt-2 space-y-1">
-      <li>Conferir se não foi uma compra legítima feita por outro responsável da loja;</li>
-      <li>Verificar se não é uma assinatura ou cobrança recorrente que passou despercebida;</li>
-      <li>Confirmar se o valor, data e estabelecimento realmente não fazem sentido para a operação da loja.</ul>
- 
-    <p class="mt-3">
-      Se, depois dessa checagem, continuar parecendo <b>fraude ou uso indevido</b>, siga estes passos:
- 
-    <ul class="list-disc ml-4 mt-2 space-y-1">
-      <li>Bloqueie o cartão na própria Clara, se ainda houver risco de novas cobranças;</li>
-      <li>Levante todas as informações da transação: data, valor, estabelecimento e descrição;</li>
-      <li>Se houver indício de golpe ou roubo, registre um <b>Boletim de Ocorrência</b> (quando aplicável).
-
-    <p class="mt-3">
-      <b>Formalização no ServiceNow:</b>
-    </p>
-      Para seguir o fluxo oficial, abra um chamado de <b>Fraude / Contestação de transação – Cartão Clara</b> no <b>ServiceNow</b>, informando: (Isso é diferente de gasto pessoal reconhecido (tipo Uber pessoal etc. Se a compra foi pessoal, aí precisa ressarcir em até 2 dias úteis em outro fluxo; não é contestação.)
-
-    <ul class="list-disc ml-4 mt-2 space-y-1">
-      <li>Loja, BU (Centauro / Fisia) e código da unidade;</li>
-      <li>Dados completos da transação (data, valor, estabelecimento, descrição);</li>
-      <li>Contexto do ocorrido e, se houver, anexos como prints e boletim de ocorrência;</li>
-      <li>Telefone ou contato de referência da loja para retorno.
-  
-    <p class="mt-3 text-xs text-slate-500">
-      Resumo alinhado ao Anexo II (Fraude / Contestação) da Política de Utilização dos Cartões Clara. Sempre acompanhe o retorno pelo próprio ServiceNow e pelos canais oficiais do Financeiro.
-    </p>
+    <p><b>Suspeita de fraude ou transação não reconhecida no cartão Clara</b></p>
+    <p class="mt-2">Se aparecer uma compra que você realmente não reconhece na Clara, primeiro confira se não foi uma compra legítima feita por outro responsável, se não é uma assinatura recorrente ou algo ligado à operação da loja.</p>
+    <p class="mt-2">Se mesmo assim continuar parecendo fraude ou uso indevido, é caso de tratar como contestação formal.</p>
+    <details class="mt-3">
+      <summary class="cursor-pointer underline">Ver orientação completa no ServiceNow / política</summary>
+      <div class="mt-2">
+        <p>Quando a transação for suspeita de fraude ou não reconhecida mesmo após conferência interna, siga estes passos:</p>
+        <ul class="list-disc ml-4 mt-2 space-y-1">
+          <li>Bloqueie o cartão na Clara, se ainda houver risco de novas cobranças;</li>
+          <li>Levante todas as informações da transação: data, valor, estabelecimento e descrição;</li>
+          <li>Se houver indício de golpe ou roubo, registre um Boletim de Ocorrência, quando aplicável.</li>
+        </ul>
+        <p class="mt-3"><b>Formalização no ServiceNow:</b></p>
+        <p>Abra um chamado de <b>Fraude / Contestação de transação – Cartão Clara</b> no ServiceNow, informando loja, BU (Centauro / Fisia) e código da unidade, além dos dados completos da transação (data, valor, estabelecimento) e um resumo do ocorrido.</p>
+        <p class="mt-2">Anexe prints da Clara, boletim de ocorrência (se houver) e qualquer evidência que ajude o Financeiro a tratar a contestação com o emissor.</p>
+        <p class="mt-3 text-xs text-slate-500">Resumo alinhado ao Anexo II (Fraude / Contestação) da Política de Utilização dos Cartões Clara. Acompanhe o retorno pelo próprio ServiceNow e pelos canais oficiais do Financeiro.</p>
+      </div>
+    </details>
   </div>`;
 }
 
@@ -3437,27 +3486,52 @@ function respNovoCartaoSegundaVia() {
 </div>`;
 }
 
-    function respGenerica(msgNorm) {
-        const avaliacao = avaliarCompraEspecifica(msgNorm);
+      function respGenerica(msgNorm) {
+  const texto = (msgNorm || "").toLowerCase();
 
-        if (avaliacao.pode === false) {
-            return `HTML:<div class="text-sm text-slate-700">
-<p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
-<p>${avaliacao.resposta}</p>
-</div>`;
-        }
+  // 1) Ver se a pessoa está claramente falando de COMPRA/USO DO CARTÃO
+  const falandoDeCompra =
+    texto.includes("posso comprar") ||
+    texto.includes("pode comprar") ||
+    texto.includes("posso usar") ||
+    texto.includes("pode usar") ||
+    texto.includes("posso pagar") ||
+    texto.includes("pode pagar") ||
+    texto.includes("pode gastar") ||
+    texto.includes("pagar com o cartao") ||
+    texto.includes("pagar com o cartão") ||
+    texto.includes("posso passar o cartao") ||
+    texto.includes("posso passar o cartão") ||
+    texto.includes("posso usar o cartao para") ||
+    texto.includes("posso usar o cartão para") ||
+    texto.includes("pode no cartao") ||
+    texto.includes("pode no cartão") ||
+    texto.includes("pode colocar no cartao") ||
+    texto.includes("pode colocar no cartão") ||
+    texto.includes("para que posso usar") ||
+    texto.includes("em que posso usar") ||
+    texto.includes("em que eu posso usar") ||
+    texto.includes("oq eu posso pagar") ||
+    texto.includes("oque posso pagar") ||
+    texto.includes("o q posso pagar") ||
+    texto.includes("oq pode pagar") ||
+    texto.includes("pode ser pago") ||
+    (
+      typeof perguntasGeraisOquePosso !== "undefined" &&
+      perguntasGeraisOquePosso.some(f => texto.includes(f))
+    );
 
-        if (avaliacao.pode === true && avaliacao.etiquetaValida) {
-            const et = avaliacao.etiquetaValida;
-            return `HTML:<div class="text-sm text-slate-700">
-<p><b>✅ Pode usar o cartão Clara (despesa operacional autorizada).</b></p>
-<p>Use a etiqueta: "<b>${et.nome}</b>".</p>
-<p class="mt-1">${et.desc}</p>
-</div>`;
-        }
+  // 2) Se NÃO está claro que é pergunta sobre uso do cartão,
+  // não vamos ficar chutando "pode/não pode"
+  if (!falandoDeCompra) {
 
-        if (perguntasGeraisOquePosso.some(f => msgNorm.includes(f))) {
-            return `HTML:<div class="text-sm text-slate-700">
+    // 2.1) Se for aquelas perguntas bem genéricas "o que posso / o que pode",
+    // mantém o bloco grande de orientação
+    if (
+      typeof perguntasGeraisOquePosso !== "undefined" &&
+      perguntasGeraisOquePosso.some(f => texto.includes(f))
+    ) {
+      return `HTML:<div class="text-sm text-slate-700">
 <p><b>✅ O que pode no cartão Clara</b> - Exemplos de materiais:</p>
 <ul class="list-disc ml-4 mt-1">
 <li>Materiais de escritório: canetas, blocos, pastas, papel, clips, organizadores, grampeadores;</li>
@@ -3481,18 +3555,68 @@ function respNovoCartaoSegundaVia() {
 <li>Gastos fora da operação da loja ou que não tenham relação com a atividade comercial;</li>
 </ul>
 </div>`;
-        }
-
-        return `HTML:<div class="text-sm text-slate-700">
-<p>Pra usar o cartão Clara, o gasto precisa ser <b>necessário pra operação da loja</b> (ex.: chaveiro emergencial, motoboy urgente, material de limpeza, periférico de PDV, bobina fiscal, água/coffee break autorizado pra treinamento interno ou ação oficial).</p>
-<p class="mt-2">O que <b>não pode</b> no cartão Clara:<br/>
-• gasto pessoal (refeição pessoal, compra pra uso próprio etc.);<br/>
-• bebida alcoólica em geral;<br/>
-• transporte pessoal (Uber/99 pra deslocamento pessoal);<br/>
-• itens patrimoniais / infraestrutura grande (geladeira, micro-ondas, TV, mesa, cadeira, entre outros).</p><br/>
-Caso entenda que a compra é essencial para o dia a dia da loja, fale com o financeiro, caso seja verificado que o item é essencial eles podem abrir uma exceção para a compra.
-</div>`;
     }
+
+    // 2.2) Qualquer outro assunto (tipo "vc sabe tocar violão?",
+    // "qual a capital da austrália?", "como conserta uma porta?")
+    // vira pergunta de clarificação, não resposta de política
+    return gerarPerguntaDeClarificacao(texto);
+  }
+
+  // 3) Aqui SIM está claro que a pessoa está falando de comprar/usar o cartão
+  const avaliacao = avaliarCompraEspecifica(texto);
+
+  if (avaliacao && avaliacao.pode === false) {
+    return `HTML:<div class="text-sm text-slate-700">
+<p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
+<p>${avaliacao.resposta}</p>
+</div>`;
+  }
+
+  if (avaliacao && avaliacao.pode === true && avaliacao.etiquetaValida) {
+    const et = avaliacao.etiquetaValida;
+    return `HTML:<div class="text-sm text-slate-700">
+<p><b>✅ Pode usar o cartão Clara (despesa operacional autorizada).</b></p>
+<p>Use a etiqueta: "<b>${et.nome}</b>".</p>
+<p class="mt-1">${et.desc}</p>
+</div>`;
+  }
+
+  // 4) Se falou de "o que posso / o que pode" e não caiu em nenhum caso
+  // específico acima, usa o bloco geral de pode/não pode
+  if (
+    typeof perguntasGeraisOquePosso !== "undefined" &&
+    perguntasGeraisOquePosso.some(f => texto.includes(f))
+  ) {
+    return `HTML:<div class="text-sm text-slate-700">
+<p><b>✅ O que pode no cartão Clara</b> - Exemplos de materiais:</p>
+<ul class="list-disc ml-4 mt-1">
+<li>Materiais de escritório: canetas, blocos, pastas, papel, clips, organizadores, grampeadores;</li>
+<li>Serviços gráficos e de comunicação visual: impressão de banners, adesivos promocionais, folders e plotagens autorizadas pela área de VM;</li>
+<li>Compra de água mineral ou galões para abastecimento da equipe (etiqueta “ÁGUA POTÁVEL”);</li>
+<li>Suprimentos de informática (mouse, teclado, cabos, bobina fiscal etc.);</li>
+<li>Lanches, coffee breaks ou premiações para equipe somente quando vinculados a treinamentos internos, ações oficiais ou campanhas aprovadas (etiqueta “LANCHES DE REFEIÇÕES”);</li>
+<li>Serviços emergenciais (motoboy urgente, chaveiro, Sedex de documento);</li>
+<li>Compra de bobinas fiscais ou suprimentos obrigatórios do PDV;</li>
+<li>Pequenas manutenções (elétrica, civil, ar-condicionado, equipamentos).</li>
+</ul>
+<p class="mt-2"><b>❌ O que não pode</b> - Exemplos de itens não permitidos:</p>
+<ul class="list-disc ml-4">
+<li>Itens patrimoniais ou de infraestrutura: TV, micro-ondas, geladeira, freezer, mesa, cadeira, armário, ventilador, cafeteira elétrica, computador, impressora, celular, tablets, ou qualquer bem durável;</li>
+<li>Bebidas alcoólicas (cerveja, vinho, whisky, vodka, gin, tequila, entre outras);</li>
+<li>Transporte pessoal: Uber, 99, táxi, aplicativos de carona ou combustível para veículo particular;</li>
+<li>Despesas pessoais: almoço, jantar, lanche, coffee break pessoal, delivery, supermercado para consumo próprio;</li>
+<li>Equipamentos e mobiliários que exigem tombamento patrimonial (mesmo que de baixo valor);</li>
+<li>Manutenções estruturais de grande porte (obras, pintura geral, reformas, trocas de piso, elétrica complexa, etc.);</li>
+<li>Serviços ou produtos sem nota fiscal (inclusive compras em marketplaces sem NF emitida no CNPJ da loja);</li>
+<li>Gastos fora da operação da loja ou que não tenham relação com a atividade comercial;</li>
+</ul>
+</div>`;
+  }
+
+  // 5) Último fallback: ainda assim, prefere perguntar do que chutar
+  return gerarPerguntaDeClarificacao(texto);
+}
 
     /* ========= FUNÇÕES DE PENDÊNCIAS (BACKEND) ========= */
 
@@ -3766,18 +3890,27 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
 
         const isGastoPessoalAlimentacao = padroesGastoPessoalAlimentacao.some(p => norm.includes(p));
         if (isGastoPessoalAlimentacao) {
-            ultimaIntencao = "gasto_pessoal_alimentacao";
-            return `HTML:<div class="text-sm text-slate-700">
-            <p>⛔ Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja.</p>
-            <p class="mt-2">Se já foi pago com o cartão:</p>
-            <ul class="list-disc ml-4">
-            <li>Avise o Financeiro e abra chamado no ServiceNow (Contas a Receber &gt; Cartão Clara &gt; Gasto Indevido - pessoal);</li>
-            <li>Classifique na Clara como "Despesa Pessoal – Uso Indevido";</li>
-            <li>Ressarça o valor à empresa em até 2 dias úteis.</li>
-            </ul>
-            <p class="mt-2">Se não regularizar, o cartão pode ficar bloqueado preventivamente.</p>
-            </div>`;
-        }
+  ultimaIntencao = "gasto_pessoal_alimentacao";
+  return `HTML:<div class="text-sm text-slate-700">
+    <p><b>Gasto pessoal com alimentação não é permitido no cartão Clara</b></p>
+    <p class="mt-2">Refeições pessoais como almoço, jantar, lanches ou consumo individual não podem ser pagos com o cartão corporativo, pois não são despesas operacionais da loja.</p>
+    <p class="mt-2">Se a compra já foi realizada, ela deve ser tratada como uso indevido.
+
+    <details class="mt-3">
+      <summary class="cursor-pointer underline">Ver orientação completa no ServiceNow / política</summary>
+      <div class="mt-2">
+        <p>Quando houver uso do cartão Clara para gasto pessoal, a loja deve:</p>
+        <ul class="list-disc ml-4 mt-2 space-y-1">
+          <li>Classificar a compra na Clara como <b>Despesa pessoal – Uso indevido</b>;</li>
+          <li>Providenciar o ressarcimento do valor à empresa dentro do prazo definido;</li>
+          <li>Formalizar o caso no ServiceNow, se orientado pelo Financeiro.</li>
+        </ul>
+        <p class="mt-2">O chamado a ser utilizado é <b>Gasto indevido (pessoal) / Ressarcimento – Cartão Clara</b>, com descrição do ocorrido, valor, data e loja.</p>
+        <p class="mt-3 text-xs text-slate-500">Uso indevido pode gerar bloqueio preventivo do cartão e impactos administrativos para a loja.</p>
+      </div>
+    </details>
+  </div>`;
+}
 
         let resposta;
 
@@ -4864,6 +4997,137 @@ function aplicarRegraDeIntencao(msgOriginal) {
   return null;
 }
 
+// Fallback: quando nada casa, perguntar em vez de chutar resposta
+function gerarPerguntaDeClarificacao(norm) {
+  norm = norm || "";
+
+  const temasProvaveis = [];
+
+  // Sinais de tema → só pra deixar a pergunta mais “esperta”
+  if (norm.includes("pendenc")) {
+    temasProvaveis.push("pendências da Clara");
+  }
+  if (norm.includes("justific")) {
+    temasProvaveis.push("justificativas das transações");
+  }
+  if (norm.includes("fatura")) {
+    temasProvaveis.push("faturas / ciclo de fatura");
+  }
+  if (norm.includes("bloqueio") || norm.includes("bloqueado")) {
+    temasProvaveis.push("bloqueio ou desbloqueio do cartão");
+  }
+  if (norm.includes("limite")) {
+    temasProvaveis.push("limite do cartão Clara");
+  }
+  if (
+    norm.includes("nota fiscal") ||
+    norm.includes("nf ") ||
+    norm.includes("nf/") ||
+    norm.includes("recibo")
+  ) {
+    temasProvaveis.push("nota fiscal / recibo / comprovantes");
+  }
+
+  // Se não achou nenhum “cheiro”, usa uma frase aleatória
+if (!temasProvaveis.length) {
+
+  const variacoes = [
+    "Não tenho certeza se entendi sua pergunta. Você está falando de pendências, faturas, regras de uso do cartão ou outro assunto?",
+    "Fiquei em dúvida sobre o que você quis dizer. É algo sobre pendências, faturas ou regras de uso do cartão?",
+    "Talvez eu esteja interpretando errado. Seu assunto é pendências, faturas, política de uso do cartão ou outra coisa?",
+    "Preciso de mais contexto. Sua dúvida envolve pendências, faturas, regras do cartão Clara ou é outro tema?",
+    "Não consegui identificar o assunto. Você queria saber sobre faturas, pendências, política de compras ou algo diferente?",
+    "Não entendi completamente sua pergunta. Está relacionada a pendências, faturas, cartão Clara ou outro tema?"
+  ];
+
+  const frase = variacoes[Math.floor(Math.random() * variacoes.length)];
+
+  return (
+    "HTML:" +
+    "<p class='text-sm text-slate-700'>" +
+    frase +
+    "</p>"
+  );
+}
+
+  // Se achou alguns temas, monta a frase usando eles
+  const listaTemas = temasProvaveis
+    .map(function (t) { return "<b>" + t + "</b>"; })
+    .join(", ");
+
+  return (
+    "HTML:" +
+    "<p class='text-sm text-slate-700'>" +
+    "Não tenho certeza se entendi completamente. " +
+    "Estou entendendo que pode ser algo relacionado a " + listaTemas + ". " +
+    "Você consegue detalhar um pouco melhor o que precisa?" +
+    "</p>"
+  );
+}
+
+// Tenta entender respostas curtas depois da pergunta de clarificação
+
+function tentarInterpretarRespostaClarificacao(norm) {
+  let t = (norm || "").trim().toLowerCase();
+  if (!t) return null;
+
+  // normaliza acentos
+  t = t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  const palavras = t.split(/\s+/).filter(Boolean);
+
+  // 1) Só trata respostas MUITO curtas (no máx. 3 palavras).
+  // Se a pessoa escreveu uma frase mesmo ("valor das ultimas 3 faturas"),
+  // NÃO é clarificação, é uma pergunta nova → não mexe.
+  if (palavras.length > 3) {
+    return null;
+  }
+
+  // 2) Se tem número, "ultimas", "todas", "valor", "periodo", etc,
+  // não é clarificação simples. Deixa passar sem reescrever.
+  const temNumero = /\d/.test(t);
+  const temDetalhe =
+    t.includes("ultima") ||
+    t.includes("ultimas") ||
+    t.includes("todas") ||
+    t.includes("valor") ||
+    t.includes("periodo") ||
+    t.includes("periodo") ||
+    t.includes("historico") ||
+    t.includes("quantidade");
+
+  if (temNumero || temDetalhe) {
+    return null;
+  }
+
+  // 3) Agora sim, mapeia respostas bem curtas
+  // Ex.: "pendencias", "pendência clara"
+  if (t.includes("pendenc")) {
+    return "Quero consultar as pendências Clara da minha loja";
+  }
+
+  // Ex.: "fatura", "faturas"
+  if (t.includes("fatura")) {
+    return "Quero ver as faturas da Clara";
+  }
+
+  // Ex.: "regras", "politica", "uso do cartao"
+  if (
+    t.includes("regra") ||
+    t.includes("regras") ||
+    t.includes("politica") ||
+    t.includes("politicas") ||
+    t.includes("politica de uso") ||
+    t.includes("uso do cartao") ||
+    t.includes("uso do cartão")
+  ) {
+    return "Quero tirar dúvidas sobre a política de uso do cartão Clara";
+  }
+
+  // Se não encaixar em nada, não força interpretação
+  return null;
+}
+
 // 🧠 Engine simples de insights em cima de faturas
 function analisarFaturas(faturas) {
   try {
@@ -5137,8 +5401,18 @@ function gerarInsightsResumoChaveCategoriaEstab(res, opcoes) {
 
     /* ========= GERADOR FINAL ========= */
 
-function gerarRespostaDoBot(msgUsuario) {
+function gerarRespostaDoBot(msgUsuario, vindoDaClarificacao = false) {
   const norm = normalize(msgUsuario || "");
+
+  // 🔹 0.5: se a frase parece ser só uma resposta curta à clarificação,
+  // reinterpreta UMA ÚNICA VEZ como uma pergunta completa que o motor já entende
+  if (!vindoDaClarificacao) {
+    const reescrita = tentarInterpretarRespostaClarificacao(norm);
+    if (reescrita) {
+      // chama de novo o gerador, marcando que já viemos da clarificação
+      return gerarRespostaDoBot(reescrita, true);
+    }
+  }
 
     // 🔹 1ª camada: motor de intenções por regras
   const resultadoIntencao = aplicarRegraDeIntencao(msgUsuario);
@@ -5903,11 +6177,105 @@ if (detTimeCampeao) {
         }
 
         var todas = res.faturas || [];
+
+              // ================== INTERPRETAÇÃO LOCAL DA PERGUNTA ==================
+        let perguntaBruta = (msgUsuario || "").toLowerCase();
+
+        // remove acentos: "últimas" -> "ultimas", "mês" -> "mes"
+        let perguntaNorm = perguntaBruta
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "");
+
+        let modoLocal = "atual";   // padrão
+        let qtdLocal  = null;      // quantidade de faturas quando for "ultimas N"
+
+        const temPluralFaturas   = perguntaNorm.includes("faturas");
+        const temExplicitoAtual  = perguntaNorm.includes("fatura atual") ||
+                                   perguntaNorm.includes("deste mes") ||
+                                   perguntaNorm.includes("desse mes");
+        const temExplicitoAnterior = perguntaNorm.includes("anterior") ||
+                                     perguntaNorm.includes("mes passado");
+        const temExplicitoTodas  = perguntaNorm.includes("todas");
+        const temExplicitoUltimas = perguntaNorm.includes("ultimas") ||
+                                    perguntaNorm.includes("ultimos");
+
+        // 1) TODAS AS FATURAS (frase explícita)
+        if (temExplicitoTodas && temPluralFaturas) {
+          modoLocal = "todas";
+        }
+
+        // 2) ÚLTIMAS N FATURAS (explicitamente com número)
+        // exemplos:
+        // "ultimas 6 faturas", "ultimas 3 faturas da clara",
+        // "6 ultimas faturas", "3 ultimas faturas da clara"
+        let m =
+          perguntaNorm.match(/ultimas?\s+(\d{1,2})\s*faturas?/) ||
+          perguntaNorm.match(/(\d{1,2})\s+ultimas?\s*faturas?/);
+
+        if (m && m[1]) {
+          modoLocal = "ultimas";
+          qtdLocal  = parseInt(m[1], 10);
+        }
+
+        // 2.b) "ultimas faturas" sem número → usa um padrão (ex.: 6)
+        if (!qtdLocal && temExplicitoUltimas && temPluralFaturas) {
+          modoLocal = "ultimas";
+          qtdLocal  = 6;
+        }
+
+        // 3) FATURA ANTERIOR
+        if (temExplicitoAnterior) {
+          modoLocal = "anterior";
+          qtdLocal  = null;
+        }
+
+        // 4) FATURA ATUAL (reforço explícito)
+        if (temExplicitoAtual) {
+          modoLocal = "atual";
+          qtdLocal  = null;
+        }
+
+        // 5) FALLBACK INTELIGENTE:
+        // Se ainda está em "atual", mas o usuário falou em "faturas" (plural)
+        // sem dizer "atual", "anterior", "todas" ou "ultimas",
+        // vamos assumir que ele quer ver mais de uma: ex.: últimas 6.
+        if (
+          modoLocal === "atual" &&
+          temPluralFaturas &&
+          !temExplicitoAtual &&
+          !temExplicitoAnterior &&
+          !temExplicitoTodas &&
+          !temExplicitoUltimas
+        ) {
+          modoLocal = "ultimas";
+          qtdLocal  = 6; // aqui você define o padrão que quiser
+        }
+
+        // 6) Segurança extra: se por qualquer motivo o modoLocal estiver "atual"
+        //    mas temos qtdLocal > 1, tratamos como "ultimas".
+        if (modoLocal === "atual" && typeof qtdLocal === "number" && qtdLocal > 1) {
+          modoLocal = "ultimas";
+        }
+
+        // ================== APLICA O FILTRO ==================
         var selecionadas = vektorFiltrarFaturasPeloModo_(
           todas,
-          detFatura.modo,
-          detFatura.qtd
+          modoLocal,
+          qtdLocal
         );
+
+        // ================== APLICA O FILTRO ==================
+        var selecionadas = vektorFiltrarFaturasPeloModo_(
+          todas,
+          modoLocal,
+          qtdLocal
+        );
+
+        // DEBUG pra gente ver exatamente o que está acontecendo
+        console.log("perguntaNorm =", perguntaNorm);
+        console.log("modoLocal =", modoLocal, "qtdLocal =", qtdLocal);
+        console.log("total faturas retornadas =", todas.length);
+        console.log("selecionadas pelo filtro =", selecionadas.length);
 
         if (!selecionadas.length) {
           renderBotMessage(
@@ -5917,32 +6285,57 @@ if (detTimeCampeao) {
           return;
         }
 
+        // ================== MONTA TÍTULO ==================
         var titulo = "RESUMO DE FATURAS CLARA";
 
-        if (detFatura.modo === "atual") {
+        if (modoLocal === "atual") {
           titulo = "VALOR DA FATURA ATUAL";
-        } else if (detFatura.modo === "anterior") {
+        } else if (modoLocal === "anterior") {
           titulo = "VALOR DA FATURA DO MÊS PASSADO";
-        } else if (detFatura.modo === "ultimas") {
-          var n = detFatura.qtd || 2;
-          // se pediu 3 mas só existem 2, mostra "2"
+        } else if (modoLocal === "ultimas") {
+          var n = qtdLocal || 2;
           var usado = Math.min(n, selecionadas.length);
           titulo = "VALOR DAS ÚLTIMAS " + usado + " FATURAS";
-        } else if (detFatura.modo === "todas") {
+        } else if (modoLocal === "todas") {
           titulo = "VALOR DE TODAS AS FATURAS";
         }
 
         var html = vektorMontarTabelaFaturas_(titulo, selecionadas);
         renderBotMessage("HTML:" + html);
 
-        // 🧠 Chama a engine de insights automáticos em cima das faturas exibidas
-      var htmlInsights = analisarFaturas(selecionadas);
-      if (htmlInsights && typeof htmlInsights === "string") {
-        renderBotMessage("HTML:" + htmlInsights);
-      }
+        // 🧠 Engine de insights automáticos em cima das faturas exibidas
+        var htmlInsights = analisarFaturas(selecionadas);
+        if (htmlInsights && typeof htmlInsights === "string") {
+          renderBotMessage("HTML:" + htmlInsights);
+        }
 
-      let __vektorChartFaturas = null;
+        // 🆕 Se for fatura ATUAL, envia lembrete de fechamento e pagamento
+        if (modoLocal === "atual") {
+          const diasFechamento = vektorDiasAteFechamentoFaturaAtual();
 
+          let msgFechamento;
+          if (diasFechamento === 0) {
+            msgFechamento =
+              "Hoje é o <b>dia de fechamento</b> da fatura atual. " +
+              "O pagamento da fatura é programado sempre para o dia <b>12</b> de cada mês.";
+          } else if (diasFechamento === 1) {
+            msgFechamento =
+              "Falta <b>1 dia</b> para o fechamento da fatura atual. " +
+              "O pagamento da fatura é programado sempre para o dia <b>12</b> de cada mês.";
+          } else {
+            msgFechamento =
+              "Faltam <b>" + diasFechamento + " dias</b> para o fechamento da fatura atual. " +
+              "O pagamento da fatura é programado sempre para o dia <b>12</b> de cada mês.";
+          }
+
+          renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700 mt-2'>" +
+              msgFechamento +
+            "</p>"
+          );
+        }
+
+        let __vektorChartFaturas = null;
       })
       .withFailureHandler(function () {
         renderBotMessage(
@@ -6559,9 +6952,18 @@ Sem problemas, vamos falar de outro assunto então. 😉
             </p>`;
         }
 
-        // 13) Demais casos -> motor da política
-        return gerarRespostaPolitica(msgUsuario);
-    }
+                // 13) Demais casos -> motor da política
+          const respPolitica = gerarRespostaPolitica(msgUsuario);
+
+          // Se a política conseguir responder, usamos a resposta dela
+          if (respPolitica !== null && respPolitica !== undefined && respPolitica !== "") {
+            return respPolitica;
+          }
+
+          // 14) 3ª camada: se nada disparou até aqui, em vez de chutar,
+          // devolve uma pergunta de clarificação
+          return gerarPerguntaDeClarificacao(norm);
+        }
 
     // ========= INTERVALOS DE DATA PARA PERGUNTAS DE RELATÓRIO ========= //
 
@@ -6918,19 +7320,45 @@ function renderResumoTransacoesSemana(resumo, opts) {
   // Base de lojas
   var all = Array.isArray(resumo.lojas) ? resumo.lojas : [];
 
-  // Aplica filtros de LOJAS
+     // Aplica filtros de LOJAS (aceita “0034 - MORUMBI…”, “0034”, “34” etc.)
   if (temFiltroLojas) {
     var codSet = {};
+
+    // Normaliza os códigos pedidos pelo usuário (remove tudo que não for dígito e zeros à esquerda)
     opts.filtrarLojasCodigos.forEach(function (c) {
-      var key = String(c).replace(/\D/g, "");
-      codSet[key] = true;
+      var digits = String(c || "").replace(/\D/g, "");  // só dígitos
+      if (!digits) return;
+      var norm = digits.replace(/^0+/, "") || digits;   // tira zeros à esquerda (0176 -> 176)
+      codSet[norm] = true;
     });
 
     all = all.filter(function (linha) {
-      var codLinha = String(
-        linha.loja || linha.Loja || linha.codigoLoja || linha.CodigoLoja || ""
-      ).replace(/\D/g, "");
-      return codSet[codLinha];
+      // Vamos testar vários campos possíveis da linha
+      var campos = [
+        linha.loja,
+        linha.Loja,
+        linha.LojaNum,
+        linha.codigoLoja,
+        linha.CodigoLoja
+      ];
+
+      for (var i = 0; i < campos.length; i++) {
+        var v = campos[i];
+        if (v === undefined || v === null) continue;
+
+        // pode vir "0176", "176" ou "0176 - PLAZA NITEROI-RJ"
+        var digitsLinha = String(v).replace(/\D/g, "");
+        if (!digitsLinha) continue;
+
+        var normLinha = digitsLinha.replace(/^0+/, "") || digitsLinha;
+
+        if (codSet[normLinha]) {
+          return true; // bateu em algum campo -> mantém a linha
+        }
+      }
+
+      // nenhum campo da linha bateu com os códigos desejados
+      return false;
     });
   }
 
@@ -6987,8 +7415,8 @@ function renderResumoTransacoesSemana(resumo, opts) {
 
     // Dropdown de drilldown
     linhasTabela.push(
-      "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
-        "Expandir a tabela por: " +
+      "<div style='margin-top:8px;margin-bottom:10px;font-size:12px;margin-bottom:4px;color:#334155;display:flex;align-items:center;gap:6px;'>" +
+        "<span>Expandir a tabela por:</span>" +
         "<select class='vektor-drill-select' data-base='loja' " +
                "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
           "<option value='estabelecimento'>Estabelecimentos</option>" +
@@ -7691,7 +8119,7 @@ function vektorGerarInsightsRankingLojas(lojas) {
 }
 
 // ===================================================================
-// TÓPICO 4 – Insights automáticos: CATEGORIAS (tíquete médio)
+// TÓPICO 4 – Insights automáticos: CATEGORIAS (ticket médio)
 // ===================================================================
 function vektorGerarInsightsResumoCategorias(itens) {
   if (!Array.isArray(itens) || !itens.length) return "";
@@ -7711,7 +8139,7 @@ function vektorGerarInsightsResumoCategorias(itens) {
 
   if (lista.length < 2) return "";
 
-  // calcula tíquete médio
+  // calcula ticket médio
   lista.forEach(function (l) {
     l.media = l.valor / l.qtd;
   });
@@ -7727,7 +8155,7 @@ function vektorGerarInsightsResumoCategorias(itens) {
   var comentarios = [];
 
   comentarios.push(
-    "A categoria com <b>maior tíquete médio</b> (valor médio por transação) é <b>" +
+    "A categoria com <b>maior ticket médio</b> (valor médio por transação) é <b>" +
       top.nome +
       "</b>, com cerca de <b>" +
       top.media.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
@@ -7735,7 +8163,7 @@ function vektorGerarInsightsResumoCategorias(itens) {
   );
 
   comentarios.push(
-    "A categoria com <b>menor tíquete médio</b> é <b>" +
+    "A categoria com <b>menor ticket médio</b> é <b>" +
       bottom.nome +
       "</b>, com cerca de <b>" +
       bottom.media.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
@@ -7758,7 +8186,7 @@ function vektorGerarInsightsResumoCategorias(itens) {
 }
 
 // ===================================================================
-// TÓPICO 5 – Insights automáticos: ESTABELECIMENTOS (tíquete médio)
+// TÓPICO 5 – Insights automáticos: ESTABELECIMENTOS (ticket médio)
 // ===================================================================
 function vektorGerarInsightsResumoEstabelecimentos(itens) {
   if (!Array.isArray(itens) || !itens.length) return "";
@@ -7791,7 +8219,7 @@ function vektorGerarInsightsResumoEstabelecimentos(itens) {
   var comentarios = [];
 
   comentarios.push(
-    "O estabelecimento com <b>maior tíquete médio</b> é <b>" +
+    "O estabelecimento com <b>maior ticket médio</b> é <b>" +
       top.nome +
       "</b>, com cerca de <b>" +
       top.media.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
@@ -7799,7 +8227,7 @@ function vektorGerarInsightsResumoEstabelecimentos(itens) {
   );
 
   comentarios.push(
-    "O estabelecimento com <b>menor tíquete médio</b> é <b>" +
+    "O estabelecimento com <b>menor ticket médio</b> é <b>" +
       bottom.nome +
       "</b>, com cerca de <b>" +
       bottom.media.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
@@ -7911,6 +8339,14 @@ window.vektorDrillTimesFatura = function (tr) {
 function vektorFiltrarFaturasPeloModo_(todas, modo, qtd) {
     if (!Array.isArray(todas) || !todas.length) return [];
 
+        // 🔧 Ajuste de segurança:
+    // Se o modo veio como "atual" mas temos uma quantidade maior que 1,
+    // significa que em algum ponto a interpretação falhou.
+    // Nesse caso, tratamos como "últimas N faturas".
+    if (modo === "atual" && typeof qtd === "number" && qtd > 1) {
+        modo = "ultimas";
+    }
+
     // ---------------------------------------------------------
     // Função para converter "06 Nov 2025" → Date real
     // ---------------------------------------------------------
@@ -7986,6 +8422,31 @@ function vektorFiltrarFaturasPeloModo_(todas, modo, qtd) {
 
     // padrão → atual
     return [lista[idxAtual]];
+}
+
+function vektorDiasAteFechamentoFaturaAtual() {
+  const hoje = new Date();
+  const dia = hoje.getDate();
+
+  // fechamento sempre no dia 5
+  let ano = hoje.getFullYear();
+  let mes = hoje.getMonth(); // 0 = janeiro
+
+  // Se já passou do dia 5, o próximo fechamento é no mês seguinte
+  if (dia > 5) {
+    mes += 1;
+    if (mes > 11) {
+      mes = 0;
+      ano += 1;
+    }
+  }
+
+  const fechamento = new Date(ano, mes, 5);
+
+  const diffMs = fechamento.getTime() - hoje.getTime();
+  const dias = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  return Math.max(dias, 0); // não deixa negativo
 }
 
 
@@ -8201,8 +8662,8 @@ if (temFiltroTimes) {
 
     // 🔽 Dropdown de drilldown para a tabela de TIMES
     linhasTabela.push(
-      "<div style='font-size:11px;margin-bottom:4px;color:#334155'>" +
-        "Expandir a tabela por: " +
+      "<div style='margin-top:8px;margin-bottom:10px;font-size:12px;margin-bottom:4px;color:#334155;display:flex;align-items:center;gap:6px;'>" +
+        "<span>Expandir a tabela por:</span>" +
         "<select class='vektor-drill-select' data-base='time' " +
                "style='border:1px solid #cbd5e1;border-radius:4px;font-size:11px;padding:2px 4px;'>" +
           "<option value='loja'>Lojas</option>" +
@@ -8586,7 +9047,7 @@ function renderResumoPorChaveGenerico(resumo, opts) {
 
   renderBotMessage("HTML:" + html);
 
-  // 🔎 Insights automáticos adicionais para Categoria / Estabelecimento (tíquete médio)
+  // 🔎 Insights automáticos adicionais para Categoria / Estabelecimento (ticket médio)
   var tipoLower = tipoChaveLower;
   if (tipoLower === "categoria" || tipoLower === "estabelecimento") {
     var listaInsights = lista
@@ -8850,81 +9311,51 @@ function detectarPerguntaEstabelecimentos(msgOriginal, norm) {
 // ========= DETECTOR: PERGUNTAS DE FATURA (Extrato da conta) =========
 
 function detectarPerguntaFaturaClara(msgOriginal, norm) {
-    const t = norm || "";
-    // precisa citar "fatura"
-    if (!t.includes("fatura")) return null;
+  const t = norm || "";
 
-    // Só consideramos casos relacionados a valor
-    const falaValor =
-        t.includes("valor da fatura") ||
-        t.includes("valor dessa fatura") ||
-        t.includes("valor de fatura") ||
-        t.includes("valor total da fatura");
+  // precisa conter "fatura" ou "faturas"
+  if (!t.includes("fatura")) return null;
 
-    if (
-      !falaValor &&
-      !t.includes("fatura atual") &&
-      !t.includes("fatura do mes") &&
-      !t.includes("fatura do mês") &&
-      !t.includes("fatura") &&
-      !t.includes("faturas") &&
-      !t.includes("ultimas faturas") &&
-      !t.includes("últimas faturas") &&
-      !t.includes("todas as faturas")
-    ) {
-        // se não tiver nenhum indicativo de valor ou período, ignora
-        return null;
-    }
+  let modo = "atual";
+  let qtd = null;
 
-    let modo = "atual";  // padrão
-    let qtd  = null;
+  // todas as faturas
+  if (t.includes("todas") && t.includes("faturas")) {
+    modo = "todas";
+  }
 
-    // fatura do mês passado / anterior
-    if (
-      t.includes("mes passado") ||
-      t.includes("mês passado") ||
-      t.includes("fatura anterior")
-    ) {
-        modo = "anterior";
-    }
+  // últimas N faturas
+  if (t.includes("ultimas") || t.includes("ultimos") || t.includes("últimas")) {
+    modo = "ultimas";
 
-    // últimas N faturas  → pega tanto "ultimas 3" quanto "3 ultimas"
-    if (t.includes("ultimas") || t.includes("últimas")) {
-        modo = "ultimas";
+    // capturar número "6", "3", etc.
+    let m1 = t.match(/ultimas?\s+(\d+)/);
+    let m2 = t.match(/(\d+)\s+ultimas?/);
+    let m3 = t.match(/ultimos?\s+(\d+)/);
 
-        // casos tipo "ultimas 3 faturas"
-        let m = t.match(/ultimas?\s+(\d+)/);
-        // casos tipo "3 ultimas faturas"
-        if (!m) m = t.match(/(\d+)\s+ultimas?/);
+    const m = m1 || m2 || m3;
+    qtd = m ? parseInt(m[1], 10) : 2;
+  }
 
-        if (m && m[1]) {
-            qtd = parseInt(m[1], 10);
-        } else {
-            qtd = 2; // padrão se não achar número
-        }
-    }
+  // fatura anterior
+  if (
+    t.includes("anterior") ||
+    t.includes("mes passado") ||
+    t.includes("mês passado")
+  ) {
+    modo = "anterior";
+  }
 
-    // todas as faturas
-    if (t.includes("todas as faturas") || t.includes("todas faturas")) {
-        modo = "todas";
-    }
+  // reforço: fatura atual
+  if (t.includes("atual") || t.includes("deste mes") || t.includes("desse mes")) {
+    modo = "atual";
+  }
 
-    // reforça "atual" se mencionar explicitamente
-    if (
-      t.includes("fatura atual") ||
-      t.includes("fatura deste mes") ||
-      t.includes("fatura desse mes") ||
-      t.includes("fatura deste mês") ||
-      t.includes("fatura desse mês")
-    ) {
-        modo = "atual";
-    }
-
-    return {
-        tipo: "fatura",
-        modo: modo,
-        qtd: qtd
-    };
+  return {
+    tipo: "fatura",
+    modo,
+    qtd
+  };
 }
 
 // ========= DETECTOR: "loja e time com maior número/valor de transações..." ========= //
