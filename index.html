@@ -2860,7 +2860,7 @@ function respProcedimentosServiceNow() {
             "Smartwatches", "Pulseiras Fitness", "Controles Remotos", "Carregadores Portáteis", "Power Bank", "powerbank",
             "power bank", "Lanterna Elétrica", "lanterna", "relógio", "relogios", "relógios", "projetor", "telao",
             "telão", "tela gigante", "drone", "GoPro", "câmera de ação", "gimbal", "tablet", "smartwatch",
-            "oculos", "óculos", "pen-drive", "pendrive", "gps"
+            "oculos", "óculos", "gps"
         ].map(normalize),
 
         games: [
@@ -3011,138 +3011,180 @@ function respProcedimentosServiceNow() {
         utensiliosCozinha: "MasterChef que habita em você não é o mesmo que habita na Clara 🧑🏼‍🍳"
     };
 
-    function avaliarCompraEspecifica(msgNorm) {
-        const baseMsg = `Esse tipo de item <b>NÃO</b> pode ser comprado/utilizado com o cartão.<br>
-Ele deve seguir o processo de requisição junto à área de Compras (se for relevante e apto de acordo com o negócio e estiver dentro da política da área), com aprovação formal, não o cartão da loja.`;
-
-        // 1) Checa os GRUPOS de proibidos primeiro
-        for (const [grupo, palavras] of Object.entries(gruposProibidos)) {
-            for (const palavra of palavras) {
-                const regex = new RegExp(`\\b${palavra}\\b`, "i");
-                    if (regex.test(msgNorm)) {
-                    const intro = mensagensBrincadeiraPorGrupo[grupo] || "⛔ Não pode usar o cartão Clara pra isso.";
-                    const respostaFinal = `${intro}<br><br>${baseMsg}`;
-
-                    return {
-                        pode: false,
-                        resposta: respostaFinal
-                    };
-                }
-            }
-        }
-
-        // 2) Casos específicos de PROIBIDOS (alimentação pessoal, álcool, transporte pessoal)
-        const pessoalAlim = [
-            "paguei meu almoco","paguei meu almoço","paguei meu jantar",
-            "paguei meu lanche","paguei meu café","paguei meu cafe",
-            "paguei meu pastel","paguei minha refeicao","paguei minha refeição",
-            "paguei minha comida","paguei minha janta",
-            "meu almoço","meu almoco","meu jantar","minha janta",
-            "meu lanche","minha comida","almoco pessoal","almoço pessoal",
-            "jantar pessoal","lanche pessoal","refeição pessoal","refeicao pessoal",
-            "almocei com o cartao","almocei com o cartão",
-            "jantei com o cartao","jantei com o cartão",
-            "comi com o cartao","comi com o cartão"
-        ].map(normalize);
-
-        for (const termo of pessoalAlim) {
-            if (msgNorm.includes(termo)) {
-                return {
-                    pode: false,
-                    resposta: `Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja. Se já foi pago com o cartão, precisa sinalizar como "Despesa Pessoal – Uso Indevido", avisar o Financeiro e ressarcir em até 2 dias úteis.`
-                };
-            }
-        }
-
-        const alcool = ["cerveja","vodka", "gin", "tequila", "rum", "saque", "espumante", "conhaque", "51", "sidra", "brandy", "hidromel", "absinto", "champagne", "menta", "bitter", "vermute", "prosecco", "vinho do porto", "xerez", "marsala", "grappa", "pisco", "mezcal", "calvados", "amaretto", "ouzo", "jägermeister", "soju", "arac", "baijiu", "vinho","whisky","whiskey","cachaça", "licor", "cachaca","gin","tequila", "Skol", "Brahma", "Heineken", "Corona Extra", "Budweiser", "Bud Light", "Stella Artois", "stella", "itaipava", "devassa", "Guinness", "Pilsner Urquell", "Super Bock", "Asahi", "Tsingtao", "Yanjing", "Smirnoff", "Absolut", "Cîroc", "Grey Goose", "Belvedere", "Stolichnaya", "Ketel One", "Tito's Handmade Vodka", "Skyy", "Orloff", "Johnnie Walker", "Jack Daniel's", "Jameson", "Chivas Regal", "Jim Beam", "Ballantine's", "Grant's", "Macallan", "Glenfiddich", "Bulleit", "Suntory", "Tanqueray", "Beefeater", "Bombay Sapphire", "Gordon's", "Hendrick's", "Bulldog", "The Botanist", "Seagers", "Jose Cuervo", "Patrón", "Don Julio", "1800", "Casamigos", "Espolòn", "El Jimador", "Herradura", "Altos Tequila", "Bacardi", "Havana Club", "Captain Morgan", "Ron Zacapa", "Mount Gay", "Appleton Estate", "Diplomático", "Brugal", "Plantation", "Cachaça 51", "Seleta", "Salinas", "Velho Barreiro", "Pitú", "Weber Haus", "Magnífica", "Anísio Santiago (Havana)", "Moët & Chandon", "Dom Pérignon", "Veuve Clicquot", "Krug", "Chandon", "Casa Perini", "Salton", "Freixenet", "Baileys", "Licor 43", "Jägermeister", "Amarula", "Cointreau", "Grand Marnier", "Campari", "Aperol", "Frangelico", "Sheridan's", "Drambuie", "Fireball", "blue label", "gold label","black label", "green label", "ciroc", "absolut", "Cîroc", "Grey Goose", "Belvedere", "Stolichnaya", "Ketel One", "Tito's Handmade Vodka", "Skyy", "Orloff", "Russian Standard", "Żubrówka", "Finlandia", "Eristoff", "Beluga", "Svedka", "Wyborowa", "Crystal Head", 
-        "Hangar 1" ].map(normalize);
-        for (const termo of alcool) {
-            if (msgNorm.includes(termo)) {
-                return {
-                    pode: false,
-                    resposta: `Bebida alcoólica não é permitida no cartão Clara. Isso não é considerado despesa operacional autorizada.`
-                };
-            }
-        }
-
-        const transportePessoal = ["uber"," 99","taxi","táxi","taxí","cabify"].map(normalize);
-        for (const termo of transportePessoal) {
-            if (msgNorm.includes(termo)) {
-                return {
-                    pode: false,
-                    resposta: `Uber / 99 / táxi para deslocamento pessoal não pode no cartão Clara. Não é gasto operacional direto da loja.`
-                };
-            }
-        }
-
-        // 3) Casos específicos PERMITIDOS (lanche time, periféricos, serviços emergenciais)
-        const palavrasTime = [
-            "coffee break","lanche pra equipe","lanche para equipe","lanche equipe",
-            "lanche time","lanche pro time","lanche para o time",
-            "treinamento","premiacao","premiação","acao oficial","ação oficial",
-            "acao vm","ação vm","acao regional","ação regional",
-            "agua pra equipe","água pra equipe","galão de agua","galao de agua","galão de água",
-            "salgadinho pra treinamento","bolo pra treinamento",
-            "suco pra treinamento","suco para treinamento","lanche treinamento"
-        ].map(normalize);
-
-        for (const termo of palavrasTime) {
-            if (msgNorm.includes(termo)) {
-                return {
-                    pode: true,
-                    etiquetaValida: {
-                        nome: "LANCHES DE REFEIÇÕES / AGUA POTÁVEL",
-                        desc: "Coffee break autorizado, água/lanche para equipe em treinamento interno aprovado, ação oficial da loja (VM, regional, diretoria) ou premiação operacional.",
-                        exemploDescricao: "Coffee break treinamento VM loja 1234"
-                    },
-                    resposta: `Pode usar o cartão Clara se for ação autorizada (treinamento interno, VM, regional, diretoria, premiação operacional). Precisa lançar na Clara em até 48h com nota fiscal, etiqueta correta e descrição objetiva.`
-                };
-            }
-        }
-
-        const perifOperacional = [
-            "mouse","teclado","cabo usb","usb","pendrive","fonte de notebook",
-            "hub usb","roteador","teclado pdv","teclado do pdv","teclado caixa",
-            "bobina ecf","bobina fiscal"
-        ].map(normalize);
-
-        for (const termo of perifOperacional) {
-            if (msgNorm.includes(termo)) {
-                return {
-                    pode: true,
-                    etiquetaValida: {
-                        nome: "MATERIAL DE INFORMÁTICA",
-                        desc: "Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (sem controle patrimonial).",
-                        exemploDescricao: "Teclado PDV loja 1234"
-                    },
-                    resposta: `Esse tipo de material (ex.: mouse, teclado, cabo) é considerado suprimento operacional de baixo valor para a loja e pode ser pago no cartão Clara, desde que classificado corretamente e lançado em até 48h.`
-                };
-            }
-        }
-
-        const servicoEmerg = [
-            "chaveiro","abrir cofre","abrir estoque","perdi a chave",
-            "motoboy","sedex","correios","envio de documento","postar documento",
-            "mandar documento","enviar documento"
-        ].map(normalize);
-
-        for (const termo of servicoEmerg) {
-            if (msgNorm.includes(termo)) {
-                return {
-                    pode: true,
-                    etiquetaValida: {
-                        nome: "TRANSPORTE SERVIÇOS EMERGENCIAS / CORREIOS_SEDEX/AR/POSTAGEM / CHAVEIRO EMERGENCIAL",
-                        desc: "Motoboy emergencial, envio urgente de documentos (Sedex/AR/postagem oficial), chaveiro emergencial para abrir estoque/cofre.",
-                        exemploDescricao: "Motoboy urgente documentação loja 1234"
-                    },
-                    resposta: `Serviços emergenciais (motoboy urgente, Sedex de documento oficial, chaveiro emergencial pra abrir estoque/cofre) podem usar o cartão Clara, desde que sejam necessidade imediata da operação e sejam justificados na Clara dentro de 48h.`
-                };
-            }
-        }
-
-        // 4) Se não casou em nada, deixa para a resposta genérica
+      function avaliarCompraEspecifica(msgNorm) {
+    if (!msgNorm) {
         return { pode: null, resposta: "" };
     }
+
+    const baseMsg = `Esse tipo de item <b>NÃO</b> pode ser comprado/utilizado com o cartão.<br>
+        Ele deve seguir o processo de requisição junto à área de Compras (se for relevante e apto de acordo com o negócio e estiver dentro da política da área), com aprovação formal, não o cartão da loja.`;
+
+    // 0) SÓ entro nessa função se a frase tiver cara de COMPRA / USO DO CARTÃO
+    const falaDeCompraOuUso =
+        msgNorm.includes("comprar") ||
+        msgNorm.includes("comprei") ||
+        msgNorm.includes("comprou") ||
+        msgNorm.includes("compra ") ||
+        msgNorm.includes("vou comprar") ||
+        msgNorm.includes("posso comprar") ||
+        msgNorm.includes("pagar") ||
+        msgNorm.includes("paguei") ||
+        msgNorm.includes("pagou") ||
+        msgNorm.includes("passei no cartao") ||
+        msgNorm.includes("passei no cartão") ||
+        msgNorm.includes("passar no cartao") ||
+        msgNorm.includes("passar no cartão") ||
+        msgNorm.includes("usei o cartao") ||
+        msgNorm.includes("usei o cartão") ||
+        msgNorm.includes("usar o cartao") ||
+        msgNorm.includes("usar o cartão") ||
+        msgNorm.includes("cartao clara") ||
+        msgNorm.includes("cartão clara");
+
+    // Se não tem nenhum verbo de compra/uso, NÃO forço uma decisão aqui
+    if (!falaDeCompraOuUso) {
+        return { pode: null, resposta: "" };
+    }
+
+    // 1) Checa os GRUPOS de proibidos primeiro
+    for (const [grupo, palavras] of Object.entries(gruposProibidos)) {
+        for (const palavra of palavras) {
+            const regex = new RegExp(`\\b${palavra}\\b`, "i");
+            if (regex.test(msgNorm)) {
+                const intro = mensagensBrincadeiraPorGrupo[grupo] || "⛔ Não pode usar o cartão Clara pra isso.";
+                const respostaFinal = `${intro}<br><br>${baseMsg}`;
+
+                return {
+                    pode: false,
+                    resposta: respostaFinal
+                };
+            }
+        }
+    }
+
+    // 2) Casos específicos de PROIBIDOS (alimentação pessoal, álcool, transporte pessoal)
+    const pessoalAlim = [
+        "paguei meu almoco","paguei meu almoço","paguei meu jantar",
+        "paguei meu lanche","paguei meu café","paguei meu cafe",
+        "paguei meu pastel","paguei minha refeicao","paguei minha refeição",
+        "paguei minha comida","paguei minha janta",
+        "meu almoço","meu almoco","meu jantar","minha janta",
+        "meu lanche","minha comida","almoco pessoal","almoço pessoal",
+        "jantar pessoal","lanche pessoal","refeição pessoal","refeicao pessoal",
+        "almocei com o cartao","almocei com o cartão",
+        "jantei com o cartao","jantei com o cartão",
+        "comi com o cartao","comi com o cartão"
+    ].map(normalize);
+
+    for (const termo of pessoalAlim) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: false,
+                resposta: `Refeição pessoal (almoço, jantar, lanche etc.) não pode ser paga com o cartão Clara. Isso não é despesa operacional da loja. Se já foi pago com o cartão, precisa sinalizar como "Despesa Pessoal – Uso Indevido", enccaminhar chamado via Servicenow: <b>Contas a Receber > Cartão Clara > Gasto Indevido (pessoal)</b>. O financeiro irá informar como proceder com o ressarcimento do valor.`
+            };
+        }
+    }
+
+    const alcool = [
+        "cerveja","vodka", "gin", "tequila", "rum", "saque", "espumante", "conhaque", "51", "sidra", "brandy",
+        "hidromel", "absinto", "champagne", "menta", "bitter", "vermute", "prosecco", "vinho do porto",
+        "xerez", "marsala", "grappa", "pisco", "mezcal", "calvados", "amaretto", "ouzo", "jägermeister",
+        "soju", "arac", "baijiu", "vinho","whisky","whiskey","cachaça", "licor", "cachaca","Skol", "Brahma",
+        "Heineken", "Corona Extra", "Budweiser", "Bud Light", "Stella Artois", "stella", "itaipava",
+        "devassa", "Guinness", "Smirnoff", "Absolut", "Cîroc", "Grey Goose", "Belvedere",
+        "Tito's Handmade Vodka", "Skyy", "Orloff", "Johnnie Walker", "Jack Daniel's", "Jameson",
+        "Chivas Regal", "Jim Beam", "Ballantine's", "Grant's", "Macallan", "Glenfiddich", "Bulleit",
+        "Baileys", "Licor 43", "Amarula", "Campari", "Aperol", "blue label", "gold label","black label",
+        "green label"
+    ].map(normalize);
+
+    for (const termo of alcool) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: false,
+                resposta: `Bebida alcoólica não é permitida no cartão Clara. Isso não é considerado despesa operacional autorizada.`
+            };
+        }
+    }
+
+    const transportePessoal = ["uber"," 99","taxi","táxi","taxí","cabify"].map(normalize);
+    for (const termo of transportePessoal) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: false,
+                resposta: `Uber / 99 / táxi para deslocamento pessoal não pode no cartão Clara. Não é gasto operacional direto da loja.`
+            };
+        }
+    }
+
+    // 3) Casos específicos PERMITIDOS (lanche time, periféricos, serviços emergenciais)
+    const palavrasTime = [
+        "coffee break","lanche pra equipe","lanche para equipe","lanche equipe",
+        "lanche time","lanche pro time","lanche para o time",
+        "treinamento","premiacao","premiação","acao oficial","ação oficial",
+        "acao vm","ação vm","acao regional","ação regional",
+        "agua pra equipe","água pra equipe","galão de agua","galao de agua","galão de água",
+        "salgadinho pra treinamento","bolo pra treinamento",
+        "suco pra treinamento","suco para treinamento","lanche treinamento"
+    ].map(normalize);
+
+    for (const termo of palavrasTime) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: true,
+                etiquetaValida: {
+                    nome: "LANCHES DE REFEIÇÕES / AGUA POTÁVEL",
+                    desc: "Coffee break autorizado, água/lanche para equipe em treinamento interno aprovado, ação oficial da loja (VM, regional, diretoria) ou premiação operacional.",
+                    exemploDescricao: "Coffee break treinamento VM loja 1234"
+                },
+                resposta: `Pode usar o cartão Clara se for ação autorizada (treinamento interno, VM, regional, diretoria, premiação operacional). Precisa lançar na Clara em até 48h com nota fiscal, etiqueta correta e descrição objetiva.`
+            };
+        }
+    }
+
+    const perifOperacional = [
+        "mouse","teclado","cabo usb","usb","pendrive","fonte de notebook",
+        "hub usb","roteador","teclado pdv","teclado do pdv","teclado caixa",
+        "bobina ecf","bobina fiscal"
+    ].map(normalize);
+
+    for (const termo of perifOperacional) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: true,
+                etiquetaValida: {
+                    nome: "MATERIAL DE INFORMÁTICA",
+                    desc: "Mouse, teclado, cabos, pendrive, suportes de notebook, fontes, roteadores, hubs USB, cartões de memória (sem controle patrimonial).",
+                    exemploDescricao: "Teclado PDV loja 1234"
+                },
+                resposta: `Esse tipo de material (ex.: mouse, teclado, cabo) é considerado suprimento operacional de baixo valor para a loja e pode ser pago no cartão Clara, desde que classificado corretamente e lançado em até 48h.`
+            };
+        }
+    }
+
+    const servicoEmerg = [
+        "chaveiro","abrir cofre","abrir estoque","perdi a chave",
+        "motoboy","sedex","correios","envio de documento","postar documento",
+        "mandar documento","enviar documento"
+    ].map(normalize);
+
+    for (const termo of servicoEmerg) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: true,
+                etiquetaValida: {
+                    nome: "TRANSPORTE SERVIÇOS EMERGENCIAS / CORREIOS_SEDEX/AR/POSTAGEM / CHAVEIRO EMERGENCIAL",
+                    desc: "Motoboy emergencial, envio urgente de documentos (Sedex/AR/postagem oficial), chaveiro emergencial para abrir estoque/cofre.",
+                    exemploDescricao: "Motoboy urgente documentação loja 1234"
+                },
+                resposta: `Serviços emergenciais (motoboy urgente, Sedex de documento oficial, chaveiro emergencial pra abrir estoque/cofre) podem usar o cartão Clara, desde que sejam necessidade imediata da operação e sejam justificados na Clara dentro de 48h.`
+            };
+        }
+    }
+
+    // 4) Se não casou em nada, deixa para a resposta genérica / política
+    return { pode: null, resposta: "" };
+}
 
     /* ========= RESPOSTAS ========= */
 
@@ -3364,37 +3406,33 @@ function respTrocaGerente() {
 
     function respCartaoGeral() {
     return `HTML:<div class="text-sm text-slate-700">
-<p><b>Sobre o cartão Clara nas lojas:</b></p>
+<p><b>Sobre o cartão Clara nas lojas:</b>
 
 <p class="mt-1">
 O cartão Clara é o meio oficial para pagar <b>despesas operacionais da loja</b>, em substituição ao antigo processo de sangrias, como:
-</p>
 <ul class="list-disc ml-4 mt-1">
   <li>materiais de limpeza e pequenos reparos;</li>
   <li>materiais de escritório e informática de baixo valor;</li>
   <li>água / coffee break para treinamentos internos e ações autorizadas;</li>
-  <li>serviços emergenciais (motoboy, chaveiro, correios em situações operacionais).</li>
-</ul>
+  <li>serviços emergenciais (motoboy, chaveiro, correios em situações operacionais).
 
 <p class="mt-2">
 Sempre precisa:
-</p>
 <ul class="list-disc ml-4 mt-1">
   <li>nota fiscal ou recibo;</li>
   <li>etiqueta correta na Clara;</li>
   <li>descrição objetiva do gasto;</li>
-  <li>lançar tudo em até <b>48h</b> no app/web da Clara.</li>
-</ul>
+  <li>lançar tudo em até <b>48h</b> no app/web da Clara.
+
 
 <p class="mt-2">
 Não pode usar o cartão para:
-</p>
+
 <ul class="list-disc ml-4 mt-1">
   <li>gasto pessoal (roupa, almoço/jantar pessoal, compras para uso próprio);</li>
   <li>bebida alcoólica;</li>
   <li>Uber / 99 / táxi para deslocamento pessoal;</li>
-  <li>itens patrimoniais / infraestrutura (TV, geladeira, micro-ondas, mesa, cadeira etc.).</li>
-</ul>
+  <li>itens patrimoniais / infraestrutura (TV, geladeira, micro-ondas, mesa, cadeira etc.).
 
 <p class="mt-2">
 Se quiser, posso te explicar um caso específico. Por exemplo:
@@ -3487,51 +3525,30 @@ function respNovoCartaoSegundaVia() {
 }
 
       function respGenerica(msgNorm) {
-  const texto = (msgNorm || "").toLowerCase();
+    msgNorm = msgNorm || "";
+    const avaliacao = avaliarCompraEspecifica(msgNorm);
 
-  // 1) Ver se a pessoa está claramente falando de COMPRA/USO DO CARTÃO
-  const falandoDeCompra =
-    texto.includes("posso comprar") ||
-    texto.includes("pode comprar") ||
-    texto.includes("posso usar") ||
-    texto.includes("pode usar") ||
-    texto.includes("posso pagar") ||
-    texto.includes("pode pagar") ||
-    texto.includes("pode gastar") ||
-    texto.includes("pagar com o cartao") ||
-    texto.includes("pagar com o cartão") ||
-    texto.includes("posso passar o cartao") ||
-    texto.includes("posso passar o cartão") ||
-    texto.includes("posso usar o cartao para") ||
-    texto.includes("posso usar o cartão para") ||
-    texto.includes("pode no cartao") ||
-    texto.includes("pode no cartão") ||
-    texto.includes("pode colocar no cartao") ||
-    texto.includes("pode colocar no cartão") ||
-    texto.includes("para que posso usar") ||
-    texto.includes("em que posso usar") ||
-    texto.includes("em que eu posso usar") ||
-    texto.includes("oq eu posso pagar") ||
-    texto.includes("oque posso pagar") ||
-    texto.includes("o q posso pagar") ||
-    texto.includes("oq pode pagar") ||
-    texto.includes("pode ser pago") ||
-    (
-      typeof perguntasGeraisOquePosso !== "undefined" &&
-      perguntasGeraisOquePosso.some(f => texto.includes(f))
-    );
+    // 1) Se a avaliação específica decidiu claramente que NÃO pode
+    if (avaliacao && avaliacao.pode === false && avaliacao.resposta) {
+        return `HTML:<div class="text-sm text-slate-700">
+<p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
+<p>${avaliacao.resposta}</p>
+</div>`;
+    }
 
-  // 2) Se NÃO está claro que é pergunta sobre uso do cartão,
-  // não vamos ficar chutando "pode/não pode"
-  if (!falandoDeCompra) {
+    // 2) Se a avaliação específica decidiu claramente que PODE e tem etiqueta
+    if (avaliacao && avaliacao.pode === true && avaliacao.etiquetaValida) {
+        const et = avaliacao.etiquetaValida;
+        return `HTML:<div class="text-sm text-slate-700">
+<p><b>✅ Pode usar o cartão Clara (despesa operacional autorizada).</b></p>
+<p>Use a etiqueta: "<b>${et.nome}</b>".</p>
+<p class="mt-1">${et.desc}</p>
+</div>`;
+    }
 
-    // 2.1) Se for aquelas perguntas bem genéricas "o que posso / o que pode",
-    // mantém o bloco grande de orientação
-    if (
-      typeof perguntasGeraisOquePosso !== "undefined" &&
-      perguntasGeraisOquePosso.some(f => texto.includes(f))
-    ) {
-      return `HTML:<div class="text-sm text-slate-700">
+    // 3) Perguntas amplas do tipo "O que posso comprar com o cartão?"
+    if (perguntasGeraisOquePosso && perguntasGeraisOquePosso.some(f => msgNorm.includes(f))) {
+        return `HTML:<div class="text-sm text-slate-700">
 <p><b>✅ O que pode no cartão Clara</b> - Exemplos de materiais:</p>
 <ul class="list-disc ml-4 mt-1">
 <li>Materiais de escritório: canetas, blocos, pastas, papel, clips, organizadores, grampeadores;</li>
@@ -3557,65 +3574,33 @@ function respNovoCartaoSegundaVia() {
 </div>`;
     }
 
-    // 2.2) Qualquer outro assunto (tipo "vc sabe tocar violão?",
-    // "qual a capital da austrália?", "como conserta uma porta?")
-    // vira pergunta de clarificação, não resposta de política
-    return gerarPerguntaDeClarificacao(texto);
-  }
+    // 4) Se a mensagem NÃO tem cara de assunto da Clara/cartão, devolve FORA DE ESCOPO
+    const falaMundoClara =
+        msgNorm.includes("clara") ||
+        msgNorm.includes("cartao") || msgNorm.includes("cartão") ||
+        msgNorm.includes("fatura") ||
+        msgNorm.includes("pendencia") || msgNorm.includes("pendência") ||
+        msgNorm.includes("nota fiscal") || msgNorm.includes("nf ") || msgNorm.startsWith("nf") ||
+        msgNorm.includes("etiqueta") ||
+        msgNorm.includes("limite") ||
+        msgNorm.includes("transacao") || msgNorm.includes("transação") ||
+        msgNorm.includes("compra") || msgNorm.includes("comprar") || msgNorm.includes("paguei");
 
-  // 3) Aqui SIM está claro que a pessoa está falando de comprar/usar o cartão
-  const avaliacao = avaliarCompraEspecifica(texto);
+    if (!falaMundoClara) {
+        // Usa a mesma função que você já tem para fora de escopo
+        return respostaForaEscopo(msgNorm);
+    }
 
-  if (avaliacao && avaliacao.pode === false) {
+    // 5) Fallback genérico (quando é assunto Clara, mas não bateu em nada acima)
     return `HTML:<div class="text-sm text-slate-700">
-<p><b>⛔ Não pode usar o cartão Clara pra isso.</b></p>
-<p>${avaliacao.resposta}</p>
+<p>Pra usar o cartão Clara, o gasto precisa ser <b>necessário pra operação da loja</b> (ex.: chaveiro emergencial, motoboy urgente, material de limpeza, periférico de PDV, bobina fiscal, água/coffee break autorizado pra treinamento interno ou ação oficial).</p>
+<p class="mt-2">O que <b>não pode</b> no cartão Clara:<br/>
+• gasto pessoal (refeição pessoal, compra pra uso próprio etc.);<br/>
+• bebida alcoólica em geral;<br/>
+• transporte pessoal (Uber/99 pra deslocamento pessoal);<br/>
+• itens patrimoniais / infraestrutura grande (geladeira, micro-ondas, TV, mesa, cadeira, entre outros).</p><br/>
+Caso entenda que a compra é essencial para o dia a dia da loja, fale com o financeiro, caso seja verificado que o item é essencial eles podem abrir uma exceção para a compra.
 </div>`;
-  }
-
-  if (avaliacao && avaliacao.pode === true && avaliacao.etiquetaValida) {
-    const et = avaliacao.etiquetaValida;
-    return `HTML:<div class="text-sm text-slate-700">
-<p><b>✅ Pode usar o cartão Clara (despesa operacional autorizada).</b></p>
-<p>Use a etiqueta: "<b>${et.nome}</b>".</p>
-<p class="mt-1">${et.desc}</p>
-</div>`;
-  }
-
-  // 4) Se falou de "o que posso / o que pode" e não caiu em nenhum caso
-  // específico acima, usa o bloco geral de pode/não pode
-  if (
-    typeof perguntasGeraisOquePosso !== "undefined" &&
-    perguntasGeraisOquePosso.some(f => texto.includes(f))
-  ) {
-    return `HTML:<div class="text-sm text-slate-700">
-<p><b>✅ O que pode no cartão Clara</b> - Exemplos de materiais:</p>
-<ul class="list-disc ml-4 mt-1">
-<li>Materiais de escritório: canetas, blocos, pastas, papel, clips, organizadores, grampeadores;</li>
-<li>Serviços gráficos e de comunicação visual: impressão de banners, adesivos promocionais, folders e plotagens autorizadas pela área de VM;</li>
-<li>Compra de água mineral ou galões para abastecimento da equipe (etiqueta “ÁGUA POTÁVEL”);</li>
-<li>Suprimentos de informática (mouse, teclado, cabos, bobina fiscal etc.);</li>
-<li>Lanches, coffee breaks ou premiações para equipe somente quando vinculados a treinamentos internos, ações oficiais ou campanhas aprovadas (etiqueta “LANCHES DE REFEIÇÕES”);</li>
-<li>Serviços emergenciais (motoboy urgente, chaveiro, Sedex de documento);</li>
-<li>Compra de bobinas fiscais ou suprimentos obrigatórios do PDV;</li>
-<li>Pequenas manutenções (elétrica, civil, ar-condicionado, equipamentos).</li>
-</ul>
-<p class="mt-2"><b>❌ O que não pode</b> - Exemplos de itens não permitidos:</p>
-<ul class="list-disc ml-4">
-<li>Itens patrimoniais ou de infraestrutura: TV, micro-ondas, geladeira, freezer, mesa, cadeira, armário, ventilador, cafeteira elétrica, computador, impressora, celular, tablets, ou qualquer bem durável;</li>
-<li>Bebidas alcoólicas (cerveja, vinho, whisky, vodka, gin, tequila, entre outras);</li>
-<li>Transporte pessoal: Uber, 99, táxi, aplicativos de carona ou combustível para veículo particular;</li>
-<li>Despesas pessoais: almoço, jantar, lanche, coffee break pessoal, delivery, supermercado para consumo próprio;</li>
-<li>Equipamentos e mobiliários que exigem tombamento patrimonial (mesmo que de baixo valor);</li>
-<li>Manutenções estruturais de grande porte (obras, pintura geral, reformas, trocas de piso, elétrica complexa, etc.);</li>
-<li>Serviços ou produtos sem nota fiscal (inclusive compras em marketplaces sem NF emitida no CNPJ da loja);</li>
-<li>Gastos fora da operação da loja ou que não tenham relação com a atividade comercial;</li>
-</ul>
-</div>`;
-  }
-
-  // 5) Último fallback: ainda assim, prefere perguntar do que chutar
-  return gerarPerguntaDeClarificacao(texto);
 }
 
     /* ========= FUNÇÕES DE PENDÊNCIAS (BACKEND) ========= */
@@ -3846,6 +3831,25 @@ function respNovoCartaoSegundaVia() {
  function gerarRespostaPolitica(msgUsuario) {
         const norm = normalize(msgUsuario);
         const intencao = detectarIntencaoPergunta(norm);
+
+        // 0) Frases de compra/uso em primeira pessoa (mais específicas que categoria genérica)
+    const fraseCompraPrimeiraPessoa =
+      norm.includes("paguei ") ||
+      norm.includes("paguei meu") ||
+      norm.includes("paguei minha") ||
+      norm.includes("usei o cartao") ||
+      norm.includes("usei o cartão") ||
+      norm.includes("vou comprar") ||
+      norm.includes("vou compra") ||
+      norm.includes("posso usar o cartao") ||
+      norm.includes("posso usar o cartão") ||
+      norm.includes("usei o cartao clara") ||
+      norm.includes("usei o cartão clara");
+
+    if (fraseCompraPrimeiraPessoa) {
+      // usa a lógica já existente de casos específicos (proibidos/permitidos)
+      return respGenerica(norm);
+    }
 
     // 1) Primeiro tenta responder usando o motor de categorias da política
   const resultadoCategoria = tentarResponderPorCategoriaPolitica(msgUsuario, norm);
@@ -5566,11 +5570,10 @@ if (
   if (
     norm.includes("manual clara") ||
     norm.includes("manual da clara") ||
-    norm.includes("manual") ||
+    (norm.includes("manual") && norm.includes("clara")) ||
     norm.includes("treinamento clara") ||
-    norm.includes("treinamento da clara") ||
-    norm.includes("treinamentos") ||
-    norm.includes("treinamento")
+    norm.includes("treinamento do cartao clara") ||
+    norm.includes("treinamento do cartão clara")
   ) {
 
     
@@ -6941,7 +6944,7 @@ Sem problemas, vamos falar de outro assunto então. 😉
             return respNovoCartaoSegundaVia();
         }
 
-        // 12) Gatilho – quero pedir um cartão (abre fluxo pra perguntar primeira/segunda via)
+                // 12) Gatilho – quero pedir um cartão (abre fluxo pra perguntar primeira/segunda via)
         if (gatilhosNovoCartao.some(fr => norm.includes(fr))) {
             fluxoNovoCartao = "aguardando_tipo_via";
             return `HTML:<p class="text-sm text-slate-700">
@@ -6952,18 +6955,28 @@ Sem problemas, vamos falar de outro assunto então. 😉
             </p>`;
         }
 
-                // 13) Demais casos -> motor da política
-          const respPolitica = gerarRespostaPolitica(msgUsuario);
+        // 13) Demais casos:
+        //    Se a frase não fala claramente de cartão/fatura/pendências,
+        //    em vez de chutar uma resposta de política, faz uma pergunta de clarificação.
+        const falaDeCartaoOuFatura =
+          norm.includes("clara") ||
+          norm.includes("cartao") ||
+          norm.includes("cartão") ||
+          norm.includes("fatura") ||
+          norm.includes("pendencia") ||
+          norm.includes("pendência") ||
+          norm.includes("limite");
 
-          // Se a política conseguir responder, usamos a resposta dela
-          if (respPolitica !== null && respPolitica !== undefined && respPolitica !== "") {
-            return respPolitica;
+        if (!falaDeCartaoOuFatura) {
+          const perguntaClara = gerarPerguntaDeClarificacao(norm);
+          if (perguntaClara) {
+            return perguntaClara;
           }
-
-          // 14) 3ª camada: se nada disparou até aqui, em vez de chutar,
-          // devolve uma pergunta de clarificação
-          return gerarPerguntaDeClarificacao(norm);
         }
+
+        // 14) Ainda assim sobrou → motor da política
+        return gerarRespostaPolitica(msgUsuario);
+    }
 
     // ========= INTERVALOS DE DATA PARA PERGUNTAS DE RELATÓRIO ========= //
 
@@ -9250,22 +9263,33 @@ function detectarPerguntaEstabelecimentos(msgOriginal, norm) {
   let   topN    = extrairTopN(t); // let para conseguirmos ajustar para 1
 
   // Palavras que DEFINEM claramente a intenção de estabelecimento
-  const falaLocal =
+  const falaLocalBase =
     t.includes("estabelecimento") ||
     t.includes("estabelecimentos") ||
     t.includes("local") ||
     t.includes("locais") ||
-    t.includes("lugar") ||
-    t.includes("lugares") ||
     t.includes("fornecedor") ||
     t.includes("fornecedores") ||
-    t.includes("transacao no") ||
-    t.includes("transacao na") ||
-    t.includes("transacao em") ||
-    t.includes("transações para") ||
-    t.includes("transação para") ||
-    t.includes("onde foi feita") ||
-    t.includes("onde foi a compra");
+    t.includes("mercado") ||
+    t.includes("mercados") ||
+    t.includes("supermercado") ||
+    t.includes("supermercados");
+
+  const falaLugarComCompra =
+    (t.includes("lugar") || t.includes("lugares")) &&
+    (
+      t.includes("cartao") ||
+      t.includes("cartão") ||
+      t.includes("clara") ||
+      t.includes("comprar") ||
+      t.includes("compra") ||
+      t.includes("compras") ||
+      t.includes("gastar") ||
+      t.includes("gasto") ||
+      t.includes("gastos")
+    );
+
+  const falaLocal = falaLocalBase || falaLugarComCompra;
 
   // Palavras que INDICAM time campeão — e por isso devem bloquear
   const falaTimeCampeao =
