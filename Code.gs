@@ -19,6 +19,12 @@ function doGet(e) {
     nome = nomeFormatado;
   }
 
+  // Definição simples de perfil
+  var role = "Acesso padrão";
+  if (email === "rodrigo.lisboa@gruposbf.com.br") {
+    role = "Administrador";
+  }
+
   var template = HtmlService
     .createTemplateFromFile('index');
 
@@ -26,7 +32,7 @@ function doGet(e) {
   template.userName  = nome;
   // 👇 passa também o e-mail bruto
   template.userEmail = email;
-
+  template.userRole  = role;
 
   return template
     .evaluate()
@@ -1215,6 +1221,150 @@ function getResumoTransacoesPorTime(dataInicioStr, dataFimStr, criterio) {
 }
 
 /**
+ * Resumo de transações por TIME, filtrando pela coluna
+ * "Extrato da conta" (coluna B da BaseClara).
+ *
+ * @param {string} extratoConta  Texto exato do extrato (ex.: "06 Nov 2025 - 05 Dec 2025")
+ * @param {string} criterio      "valor" ou "quantidade" (mantém a mesma lógica do resumo por time)
+ *
+ * Retorna objeto compatível com renderResumoTransacoesPorTime:
+ * {
+ *   ok: true,
+ *   criterio: "valor",
+ *   extratoOriginal: "06 Nov 2025 - 05 Dec 2025",
+ *   times: [
+ *     { time: "Águias do Cerrado", total: 10, valorTotal: 1234.56 },
+ *     ...
+ *   ],
+ *   top: { ... }
+ * }
+ */
+function getResumoTransacoesPorTimeExtrato(extratoConta, criterio) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Índice da coluna "Extrato da conta"
+    var idxExtrato = encontrarIndiceColuna_(header, [
+      "Extrato da conta",
+      "Extrato conta",
+      "Extrato"
+    ]);
+
+    // Índice da coluna de valor
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor em R$",
+      "Valor (R$)",
+      "Valor"
+    ]);
+
+    // Índice da coluna de GRUPO / TIME
+    var idxGrupo = encontrarIndiceColuna_(header, [
+      "Grupos",
+      "Grupo",
+      "Time"
+    ]);
+
+    if (idxExtrato < 0 || idxValor < 0 || idxGrupo < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas 'Extrato da conta', 'Valor' e 'Grupo/Time' na BaseClara."
+      };
+    }
+
+    // Normaliza critério
+    if (!criterio) {
+      criterio = "valor";
+    }
+    criterio = String(criterio).toLowerCase();
+    if (criterio !== "valor" && criterio !== "quantidade") {
+      criterio = "valor";
+    }
+
+    // Normaliza o texto do extrato informado
+    var alvoOriginal = (extratoConta || "").toString().trim();
+    var alvoNorm = normalizarTexto_(alvoOriginal);
+    if (!alvoNorm) {
+      return { ok: false, error: "Extrato da conta não informado." };
+    }
+
+    // Agrupa por time, considerando somente as linhas desse extrato
+    var mapa = {}; // chave = time normalizado
+    for (var i = 0; i < linhas.length; i++) {
+      var row = linhas[i];
+
+      var extratoLinha = (row[idxExtrato] || "").toString();
+      var extratoNorm = normalizarTexto_(extratoLinha);
+      if (!extratoNorm || extratoNorm !== alvoNorm) {
+        continue; // ignora linhas de outros ciclos
+      }
+
+      var grupoOriginal = (row[idxGrupo] || "").toString().trim();
+      if (!grupoOriginal) continue;
+
+      var grupoNorm = normalizarTexto_(grupoOriginal);
+      if (!grupoNorm) continue;
+
+      if (!mapa[grupoNorm]) {
+        mapa[grupoNorm] = {
+          time: grupoOriginal,
+          total: 0,
+          valorTotal: 0
+        };
+      }
+
+      mapa[grupoNorm].total++;
+
+      var valor = Number(row[idxValor]) || 0;
+      mapa[grupoNorm].valorTotal += valor;
+    }
+
+    // Converte mapa em array
+    var arr = [];
+    for (var chave in mapa) {
+      if (!Object.prototype.hasOwnProperty.call(mapa, chave)) continue;
+      arr.push(mapa[chave]);
+    }
+
+    // Ordena conforme critério (mesma lógica do getResumoTransacoesPorTime)
+    arr.sort(function (a, b) {
+      if (criterio === "quantidade") {
+        if (b.total !== a.total) {
+          return b.total - a.total;
+        }
+        return b.valorTotal - a.valorTotal;
+      }
+      // padrão: valor
+      if (b.valorTotal !== a.valorTotal) {
+        return b.valorTotal - a.valorTotal;
+      }
+      return b.total - a.total;
+    });
+
+    var top = arr.length ? arr[0] : null;
+
+    return {
+      ok: true,
+      criterio: criterio,
+      extratoOriginal: alvoOriginal,
+      times: arr,
+      top: top
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : e
+    };
+  }
+}
+
+/**
  * Resumo de transações por CATEGORIA DA COMPRA (BaseClara).
  * 
  * - dataInicioStr / dataFimStr: datas em ISO (como já usamos nas outras funções). 
@@ -1935,6 +2085,237 @@ function getResumoLojasPorCategoria(categoria, dataIni, dataFim) {
 }
 
 /**
+ * Retorna lista de lojas para autocomplete:
+ * [{ codigo: "0297", nome: "CATUAÍ CASCAVEL" }, ...]
+ */
+
+function getListaLojas() {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return [];
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // 1) Índice da coluna do código da loja (continua dinâmico)
+    var idxLoja = encontrarIndiceColuna_(header, [
+      "LojaNum", "Loja Num", "Loja Número", "Loja Numero", "Loja", "cod_loja", "codLoja"
+    ]);
+
+    if (idxLoja < 0) {
+      return [];
+    }
+
+    // 2) Índice da coluna de "Descrição Loja" — coluna W
+    // aqui vamos ser bem específicos para NÃO pegar "Descrição" da coluna U
+    var idxNome = header.indexOf("Descrição Loja");
+    if (idxNome < 0) {
+      idxNome = header.indexOf("Descricao Loja"); // fallback sem acento, se for o caso
+    }
+
+    // Se mesmo assim não achar, melhor retornar só código
+    var temNome = idxNome >= 0;
+
+    var mapa = {};
+
+    linhas.forEach(function (row) {
+      var codRaw = (row[idxLoja] || "").toString().trim();
+      if (!codRaw) return;
+
+      var digits = codRaw.replace(/\D/g, "");
+      if (!digits) return;
+
+      var cod4 = ("0000" + digits).slice(-4);
+
+      var nome = "";
+      if (temNome) {
+        nome = (row[idxNome] || "").toString().trim();
+      }
+
+      mapa[cod4] = nome;
+    });
+
+    var out = [];
+    for (var c in mapa) {
+      if (Object.prototype.hasOwnProperty.call(mapa, c)) {
+        out.push({
+          codigo: c,
+          nome: mapa[c]   // <- agora vem especificamente da coluna W
+        });
+      }
+    }
+
+    out.sort(function (a, b) {
+      return a.codigo.localeCompare(b.codigo);
+    });
+
+    return out;
+
+  } catch (e) {
+    return [];
+  }
+}
+
+function getListaEtiquetasClara() {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return [];
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Procurar EXATAMENTE a coluna "Etiquetas" (coluna T da BaseClara)
+    var idxEtiqueta = header.indexOf("Etiquetas");
+    if (idxEtiqueta < 0) {
+      // fallback simples, se algum dia mudar para "Etiqueta"
+      idxEtiqueta = header.indexOf("Etiqueta");
+    }
+
+    if (idxEtiqueta < 0) {
+      // não achou a coluna de etiquetas
+      return [];
+    }
+
+    // mapa para garantir apenas UMA ocorrência de cada valor de célula,
+    // sem alterar o texto
+    var mapa = {};
+
+    linhas.forEach(function (row) {
+      var valor = row[idxEtiqueta];
+      if (valor === null || valor === undefined) return;
+
+      // mantém exatamente como está na planilha
+      valor = valor.toString();
+
+      // se quiser ignorar células que sejam só espaços, descomente a linha abaixo:
+      // if (valor.trim() === "") return;
+
+      if (!mapa.hasOwnProperty(valor)) {
+        mapa[valor] = true;
+      }
+    });
+
+    // converte as chaves do mapa em array de etiquetas "cruas"
+    var out = Object.keys(mapa);
+
+    // ordena alfabeticamente (sem mexer no conteúdo)
+    out.sort(function (a, b) {
+      return a.localeCompare(b, "pt-BR");
+    });
+
+    return out;
+
+  } catch (e) {
+    return [];
+  }
+}
+
+function getResumoEtiquetasClara() {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return { totalGeral: 0, itens: [] };
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Índice da coluna de etiquetas (coluna T: "Etiquetas")
+    var idxEtiqueta = header.indexOf("Etiquetas");
+    if (idxEtiqueta < 0) {
+      idxEtiqueta = header.indexOf("Etiqueta");
+    }
+    if (idxEtiqueta < 0) {
+      return { totalGeral: 0, itens: [] };
+    }
+
+    // Índice da coluna de VALOR da transação
+    // Ajuste essa lista se o nome do cabeçalho for diferente
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor original"
+    ]);
+
+    if (idxValor < 0) {
+      // sem coluna de valor, não faz sentido calcular percentuais
+      return { totalGeral: 0, itens: [] };
+    }
+
+    var mapa = {};       // etiqueta -> { valor: number, count: number }
+    var totalGeral = 0;  // soma de todos os valores
+
+    linhas.forEach(function (row) {
+      var celEtiqueta = row[idxEtiqueta];
+      if (celEtiqueta === null || celEtiqueta === undefined) return;
+
+      var textoCelula = celEtiqueta.toString();
+      if (!textoCelula) return;
+
+      var rawValor = row[idxValor];
+      var valorNum = 0;
+
+      if (typeof rawValor === "number") {
+        valorNum = rawValor;
+      } else if (rawValor !== null && rawValor !== undefined) {
+        var s = rawValor.toString().trim();
+        if (s) {
+          // tenta tratar "1.234,56" e "1234.56"
+          s = s.replace(/\./g, "").replace(",", ".");
+          var parsed = parseFloat(s);
+          if (!isNaN(parsed)) valorNum = parsed;
+        }
+      }
+
+      // Se ainda não conseguiu número, ignora esse valor
+      if (isNaN(valorNum)) valorNum = 0;
+
+      // Divide a célula em múltiplas etiquetas, separadas por "|"
+      textoCelula.split("|").forEach(function (parte) {
+        var et = parte.trim();
+        if (!et) return;
+
+        if (!mapa[et]) {
+          mapa[et] = { valor: 0, count: 0 };
+        }
+        mapa[et].valor += valorNum;
+        mapa[et].count += 1;
+      });
+
+      totalGeral += valorNum;
+    });
+
+    var itens = [];
+    for (var etiqueta in mapa) {
+      if (!Object.prototype.hasOwnProperty.call(mapa, etiqueta)) continue;
+      var dado = mapa[etiqueta];
+      var valorEti = dado.valor || 0;
+      var perc = 0;
+
+      if (totalGeral > 0) {
+        perc = (valorEti / totalGeral) * 100;
+      }
+
+      itens.push({
+        etiqueta: etiqueta,
+        valorTotal: valorEti,
+        percentual: perc,
+        quantidade: dado.count
+      });
+    }
+
+    // ordena por valor total decrescente
+    itens.sort(function (a, b) {
+      return b.valorTotal - a.valorTotal;
+    });
+
+    return {
+      totalGeral: totalGeral,
+      itens: itens
+    };
+
+  } catch (e) {
+    return { totalGeral: 0, itens: [] };
+  }
+}
+
+/**
  * Converte o texto da coluna "Extrato da conta"
  * (ex.: "06 Nov 2025 - 05 Dec 2025")
  * em datas de início/fim.
@@ -2096,4 +2477,8 @@ function getResumoFaturasClara() {
       error: e && e.message ? e.message : e
     };
   }
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
