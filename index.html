@@ -517,6 +517,10 @@ function closeVektorModal() {
 }
 
 let __vektorJaSugeriuLooker = false;
+let __vektorJaSugeriuPoliticaRestricoes = false;
+let __vektorJaSugeriuPoliticaUso = false;
+let __vektorJaSugeriuJustificativas = false;
+
 
 // Registro do plugin de rótulos do Chart.js (se estiver carregado)
 if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
@@ -745,20 +749,28 @@ function vektorHighlightSelected() {
 function vektorApplySuggestion(textoSugestao) {
   const raw = vektorInput.value || "";
 
-  // casa tudo até o último espaço em grupo 1
-  // e a última "palavra" (sem espaço) em grupo 2
-  const m = raw.match(/^(.*\s)(\S+)?$/);
+  // Se o campo está vazio ou só tem espaço -> vira apenas a sugestão
+  if (!raw.trim()) {
+    vektorInput.value = textoSugestao;
+    return;
+  }
+
+  // Remove espaços do fim pra achar a última palavra "inteira"
+  const base = raw.replace(/\s+$/g, "");
+  const m = base.match(/^(.*\s)(\S+)$/);
 
   let novoTexto;
 
-  if (!raw.trim()) {
-    // campo vazio -> vira apenas a sugestão
-    novoTexto = textoSugestao;
-  } else if (m) {
+  if (m) {
+    // m[1] = tudo até o último espaço (prefixo)
+    // m[2] = última palavra
     const prefixo = m[1] || "";
+
+    // "loja 12 " + sugestão -> "loja " + "0012 - Nome da Loja"
     novoTexto = prefixo + textoSugestao;
   } else {
-    // fallback: se não bater o regex, substitui tudo
+    // Se não tem espaço (só uma palavra digitada), substitui tudo
+    // "pendencias " -> só sugestão
     novoTexto = textoSugestao;
   }
 
@@ -814,17 +826,35 @@ function vektorRenderSugestoes(lista) {
 
 // 7) Lógica do autocomplete
 vektorInput.addEventListener("input", function () {
-  const raw  = vektorInput.value || "";
+  const raw = vektorInput.value || "";
+
+  // Se o campo está vazio, limpa e sai
+  if (!raw.trim()) {
+    vektorBox.style.display = "none";
+    vektorCurrentSuggestions = [];
+    vektorSelectedIndex = -1;
+    return;
+  }
+
+  // 🔹 Só mostra autocomplete quando o usuário encerrou a palavra com espaço
+  // Ex.: "pendencias " -> ok; "pendencias" (sem espaço) -> não mostra
+  if (!/\s$/.test(raw)) {
+    vektorBox.style.display = "none";
+    vektorCurrentSuggestions = [];
+    vektorSelectedIndex = -1;
+    return;
+  }
 
   // texto inteiro normalizado (para intents)
   const norm = vektorNormAutocomplete(raw);
 
-  // pega apenas o último "bloco" digitado (depois do último espaço)
-  const lastMatch = raw.match(/(\S+)$/);
+  // Usa o texto SEM os espaços finais para pegar a última palavra completa
+  const base = raw.replace(/\s+$/g, ""); // remove espaços do fim
+  const lastMatch = base.match(/(\S+)$/);
   const lastRaw   = lastMatch ? lastMatch[1] : "";
   const lastNorm  = vektorNormAutocomplete(lastRaw);
 
-  // se o último bloco tem menos de 2 caracteres, não sugere nada
+  // se a última palavra completa tem menos de 2 caracteres, não sugere nada
   if (!lastNorm || lastNorm.length < 2) {
     vektorBox.style.display = "none";
     vektorCurrentSuggestions = [];
@@ -841,30 +871,30 @@ vektorInput.addEventListener("input", function () {
     );
   }
 
-  // b) autocomplete de LOJAS -> usa só os dígitos do último bloco
- if (window.__VEKTOR_LOJAS && window.__VEKTOR_LOJAS.length) {
-  const digits = (lastRaw || "").replace(/\D/g, "");
-  if (digits && digits.length <= 4) {
-    const padded = ("0000" + digits).slice(-4);
+  // b) autocomplete de LOJAS -> usa só os dígitos da última palavra
+  if (window.__VEKTOR_LOJAS && window.__VEKTOR_LOJAS.length) {
+    const digits = (lastRaw || "").replace(/\D/g, "");
+    if (digits && digits.length <= 4) {
+      const padded = ("0000" + digits).slice(-4);
 
-    window.__VEKTOR_LOJAS.forEach((l) => {
-      const cod = String(l.codigo || "").padStart(4, "0");
+      window.__VEKTOR_LOJAS.forEach((l) => {
+        const cod = String(l.codigo || "").padStart(4, "0");
 
-      if (cod.startsWith(padded)) {
-        const nomeFinal = l.nome || l.nomeLojaTxt || "";
-        let label = cod;
+        if (cod.startsWith(padded)) {
+          const nomeFinal = l.nome || l.nomeLojaTxt || "";
+          let label = cod;
 
-        if (nomeFinal) {
-          label += " - " + nomeFinal;
+          if (nomeFinal) {
+            label += " - " + nomeFinal;
+          }
+
+          suggestions.push(label);
         }
-
-        suggestions.push(label);
-      }
-    });
+      });
+    }
   }
-}
 
-  // c) autocomplete de TIMES -> compara contra o último termo digitado
+  // c) autocomplete de TIMES -> compara contra a última palavra completa
   if (lastNorm.length >= 2) {
     suggestions.push(
       ...VEKTOR_TIMES.filter(t => vektorNormAutocomplete(t).includes(lastNorm))
@@ -3117,6 +3147,33 @@ function respProcedimentosServiceNow() {
         }
     }
 
+        // 2c) Estacionamento (não autorizado no cartão Clara)
+    const estacionamento = [
+        "estacionamento",
+        "pagar estacionamento",
+        "paguei estacionamento",
+        "ticket de estacionamento",
+        "tiket de estacionamento",
+        "ticket do estacionamento",
+        "talão de estacionamento",
+        "talonario de estacionamento",
+        "estacionamento do shopping",
+        "estacionei o carro",
+        "pagar o parking",
+        "ticket parking"
+    ].map(normalize);
+
+    for (const termo of estacionamento) {
+        if (msgNorm.includes(termo)) {
+            return {
+                pode: false,
+                resposta: `Gasto com <b>estacionamento</b> não é permitido no cartão Clara.<br>
+                Esse tipo de despesa não é tratado como gasto operacional direto da loja e não deve ser pago com o cartão corporativo.<br>
+                Se o cartão já foi utilizado para estacionamento, trate o valor como <b>uso indevido</b> e siga as orientações de ressarcimento com o time de Contas a Receber / Financeiro.`
+            };
+        }
+    }
+
     // 3) Casos específicos PERMITIDOS (lanche time, periféricos, serviços emergenciais)
     const palavrasTime = [
         "coffee break","lanche pra equipe","lanche para equipe","lanche equipe",
@@ -3281,27 +3338,70 @@ Sou um agente especializado na Política de Uso dos Cartões Clara nas lojas. N�
               }
 
     function respCatalogoEtiquetas() {
-  // Sugestão para listar todas as etiquetas (entra no fluxo de sugestões existente)
-  if (typeof vektorSugerirTopicoRelacionadoManual === "function") {
-    vektorSugerirTopicoRelacionadoManual(
-      "catalogo_etiquetas_listar",
-      "Ver lista completa de etiquetas Clara",
-      "Quero ver a lista de etiquetas da Clara"
-    );
+  // Monta lista de etiquetas oficiais da política (etiquetasOficiais vem do politica_dados)
+  let listaEtiquetasHtml = "";
+
+  if (Array.isArray(etiquetasOficiais) && etiquetasOficiais.length) {
+    listaEtiquetasHtml =
+      `<div class="mt-3">
+        <p class="mt-2"><b>Etiquetas oficiais disponíveis hoje na Clara</b></p>
+        <ul class="list-disc ml-4 mt-1 space-y-1">
+          ${
+            etiquetasOficiais
+              .map(function (et) {
+                const nome = et.nome || "";
+                const desc = et.descricao || "";
+                const obs  = et.observacaoUso || "";
+
+                let li = `<li><b>${nome}</b>`;
+                if (desc) {
+                  li += ` – ${desc}`;
+                }
+                if (obs) {
+                  li += ` <span class="text-xs text-slate-500">(${obs})</span>`;
+                }
+                li += `</li>`;
+                return li;
+              })
+              .join("")
+          }
+        </ul>
+        <p class="mt-2 text-xs text-slate-500">
+          Lista baseada no Anexo II da Política de Utilização dos Cartões Clara e alinhada ao catálogo oficial de etiquetas.
+      </div>`;
   }
 
   return `HTML:<div class="text-sm text-slate-700">
     <p><b>Etiquetas na Clara</b></p>
-    <p class="mt-2">As etiquetas servem para classificar corretamente cada gasto feito com o cartão Clara e facilitar o controle financeiro e a prestação de contas.
-    <p class="mt-2">Sempre escolha a etiqueta que mais represente o tipo real de despesa, evitando classificar tudo em categorias genéricas.
+    <p class="mt-2">
+      As etiquetas servem para classificar corretamente cada gasto feito com o cartão Clara e facilitar o controle financeiro e a prestação de contas.
+    <p class="mt-2">
+      Sempre escolha a etiqueta que mais represente o tipo real de despesa, evitando classificar tudo em categorias genéricas.
+
+    ${listaEtiquetasHtml}
 
     <details class="mt-3">
-      <summary class="cursor-pointer underline">Ver orientação completa no ServiceNow / política</summary>
+      <summary class="cursor-pointer underline">
+        Ver orientação completa no ServiceNow / política
+      </summary>
       <div class="mt-2">
-        <p>Se não existir uma etiqueta adequada para o tipo de gasto recorrente da sua loja, não improvise usando algo que não represente a realidade da compra.</p>
-        <p class="mt-2">Nesse caso, a orientação é abrir chamado no ServiceNow do tipo <b>Inserção ou ajuste de etiqueta – Cartão Clara</b>, informando loja, BU, tipo de despesa, justificativa e exemplos de uso.</p>
-        <p class="mt-2">O Financeiro avaliará a solicitação e, se aprovado, criará ou ajustará a etiqueta no catálogo oficial da Clara.</p>
-        <p class="mt-3 text-xs text-slate-500">Fluxo baseado no Anexo II da Política de Utilização dos Cartões Clara. A escolha correta de etiquetas impacta diretamente indicadores e controles da companhia.</p>
+        <p>
+          Se não existir uma etiqueta adequada para o tipo de gasto recorrente da sua loja,
+          não improvise usando algo que não represente a realidade da compra.
+        </p>
+        <p class="mt-2">
+          Nesse caso, a orientação é abrir chamado no ServiceNow do tipo
+          <b>Inserção ou ajuste de etiqueta – Cartão Clara</b>, informando loja, BU,
+          tipo de despesa, justificativa e exemplos de uso.
+        </p>
+        <p class="mt-2">
+          O Financeiro avaliará a solicitação e, se aprovado, criará ou ajustará a etiqueta
+          no catálogo oficial da Clara.
+        </p>
+        <p class="mt-3 text-xs text-slate-500">
+          Fluxo baseado no Anexo II da Política de Utilização dos Cartões Clara.
+          A escolha correta de etiquetas impacta diretamente indicadores e controles da companhia.
+        </p>
       </div>
     </details>
   </div>`;
@@ -4323,8 +4423,9 @@ function vektorSugerirTopicosGerais(msgOriginal) {
     const norm = normalize(msgOriginal);
     const blocos = [];
 
-    // 1) Dúvidas de PERMISSÃO DE COMPRA → sugerir Política de Uso
+    // 1) Dúvidas de PERMISSÃO DE COMPRA → sugerir Política de Uso (apenas 1 vez por sessão)
     if (
+      !__vektorJaSugeriuPoliticaRestricoes &&
       (
         norm.includes("pode comprar") ||
         norm.includes("posso comprar") ||
@@ -4339,6 +4440,8 @@ function vektorSugerirTopicosGerais(msgOriginal) {
       ) &&
       typeof POLITICA_CARTOES_CLARA_LINK === "string"
     ) {
+      __vektorJaSugeriuPoliticaRestricoes = true;
+
       blocos.push(
         "<div style='margin-top:6px;'>" +
           "<p><b>Dica:</b> sempre que tiver dúvida se uma compra é permitida ou não, você pode consultar a <b>Política de Uso dos Cartões Clara</b>, <b>Item 7 - Restrições de Uso</b>.</p>" +
@@ -4352,22 +4455,20 @@ function vektorSugerirTopicosGerais(msgOriginal) {
       );
     }
 
-    // 2) Pedidos de RELATÓRIO / RANKING / DASHBOARD → sugerir Looker Studio
-    
+    // 2) Pedidos de RELATÓRIO / RANKING / DASHBOARD → sugerir Looker Studio (apenas 1 vez)
     if (
-  !__vektorJaSugeriuLooker &&   // 👈 impõe limite de 1 vez por sessão
-  (
-    // termos genéricos de relatório / ranking / dashboard
-    norm.includes("top") ||
-    norm.includes("mais comprou") ||
-    norm.includes("mais gastos") ||
-    norm.includes("mais gastou") ||
-    norm.includes("mais compras") ||
-    norm.includes("maior valor") ||
-    norm.includes("mais transações") ||
-    norm.includes("mais transacoes")
-  )
-) {
+      !__vektorJaSugeriuLooker &&
+      (
+        norm.includes("top") ||
+        norm.includes("mais comprou") ||
+        norm.includes("mais gastos") ||
+        norm.includes("mais gastou") ||
+        norm.includes("mais compras") ||
+        norm.includes("maior valor") ||
+        norm.includes("mais transações") ||
+        norm.includes("mais transacoes")
+      )
+    ) {
       blocos.push(
         "<div style='margin-top:10px;'>" +
           "<p>Se quiser uma visão completa (gráficos, filtros e detalhamentos), você pode abrir o relatório gerencial no <b>Looker Studio</b>:</p>" +
@@ -4379,13 +4480,14 @@ function vektorSugerirTopicosGerais(msgOriginal) {
           "</button>" +
         "</div>"
       );
+
+      __vektorJaSugeriuLooker = true;
     }
 
-    __vektorJaSugeriuLooker = true;
-
-
-    // 3) PENDÊNCIAS / JUSTIFICATIVAS → reforçar política e fluxo
+    // 3) PENDÊNCIAS / JUSTIFICATIVAS → reforçar política e fluxo (apenas 1 vez por sessão)
     if (
+      !__vektorJaSugeriuJustificativas &&
+      (
         norm.includes("pendencia") ||
         norm.includes("pendência") ||
         norm.includes("pendencias") ||
@@ -4393,14 +4495,14 @@ function vektorSugerirTopicosGerais(msgOriginal) {
         norm.includes("justificativa") ||
         norm.includes("justificativas") ||
         norm.includes("justificar") ||
-
-        // você comentou frases tipo:
-        // "ver justificativas completas de uma loja" / "de um time"
         norm.includes("justificativas completas") ||
         norm.includes("ver justificativas completas") ||
         norm.includes("justificativas de uma loja") ||
         norm.includes("justificativas de um time")
+      )
     ) {
+      __vektorJaSugeriuJustificativas = true;
+
       blocos.push(
         "<div style='margin-top:10px;'>" +
           "<p>Além de anexar os comprovantes, existe uma política específica de prazos e regras para justificativas.</p>" +
@@ -4413,36 +4515,35 @@ function vektorSugerirTopicosGerais(msgOriginal) {
     if (!blocos.length) return;
 
     const html =
-  "HTML:<div class='text-sm text-slate-700 mt-2'>" +
-    blocos.join("<hr style='margin:8px 0;border:none;border-top:1px solid #e2e8f0;'/>") +
-  "</div>";
+      "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+        blocos.join("<hr style='margin:8px 0;border:none;border-top:1px solid #e2e8f0;'/>") +
+      "</div>";
 
-// 🔁 Aguarda para dar tempo da resposta "normal" aparecer antes
-setTimeout(function () {
-  renderBotMessage(html);
-  if (typeof scrollToBottom === "function") {
-    scrollToBottom();
-  }
-}, VEKTOR_SUGESTAO_DELAY_MS);
+    // 🔁 Aguarda para dar tempo da resposta "normal" aparecer antes
+    setTimeout(function () {
+      renderBotMessage(html);
+      if (typeof scrollToBottom === "function") {
+        scrollToBottom();
+      }
+    }, VEKTOR_SUGESTAO_DELAY_MS);
 
   } catch (e) {
     console.warn("Erro ao sugerir tópicos gerais:", e);
   }
 
   // Sugestão quando o usuário fala de ciclo de fatura
-if (
-  norm.includes("ciclo da fatura") ||
-  norm.includes("ciclo de fatura") ||
-  norm.includes("ciclo da fatura da clara") ||
-  norm.includes("periodo da fatura") ||
-  norm.includes("período da fatura")
-) {
-  vektorMostrarSugestao(
-    "Quer ver a tabela completa das faturas?",
-    "Quero ver a tabela de faturas da Clara"
-  );
-}
-
+  if (
+    norm.includes("ciclo da fatura") ||
+    norm.includes("ciclo de fatura") ||
+    norm.includes("ciclo da fatura da clara") ||
+    norm.includes("periodo da fatura") ||
+    norm.includes("período da fatura")
+  ) {
+    vektorMostrarSugestao(
+      "Quer ver a tabela completa das faturas?",
+      "Quero ver a tabela de faturas da Clara"
+    );
+  }
 }
 
 // ---------------------------------------------------------------------
@@ -4498,27 +4599,32 @@ function vektorSugerirManualAPartirDaPergunta(msgOriginal) {
     let sugestao = null;
 
     // 1) Comprovante / nota / justificativa → sugerir "Como anexar comprovante"
-    if (
-      norm.includes("comprovante") ||
-      norm.includes("nota fiscal") ||
-      norm.includes(" nf ") ||
-      norm.includes(" xml") ||
-      norm.includes("justificativa") ||
-      norm.includes("justificar") ||
-      norm.includes("pendencia") ||
-      norm.includes("pendencias") ||
-      norm.includes("pendências") ||
-      norm.includes("pendência")
-    ) {
-      if (!usuarioViuTopicoManualRecentemente("anexar_comprovante", VEKTOR_TEMPO_SUGESTAO_MIN)) {
-        sugestao = {
-          secaoId: "anexar_comprovante",
-          tituloBotao: "Ver como anexar comprovante",
-          textoIntro:
-            "Percebi que você está falando de nota fiscal, comprovante ou pendência. Quer abrir o trecho do Manual da Clara sobre isso?"
-        };
-      }
-    }
+if (
+  norm.includes("comprovante") ||
+  norm.includes("nota fiscal") ||
+  norm.includes(" nf ") ||
+  norm.includes(" xml") ||
+  norm.includes("justificativa") ||
+  norm.includes("justificar") ||
+  norm.includes("pendencia") ||
+  norm.includes("pendencias") ||
+  norm.includes("pendências") ||
+  norm.includes("pendência")
+) {
+  // ❗ Só sugere uma vez por sessão
+  if (vektorSugestaoJaMostrada("manual_anexar_comprovante")) {
+    return; // já sugeriu antes nesta sessão, não repete
+  }
+
+  vektorMarcarSugestaoMostrada("manual_anexar_comprovante");
+
+  sugestao = {
+    secaoId: "anexar_comprovante",
+    tituloBotao: "Ver como anexar comprovante",
+    textoIntro:
+      "Percebi que você está falando de nota fiscal, comprovante ou pendência. Quer abrir o trecho do Manual da Clara sobre isso?"
+  };
+}
 
     // 2) Problemas de login / primeiro acesso
     else if (
@@ -6959,13 +7065,17 @@ Sem problemas, vamos falar de outro assunto então. 😉
         //    Se a frase não fala claramente de cartão/fatura/pendências,
         //    em vez de chutar uma resposta de política, faz uma pergunta de clarificação.
         const falaDeCartaoOuFatura =
+
           norm.includes("clara") ||
           norm.includes("cartao") ||
           norm.includes("cartão") ||
           norm.includes("fatura") ||
           norm.includes("pendencia") ||
           norm.includes("pendência") ||
-          norm.includes("limite");
+          norm.includes("limite") ||
+          norm.includes("estacionamento") ||
+          norm.includes("posso comprar") ||
+          norm.includes("pode comprar");
 
         if (!falaDeCartaoOuFatura) {
           const perguntaClara = gerarPerguntaDeClarificacao(norm);
