@@ -39,7 +39,7 @@
         border-top-left-radius:1rem;
         border-top-right-radius:1rem;
         border-bottom:1px solid rgba(0,0,0,.08);
-        padding:1rem 1.25rem;
+        padding:0.5rem 1.25rem 0.75rem;
     }
     .chat-header-inner {
         display:flex;
@@ -312,16 +312,28 @@
  <body class="text-slate-800">
 
     <!-- Topbar com login, tipo de acesso e relógio -->
-  <div id="vektor-topbar" 
-       class="w-full flex items-center justify-start gap-6 px-6 pt-3 pb-1 text-[11px] text-slate-600">
-    <div id="vektor-user-info" class="font-medium"></div>
-    <div id="vektor-clock" class="font-normal"></div>
-  </div>
+      <div id="vektor-topbar" 
+          class="w-full px-6 pt-3 pb-1 text-[11px] text-black leading-tight">
+  <div id="vektor-user-info" class="font-semibold"></div>
+  <div id="vektor-clock" class="mt-0.5 font-normal"></div>
+</div>
  
  <div class="h-screen flex px-4 py-6 gap-4 items-stretch">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
    
    <aside class="hidden md:flex w-72 flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 space-y-4 h-full">
+
+  <!-- Bloco Vektor + título -->
+  <div class="w-full flex flex-col items-center mb-4">
+    <img
+      src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png"
+      alt="Assistente Clara (robô)"
+      class="h-24 w-auto mb-3"
+    />
+    <h1 class="text-xl font-extrabold bg-[#005E27] text-[#B5FF20] px-3 py-2 rounded-lg text-center">
+      Grupo SBF | Vektor
+    </h1>
+  </div>
 
   <!-- Título do menu -->
   <div class="w-full text-center mb-1">
@@ -363,23 +375,13 @@
 
     <!-- HEADER -->
     <header class="chat-header-area">
-        <div class="chat-header-inner">
-            <div class="chat-header-left">
-                <h1>Grupo SBF | Vektor</h1>
-
-                <p>Pergunte tudo sobre o uso do cartão Clara nas lojas.</p>
-
-                <div class="examples"></div>
-                <div class="policy-note text-[12px] mt-2"></div>
-            </div>
-
-            <div class="chat-header-avatar">
-                <img
-                    src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png"
-                    alt="Assistente Clara (robô)" />
-            </div>
-        </div>
-    </header>
+  <div class="chat-header-inner">
+    <div class="chat-header-left">
+      <div class="examples"></div>
+      <div class="policy-note text-[12px] mt-2"></div>
+    </div>
+  </div>
+</header>
 
     <!-- BODY -->
     <main class="chat-body">
@@ -543,6 +545,37 @@ const USER_EMAIL_REPLACED = (USER_EMAIL_RAW || "")
   .trim();
 const USER_ROLE_CLEAN     = (USER_ROLE_RAW  || "").replace(/^"+|"+$/g, "").trim();
 
+// ================== MÉTRICAS VEKTOR → GOOGLE SHEETS ==================
+
+function vektorRegistrarMetrica(
+  intencao,
+  msgOriginal,
+  norm,
+  resultado,
+  topicoExtra,
+  funcaoOrigem
+) {
+  if (typeof google === "undefined" || !google.script || !google.script.run) {
+    console.warn("google.script.run não disponível");
+    return;
+  }
+
+  const payload = {
+    intencao: intencao || "",
+    topico: topicoExtra || "",
+    mensagemOriginal: msgOriginal || "",
+    norm: norm || "",
+    resultado: resultado || "",
+    usuarioNome: displayName || "",
+    usuarioEmail: USER_EMAIL_REPLACED || "",
+    loja: (window.VEKTOR_LOJA || ""),
+    funcaoOrigem: funcaoOrigem || "desconhecida"
+  };
+
+  google.script.run
+    .withFailureHandler(err => console.error("Falha métrica:", err))
+    .registrarMetricaVektor(payload);
+}
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -642,21 +675,25 @@ setTimeout(() => {
 // 1) Lista de intenções (VOCÊ JÁ TEM — basta mover pra cá)
 const VEKTOR_INTENTS = [
   "Consultar pendências de uma loja",
-  "Ver pendências por período",
-  "Ver pendências por time",
-  "Pendências que causam bloqueio",
+  "Gerente está de férias",
+  "Gerente foi demitido",
+  "Gerente foi desligado",
+  "Gerente mudou de loja",
+  "Troca de gerente entre lojas",
+  "Servicenow",
+  "Como abrir chamado no servinow?",
+  "Lojas com mais pendências",
+  "Pendências do time",
+  "Time com mais pendências",
   "Ver justificativas completas de uma loja",
+  "Vídeo de justificativas",
+  "Como justificar uma transação",
   "Ver justificativas completas de um time",
-  "Pendências de etiqueta / descrição / nota fiscal",
-  "Verificar pendências de NF/Recibo",
-  "Como justificar uma transação da Clara",
   "Loja com maior valor de transações neste mês",
   "Loja com mais transações neste mês",
   "Ranking de categorias por valor",
   "Lista de categorias por valor",
   "Treinamento Clara",
-  "Treinamento política Clara",
-  "Treinamento sobre uso do cartão Clara",
   "Termo de responsabilidade Clara",
   "Valor da fatura atual",
   "Valor da fatura do mês passado",
@@ -665,6 +702,7 @@ const VEKTOR_INTENTS = [
   "Valor de todas as faturas",
   "Ver extrato da conta da Clara",
   "Qual é o ciclo da fatura da Clara?",
+  "Qual etiqueta usar para compra de",
   "Listagem de etiquetas cadastradas na Clara",
   "Ranking de lojas com mais transações",
   "Ranking de lojas com maior valor",
@@ -700,8 +738,6 @@ const VEKTOR_INTENTS = [
   "Cartão Clara bloqueado, como resolver?",
   "Como desbloquear o cartão Clara?",
   "Meu cartão não passou, o que pode ser?",
-  "Enviar pendências por e-mail",
-  "Receber pendências da loja por e-mail",
   "Abrir relatório gerencial da Clara",
   "Ver dashboard no Looker Studio",
   "Como aumento o limite do cartão?",
@@ -1084,46 +1120,122 @@ pendenciasTimeoutId = setTimeout(() => {
     if (typingDiv) typingDiv.remove();
   }
 
+  function vektorStripHtml(html) {
+  if (!html) return "";
+  // remove prefixo "HTML:" se existir
+  if (typeof html === "string" && html.startsWith("HTML:")) {
+    html = html.substring(5);
+  }
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  const text = tmp.textContent || tmp.innerText || "";
+  return text.replace(/\s+/g, " ").trim();
+}
 
-            async function renderBotMessage(text) {
-          if (!text) return;
+function vektorResumoTexto(texto, maxLen) {
+  maxLen = maxLen || 200;
+  if (!texto) return "";
+  if (texto.length <= maxLen) return texto;
+  return texto.substring(0, maxLen) + " ...";
+}
 
-          // 👇 Mostra o indicador de "digitando..."
-          showTypingIndicator();
+function vektorDetectarFuncaoOrigem() {
+  let origem = "renderBotMessage";
+  try {
+    // Em muitos navegadores, em modo não-estrito, caller funciona
+    const caller = renderBotMessage.caller;
+    if (caller && caller.name) {
+      origem = caller.name;
+    }
+  } catch (e) {
+    // Se der erro por restrição de caller, mantém o fallback
+    console.warn("Não foi possível detectar caller da renderBotMessage:", e);
+  }
+  return origem;
+}
 
-          // Aguarda 1 segundo (simulando digitação)
-          await new Promise(r => setTimeout(r, 800));
+  async function renderBotMessage(text) {
+  if (!text) return;
 
-          // Remove o indicador
-          hideTypingIndicator();
+  // 👇 Mostra o indicador de "digitando..."
+  showTypingIndicator();
 
-          // --- Parte original do seu código ---
-          const wrapper = document.createElement("div");
-          wrapper.className = "flex items-start gap-3";
+  // Aguarda 1 segundo (simulando digitação)
+  await new Promise(r => setTimeout(r, 800));
 
-          const avatar = document.createElement("img");
-          avatar.src = ROBOT_IMG_URL;
-          avatar.alt = "Assistente Clara (robô)";
-          avatar.className = "h-16 w-auto object-contain flex-shrink-0";
+  // Remove o indicador
+  hideTypingIndicator();
 
-          const bubble = document.createElement("div");
-          bubble.className =
-            "bot-bubble px-4 py-3 max-w-[80%] text-sm whitespace-pre-line text-slate-700";
+  // --- Parte original do seu código ---
+  const wrapper = document.createElement("div");
+  wrapper.className = "flex items-start gap-3";
 
-          if (typeof text === "string" && text.startsWith("HTML:")) {
-            bubble.innerHTML = text.replace(/^HTML:/, "").trim();
-          } else {
-            bubble.innerText = text;
-          }
+  const avatar = document.createElement("img");
+  avatar.src = ROBOT_IMG_URL;
+  avatar.alt = "Assistente Clara (robô)";
+  avatar.className = "h-16 w-auto object-contain flex-shrink-0";
 
-          wrapper.appendChild(avatar);
-          wrapper.appendChild(bubble);
-          chatWindow.appendChild(wrapper);
+  const bubble = document.createElement("div");
+  const baseBubbleClasses =
+    "bot-bubble px-4 py-3 text-sm whitespace-pre-line text-slate-700";
+  bubble.className = baseBubbleClasses;
 
-          scrollToBottom();
-          // 👇 dispara notificação de nova mensagem do bot
-          notificarNovaMensagem(text);
-        }
+  // Conteúdo: HTML ou texto puro
+  if (typeof text === "string" && text.startsWith("HTML:")) {
+    bubble.innerHTML = text.replace(/^HTML:/, "").trim();
+  } else {
+    bubble.innerText = text;
+  }
+
+  // Se a resposta contém <iframe> (ex.: relatório gerencial),
+  // a bolha ocupa a largura total do chat; caso contrário, 80%.
+  if (bubble.querySelector("iframe")) {
+    bubble.className = baseBubbleClasses + " w-full";
+  } else {
+    bubble.className = baseBubbleClasses + " max-w-[80%]";
+  }
+
+  wrapper.appendChild(avatar);
+  wrapper.appendChild(bubble);
+  chatWindow.appendChild(wrapper);
+
+  scrollToBottom();
+  // 👇 dispara notificação de nova mensagem do bot
+  notificarNovaMensagem(text);
+
+  // ============================================================
+  // 🔹 LOG CENTRALIZADO DE SAÍDA DO BOT → GOOGLE SHEETS
+  // ============================================================
+  try {
+    const textoLimpo = vektorStripHtml(text);
+    const resumo = vektorResumoTexto(textoLimpo, 250);
+
+    let intencaoSaida = "bot_generico";
+    if (typeof ultimaIntencao !== "undefined" && ultimaIntencao) {
+      intencaoSaida = ultimaIntencao;
+    }
+
+    // 🔹 AGORA A ORIGEM É DETECTADA AUTOMATICAMENTE
+    const origemSaida = vektorDetectarFuncaoOrigem();
+
+    vektorRegistrarMetrica(
+      intencaoSaida,         // intencao
+      "[BOT] " + resumo,     // mensagemOriginal
+      "",                    // norm
+      "bot_msg",             // resultado
+      "SaidaBot",            // topico
+      origemSaida            // funcaoOrigem (ex.: vektorBlocoRaciocinioPolitica)
+    );
+
+    if (typeof ultimaIntencao !== "undefined") {
+      ultimaIntencao = null;
+    }
+    // não precisa mais de ultimaFuncaoOrigem, então nada pra resetar aqui
+
+  } catch (e) {
+    console.error("Erro ao registrar métrica de saída do bot:", e);
+  }
+}
 
           // ========= EXPORTAÇÃO DE TABELA PARA CSV =========
 
@@ -1672,7 +1784,7 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
   },
   {
     nome: "SERVIÇOS GRÁFICOS OPERAÇÕES",
-    palavrasChave: ["banner", "adesivo", "flyer", "folder", "grafica", "impressao", "impressão"],
+    palavrasChave: ["banner", "adesivo", "flyer", "folder", "grafica", "impressao", "impressão", "impressões"],
     descricao: "Materiais gráficos operacionais, banners e impressões.",
     observacaoUso: ""
   },
@@ -2069,6 +2181,10 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
     /* ========= INTENÇÃO ========= */
 
     function detectarIntencaoPergunta(msgNorm) {
+        // garante que msgNorm é sempre string e cria um alias "norm"
+      msgNorm = msgNorm || "";
+      const norm = msgNorm;
+
   const foraEscopoPadroes = [
     "palmeiras","corinthians","bolsonaro","lula","eleicao","eleição",
     "presidente","futebol","time joga","campeonato","xing","vai tomar",
@@ -2106,8 +2222,13 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
     msgNorm.includes("procedimento") ||
     msgNorm.includes("procedimentos");
 
-  const falaClara =
-    msgNorm.includes("clara");
+    const falaClara =
+    msgNorm.includes("clara") ||
+    msgNorm.includes("cartao") ||
+    msgNorm.includes("cartão") ||
+    msgNorm.includes("fatura") ||
+    msgNorm.includes("cartoes") ||
+    msgNorm.includes("cartões");
 
   if (
     (falaServiceNow && falaChamado && falaClara) ||
@@ -2122,6 +2243,82 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
     msgNorm.includes("chamados da clara no servicenow")
   ) {
     return "procedimentosServiceNow";
+  }
+
+    // se falar de ServiceNow + (chamado OU Clara), já manda pra procedimentosServiceNow
+  if (falaServiceNow && (falaChamado || falaClara)) {
+    return "procedimentosServiceNow";
+  }
+
+  // também aceita frases mais simples tipo "como abrir chamado no servicenow"
+  if (falaServiceNow && norm.includes("abrir") && norm.includes("chamado")) {
+    return "procedimentosServiceNow";
+  }
+
+  // fallback suave: se a pessoa só digita "servicenow" ou algo muito curto com o nome,
+// também manda para os procedimentos do ServiceNow.
+if (falaServiceNow && !falaChamado) {
+  return "procedimentosServiceNow";
+}
+
+ // 4) Troca / afastamento / demissão de gerente, uso de cartão de outra loja
+  const falaTrocaGerente =
+    norm.includes("mudar de loja") ||
+    norm.includes("mudanca de loja") ||
+    norm.includes("mudança de loja") ||
+    norm.includes("troca de loja") ||
+    norm.includes("trocar de loja") ||
+    norm.includes("vou mudar de loja") ||
+    norm.includes("fui transferido") ||
+    norm.includes("fui transferida") ||
+    norm.includes("transferido de loja") ||
+    norm.includes("transferida de loja") ||
+    norm.includes("transferencia de loja") ||
+    norm.includes("transferência de loja") ||
+    norm.includes("mudei de loja") ||          // <<< ESSA AQUI ESTAVA FALTANDO PRA SUA FRASE
+    norm.includes("mudei de unidade") ||
+    norm.includes("trocar de unidade") ||
+    norm.includes("troquei de loja") ||
+    norm.includes("sou de outra loja") ||
+    norm.includes("sou de outra unidade") ||
+
+    norm.includes("gerente desligado") ||
+    norm.includes("sem gerente") ||
+    norm.includes("gerente saiu") ||
+    norm.includes("gerente saiu da loja") ||
+    norm.includes("gerente demitido") ||
+    norm.includes("gerente demitida") ||
+    norm.includes("gerente foi desligado") ||
+    norm.includes("gerente foi desligada") ||
+    norm.includes("minha loja esta sem gerente") ||
+    norm.includes("minha loja está sem gerente") ||
+
+    norm.includes("gerente afastado") ||
+    norm.includes("gerente afastada") ||
+    norm.includes("afastamento do gerente") ||
+    norm.includes("gerente de ferias") ||
+    norm.includes("gerente de férias") ||
+    norm.includes("gestor de ferias") ||
+    norm.includes("gestor de férias") ||
+
+    norm.includes("gerente novo") ||
+    norm.includes("novo gerente") ||
+    norm.includes("novo gerente da loja") ||
+    norm.includes("troca de gerente") ||
+    norm.includes("troca do gerente") ||
+
+    norm.includes("cartao de outra loja") ||
+    norm.includes("cartão de outra loja") ||
+    norm.includes("usar cartao de outra loja") ||
+    norm.includes("usar cartão de outra loja") ||
+    norm.includes("colocar cartao de outra loja") ||
+    norm.includes("habilitar cartao de outra loja") ||
+    norm.includes("como uso o cartao em outra loja") ||
+    norm.includes("cartao nao funciona em outra loja") ||
+    norm.includes("cartão não funciona em outra loja");
+
+  if (falaTrocaGerente) {
+    return "trocaGerente";
   }
 
 
@@ -2306,50 +2503,101 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
     return "bloqueio";
   }
 
+  // -------------------------------------------------------------
+// RESPOSTAS DE JUSTIFICATIVAS / NOTAS / PERDA DE COMPROVANTE
+// -------------------------------------------------------------
+if (
+  msgNorm.includes("como justificar") ||
+  msgNorm.includes("vídeo de justificativa") ||
+  msgNorm.includes("video de justificativa") ||
+  msgNorm.includes("vídeo de justificativas") ||
+  msgNorm.includes("video de justificativas") ||
+  msgNorm.includes("como justificar essa compra") ||
+  msgNorm.includes("como envio comprovante?") ||
+  msgNorm.includes("justificar compra") ||
+  msgNorm.includes("prestar contas") ||
+  msgNorm.includes("prestacao de contas") ||
+  msgNorm.includes("prestação de contas") ||
+  msgNorm.includes("colocar nota") ||
+  msgNorm.includes("inserir nota") ||
+  msgNorm.includes("anexar nota") ||
+  msgNorm.includes("descricao na clara") ||
+  msgNorm.includes("como inserir nota") ||
+  msgNorm.includes("nota fiscal") ||
+  msgNorm.includes("como lançar despesas na clara?") ||
+  msgNorm.includes("nota da compra") ||
+  msgNorm.includes("escrever justificativa") ||
+  msgNorm.includes("como colocar justificativa") ||
+  msgNorm.includes("comprovante") ||
+  msgNorm.includes("comprovantes") ||
+  msgNorm.includes("comprovante de compra") ||
+  msgNorm.includes("comprovacao de despesa") ||
+  msgNorm.includes("comprovação de despesa") ||
+  msgNorm.includes("registro de despesa") ||
+  msgNorm.includes("lançar despesa") ||
+  msgNorm.includes("lancamento de despesa") ||
+  msgNorm.includes("lançamento de despesa") ||
+  msgNorm.includes("reembolso sem nota") ||
+  msgNorm.includes("perdi a nota") ||        // << IMPORTANTE
+  msgNorm.includes("despesa sem comprovante") ||
+  msgNorm.includes("colocar comprovante") ||
+  msgNorm.includes("como declarar") ||
+  msgNorm.includes("declarar despesa") ||
+  msgNorm.includes("como finalizar prestacao") ||
+  msgNorm.includes("como finalizar prestação") ||
+  msgNorm.includes("relatorio de despesa") ||
+  msgNorm.includes("relatório de despesa") ||
+  msgNorm.includes("enviar nota") ||
+  msgNorm.includes("falta a nota") ||
+  msgNorm.includes("despesa sem nota") ||
+  msgNorm.includes("finalizar contas") ||
+  msgNorm.includes("minhas prestacoes") ||
+  msgNorm.includes("minhas prestações") ||
+  msgNorm.includes("descrição na clara")
+) {
+
+  // 1. Mensagem bem específica caso tenha perdido a nota
   if (
-    msgNorm.includes("como justificar") ||
-    msgNorm.includes("justificar compra") ||
-    msgNorm.includes("prestar contas") ||
-    msgNorm.includes("prestacao de contas") ||
-    msgNorm.includes("prestação de contas") ||
-    msgNorm.includes("colocar nota") ||
-    msgNorm.includes("inserir nota") ||
-    msgNorm.includes("anexar nota") ||
-    msgNorm.includes("descricao na clara") ||
-    msgNorm.includes("como inserir nota") ||
-    msgNorm.includes("nota fiscal") ||
-    msgNorm.includes("nota da compra") ||
-    msgNorm.includes("escrever justificativa") ||
-    msgNorm.includes("como colocar justificativa") ||
-    msgNorm.includes("comprovante") ||
-    msgNorm.includes("comprovantes") ||
-    msgNorm.includes("comprovante de compra") ||
-    msgNorm.includes("comprovacao de despesa") ||
-    msgNorm.includes("comprovação de despesa") ||
-    msgNorm.includes("registro de despesa") ||
-    msgNorm.includes("lançar despesa") ||
-    msgNorm.includes("lancamento de despesa") ||
-    msgNorm.includes("lançamento de despesa") ||
-    msgNorm.includes("reembolso sem nota") ||
     msgNorm.includes("perdi a nota") ||
-    msgNorm.includes("despesa sem comprovante") ||
-    msgNorm.includes("colocar comprovante") ||
-    msgNorm.includes("como declarar") ||
-    msgNorm.includes("declarar despesa") ||
-    msgNorm.includes("como finalizar prestacao") ||
-    msgNorm.includes("como finalizar prestação") ||
-    msgNorm.includes("relatorio de despesa") ||
-    msgNorm.includes("relatório de despesa") ||
-    msgNorm.includes("enviar nota") ||
     msgNorm.includes("falta a nota") ||
     msgNorm.includes("despesa sem nota") ||
-    msgNorm.includes("finalizar contas") ||
-    msgNorm.includes("minhas prestacoes") ||
-    msgNorm.includes("minhas prestações") ||
-    msgNorm.includes("descrição na clara")
+    msgNorm.includes("despesa sem comprovante")
   ) {
-    return "prestacao";
+    renderBotMessage("HTML:" +
+      `<p class="text-sm text-slate-700">
+        Quando a loja perde a nota fiscal, deve abrir uma <b>ocorrência formal de extravio</b> e anexar esse documento no app da Clara, como justificativa da transação. O financeiro irá avaliar o caso. Ocorrências recorrentes podem gerar recusa definitiva.
+      </p>`
+    );
+  } else {
+    // 2. Mensagem geral de justificativa
+    renderBotMessage("HTML:" +
+      `<p class="text-sm text-slate-700">
+        Para justificar uma compra no app da Clara, basta abrir a transação, escrever a descrição e anexar o comprovante ou nota fiscal correspondente.
+      </p>`
+    );
   }
+
+  // 3. Enviar automaticamente o vídeo de justificativas
+  const videoHtml = [
+  "<div style='margin-top:8px; text-align:center;'>",
+  "  <p class='text-sm text-slate-700' style='text-align:center;'>",
+  "    Assista ao vídeo abaixo, explicando sobre o procedimento de justificativas no app da Clara.",
+  "    Clique nos 3 pontos do lado direito inferior e escolha ",
+  "    <b style='color:#005E27;'>Picture-in-picture</b> ",
+  "    para ver em um formato melhor:",
+  "  </p>",
+  "  <div style='width:100%; display:flex; justify-content:center; margin-top:12px;'>",
+  "    <video controls style='width:100%; max-width:480px; border-radius:8px; object-fit:contain;'>",
+  "      <source src='https://raw.githubusercontent.com/rslisboa/cartoesclara/4fad8ce4eda430baf37ecccd7d480a77f759af27/Video%20Clara%20(4).mp4' type='video/mp4'>",
+  "      Seu navegador não suporta vídeo HTML5.",
+  "    </video>",
+  "  </div>",
+  "</div>"
+].join("");
+
+  renderBotMessage("HTML:" + videoHtml);
+  return null;
+}
 
   if (
     msgNorm.includes("lanche") ||
@@ -2409,78 +2657,47 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
     return "transportePessoal";
   }
 
-  // 🔹 Troca / afastamento / demissão de gerente e uso de cartão de outra loja
-  if (
-    msgNorm.includes("mudar de loja") ||
-    msgNorm.includes("troca de loja") ||
-    msgNorm.includes("trocar de loja") ||
-    msgNorm.includes("mudança de loja") ||
-    msgNorm.includes("mudanca de loja") ||
-    msgNorm.includes("vou mudar de loja") ||
-    msgNorm.includes("fui transferido") ||
-    msgNorm.includes("transferido de loja") ||
-    msgNorm.includes("transferencia de loja") ||
-    msgNorm.includes("transferência de loja") ||
-    msgNorm.includes("gerente desligado") ||
-    msgNorm.includes("sem gerente") ||
-    msgNorm.includes("gerente saiu") ||
-    msgNorm.includes("gerente saiu da loja") ||
-    msgNorm.includes("cartao de outra loja") ||
-    msgNorm.includes("cartão de outra loja") ||
-    msgNorm.includes("usar cartao de outra loja") ||
-    msgNorm.includes("trocar minha loja") ||
-    msgNorm.includes("mudar minha loja") ||
-    msgNorm.includes("sair da loja") ||
-    msgNorm.includes("qual minha loja") ||
-    msgNorm.includes("quero mudar a loja") ||
-    msgNorm.includes("mudei de unidade") ||
-    msgNorm.includes("trocar de unidade") ||
-    msgNorm.includes("como troco de loja") ||
-    msgNorm.includes("troquei de loja") ||
-    msgNorm.includes("sou de outra loja") ||
-    msgNorm.includes("sou de outra unidade") ||
-    msgNorm.includes("cartao de loja diferente") ||
-    msgNorm.includes("cartão de loja diferente") ||
-    msgNorm.includes("gerente novo") ||
-    msgNorm.includes("novo gerente") ||
-    msgNorm.includes("cadastro de gerente") ||
-    msgNorm.includes("tirar gerente") ||
-    msgNorm.includes("excluir gerente") ||
-    msgNorm.includes("quem e o gerente") ||
-    msgNorm.includes("quem é o gerente") ||
-    msgNorm.includes("gestor estiver de férias") ||
-    msgNorm.includes("gerente de férias") ||
-    msgNorm.includes("problema com gerente") ||
-    msgNorm.includes("gerente nao esta na loja") ||
-    msgNorm.includes("gerente não está na loja") ||
-    msgNorm.includes("minha loja esta sem gerente") ||
-    msgNorm.includes("gerente demitido") ||
-    msgNorm.includes("colocar cartao de outra loja") ||
-    msgNorm.includes("habilitar cartao de outra loja") ||
-    msgNorm.includes("como uso o cartao em outra loja") ||
-    msgNorm.includes("cartao nao funciona em outra loja") ||
-    msgNorm.includes("cartão não funciona em outra loja") ||
-    msgNorm.includes("gerente afastado") ||
-    msgNorm.includes("gerente afastada") ||
-    msgNorm.includes("afastamento do gerente") ||
-    msgNorm.includes("gerente demitida") ||
-    msgNorm.includes("gerente foi desligado") ||
-    msgNorm.includes("gerente foi desligada") ||
-    msgNorm.includes("novo gerente da loja") ||
-    msgNorm.includes("troca de gerente") ||
-    msgNorm.includes("troca do gerente") ||
-    msgNorm.includes("usar cartão de outra loja") ||
+  const temGerenteOuGestor =
+  msgNorm.includes("gerente") ||
+  msgNorm.includes("gerentes") ||
+  msgNorm.includes("gestor") ||
+  msgNorm.includes("gestora");
 
-    // férias + gerente/gestor/gestora
-    (
-      msgNorm.includes("ferias") &&
-      (msgNorm.includes("gerente") ||
-       msgNorm.includes("gestor")  ||
-       msgNorm.includes("gestora"))
-    )
-  ) {
-    return "trocaGerente";
-  }
+const temFerias =
+  msgNorm.includes("ferias"); // já está normalizado sem acento
+
+const temAfastamento =
+  msgNorm.includes("afastado")  ||
+  msgNorm.includes("afastada")  ||
+  msgNorm.includes("afastados") ||
+  msgNorm.includes("afastadas") ||
+  msgNorm.includes("afastamento");
+
+const temDesligamento =
+  msgNorm.includes("desligado")  ||
+  msgNorm.includes("desligada")  ||
+  msgNorm.includes("demitido")   ||
+  msgNorm.includes("demitida")   ||
+  msgNorm.includes("demissao")   ||
+  msgNorm.includes("demissão");
+
+if (
+  // seus casos antigos de troca de loja, cartão de outra loja, etc...
+  msgNorm.includes("mudar de loja") ||
+  msgNorm.includes("troca de loja") ||
+  // ... (mantenha o que já tem aqui)
+
+  // gerente de férias / gestor de férias
+  (temGerenteOuGestor && temFerias) ||
+
+  // gerente afastado / afastamento do gerente
+  (temGerenteOuGestor && temAfastamento) ||
+
+  // gerente foi desligado / demitido
+  (temGerenteOuGestor && temDesligamento)
+) {
+  return "trocaGerente";
+}
 
   if (
     msgNorm.includes("sangria") ||
@@ -2743,6 +2960,23 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
   return "generica";
 }
 
+// Bloco HTML para o relatório gerencial da Clara (Looker Studio)
+const htmlRelatorioGerencial = [
+  "<div class='w-full'>",
+  "  <div class='w-full mt-1'>",
+  "    <iframe",
+  "      src='https://lookerstudio.google.com/embed/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF'",
+  "      width='100%'",
+  "      height='6630'",
+  "      frameborder='0'",
+  "      style='border:0;border-radius:0.75rem;'",
+  "      allowfullscreen",
+  "      sandbox='allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox'>",
+  "    </iframe>",
+  "  </div>",
+  "</div>"
+].join("");
+
 function respProcedimentosServiceNow() {
   var corpo =
     '<div class="text-sm text-slate-700">' +
@@ -2773,11 +3007,13 @@ function respProcedimentosServiceNow() {
         '</li>' +
 
         '<li>' +
-          '<b>Troca de gerente / mudança de loja do portador</b><br>' +
-          'Usado quando o gerente muda de loja ou há substituição definitiva do responsável.' +
-          ' O fluxo pede BU (Centauro/Fisia), loja anterior, nova loja, data da troca e quem assume a titularidade.' +
-          ' É esse procedimento que formaliza a situação descrita na seção de afastamento/demissão de gerente.' +
-        '</li>' +
+        '<b>Troca de Gerente (mudança entre lojas)</b><br>' +
+        'Chamado usado quando um gerente que possui cartão Clara é transferido de uma loja para outra.' +
+        ' É obrigatório informar a BU (ex.: Centauro, Fisia), a loja de origem, a loja de destino e a data efetiva da troca,' +
+        ' para que o cartão fique vinculado corretamente à nova unidade.' +
+        ' O cartão físico deve acompanhar o gerente na mudança e continua sendo utilizado na nova loja após o ajuste cadastral.' +
+        ' Esse fluxo também é o caminho para formalizar trocas definitivas de responsável, em conjunto com as orientações de afastamento/demissão de gerente na política.' +
+      '</li>' +
 
         '<li>' +
           '<b>Inserção ou ajuste de etiqueta</b><br>' +
@@ -3273,6 +3509,7 @@ Sou um agente especializado na Política de Uso dos Cartões Clara nas lojas. N�
   return `HTML:<div class="text-sm text-slate-700">
     <p><b>Limite do cartão Clara nas lojas</b></p>
     <p class="mt-2">O limite do cartão Clara é definido para cobrir os gastos previstos do ciclo de fatura (de 06 até 05 do mês seguinte), considerando o padrão de despesas operacionais da loja.</p>
+    <p class="mt-2">O limite é reestabelecido por completo sempre no dia 06 de cada mês.</p>
     <p class="mt-2">Para visualizar o limite, ali na parte do menu de <b>Açoes</b>, arraste pro lado e vai em <b>Ajustar limite</b>. Lá vai aparecer de forma mais simples o valor atual do limite, de forma integral.</p>
     <p class="mt-2">Planeje as compras para não estourar o limite logo no início do ciclo, priorize gastos essenciais e evite despesas de alto valor.</p>
     <details class="mt-3">
@@ -3329,7 +3566,7 @@ Sou um agente especializado na Política de Uso dos Cartões Clara nas lojas. N�
 
               function respPoliticaOficial() {
         return `HTML:<div class="text-sm text-slate-700">
-          <p>Este documento contém as diretrizes e padrões oficiais de referência da Companhia. Ele deve ser consultado e seguido como a fonte de autoridade final para todos os assuntos que lhe são pertinentes.</p>
+          <p>Este documento contém as diretrizes e padrões oficiais de referência da Companhia. Ele deve ser consultado e seguido como a fonte de autoridade final para todos os assuntos que lhe são pertinentes.
           <a class="service-link" href="https://drive.google.com/file/d/1pDftfaJOPUra0-0gAeK2ziJ3llyscvjx/view?usp=sharing" target="_blank" rel="noopener noreferrer">
           <strong>Política de Uso dos Cartões Clara (documento oficial).</strong>
           </a>
@@ -3480,18 +3717,61 @@ function respTrocaGerente() {
       '</ol>' +
 
       '<p class="mt-3">' +
-        'Em qualquer cenário de troca, afastamento ou demissão, a orientação é sempre:' +
+        'Em qualquer cenário de afastamento ou demissão, a orientação é sempre:' +
       '</p>' +
       '<ul class="list-disc ml-4 mt-1">' +
         '<li>Garantir que o cartão do gerente desligado seja recolhido e bloqueado;</li>' +
-        '<li>Formalizar a situação abrindo chamado no <b>ServiceNow</b>, informando loja, BU, data e quem assume a responsabilidade;</li>' +
         '<li>Registrar na descrição das compras qualquer uso temporário de cartão de outra loja;</li>' +
-        '<li>Em caso de <b>férias do gerente</b>, a loja deve abrir chamado no ServiceNow informando o período e quem ficará responsável pela guarda do cartão, para que o Financeiro acompanhe e, quando necessário, faça o tratamento dos comprovantes em nome do responsável temporário.</li>' +
+        '<li>Em caso de <b>férias do gerente ou afastamento</b>, a loja deve abrir chamado no ServiceNow informando o período e quem ficará responsável pela guarda do cartão, para que o Financeiro acompanhe e, quando necessário, faça o tratamento dos comprovantes em nome do responsável temporário, caminho para abertura do chamado: <b>Contas a Receber > Cartão Clara > Solicitação para anexar comprovantes</b>.</li>' +
+        '<li><b>Importante:</b> O financeiro deve autorizar esse fluxo por email antes da loja encaminhar chamado.</li>' +
       '</ul>' +
 
       '<p class="mt-3 text-xs text-slate-500">' +
         'Resumo baseado no item 8.4 e no Anexo II da Política de Utilização dos Cartões Clara.' +
         ' Em caso de dúvida ou situações não previstas, valide com o Financeiro.' +
+      '</p>' +
+    '</div>';
+
+  return vektorBlocoRaciocinioPolitica(
+    corpo,
+    "",
+    typeof POLITICA_CARTOES_CLARA_LINK !== "undefined"
+      ? POLITICA_CARTOES_CLARA_LINK
+      : ""
+  );
+}
+
+function respTrocaGerenteMudancaLojas() {
+  var corpo =
+    '<div class="text-sm text-slate-700">' +
+      '<p><b>Troca de gerente entre lojas com Cartão Clara</b></p>' +
+
+      '<p class="mt-2">' +
+        'Quando um gerente que possui um <b>cartão Clara</b> é transferido de uma loja para outra, ' +
+        'não é apenas uma ausência temporária: é uma <b>mudança de unidade</b> que precisa ser refletida no cadastro do cartão.' +
+      '</p>' +
+
+      '<p class="mt-2">' +
+        'Nesses casos, a orientação é abrir no ServiceNow o tipo de chamado <b>"Troca de Gerente (mudança entre lojas)"</b>, ' +
+        'informando obrigatoriamente:' +
+      '</p>' +
+
+      '<ul class="list-disc ml-4 mt-1">' +
+        '<li><b>BU</b> (ex.: Centauro, Fisia);</li>' +
+        '<li><b>Loja de origem</b> do gerente;</li>' +
+        '<li><b>Loja de destino</b> para onde ele está sendo transferido;</li>' +
+        '<li><b>Data efetiva da troca</b>, para ajustar o vínculo do cartão no sistema.</li>' +
+      '</ul>' +
+
+      '<p class="mt-2">' +
+        'O <b>cartão físico</b> deve acompanhar o gerente na mudança e passar a ser usado na nova loja, ' +
+        'sempre após o ajuste cadastral. O ponto crítico é garantir que, no sistema, o cartão fique ' +
+        'vinculado à unidade correta, evitando despesas “aparecendo” na loja errada.' +
+      '</p>' +
+
+      '<p class="mt-3 text-xs text-slate-500">' +
+        'Fluxo alinhado ao Anexo II (ServiceNow) e às regras de responsabilidade do portador na Política de Utilização dos Cartões Clara. ' +
+        'Em caso de exceções, valide com o Financeiro.' +
       '</p>' +
     '</div>';
 
@@ -3544,12 +3824,25 @@ Se quiser, posso te explicar um caso específico. Por exemplo:
 }
 
     function respSangria() {
-        return `HTML:<p class="text-sm text-slate-700">
-Depois que a loja recebeu o cartão Clara e fez o treinamento, o processo de sangria em dinheiro pra pagar despesa operacional é <b>DESCONTINUADO</b>.<br/><br/>
-Ou seja: a loja não deve mais tirar dinheiro do caixa pra pagar gasto de operação. Tudo vai no cartão Clara, com justificativa na plataforma.<br/><br/>
-Só em caso de exceção real (cartão sem funcionar e gasto urgente da operação) o Financeiro pode liberar temporariamente uma sangria. Isso precisa de autorização prévia e justificativa formal.
-</p>`;
-    }
+  return `HTML:
+<div class="text-sm text-slate-700">
+Depois que a loja recebeu o cartão Clara e fez o treinamento, o processo de sangria em dinheiro pra pagar despesa operacional é <b>DESCONTINUADO</b>
+
+  <p>Ou seja: a loja não deve mais tirar dinheiro do caixa pra pagar gasto de operação. Tudo deve ser pago com o <b>cartão Clara</b>, com justificativa na plataforma.
+
+  <p>Se a loja pensou em fazer sangria porque <b>não conseguiu usar o cartão Clara</b> (categoria bloqueada na maquininha / MCC bloqueado), o fluxo correto é <b>abrir chamado no ServiceNow para tratar a categoria</b>, e não tirar dinheiro do caixa.
+
+  <p>No ServiceNow, utilize o caminho: <b>Contas a Receber > Cartão Clara > Liberação de categoria</b>, informando:
+
+  <ul class="list-disc ml-4">
+    <li><b>BU</b> e <b>loja</b>;</li>
+    <li>Se tentou utilizar o cartão no estabelecimento;</li>
+    <li><b>Data e valor</b> onde da transação (se já efetuada);</li>
+    <li><b>Categoria desejada</b>.
+
+  <p>O Financeiro avalia a solicitação e ajusta as permissões de categoria. A sangria em dinheiro continua sendo exceção extrema.
+</div>`;
+}
 
     function respFraudeContestacao() {
   return `HTML:<div class="text-sm text-slate-700">
@@ -3575,14 +3868,19 @@ Só em caso de exceção real (cartão sem funcionar e gasto urgente da operaç�
 }
 
     function respTermoResponsabilidade() {
-        return `HTML:<div class="text-sm text-slate-700">
-<p>
-O <b>Termo de Responsabilidade de uso do cartão da Clara</b> deve ser preenchido para que a loja possa utilizar o cartão. Esse termo traz também o aceite para a Política de uso do cartão.
-<p class="mt-2">
-Preencha <a class="service-link" href="https://docs.google.com/forms/d/e/1FAIpQLSdnQWYFWp-udS9V039avJlXb4x1VnlDC6us5dSCrLkgngAxpg/alreadyresponded" target="_blank" rel="noopener noreferrer"><b>este formulário</b></a>. Após preencher você receberá o termo anexado ao e-mail, onde deve <b>imprimir, assinar e nos enviar</b>. Após isso, o uso do cartão estará liberado.
-</p>
-</div>`;
-    }
+  return "HTML:" +
+  "<div class='text-sm text-slate-700'>" +
+    "<p>" +
+      "O <b>Termo de Responsabilidade de uso do cartão da Clara</b> deve ser preenchido para que a loja possa utilizar o cartão. " +
+      "Esse termo traz também o aceite para a Política de uso do cartão. " +
+      "Preencha " +
+      "<a href='https://docs.google.com/forms/d/e/1FAIpQLSdnQWYFWp-udS9V039avJlXb4x1VnlDC6us5dSCrLkgngAxpg/viewform' " +
+         "target='_blank' rel='noopener noreferrer' class='service-link' style='display:inline;'><b>este formulário</b></a>. " +
+      "Após preencher, você receberá o termo anexado ao e-mail, onde deve <b>imprimir, assinar e nos enviar</b>. " +
+      "Depois disso, o uso do cartão estará liberado." +
+    "</p>" +
+  "</div>";
+}
 
     function respNovoCartaoPrimeiraVia() {
         return `HTML:<div class="text-sm text-slate-700">
@@ -3626,6 +3924,23 @@ function respNovoCartaoSegundaVia() {
 
       function respGenerica(msgNorm) {
     msgNorm = msgNorm || "";
+
+    // Mensagens claramente relacionadas a justificativa / nota / comprovante / vídeo de justificativa
+    const ehJustificativa =
+        msgNorm.includes("justific") ||
+        msgNorm.includes("nota fiscal") ||
+        msgNorm.includes("nota da compra") ||
+        msgNorm.includes("perdi a nota") ||
+        msgNorm.includes("falta a nota") ||
+        msgNorm.includes("despesa sem nota") ||
+        msgNorm.includes("despesa sem comprovante") ||
+        msgNorm.includes("comprovante") ||
+        msgNorm.includes("comprovantes") ||
+        msgNorm.includes("video de justificativa") ||
+        msgNorm.includes("vídeo de justificativa") ||
+        msgNorm.includes("video de justificativas") ||
+        msgNorm.includes("vídeo de justificativas");
+
     const avaliacao = avaliarCompraEspecifica(msgNorm);
 
     // 1) Se a avaliação específica decidiu claramente que NÃO pode
@@ -3687,8 +4002,20 @@ function respNovoCartaoSegundaVia() {
         msgNorm.includes("compra") || msgNorm.includes("comprar") || msgNorm.includes("paguei");
 
     if (!falaMundoClara) {
-        // Usa a mesma função que você já tem para fora de escopo
+        // Se é claramente uma dúvida de justificativa / nota / comprovante / vídeo de justificativa,
+        // não manda resposta fora de escopo (deixa o fluxo de justificativa/vídeo responder sozinho).
+        if (ehJustificativa) {
+            return "";
+        }
+
+        // Caso contrário, segue a lógica normal de fora de escopo
         return respostaForaEscopo(msgNorm);
+    }
+
+    // 5) Se é claramente justificativa / nota / comprovante / vídeo de justificativa,
+    // não manda o texto genérico de política (outro fluxo já respondeu).
+    if (ehJustificativa) {
+        return "";
     }
 
     // 5) Fallback genérico (quando é assunto Clara, mas não bateu em nada acima)
@@ -3951,17 +4278,23 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
       return respGenerica(norm);
     }
 
-    // 1) Primeiro tenta responder usando o motor de categorias da política
-  const resultadoCategoria = tentarResponderPorCategoriaPolitica(msgUsuario, norm);
-  if (resultadoCategoria) {
-    return vektorBlocoRaciocinioPolitica(
-      resultadoCategoria.mensagemUsuario,
-      "",
-      typeof POLITICA_CARTOES_CLARA_LINK !== "undefined"
-        ? POLITICA_CARTOES_CLARA_LINK
-        : ""
-    );
-  }
+// 1) Primeiro tenta responder usando o motor de categorias da política,
+//    EXCETO quando a pergunta é claramente sobre ETIQUETA
+let resultadoCategoria = null;
+
+if (intencao !== "etiqueta") {
+  resultadoCategoria = tentarResponderPorCategoriaPolitica(msgUsuario, norm);
+}
+
+if (resultadoCategoria) {
+  return vektorBlocoRaciocinioPolitica(
+    resultadoCategoria.mensagemUsuario,
+    "",
+    typeof POLITICA_CARTOES_CLARA_LINK !== "undefined"
+      ? POLITICA_CARTOES_CLARA_LINK
+      : ""
+  );
+}
 
   // 2) Se não bateu em uma categoria específica, tenta ver se é pedido de RESUMO de categorias
   if (typeof tentarResponderResumoCategoriasPolitica === "function") {
@@ -4136,9 +4469,37 @@ Caso entenda que a compra é essencial para o dia a dia da loja, fale com o fina
                 break;
 
             case "trocaGerente":
-                ultimaIntencao = "trocaGerente";
-                resposta = respTrocaGerente();
-                break;
+    ultimaIntencao = "trocaGerente";
+
+    // norm já foi calculado no começo de gerarRespostaPolitica
+    const falaMudancaEntreLojas =
+      norm.includes("mudar de loja") ||
+      norm.includes("mudei de loja") ||
+      norm.includes("mudanca de loja") ||
+      norm.includes("mudança de loja") ||
+      norm.includes("troca de loja") ||
+      norm.includes("trocar de loja") ||
+      norm.includes("vou mudar de loja") ||
+      norm.includes("fui transferido") ||
+      norm.includes("fui transferida") ||
+      norm.includes("transferido de loja") ||
+      norm.includes("transferida de loja") ||
+      norm.includes("transferencia de loja") ||
+      norm.includes("transferência de loja") ||
+      norm.includes("mudei de unidade") ||
+      norm.includes("trocar de unidade") ||
+      norm.includes("troquei de loja") ||
+      norm.includes("sou de outra loja") ||
+      norm.includes("sou de outra unidade") ||
+      norm.includes("troca de gerente");
+
+    if (falaMudancaEntreLojas) {
+        resposta = respTrocaGerenteMudancaLojas();
+    } else {
+        // férias, afastamento, desligado, sem gerente etc.
+        resposta = respTrocaGerente();
+    }
+    break;
 
             case "procedimentosServiceNow":
                 ultimaIntencao = "procedimentosServiceNow";
@@ -4504,11 +4865,15 @@ function vektorSugerirTopicosGerais(msgOriginal) {
       __vektorJaSugeriuJustificativas = true;
 
       blocos.push(
-        "<div style='margin-top:10px;'>" +
-          "<p>Além de anexar os comprovantes, existe uma política específica de prazos e regras para justificativas.</p>" +
-          "<p style='margin-top:4px;'>Em caso de dúvida, consulte a <b>Política de Uso dos Cartões Clara</b> ou acione o time de Conta a Receber.</p>" +
-        "</div>"
-      );
+  "<div style='margin-top:10px;'>" +
+    "<p>Além de anexar os comprovantes, existe uma política específica de prazos e regras para justificativas.</p>" +
+    "<p style='margin-top:4px;'>Em caso de dúvida, consulte a <b><a href='" +
+      (typeof POLITICA_CARTOES_CLARA_LINK !== 'undefined'
+        ? POLITICA_CARTOES_CLARA_LINK
+        : '#') +
+      "' target='_blank' style='color:#005E27; text-decoration:underline;'>Política de Uso dos Cartões Clara</a></b> ou acione o time de Conta a Receber.</p>" +
+  "</div>"
+);
     }
 
     // Se nada acionou, não sugere nada
@@ -5111,6 +5476,23 @@ function aplicarRegraDeIntencao(msgOriginal) {
 function gerarPerguntaDeClarificacao(norm) {
   norm = norm || "";
 
+  // Se a mensagem é claramente sobre justificativa / nota / comprovante,
+  // NÃO gera pergunta de clarificação (o fluxo de justificativa já responde).
+  const ehJustificativa =
+    norm.includes("justific") ||          // justificativa / justificar
+    norm.includes("nota fiscal") ||
+    norm.includes("nota da compra") ||
+    norm.includes("perdi a nota") ||
+    norm.includes("falta a nota") ||
+    norm.includes("despesa sem nota") ||
+    norm.includes("despesa sem comprovante") ||
+    norm.includes("comprovante") ||
+    norm.includes("comprovantes");
+
+  if (ehJustificativa) {
+    return ""; // devolve vazio para não mostrar nada
+  }
+
   const temasProvaveis = [];
 
   // Sinais de tema → só pra deixar a pergunta mais “esperta”
@@ -5138,27 +5520,56 @@ function gerarPerguntaDeClarificacao(norm) {
     temasProvaveis.push("nota fiscal / recibo / comprovantes");
   }
 
-  // Se não achou nenhum “cheiro”, usa uma frase aleatória
-if (!temasProvaveis.length) {
+  // Se não achou nenhum “cheiro”…
+  if (!temasProvaveis.length) {
 
-  const variacoes = [
-    "Não tenho certeza se entendi sua pergunta. Você está falando de pendências, faturas, regras de uso do cartão ou outro assunto?",
-    "Fiquei em dúvida sobre o que você quis dizer. É algo sobre pendências, faturas ou regras de uso do cartão?",
-    "Talvez eu esteja interpretando errado. Seu assunto é pendências, faturas, política de uso do cartão ou outra coisa?",
-    "Preciso de mais contexto. Sua dúvida envolve pendências, faturas, regras do cartão Clara ou é outro tema?",
-    "Não consegui identificar o assunto. Você queria saber sobre faturas, pendências, política de compras ou algo diferente?",
-    "Não entendi completamente sua pergunta. Está relacionada a pendências, faturas, cartão Clara ou outro tema?"
-  ];
+    // 🔹 1) Primeiro: checa se é caso de SANGRIA
+    const falaSangria =
+      norm.includes("sangria") ||
+      norm.includes("sangrias") ||
+      norm.includes("fazer sangria") ||
+      norm.includes("como fazer sangria") ||
+      norm.includes("puxar dinheiro do caixa") ||
+      norm.includes("retirar dinheiro do caixa") ||
+      norm.includes("tirar dinheiro do caixa") ||
+      norm.includes("retirada de dinheiro do caixa") ||
+      norm.includes("movimentacao de dinheiro no caixa") ||
+      norm.includes("movimentação de dinheiro no caixa") ||
+      norm.includes("saida de dinheiro do caixa") ||
+      norm.includes("saída de dinheiro do caixa") ||
+      norm.includes("suprimento") ||
+      norm.includes("suprimentos") ||
+      norm.includes("fazer suprimento") ||
+      norm.includes("registro de sangria") ||
+      norm.includes("registrando sangria");
 
-  const frase = variacoes[Math.floor(Math.random() * variacoes.length)];
+    if (falaSangria) {
+      // 🔸 IMPORTANTE:
+      // retorna string vazia → NÃO gera pergunta de clarificação.
+      // Isso deixa o fluxo seguir até o motor da política
+      // (detectarIntencaoPergunta -> "sangria" -> respSangria).
+      return "";
+    }
 
-  return (
-    "HTML:" +
-    "<p class='text-sm text-slate-700'>" +
-    frase +
-    "</p>"
-  );
-}
+    // 🔹 2) Se não é sangria, usa a frase padrão de “não entendi”
+    const variacoes = [
+      "Não tenho certeza se entendi sua pergunta. Você está falando de pendências, faturas, regras de uso do cartão ou outro assunto?",
+      "Fiquei em dúvida sobre o que você quis dizer. É algo sobre pendências, faturas ou regras de uso do cartão?",
+      "Talvez eu esteja interpretando errado. Seu assunto é pendências, faturas, política de uso do cartão ou outra coisa?",
+      "Preciso de mais contexto. Sua dúvida envolve pendências, faturas, regras do cartão Clara ou é outro tema?",
+      "Não consegui identificar o assunto. Você queria saber sobre faturas, pendências, política de compras ou algo diferente?",
+      "Não entendi completamente sua pergunta. Está relacionada a pendências, faturas, cartão Clara ou outro tema?"
+    ];
+
+    const frase = variacoes[Math.floor(Math.random() * variacoes.length)];
+
+    return (
+      "HTML:" +
+      "<p class='text-sm text-slate-700'>" +
+      frase +
+      "</p>"
+    );
+  }
 
   // Se achou alguns temas, monta a frase usando eles
   const listaTemas = temasProvaveis
@@ -5509,10 +5920,22 @@ function gerarInsightsResumoChaveCategoriaEstab(res, opcoes) {
   }
 }
 
+
+
     /* ========= GERADOR FINAL ========= */
 
 function gerarRespostaDoBot(msgUsuario, vindoDaClarificacao = false) {
   const norm = normalize(msgUsuario || "");
+
+  // 🔹 LOG GLOBAL: tudo que o usuário digita
+  vektorRegistrarMetrica(
+    "user_raw",           // intencao
+    msgUsuario,           // mensagem original
+    norm,                 // norm
+    "entrada",            // resultado
+    "RawMessageUsuario",  // tópico
+    "gerarRespostaDoBot"  // função de origem
+  );
 
   // 🔹 0.5: se a frase parece ser só uma resposta curta à clarificação,
   // reinterpreta UMA ÚNICA VEZ como uma pergunta completa que o motor já entende
@@ -5568,7 +5991,6 @@ if (
 
   <p class="mb-2" style="text-align:center; margin-top: -4px;">
     Use esta apresentação para reforçar boas práticas com o time da loja:
-  </p>
 
   <div style="position:relative;padding-bottom:62%;height:0;overflow:hidden;max-width:100%;
               border-radius:8px;border:1px solid #ddd;">
@@ -5591,28 +6013,22 @@ if (
   return htmlTreinamento;
 }
 
-// Relatório Gerencial / Dashboard Looker Studio
+// ======================================================================
+// RELATÓRIO GERENCIAL – incorpora Looker e manda link em mensagem separada
+// ======================================================================
 if (
-  norm.includes("relatorio gerencial") ||
-  norm.includes("relatório gerencial") ||
   norm.includes("abrir relatorio gerencial") ||
   norm.includes("abrir relatório gerencial") ||
-  norm.includes("ver dashboard") ||
-  norm.includes("dashboard looker") ||
-  norm.includes("looker studio")
+  norm.includes("relatorio gerencial da clara") ||
+  norm.includes("relatório gerencial da clara") ||
+  norm.includes("relatorio gerencial") ||
+  norm.includes("relatório gerencial")
 ) {
-  return "HTML:" +
-    "<div style='margin-top:10px;'>" +
-      "<p>Para uma visão completa (gráficos, filtros e detalhamentos), acesse o relatório gerencial da Clara:</p>" +
-      "<button type='button' " +
-        "onclick=\"window.open('" + LOOKER_RELATORIO_URL + "', '_blank')\" " +
-        "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
-               "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
-        "Abrir relatório gerencial (Looker Studio)" +
-      "</button>" +
-    "</div>";
+  // 1) Envia o relatório incorporado (iframe)
+  renderBotMessage("HTML:" + htmlRelatorioGerencial);
+
+  return;
 }
-  
 
     // Uso responsável do limite do cartão Clara
   if (
@@ -5748,6 +6164,7 @@ if (
   // 🆕 TODAS AS LOJAS DO TIME XXXXX
 if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
   const detTodasLojasDoTime = detectarListarTodasLojasDoTime(msgUsuario, norm);
+  
   if (detTodasLojasDoTime) {
     const grupo = detTodasLojasDoTime.grupo;
     const p = detTodasLojasDoTime.periodo;
@@ -5803,6 +6220,71 @@ if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
     return null;
   }
 }
+
+  // 🆕 LOJAS / LOJA COM MAIS PENDÊNCIAS (por time)
+  if (
+    (norm.includes("loja com mais pendenc") ||
+     norm.includes("lojas com mais pendenc"))
+  ) {
+    // Período (reaproveita o mesmo engine)
+    const p = extrairIntervaloDatas(msgUsuario);
+    const dataInicioIso = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimIso    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    // Tenta extrair o time da própria frase
+    const grupo = extrairGrupo(msgUsuario, norm);
+
+    if (!grupo) {
+      return "HTML:<p class='text-sm text-slate-700'>" +
+        "Para eu listar as <b>lojas com mais pendências</b>, preciso saber de <b>qual time</b>." +
+        "<br>Exemplo de pergunta completa: " +
+        "<i>Lojas com mais pendências do time XYZ neste mês / na última semana, nessa semana etc</i>." +
+        "</p>";
+    }
+
+    vektorMostrarPendenciasLojasDoTime(grupo, dataInicioIso, dataFimIso);
+    return null;
+  }
+
+    // TODAS AS PENDÊNCIAS DO TIME XXXXX  → consolidação por loja daquele time
+  
+    if (
+  (
+    norm.includes("todas as pendenc") && norm.includes("do time")
+  ) ||
+  (
+    norm.includes("pendenc") && norm.includes("do time")
+  )
+) {
+    const p = extrairIntervaloDatas(msgUsuario);
+    const dataInicioIso = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimIso    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    const grupo = extrairGrupo(msgUsuario, norm);
+
+    if (!grupo) {
+      return "HTML:<p class='text-sm text-slate-700'>" +
+        "Para listar <b>todas as pendências de um time</b>, preciso que você informe o nome completo do time na frase." +
+        "<br>Exemplo: <i>Todas as pendências do time Lobos SP neste mês</i>." +
+        "</p>";
+    }
+
+    vektorMostrarPendenciasLojasDoTime(grupo, dataInicioIso, dataFimIso);
+    return null;
+  }
+
+  // TODAS AS PENDÊNCIAS POR TIME  → consolidação por time (todas as equipes)
+  if (
+    (norm.includes("todas as pendenc") && norm.includes("por time")) ||
+    norm.includes("time com mais pendenc")
+  ) {
+    const p = extrairIntervaloDatas(msgUsuario);
+    const dataInicioIso = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
+    const dataFimIso    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    vektorMostrarPendenciasPorTimeTodos(dataInicioIso, dataFimIso);
+    return null;
+  }
 
   // Gatilho pendências (quando não há fluxo pendências em aberto)
 
@@ -7075,7 +7557,30 @@ Sem problemas, vamos falar de outro assunto então. 😉
           norm.includes("limite") ||
           norm.includes("estacionamento") ||
           norm.includes("posso comprar") ||
-          norm.includes("pode comprar");
+          norm.includes("pode comprar") ||
+          // 🔹 perguntas sobre ETIQUETA também são assunto da Clara
+          norm.includes("etiqueta") ||
+          norm.includes("etiquetas") ||
+          // 🔹 tudo que menciona gerente/gestor é claramente assunto de Clara
+          norm.includes("gerente") ||
+          norm.includes("gerentes") ||
+          norm.includes("gestor") ||
+          norm.includes("gestora") ||
+
+            // 🔹 menção direta a loja/unidade (no contexto desse bot faz sentido tratar como Clara)
+          norm.includes("loja")     ||
+          norm.includes("unidade")  ||
+
+          // 🔹 tudo que menciona ServiceNow/procedimento de chamado
+          norm.includes("servicenow") ||
+          norm.includes("service now") ||
+          norm.includes("chamado") ||
+          norm.includes("chamados") ||
+          norm.includes("ticket") ||
+          norm.includes("solicitacao") ||
+          norm.includes("solicitação") ||
+          norm.includes("procedimento") ||
+          norm.includes("procedimentos");
 
         if (!falaDeCartaoOuFatura) {
           const perguntaClara = gerarPerguntaDeClarificacao(norm);
@@ -7349,6 +7854,34 @@ if (m) {
 }
 
     return null;
+}
+
+// Formata "2025-04-10T..." -> "abr/25"
+function vektorFormatarMesAnoCurto(isoStr) {
+  if (!isoStr) return "";
+  var d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "";
+
+  var meses = ["jan", "fev", "mar", "abr", "mai", "jun",
+               "jul", "ago", "set", "out", "nov", "dez"];
+  var mes = meses[d.getMonth()];
+  var ano = d.getFullYear().toString().slice(-2);
+
+  return mes + "/" + ano;
+}
+
+// Monta a frase "Trazendo dados de abr/25 à nov/25."
+function vektorFraseResumoPeriodo(dataInicioIso, dataFimIso) {
+  if (!dataInicioIso || !dataFimIso) return "";
+
+  var ini = vektorFormatarMesAnoCurto(dataInicioIso);
+  var fim = vektorFormatarMesAnoCurto(dataFimIso);
+  if (!ini || !fim) return "";
+
+  if (ini === fim) {
+    return "Trazendo dados de " + ini + ".";
+  }
+  return "Trazendo dados de " + ini + " à " + fim + ".";
 }
 
 // ===== Cache de período para drill-down: "mesmo período da pergunta anterior" =====
@@ -8372,6 +8905,93 @@ function vektorGerarInsightsResumoEstabelecimentos(itens) {
   return html;
 }
 
+function vektorGerarInsightsPendenciasLojas(linhas) {
+  if (!Array.isArray(linhas) || !linhas.length) return "";
+
+  // mapeia só o que precisamos
+  var lista = linhas
+    .map(function (l) {
+      return {
+        nome: l.loja || l.nome || "Loja sem nome",
+        valorPend: Number(l.valorPendente || 0),
+        perc: Number(l.percPendente || 0),
+        qtd: Number(l.totalPendencias || 0)
+      };
+    })
+    .filter(function (x) {
+      return x.valorPend > 0 || x.qtd > 0;
+    });
+
+  if (!lista.length) return "";
+
+  // ordena por valor pendente
+  lista.sort(function (a, b) {
+    if (b.valorPend !== a.valorPend) return b.valorPend - a.valorPend;
+    return b.qtd - a.qtd;
+  });
+
+  var totalPend = lista.reduce(function (acc, x) {
+    return acc + x.valorPend;
+  }, 0);
+
+  var top1 = lista[0];
+  var top2 = lista[1] || null;
+
+  var comentarios = [];
+
+  // Loja campeã de pendências
+  var percTop1 = totalPend > 0 ? (top1.valorPend / totalPend) * 100 : 0;
+  comentarios.push(
+    "A loja <b>" + top1.nome +
+    "</b> concentra o maior volume de <b>valor pendente</b>, com cerca de <b>" +
+    percTop1.toFixed(1).replace(".", ",") + "%</b> do total em pendências."
+  );
+
+  // Segunda loja (se existir)
+  if (top2) {
+    var percTop2 = totalPend > 0 ? (top2.valorPend / totalPend) * 100 : 0;
+    comentarios.push(
+      "Em seguida vem a loja <b>" + top2.nome +
+      "</b>, com aproximadamente <b>" +
+      percTop2.toFixed(1).replace(".", ",") +
+      "%</b> do valor total pendente."
+    );
+  }
+
+  // Loja com maior % de pendência sobre o próprio volume
+  var listaComPerc = lista
+    .filter(function (x) { return x.perc > 0; })
+    .slice()
+    .sort(function (a, b) {
+      return b.perc - a.perc;
+    });
+
+  if (listaComPerc.length) {
+    var campeaPerc = listaComPerc[0];
+    comentarios.push(
+      "A loja <b>" + campeaPerc.nome +
+      "</b> apresenta a maior proporção de valor pendente em relação ao que transacionou no período (" +
+      campeaPerc.perc.toFixed(1).replace(".", ",") + "%)."
+    );
+  }
+
+  if (!comentarios.length) return "";
+
+  var html =
+    "<div style='margin-top:8px;font-size:12px;color:#0F172A;" +
+           "background:#F8FAFC;border-radius:4px;padding:6px;" +
+           "border:1px solid #E2E8F0;'>" +
+      "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre pendências por loja:</b></p>" +
+      "<ul style='margin:0;padding-left:16px;'>" +
+        comentarios.map(function (c) {
+          return "<li>" + c + "</li>";
+        }).join("") +
+      "</ul>" +
+    "</div>";
+
+  return html;
+}
+
 // Drilldown: ao clicar numa fatura, detalha por TIME
 window.vektorDrillTimesFatura = function (tr) {
   try {
@@ -8693,6 +9313,15 @@ window.vektorVerificarJustificativasLojas = function (btn) {
     vektorChamarPendJustLojas_('justificativas');
 };
 
+// Botão genérico para expandir a tabela de pendências consolidadas
+window.vektorDrilldownPendenciasDetalhadas = function () {
+  try {
+    vektorChamarPendJustLojas_('pendencias');
+  } catch (e) {
+    console.warn("Erro ao abrir drilldown de pendências:", e);
+  }
+};
+
 
 // RESUMO POR TIME INICIO //
 
@@ -8890,6 +9519,484 @@ if (temFiltroTimes) {
   ].join("");
 
   renderBotMessage("HTML:" + html);
+}
+
+function vektorRenderTabelaPendenciasPorLoja(resumo, dataInicioIso, dataFimIso) {
+  var linhas = (resumo && resumo.linhas) || [];
+  var totais = (resumo && resumo.totais) || {};
+  var grupo  = resumo && (resumo.grupoOriginal || resumo.grupo) || "";
+
+  // Guarda contexto para o drilldown
+  window.__vektorUltimoPeriodoIso = {
+    inicio: dataInicioIso || "",
+    fim:    dataFimIso    || ""
+  };
+  window.__vektorUltimoGrupoBaseClara = grupo || "";
+  window.__vektorUltimasLojasTabela = linhas.map(function (l) {
+    return (l.loja || "").toString();
+  });
+
+  var linhasHtml = [];
+
+    // Frase principal
+  var fraseResumo = "Tabela consolidada de pendências por loja" +
+    (grupo ? " do time <b>" + grupo + "</b>" : "") +
+    ".";
+  linhasHtml.push("<p>" + fraseResumo + "</p>");
+
+  // Garante período: usa parâmetros se existirem,
+  // senão usa o que estiver salvo no contexto global.
+  var iniIso = dataInicioIso ||
+    (window.__vektorUltimoPeriodoIso && window.__vektorUltimoPeriodoIso.inicio) ||
+    "";
+  var fimIso = dataFimIso ||
+    (window.__vektorUltimoPeriodoIso && window.__vektorUltimoPeriodoIso.fim) ||
+    "";
+
+  var frasePeriodo = vektorFraseResumoPeriodo(iniIso, fimIso);
+  if (frasePeriodo) {
+    linhasHtml.push(
+      "<p style='margin-top:2px;font-size:11px;color:#475569;'>" +
+      frasePeriodo +
+      "</p>"
+    );
+  }
+
+  // linha em branco
+  linhasHtml.push("<div style='height:8px;'></div>");
+
+  // Botão centralizado de drilldown (usa fluxo padrão de pendências)
+  linhasHtml.push(
+    "<div style='text-align:center;margin-bottom:8px;'>" +
+      "<button type='button' " +
+        "onclick=\"vektorVerificarPendenciasLojas()\" " +
+        "style='background:#0F172A;color:#fff;border:none;padding:6px 12px;" +
+               "border-radius:4px;font-size:12px;cursor:pointer;'>" +
+        "🔍 Ver detalhamento das transações pendentes" +
+      "</button>" +
+    "</div>"
+  );
+
+  // Espaço entre botão e tabela
+  linhasHtml.push("<div style='height:8px;'></div>");
+
+  // Tabela
+  linhasHtml.push("<div style='overflow-x:auto;'>");
+  linhasHtml.push("<table style='border-collapse:collapse;width:100%;font-size:12px;'>");
+
+  linhasHtml.push(
+    "<thead><tr>" +
+      // 4 primeiras colunas: verde claro
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#B5FF20;color:#000;'>Loja</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#B5FF20;color:#000;'>Qtd Transações Pendentes</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#B5FF20;color:#000;'>Valor Total Pendente (R$)</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#B5FF20;color:#000;'>% do Valor Pendente</th>" +
+      // 3 colunas de tipo de pendência: vermelho claro
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#FFB3B3;color:#000;'>Pendências: Etiqueta</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#FFB3B3;color:#000;'>Pendências: Descrição</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#FFB3B3;color:#000;'>Pendências: Nota fiscal/Recibo</th>" +
+    "</tr></thead><tbody>"
+  );
+
+  var totalValPend = 0;
+  var totalValTrans = 0;
+
+  linhas.forEach(function (l) {
+    var loja          = l.loja || "";
+    var qtdPend       = Number(l.totalPendencias || 0);
+    var valorPend     = Number(l.valorPendente || 0);
+    var percPend      = Number(l.percPendente || 0);
+    var pendEtiq      = Number(l.pendEtiqueta || 0);
+    var pendDesc      = Number(l.pendDescricao || 0);
+    var pendRec       = Number(l.pendRecibo || 0);
+
+    totalValPend  += valorPend;
+    totalValTrans += Number(l.valorTransacionado || 0);
+
+    linhasHtml.push(
+      "<tr>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + loja + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + qtdPend + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" +
+          valorPend.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" +
+          (percPend > 0 ? percPend.toFixed(1).replace(".", ",") + "%" : "—") +
+        "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + pendEtiq + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + pendDesc + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + pendRec + "</td>" +
+      "</tr>"
+    );
+  });
+
+  var totQtdPend   = Number(totais.totalPendencias || 0);
+  var totValorPend = Number(totais.valorPendente || 0);
+  var totEtiq      = Number(totais.pendEtiqueta || 0);
+  var totDesc      = Number(totais.pendDescricao || 0);
+  var totRec       = Number(totais.pendRecibo || 0);
+  var totValTrans  = Number(totais.valorTransacionado || 0);
+
+  var percGeral = 0;
+  if (totValTrans > 0 && totValorPend > 0) {
+    percGeral = (totValorPend / totValTrans) * 100;
+  }
+
+  linhasHtml.push(
+    "<tr style='font-weight:bold;background:#F1F5F9;'>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>TOTAL</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + totQtdPend + "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" +
+        totValorPend.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" +
+        (percGeral > 0 ? percGeral.toFixed(1).replace(".", ",") + "%" : "—") +
+      "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + totEtiq + "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + totDesc + "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + totRec + "</td>" +
+    "</tr>"
+  );
+
+  linhasHtml.push("</tbody></table></div>");
+
+  var tabelaHtml = linhasHtml.join("");
+  var insightsHtml = vektorGerarInsightsPendenciasLojas(linhas);
+
+  var botoesHtml = "";
+  if (tabelaHtml) {
+    botoesHtml =
+      "<div style='margin-top:8px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;'>" +
+        "<button type='button' " +
+          "onclick=\"exportTableToCSV(this, 'pendencias_por_loja')\" " +
+          "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "⬇ Exportar CSV" +
+        "</button>" +
+      "</div>";
+  }
+
+  var html =
+    "<div class='text-sm text-slate-700'>" +
+      tabelaHtml +
+      (insightsHtml || "") +
+      botoesHtml +
+    "</div>";
+
+  return html;
+}
+
+// Chamada ao Apps Script
+function vektorMostrarPendenciasLojasDoTime(grupo, dataInicioIso, dataFimIso) {
+  // Se não veio período explícito, usamos últimos 30 dias
+  var inicio = dataInicioIso;
+  var fim = dataFimIso;
+
+  if (!inicio || !fim) {
+    var hoje = new Date();
+    var fimDate = hoje;
+    var iniDate = new Date();
+    iniDate.setDate(hoje.getDate() - 30);
+
+    inicio = iniDate.toISOString();
+    fim = fimDate.toISOString();
+  }
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Vou montar a tabela de <b>pendências por loja</b> do time <b>" +
+    (grupo || "") + "</b> no período informado...</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.ok) {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui consolidar as pendências por loja na BaseClara.</p>"
+        );
+        return;
+      }
+
+      var htmlTabela = vektorRenderTabelaPendenciasPorLoja(res, inicio, fim);
+      renderBotMessage("HTML:" + htmlTabela);
+    })
+    .withFailureHandler(function (err) {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Tive um erro ao consultar as pendências por loja na BaseClara.</p>"
+      );
+      console.error(err);
+    })
+    .getResumoPendenciasPorLoja(
+      grupo || "",
+      inicio || "",
+      fim || ""
+    );
+}
+
+function vektorGerarInsightsPendenciasTimes(linhas) {
+  if (!Array.isArray(linhas) || !linhas.length) return "";
+
+  var lista = linhas
+    .map(function (t) {
+      return {
+        nome: t.time || t.grupo || "Time sem nome",
+        valorPend: Number(t.valorPendente || 0),
+        perc: Number(t.percPendente || 0),
+        qtd: Number(t.totalPendencias || 0)
+      };
+    })
+    .filter(function (x) {
+      return x.valorPend > 0 || x.qtd > 0;
+    });
+
+  if (!lista.length) return "";
+
+  lista.sort(function (a, b) {
+    if (b.valorPend !== a.valorPend) return b.valorPend - a.valorPend;
+    return b.qtd - a.qtd;
+  });
+
+  var totalPend = lista.reduce(function (acc, x) { return acc + x.valorPend; }, 0);
+
+  var top1 = lista[0];
+  var top2 = lista[1] || null;
+
+  var comentarios = [];
+
+  var percTop1 = totalPend > 0 ? (top1.valorPend / totalPend) * 100 : 0;
+  comentarios.push(
+    "O time <b>" + top1.nome +
+    "</b> concentra o maior valor em pendências, com cerca de <b>" +
+    percTop1.toFixed(1).replace(".", ",") + "%</b> do total pendente."
+  );
+
+  if (top2) {
+    var percTop2 = totalPend > 0 ? (top2.valorPend / totalPend) * 100 : 0;
+    comentarios.push(
+      "Na sequência, o time <b>" + top2.nome +
+      "</b> responde por aproximadamente <b>" +
+      percTop2.toFixed(1).replace(".", ",") +
+      "%</b> do valor pendente."
+    );
+  }
+
+  var listaComPerc = lista
+    .filter(function (x) { return x.perc > 0; })
+    .slice()
+    .sort(function (a, b) { return b.perc - a.perc; });
+
+  if (listaComPerc.length) {
+    var campeaoPerc = listaComPerc[0];
+    comentarios.push(
+      "O time <b>" + campeaoPerc.nome +
+      "</b> tem a maior proporção de valor pendente sobre o que transacionou no período<b> (" +
+      campeaoPerc.perc.toFixed(1).replace(".", ",") + "%)</b>."
+    );
+  }
+
+  if (!comentarios.length) return "";
+
+  var html =
+    "<div style='margin-top:8px;font-size:12px;color:#0F172A;" +
+           "background:#F8FAFC;border-radius:4px;padding:6px;" +
+           "border:1px solid #E2E8F0;'>" +
+      "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre pendências por time:</b></p>" +
+      "<ul style='margin:0;padding-left:16px;'>" +
+        comentarios.map(function (c) { return "<li>" + c + "</li>"; }).join("") +
+      "</ul>" +
+    "</div>";
+
+  return html;
+}
+
+function vektorRenderTabelaPendenciasPorTime(resumo, dataInicioIso, dataFimIso) {
+  var linhas = (resumo && resumo.linhas) || [];
+  var totais = (resumo && resumo.totais) || {};
+
+  window.__vektorUltimoPeriodoIso = {
+    inicio: dataInicioIso || "",
+    fim:    dataFimIso    || ""
+  };
+  window.__vektorUltimoGrupoBaseClara = "";
+  window.__vektorUltimasLojasTabela = [];
+
+  var linhasHtml = [];
+
+  // Frase principal
+  linhasHtml.push("<p>Tabela consolidada de pendências por time.</p>");
+
+  // Período: parâmetros (se existirem) OU contexto global
+  var iniIso = dataInicioIso ||
+    (window.__vektorUltimoPeriodoIso && window.__vektorUltimoPeriodoIso.inicio) ||
+    "";
+  var fimIso = dataFimIso ||
+    (window.__vektorUltimoPeriodoIso && window.__vektorUltimoPeriodoIso.fim) ||
+    "";
+
+  var frasePeriodo = vektorFraseResumoPeriodo(iniIso, fimIso);
+  if (frasePeriodo) {
+    linhasHtml.push(
+      "<p style='margin-top:2px;font-size:11px;color:#475569;'>" +
+      frasePeriodo +
+      "</p>"
+    );
+  }
+
+  linhasHtml.push("<div style='height:8px;'></div>");
+
+  // Botão de drilldown (usa fluxo padrão de pendências)
+  linhasHtml.push(
+    "<div style='text-align:center;margin-bottom:8px;'>" +
+      "<button type='button' " +
+        "onclick=\"vektorVerificarPendenciasLojas()\" " +
+        "style='background:#0F172A;color:#fff;border:none;padding:6px 12px;" +
+               "border-radius:4px;font-size:12px;cursor:pointer;'>" +
+        "🔍 Ver detalhamento das transações pendentes" +
+      "</button>" +
+    "</div>"
+  );
+
+  linhasHtml.push("<div style='height:8px;'></div>");
+
+  linhasHtml.push("<div style='overflow-x:auto;'>");
+  linhasHtml.push("<table style='border-collapse:collapse;width:100%;font-size:12px;'>");
+
+  linhasHtml.push(
+    "<thead><tr>" +
+      // colunas "gerais" em verde
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#B5FF20;color:#000;'>Time</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#B5FF20;color:#000;'>Qtd Transações Pendentes</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#B5FF20;color:#000;'>Valor Total Pendente (R$)</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#B5FF20;color:#000;'>% do Valor Pendente</th>" +
+      // colunas de tipos em vermelho claro
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#FFB3B3;color:#000;'>Pendências: Etiqueta</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#FFB3B3;color:#000;'>Pendências: Descrição</th>" +
+      "<th style='border:1px solid #000;padding:4px;text-align:center;background:#FFB3B3;color:#000;'>Pendências: Nota fiscal/Recibo</th>" +
+    "</tr></thead><tbody>"
+  );
+
+  linhas.forEach(function (t) {
+    var nome         = t.time || t.grupo || "";
+    var qtdPend      = Number(t.totalPendencias || 0);
+    var valorPend    = Number(t.valorPendente || 0);
+    var percPend     = Number(t.percPendente || 0);
+    var pendEtiq     = Number(t.pendEtiqueta || 0);
+    var pendDesc     = Number(t.pendDescricao || 0);
+    var pendRec      = Number(t.pendRecibo || 0);
+
+    linhasHtml.push(
+      "<tr>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + nome + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + qtdPend + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" +
+          valorPend.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" +
+          (percPend > 0 ? percPend.toFixed(1).replace(".", ",") + "%" : "—") +
+        "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + pendEtiq + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + pendDesc + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + pendRec + "</td>" +
+      "</tr>"
+    );
+  });
+
+  var totQtdPend   = Number(totais.totalPendencias || 0);
+  var totValorPend = Number(totais.valorPendente || 0);
+  var totEtiq      = Number(totais.pendEtiqueta || 0);
+  var totDesc      = Number(totais.pendDescricao || 0);
+  var totRec       = Number(totais.pendRecibo || 0);
+  var totValTrans  = Number(totais.valorTransacionado || 0);
+
+  var percGeral = 0;
+  if (totValTrans > 0 && totValorPend > 0) {
+    percGeral = (totValorPend / totValTrans) * 100;
+  }
+
+  linhasHtml.push(
+    "<tr style='font-weight:bold;background:#F1F5F9;'>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>TOTAL</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + totQtdPend + "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" +
+        totValorPend.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" +
+        (percGeral > 0 ? percGeral.toFixed(1).replace(".", ",") + "%" : "—") +
+      "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + totEtiq + "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + totDesc + "</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + totRec + "</td>" +
+    "</tr>"
+  );
+
+  linhasHtml.push("</tbody></table></div>");
+
+  var tabelaHtml = linhasHtml.join("");
+  var insightsHtml = vektorGerarInsightsPendenciasTimes(linhas);
+
+  var botoesHtml = "";
+  if (tabelaHtml) {
+    botoesHtml =
+      "<div style='margin-top:8px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;'>" +
+        "<button type='button' " +
+          "onclick=\"exportTableToCSV(this, 'pendencias_por_time')\" " +
+          "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+                 "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "⬇ Exportar CSV" +
+        "</button>" +
+      "</div>";
+  }
+
+  var html =
+    "<div class='text-sm text-slate-700'>" +
+      tabelaHtml +
+      (insightsHtml || "") +
+      botoesHtml +
+    "</div>";
+
+  return html;
+}
+
+function vektorMostrarPendenciasPorTimeTodos(dataInicioIso, dataFimIso) {
+  var inicio = dataInicioIso;
+  var fim = dataFimIso;
+
+  if (!inicio || !fim) {
+    var hoje = new Date();
+    var fimDate = hoje;
+    var iniDate = new Date();
+    iniDate.setDate(hoje.getDate() - 30);
+
+    inicio = iniDate.toISOString();
+    fim = fimDate.toISOString();
+  }
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Vou montar a tabela de <b>pendências por time</b> para o período informado...</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.ok) {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui consolidar as pendências por time na BaseClara.</p>"
+        );
+        return;
+      }
+
+      var htmlTabela = vektorRenderTabelaPendenciasPorTime(res, inicio, fim);
+      renderBotMessage("HTML:" + htmlTabela);
+    })
+    .withFailureHandler(function (err) {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Tive um erro ao consultar as pendências por time na BaseClara.</p>"
+      );
+      console.error(err);
+    })
+    .getResumoPendenciasPorTime(
+      inicio || "",
+      fim || "",
+      "" // todos os times
+    );
 }
 
 // 🔽 Drilldown da fatura para TIMES, respeitando o período da fatura
