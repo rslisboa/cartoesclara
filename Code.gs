@@ -40,6 +40,17 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+// ✅ ID da planilha de métricas do Vektor
+// (a planilha que você mandou)
+const VEKTOR_METRICAS_SHEET_ID = '18yAuYoAR33JOagqapxgwHh86F1WeD0mZcj9AIJym07k';
+
+// ✅ Nome da aba onde os logs serão gravados
+const VEKTOR_METRICAS_TAB_NAME = 'Vektor_Metricas';
+
+// ✅ Pasta onde serão salvos os Termos de Responsabilidade
+// (ID da pasta que você mandou no link)
+const VEKTOR_PASTA_TERMOS_ID = '1Qj1oXoBxKnkGUA9hKoaF6Ak_9m7bb4wD';
+
 
 // 🌐 BigQuery – validação de loja
 const PROJECT_ID = 'cnto-data-lake';
@@ -1099,6 +1110,379 @@ function getPendenciasEJustificativasPorLojas(
       ok: false,
       error: e && e.message ? e.message : e
     };
+  }
+}
+
+/**
+ * Resumo de pendências POR LOJA, dentro de um grupo/time (opcional).
+ *
+ * Saída:
+ * {
+ *   ok: true,
+ *   grupoOriginal: "...",
+ *   linhas: [
+ *     {
+ *       loja: "123",
+ *       totalTransacoes: 10,
+ *       valorTransacionado: 2000.00,
+ *       totalPendencias: 3,
+ *       valorPendente: 500.00,
+ *       percPendente: 25.0,
+ *       pendEtiqueta: 2,
+ *       pendDescricao: 1,
+ *       pendRecibo: 3
+ *     },
+ *     ...
+ *   ],
+ *   totais: {
+ *     totalTransacoes: ...,
+ *     valorTransacionado: ...,
+ *     totalPendencias: ...,
+ *     valorPendente: ...,
+ *     pendEtiqueta: ...,
+ *     pendDescricao: ...,
+ *     pendRecibo: ...
+ *   }
+ * }
+ */
+
+function getResumoPendenciasPorLoja(grupo, dataInicioStr, dataFimStr) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    var IDX_DATA  = 0;   // "Data da Transação"
+    var IDX_VALOR = 5;   // "Valor em R$"
+    var IDX_GRUPO = 17;  // "Grupos"
+    var IDX_LOJA  = 21;  // "LojaNum"
+
+    var idxRecibo = encontrarIndiceColuna_(header, ["Recibo", "NF / Recibo", "NF/Recibo"]);
+    var idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    var idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao", "Comentário"]);
+
+    if (idxRecibo < 0 || idxEtiqueta < 0 || idxDescricao < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas de Recibo/Etiquetas/Descrição na BaseClara."
+      };
+    }
+
+    var grupoOriginal = (grupo || "").toString().trim();
+    var grupoNorm = normalizarTexto_(grupoOriginal);
+
+    var filtradas = filtrarLinhasPorPeriodo_(
+      linhas,
+      IDX_DATA,
+      dataInicioStr,
+      dataFimStr
+    );
+
+    var mapa = {}; // key = loja
+
+    filtradas.forEach(function (row) {
+      var loja = (row[IDX_LOJA] || "").toString().trim();
+      if (!loja) return;
+
+      var grupoLinhaOriginal = (row[IDX_GRUPO] || "").toString();
+      var grupoLinhaNorm = normalizarTexto_(grupoLinhaOriginal);
+
+      if (grupoNorm) {
+        var casaGrupo =
+          grupoLinhaNorm.indexOf(grupoNorm) !== -1 ||
+          grupoNorm.indexOf(grupoLinhaNorm) !== -1;
+        if (!casaGrupo) return;
+      }
+
+      var valor = Number(row[IDX_VALOR]) || 0;
+
+      var etiqueta  = (row[idxEtiqueta]  || "").toString().trim();
+      var descricao = (row[idxDescricao] || "").toString().trim();
+      var recibo    = (row[idxRecibo]    || "").toString().trim();
+
+      var reciboNorm = normalizarTexto_(recibo);
+
+      var temPendenciaEtiqueta  = !etiqueta;
+      var temPendenciaDescricao = !descricao;
+      var temPendenciaRecibo =
+        !recibo || reciboNorm === "nao" || reciboNorm === "não";
+
+      var temPendencia =
+        temPendenciaEtiqueta || temPendenciaDescricao || temPendenciaRecibo;
+
+      if (!mapa[loja]) {
+        mapa[loja] = {
+          loja: loja,
+          totalTransacoes: 0,
+          valorTransacionado: 0,
+          totalPendencias: 0,
+          valorPendente: 0,
+          pendEtiqueta: 0,
+          pendDescricao: 0,
+          pendRecibo: 0
+        };
+      }
+
+      var item = mapa[loja];
+
+      // Todas as transações entram no volume total
+      item.totalTransacoes++;
+      item.valorTransacionado += valor;
+
+      if (temPendencia) {
+        // 1 transação pendente
+        item.totalPendencias++;
+        item.valorPendente += valor;
+
+        // Cada tipo é contado separado. Uma transação pode somar em mais de uma coluna.
+        if (temPendenciaEtiqueta) {
+          item.pendEtiqueta++;
+        }
+        if (temPendenciaDescricao) {
+          item.pendDescricao++;
+        }
+        if (temPendenciaRecibo) {
+          item.pendRecibo++;
+        }
+      }
+    });
+
+    var linhasSaida = [];
+    var totTrans = 0;
+    var totValTrans = 0;
+    var totPend = 0;
+    var totValPend = 0;
+    var totPEtiq = 0;
+    var totPDesc = 0;
+    var totPRec = 0;
+
+    Object.keys(mapa).forEach(function (loja) {
+      var it = mapa[loja];
+
+      totTrans    += it.totalTransacoes;
+      totValTrans += it.valorTransacionado;
+      totPend     += it.totalPendencias;
+      totValPend  += it.valorPendente;
+      totPEtiq    += it.pendEtiqueta;
+      totPDesc    += it.pendDescricao;
+      totPRec     += it.pendRecibo;
+
+      var perc = 0;
+      if (it.valorTransacionado > 0 && it.valorPendente > 0) {
+        perc = (it.valorPendente / it.valorTransacionado) * 100;
+      }
+
+      linhasSaida.push({
+        loja: it.loja,
+        totalTransacoes: it.totalTransacoes,
+        valorTransacionado: it.valorTransacionado,
+        totalPendencias: it.totalPendencias,
+        valorPendente: it.valorPendente,
+        percPendente: perc,
+        pendEtiqueta: it.pendEtiqueta,
+        pendDescricao: it.pendDescricao,
+        pendRecibo: it.pendRecibo
+      });
+    });
+
+    linhasSaida.sort(function (a, b) {
+      if (b.valorPendente !== a.valorPendente) {
+        return b.valorPendente - a.valorPendente;
+      }
+      return b.totalPendencias - a.totalPendencias;
+    });
+
+    return {
+      ok: true,
+      grupoOriginal: grupoOriginal,
+      linhas: linhasSaida,
+      totais: {
+        totalTransacoes: totTrans,
+        valorTransacionado: totValTrans,
+        totalPendencias: totPend,
+        valorPendente: totValPend,
+        pendEtiqueta: totPEtiq,
+        pendDescricao: totPDesc,
+        pendRecibo: totPRec
+      }
+    };
+
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : e };
+  }
+}
+
+/**
+ * Resumo de pendências POR TIME.
+ *
+ * Se grupoFiltro vier preenchido, filtra só aquele grupo.
+ */
+
+function getResumoPendenciasPorTime(dataInicioStr, dataFimStr, grupoFiltro) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    var IDX_DATA  = 0;
+    var IDX_VALOR = 5;
+    var IDX_GRUPO = 17;
+
+    var idxRecibo = encontrarIndiceColuna_(header, ["Recibo", "NF / Recibo", "NF/Recibo"]);
+    var idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    var idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao", "Comentário"]);
+
+    if (idxRecibo < 0 || idxEtiqueta < 0 || idxDescricao < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas de Recibo/Etiquetas/Descrição na BaseClara."
+      };
+    }
+
+    var filtradas = filtrarLinhasPorPeriodo_(
+      linhas,
+      IDX_DATA,
+      dataInicioStr,
+      dataFimStr
+    );
+
+    var grupoFiltroOriginal = (grupoFiltro || "").toString().trim();
+    var grupoFiltroNorm = normalizarTexto_(grupoFiltroOriginal);
+
+    var mapa = {}; // key = nome do time
+
+    filtradas.forEach(function (row) {
+      var grupoLinhaOriginal = (row[IDX_GRUPO] || "").toString().trim();
+      if (!grupoLinhaOriginal) return;
+
+      var grupoLinhaNorm = normalizarTexto_(grupoLinhaOriginal);
+
+      if (grupoFiltroNorm) {
+        var casaGrupo =
+          grupoLinhaNorm.indexOf(grupoFiltroNorm) !== -1 ||
+          grupoFiltroNorm.indexOf(grupoLinhaNorm) !== -1;
+        if (!casaGrupo) return;
+      }
+
+      var valor = Number(row[IDX_VALOR]) || 0;
+
+      var etiqueta  = (row[idxEtiqueta]  || "").toString().trim();
+      var descricao = (row[idxDescricao] || "").toString().trim();
+      var recibo    = (row[idxRecibo]    || "").toString().trim();
+
+      var reciboNorm = normalizarTexto_(recibo);
+
+      var temPendenciaEtiqueta  = !etiqueta;
+      var temPendenciaDescricao = !descricao;
+      var temPendenciaRecibo =
+        !recibo || reciboNorm === "nao" || reciboNorm === "não";
+
+      var temPendencia =
+        temPendenciaEtiqueta || temPendenciaDescricao || temPendenciaRecibo;
+
+      if (!mapa[grupoLinhaOriginal]) {
+        mapa[grupoLinhaOriginal] = {
+          time: grupoLinhaOriginal,
+          totalTransacoes: 0,
+          valorTransacionado: 0,
+          totalPendencias: 0,
+          valorPendente: 0,
+          pendEtiqueta: 0,
+          pendDescricao: 0,
+          pendRecibo: 0
+        };
+      }
+
+      var item = mapa[grupoLinhaOriginal];
+
+      item.totalTransacoes++;
+      item.valorTransacionado += valor;
+
+      if (temPendencia) {
+        item.totalPendencias++;
+        item.valorPendente += valor;
+
+        if (temPendenciaEtiqueta) {
+          item.pendEtiqueta++;
+        }
+        if (temPendenciaDescricao) {
+          item.pendDescricao++;
+        }
+        if (temPendenciaRecibo) {
+          item.pendRecibo++;
+        }
+      }
+    });
+
+    var linhasSaida = [];
+    var totTrans = 0;
+    var totValTrans = 0;
+    var totPend = 0;
+    var totValPend = 0;
+    var totPEtiq = 0;
+    var totPDesc = 0;
+    var totPRec = 0;
+
+    Object.keys(mapa).forEach(function (key) {
+      var it = mapa[key];
+
+      totTrans    += it.totalTransacoes;
+      totValTrans += it.valorTransacionado;
+      totPend     += it.totalPendencias;
+      totValPend  += it.valorPendente;
+      totPEtiq    += it.pendEtiqueta;
+      totPDesc    += it.pendDescricao;
+      totPRec     += it.pendRecibo;
+
+      var perc = 0;
+      if (it.valorTransacionado > 0 && it.valorPendente > 0) {
+        perc = (it.valorPendente / it.valorTransacionado) * 100;
+      }
+
+      linhasSaida.push({
+        time: it.time,
+        totalTransacoes: it.totalTransacoes,
+        valorTransacionado: it.valorTransacionado,
+        totalPendencias: it.totalPendencias,
+        valorPendente: it.valorPendente,
+        percPendente: perc,
+        pendEtiqueta: it.pendEtiqueta,
+        pendDescricao: it.pendDescricao,
+        pendRecibo: it.pendRecibo
+      });
+    });
+
+    linhasSaida.sort(function (a, b) {
+      if (b.valorPendente !== a.valorPendente) {
+        return b.valorPendente - a.valorPendente;
+      }
+      return b.totalPendencias - a.totalPendencias;
+    });
+
+    return {
+      ok: true,
+      linhas: linhasSaida,
+      totais: {
+        totalTransacoes: totTrans,
+        valorTransacionado: totValTrans,
+        totalPendencias: totPend,
+        valorPendente: totValPend,
+        pendEtiqueta: totPEtiq,
+        pendDescricao: totPDesc,
+        pendRecibo: totPRec
+      }
+    };
+
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : e };
   }
 }
 
@@ -2481,4 +2865,170 @@ function getResumoFaturasClara() {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function getVektorMetricSheet_() {
+  const ss = SpreadsheetApp.openById(VEKTOR_METRICAS_SHEET_ID);
+  let sheet = ss.getSheetByName(VEKTOR_METRICAS_TAB_NAME);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(VEKTOR_METRICAS_TAB_NAME);
+    // Cabeçalho padrão
+    sheet.appendRow([
+      'Timestamp',
+      'UsuarioNome',
+      'UsuarioEmail',
+      'Loja',
+      'Intencao',
+      'Topico',
+      'MensagemOriginal',
+      'Norm',
+      'Resultado',
+      'FuncaoOrigem'
+    ]);
+  }
+
+  return sheet;
+}
+
+/**
+ * Recebe o Termo de Responsabilidade (arquivo em base64 + dados do usuário),
+ * faz validações básicas e salva no formato original na pasta configurada.
+ *
+ * Nome final: "Aceite – Política e Termo de Responsabilidade Clara - NOME COMPLETO.ext"
+ *
+ * Após salvar, envia um e-mail para o Rodrigo com o arquivo em anexo
+ * para conferência.
+ *
+ * @param {Object} payload
+ * @return {Object} { ok: true, fileUrl: "..."} ou { ok: false, error: "..." }
+ */
+function salvarTermoResponsabilidade(payload) {
+  try {
+    if (!payload || !payload.base64) {
+      throw new Error("Arquivo não recebido.");
+    }
+
+    // --- Validação de tipo MIME (robusta) ---
+    var mimeType = (payload.mimeType || "").toLowerCase();
+
+    var isPdf  = mimeType === "application/pdf";
+    var isPng  = mimeType === "image/png";
+    var isHeic = mimeType.indexOf("heic") !== -1 || mimeType.indexOf("heif") !== -1;
+    var isJpeg = mimeType.indexOf("jpeg") !== -1 ||
+                 mimeType.indexOf("jpg")  !== -1 ||
+                 mimeType.indexOf("pjpeg")!== -1 ||
+                 mimeType.indexOf("jfif") !== -1;
+
+    if (!(isPdf || isPng || isHeic || isJpeg)) {
+      throw new Error("Tipo de arquivo não permitido. Envie somente PDF, JPG, JPEG, PNG ou HEIC.");
+    }
+
+    // --- Verificação mínima se "parece" ser o Termo (pelo nome do arquivo) ---
+    var fileNameOriginal = payload.fileNameOriginal || "arquivo_sem_nome";
+    var nomeLower = fileNameOriginal.toLowerCase();
+
+    if (!(nomeLower.indexOf("termo") !== -1 && nomeLower.indexOf("responsa") !== -1)) {
+      throw new Error(
+        "O arquivo não parece ser o Termo de Responsabilidade. " +
+        "Renomeie o arquivo incluindo as palavras 'termo' e 'responsabilidade' e envie novamente."
+      );
+    }
+
+    // --- Nome completo do usuário (já veio do chat) ---
+    var nomeCompleto = payload.usuarioNome || "";
+    if (!nomeCompleto) {
+      throw new Error("Nome completo do usuário não informado.");
+    }
+
+    // Sanitiza o nome para não quebrar o nome do arquivo
+    var nomeSanitizado = nomeCompleto.replace(/[\\/:*?\"<>|]/g, " ").trim();
+    if (!nomeSanitizado) {
+      nomeSanitizado = "Nome_indefinido";
+    }
+
+    // --- Define extensão de acordo com o tipo original ---
+    var ext = "bin";
+    if (isPdf)       ext = "pdf";
+    else if (isPng)  ext = "png";
+    else if (isHeic) ext = "heic";
+    else if (isJpeg) ext = "jpg";
+
+    var nomeFinal = "Aceite – Política e Termo de Responsabilidade Clara - " +
+                    nomeSanitizado + "." + ext;
+
+    // --- Decodifica base64 e monta o blob final NO FORMATO ORIGINAL ---
+    var bytes     = Utilities.base64Decode(payload.base64);
+    var blobFinal = Utilities.newBlob(
+      bytes,
+      payload.mimeType || "application/octet-stream",
+      nomeFinal
+    );
+
+    // --- Salva na pasta do Drive configurada ---
+    var pasta = DriveApp.getFolderById(VEKTOR_PASTA_TERMOS_ID);
+    var file  = pasta.createFile(blobFinal);
+
+    // --- Tenta enviar e-mail para conferência ---
+    try {
+      var assunto = "Validar - Termo enviado via Agent Vektor";
+
+      var corpo =
+        "Um novo Termo de Responsabilidade foi enviado via Agent Vektor.\n\n" +
+        "Nome completo: " + nomeCompleto + "\n" +
+        "E-mail do usuário: " + (payload.usuarioEmail || "") + "\n" +
+        "Loja: " + (payload.loja || "") + "\n" +
+        "Nome do arquivo salvo: " + nomeFinal + "\n\n" +
+        "Link no Drive: " + file.getUrl() + "\n\n" +
+        "Por favor, valide o conteúdo e o aceite desse termo.";
+
+      MailApp.sendEmail({
+        to: "rodrigo.lisboa@gruposbf.com.br",
+        subject: assunto,
+        body: corpo,
+        name: "Vektor Grupo SBF",
+        attachments: [file.getBlob()]
+      });
+
+    } catch (eMail) {
+      // Não quebra o fluxo do usuário se o e-mail falhar; apenas loga
+      console.error("Erro ao enviar e-mail de validação do Termo: " + eMail);
+    }
+
+    return {
+      ok: true,
+      fileId: file.getId(),
+      fileUrl: file.getUrl()
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : String(e)
+    };
+  }
+}
+
+function registrarMetricaVektor(payload) {
+  try {
+    const sheet = getVektorMetricSheet_();
+    const now = new Date();
+
+    const linha = [
+      now,
+      payload.usuarioNome   || '',
+      payload.usuarioEmail  || '',
+      payload.loja          || '',
+      payload.intencao      || '',
+      payload.topico        || '',
+      payload.mensagemOriginal || '',
+      payload.norm          || '',
+      payload.resultado     || '',
+      payload.funcaoOrigem || ""   // coluna extra
+    ];
+
+    sheet.appendRow(linha);
+  } catch (e) {
+    console.error('Erro ao registrar métrica do Vektor: ' + e);
+  }
 }
