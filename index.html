@@ -278,6 +278,12 @@
   background: #B5FF20;
 }
 
+#attachBtn {
+    background-color: transparent !important;
+    border-color: #cbd5e1 !important; /* mantém o cinza do Tailwind */
+    color: #0f172a !important;         /* mantém cor do ícone */
+}
+
 
 </style>
 
@@ -488,6 +494,7 @@
 <div id="vektor-autocomplete-box"></div>
 
 <!-- FOOTER / INPUT -->
+
 <footer class="chat-footer">
     <form id="chatForm" class="w-full">
         <div class="input-shell">
@@ -497,7 +504,31 @@
             <!-- AUTOCOMPLETE VEKTOR -->
             <div id="vektor-autocomplete-box"></div>
 
+            <!-- Botão de anexo do Termo -->
+            <button
+                type="button"
+                id="attachBtn"
+                title="Anexar"
+                class="ml-1 px-2 py-2 rounded-md border border-slate-300 text-sm flex items-center justify-center bg-transparent"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" 
+                    fill="none" viewBox="0 0 24 24" stroke-width="2" 
+                    stroke="#0f172a" class="w-6 h-6">
+                    <path stroke-linecap="round" stroke-linejoin="round" 
+                          d="M21 12.79V9a6 6 0 10-12 0v7a4 4 0 008 0v-6a2 2 0 00-4 0v5"/>
+                </svg>
+            </button>
+
+            <!-- Botão Enviar -->
             <button type="submit" id="sendBtn">Enviar</button>
+
+            <!-- Input de arquivo escondido (Termo) -->
+            <input
+                type="file"
+                id="fileTermo"
+                accept=".pdf,.jpg,.jpeg,.png,.heic,.HEIC"
+                class="hidden"
+            />
         </div>
     </form>
 </footer>
@@ -509,6 +540,11 @@
 <?!= include('politica_dados'); ?>
 
 <script>
+
+    // Estado global para o upload do Termo de Responsabilidade
+  window.vektorTermoPending = null;         // guarda o arquivo em memória até receber o nome
+  window.vektorTermoAguardandoNome = false; // indica se o próximo texto é o nome completo
+
 
   // Fecha o modal do vídeo de apresentação
 function closeVektorModal() {
@@ -667,6 +703,97 @@ setTimeout(() => {
     const chatWindow = document.getElementById("chatWindow");
     const chatForm   = document.getElementById("chatForm");
     const userInput  = document.getElementById("userInput");
+    const attachBtn = document.getElementById("attachBtn");
+    const fileInputTermo = document.getElementById("fileTermo");
+
+        // ===== Upload do Termo de Responsabilidade =====
+    if (attachBtn && fileInputTermo) {
+
+        // Garante que o input aceite apenas os formatos liberados
+        fileInputTermo.accept = ".pdf,.jpg,.jpeg,.png,.heic,.HEIC";
+
+        // Ao clicar no botão 📎, abre o seletor de arquivos
+        attachBtn.addEventListener("click", () => {
+            fileInputTermo.click();
+        });
+
+        // Quando o usuário escolhe o arquivo
+        fileInputTermo.addEventListener("change", function () {
+            const file = this.files && this.files[0];
+            if (!file) return;
+
+            // Valida tipo permitido
+            const mime = file.type || "";
+
+            // Aceita qualquer variação de JPEG e PNG, além de PDF e HEIC
+            const isPdf  = mime === "application/pdf";
+            const isPng  = mime === "image/png";
+            const isHeic = mime.includes("heic") || mime.includes("heif");
+
+            // Alguns navegadores enviam JPEG como image/jpg, image/pjpeg, image/jfif, etc.
+            const isJpeg = mime.includes("jpeg") || mime.includes("jpg") || mime.includes("pjpeg") || mime.includes("jfif");
+
+            // Verificação final
+            if (!(isPdf || isPng || isHeic || isJpeg)) {
+                renderBotMessage(
+                    "HTML:<p class='text-sm text-red-700'>Só é permitido enviar o <b>Termo de Responsabilidade</b> nos formatos PDF, JPG, JPEG, PNG ou HEIC.</p>"
+                );
+                this.value = "";
+                return;
+            }
+
+            const reader = new FileReader();
+    reader.onload = function (e) {
+        const dataUrl = e.target.result || "";
+        const base64  = dataUrl.split(",")[1];
+
+        // Guarda temporariamente o arquivo do termo
+        window.vektorTermoPending = {
+            base64:           base64,
+            mimeType:         mime,
+            fileNameOriginal: file.name,
+            usuarioEmail:     USER_EMAIL_REPLACED || ""
+        };
+        window.vektorTermoAguardandoNome = true;
+
+        // 1) Pré-visualização (quando for imagem)
+        if (mime.startsWith("image/")) {
+            renderBotMessage(
+                "HTML:" +
+                "<div class='text-sm text-slate-700'>" +
+                  "<p>Pré-visualização do Termo anexado:</p>" +
+                  "<img src='" + dataUrl + "' " +
+                        "alt='Pré-visualização do Termo' " +
+                        "class='mt-2 max-h-64 rounded border border-slate-200' />" +
+                "</div>"
+            );
+        } else {
+            // PDF ou outro formato suportado sem preview direto
+            renderBotMessage(
+                "HTML:" +
+                "<div class='text-sm text-slate-700'>" +
+                  "<p>Arquivo PDF do Termo foi anexado (pré-visualização não disponível aqui no chat).</p>" +
+                "</div>"
+            );
+        }
+
+        // 2) Mensagem pedindo o nome completo (em outra bolha)
+        setTimeout(function () {
+            renderBotMessage(
+                "HTML:" +
+                "<p class='text-sm text-slate-700'>" +
+                "Para concluir o registro, por favor informe seu <b>nome completo</b>." +
+                "</p>"
+            );
+        }, 150);
+    };
+
+    reader.readAsDataURL(file);
+
+            // limpa o input para permitir novo upload depois
+            this.value = "";
+        });
+    }
 
     // =========================
 // AUTOCOMPLETE VEKTOR
@@ -7146,7 +7273,28 @@ window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
 
         // 1) Termo de responsabilidade
         if (frasesTermo.some(f => norm.includes(f))) {
-            return respTermoResponsabilidade();
+            // Mensagem principal (já existente)
+            const msgPrincipal = respTermoResponsabilidade();
+
+            // Segunda mensagem, separada, explicando que pode enviar pelo chat
+            setTimeout(function () {
+                try {
+                    renderBotMessage(
+                        "HTML:" +
+                        "<div class='text-sm text-slate-700'>" +
+                          "<p>" +
+                            "Se você já tem o termo impresso e assinado, também pode me enviar diretamente por aqui. " +
+                            "Basta anexar o documento assinado." +
+                          "</p>" +
+                        "</div>"
+                    );
+                } catch (e) {
+                    console.warn('Erro ao enviar mensagem complementar do termo:', e);
+                }
+            }, 2000); // pequeno atraso só para aparecer como outra bolha
+
+            // Retorna a mensagem padrão para ser exibida normalmente
+            return msgPrincipal;
         }
 
         // 2) Saudações
@@ -11124,51 +11272,122 @@ function listarEtiquetasClara() {
 
     function enviarMensagem() {
 
+    // 🆕 cancela timeout de pendências ao responder
+    if (typeof pendenciasTimeoutId !== "undefined" && pendenciasTimeoutId) {
+        clearTimeout(pendenciasTimeoutId);
+        pendenciasTimeoutId = null;
+    }
 
-      // 🆕 cancela timeout de pendências ao responder
-        if (pendenciasTimeoutId) {
-            clearTimeout(pendenciasTimeoutId);
-            pendenciasTimeoutId = null;
-        }
+    // 👇 pede permissão de notificação logo na primeira interação
+    solicitarPermissaoNotificacao();
 
-      // 👇 pede permissão de notificação logo na primeira interação
-        solicitarPermissaoNotificacao();
-        const texto = userInput.value.trim();
-        if (!texto) return;
+    const texto = userInput.value.trim();
+    if (!texto) return;
 
-        renderUserMessage(texto);
-        userInput.value = "";  // limpa aqui, sempre
+    // Mostra a mensagem do usuário no chat
+    renderUserMessage(texto);
+    userInput.value = "";  // limpa aqui, sempre
 
-        // Normaliza o texto para busca de intenção
+    // 🌟 FLUXO ESPECIAL: estamos aguardando o NOME para o Termo de Responsabilidade
+    if (window.vektorTermoAguardandoNome && window.vektorTermoPending) {
+
+        const nomeCompleto = texto;
+
+        const payload = Object.assign({}, window.vektorTermoPending, {
+            usuarioNome: nomeCompleto
+        });
+
+        // Limpa o estado ANTES da chamada para evitar duplicidade
+        window.vektorTermoAguardandoNome = false;
+        window.vektorTermoPending = null;
+
+        renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Registrando o seu Termo de Responsabilidade. Aguarde...</p>"
+        );
+
+        google.script.run
+  .withSuccessHandler(function (res) {
+    if (res && res.ok) {
+      // Mensagem principal + link do Drive na mesma frase
+      renderBotMessage(
+        "HTML:" +
+        "<p class='text-sm text-slate-700'>" +
+          "Termo de Responsabilidade salvo com sucesso para <b>" + nomeCompleto + "</b>. " +
+          (res.fileUrl
+            ? "Link interno (Drive): <a href='" + res.fileUrl +
+              "' target='_blank' class='text-slate-700 underline'>Abrir Termo</a>."
+            : ""
+          ) +
+        "</p>"
+      );
+
+      // Mensagem complementar em outra bolha
+      setTimeout(function () {
+        renderBotMessage(
+          "HTML:" +
+          "<p class='text-sm text-slate-700'>" +
+            "Caso o cartão ainda esteja impossibilitado de uso devido ao não envio do Termo assinado, " +
+            "em breve ele estará ativo. Fique de olho no aplicativo da Clara." +
+          "</p>"
+        );
+      }, 3000);
+
+    } else {
+      // Caso o backend tenha retornado ok: false
+      renderBotMessage(
+        "HTML:" +
+        "<p class='text-sm text-red-700'>Não consegui salvar o termo. Motivo: " +
+        (res && res.error ? res.error : "erro desconhecido") +
+        "</p>"
+      );
+    }
+  })
+  .withFailureHandler(function (err) {
+    // Erro de comunicação Apps Script
+    renderBotMessage(
+      "HTML:" +
+      "<p class='text-sm text-red-700'>Falha na comunicação ao salvar o termo: " +
+      (err && err.message ? err.message : err) +
+      "</p>"
+    );
+  })
+  .salvarTermoResponsabilidade(payload);
+
+
+        // IMPORTANTE: não segue para o fluxo normal de pergunta/resposta
+        return;
+    }
+
+    // ===== FLUXO NORMAL DO VEKTOR (mantido como já estava) =====
+
+    // Normaliza o texto para busca de intenção
     const norm = normalize(texto || "");
     const resposta = gerarRespostaDoBot(texto);
 
-          // Se a intenção for listar etiquetas, chama a função específica e para aqui
-  if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
-    listarEtiquetasClara();
-    return;
-  }
+    // Se a intenção for listar etiquetas, chama a função específica e para aqui
+    if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
+        listarEtiquetasClara();
+        return;
+    }
 
-          if (resposta) renderBotMessage(resposta);
+    if (resposta) renderBotMessage(resposta);
 
-          // Depois de responder normalmente, avalia se faz sentido sugerir algo do Manual da Clara
-          try {
-            vektorSugerirManualAPartirDaPergunta(texto);
-          } catch (e) {
-            console.warn("Erro ao tentar sugerir Manual da Clara:", e);
-          }
+    // Depois de responder normalmente, avalia se faz sentido sugerir algo do Manual da Clara
+    try {
+        vektorSugerirManualAPartirDaPergunta(texto);
+    } catch (e) {
+        console.warn("Erro ao tentar sugerir Manual da Clara:", e);
+    }
 
-          // E também sugestões gerais (política, relatórios, pendências, etc.)
-          try {
-            vektorSugerirTopicosGerais(texto);
-          } catch (e) {
-            console.warn("Erro ao tentar sugerir tópicos gerais:", e);
-          }
+    // E também sugestões gerais (política, relatórios, pendências, etc.)
+    try {
+        vektorSugerirTopicosGerais(texto);
+    } catch (e) {
+        console.warn("Erro ao tentar sugerir tópicos gerais:", e);
+    }
 
-          userInput.value = "";
-          userInput.focus();
-          scrollToBottom();
-        }
+    userInput.focus();
+}
 
         // ====== RESPOSTA DOS BOTÕES "SIM" / "NÃO" PARA PENDÊNCIAS ======
         window.vektorResponderConfirmacaoPendencias = function (resposta) {
