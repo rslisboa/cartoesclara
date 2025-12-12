@@ -1,3 +1,16 @@
+
+function isAdminEmail(email) {
+  if (!email) return false;
+  email = email.toLowerCase();
+
+  var ADM_EMAILS = [
+    "rodrigo.lisboa@gruposbf.com.br",
+    "tainara.nascimento@gruposbf.com.br"
+  ];
+
+  return ADM_EMAILS.indexOf(email) !== -1;
+}
+
 /**
  * Serve o HTML do chat (index.html)
  */
@@ -19,11 +32,11 @@ function doGet(e) {
     nome = nomeFormatado;
   }
 
-  // Definição simples de perfil
-  var role = "Acesso padrão";
-  if (email === "rodrigo.lisboa@gruposbf.com.br") {
-    role = "Administrador";
-  }
+ var role = "Acesso padrão";
+if (isAdminEmail(email)) {
+  role = "Administrador";
+}
+
 
   var template = HtmlService
     .createTemplateFromFile('index');
@@ -1860,13 +1873,365 @@ function getResumoTransacoesPorCategoria(dataInicioStr, dataFimStr, criterio) {
       ok: true,
       criterio: criterio,
       categorias: arr,
-      top: top
+      top: top,
+      // 🔹 novo: devolve o período usado
+      dataInicioIso: dataInicioStr || "",
+      dataFimIso:    dataFimStr    || ""
     };
 
   } catch (e) {
     return {
       ok: false,
       error: e && e.message ? e.message : e
+    };
+  }
+}
+
+function getTransacoesPorCategoria(dataInicioStr, dataFimStr, categoriaNome) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Índices principais
+    var idxData = encontrarIndiceColuna_(header, [
+      "Data da Transação", "Data Transação", "Data"
+    ]);
+
+    var idxValor = encontrarIndiceColuna_(header, [
+      "Valor em R$", "Valor (R$)", "Valor"
+    ]);
+
+    var idxCategoria = encontrarIndiceColuna_(header, [
+      "Categoria da Compra", "Categoria"
+    ]);
+
+    var idxLoja = encontrarIndiceColuna_(header, [
+      "LojaNum", "Loja Num", "Loja Número", "Loja Numero", "Loja"
+    ]);
+
+    // Coluna C = "Transação" (nome do estabelecimento / texto da transação)
+    var idxTransacao = 2;
+
+    // Novos índices (tenta pelo header; se não achar, cai no índice fixo por letra)
+    var idxRecibo = encontrarIndiceColuna_(header, ["Recibo"]);
+    if (idxRecibo < 0) idxRecibo = 14; // O
+
+    var idxTitular = encontrarIndiceColuna_(header, ["Titular"]);
+    if (idxTitular < 0) idxTitular = 16; // Q
+
+    var idxGrupos = encontrarIndiceColuna_(header, ["Grupos", "Grupo", "Time"]);
+    if (idxGrupos < 0) idxGrupos = 17; // R
+
+    var idxEtiquetas = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    if (idxEtiquetas < 0) idxEtiquetas = 19; // T
+
+    var idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao"]);
+    if (idxDescricao < 0) idxDescricao = 20; // U
+
+    if (idxData < 0 || idxValor < 0 || idxCategoria < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei as colunas necessárias em BaseClara (Data / Valor / Categoria)."
+      };
+    }
+
+    // Filtra período
+    var filtradas = filtrarLinhasPorPeriodo_(
+      linhas,
+      idxData,
+      dataInicioStr,
+      dataFimStr
+    ) || [];
+
+    var categoriaAlvoNorm = normalizarTexto_(categoriaNome || "");
+
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var lista = [];
+
+    filtradas.forEach(function (row) {
+      if (!row) return;
+
+      var catOriginal = (row[idxCategoria] || "").toString().trim();
+      if (!catOriginal) catOriginal = "Sem categoria";
+      var catNorm = normalizarTexto_(catOriginal);
+
+      if (categoriaAlvoNorm && catNorm !== categoriaAlvoNorm) {
+        return;
+      }
+
+      var valor = Number(row[idxValor]) || 0;
+      if (!valor) return;
+
+      var dataCel = row[idxData];
+      var dataBr;
+      if (dataCel instanceof Date) {
+        dataBr = Utilities.formatDate(dataCel, tz, "dd/MM/yyyy");
+      } else {
+        dataBr = dataCel || "";
+      }
+
+      var loja = row[idxLoja] != null ? String(row[idxLoja]) : "";
+
+      lista.push({
+        loja: loja,
+        transacao: String(row[idxTransacao] || ""),
+        data: dataBr,
+        valor: valor,
+        // novos
+      titular: String(row[idxTitular] || ""),
+      grupos: String(row[idxGrupos] || ""),
+      recibo: String(row[idxRecibo] || ""),
+      etiquetas: String(row[idxEtiquetas] || ""),
+      descricao: String(row[idxDescricao] || "")
+      });
+    });
+
+    if (!lista.length) {
+      return {
+        ok: true,
+        categoria: categoriaNome || "",
+        linhas: [],
+        dataInicioIso: dataInicioStr || "",
+        dataFimIso: dataFimStr || "",
+        total: 0
+      };
+    }
+
+    // Ordena do maior para o menor valor
+    lista.sort(function (a, b) {
+      return b.valor - a.valor;
+    });
+
+    var total = 0;
+    for (var i = 0; i < lista.length; i++) {
+      total += Number(lista[i].valor) || 0;
+    }
+
+    return {
+      ok: true,
+      categoria: categoriaNome || "",
+      linhas: lista,
+      dataInicioIso: dataInicioStr || "",
+      dataFimIso: dataFimStr || "",
+      total: total
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: "Erro em getTransacoesPorCategoria: " + (e && e.message ? e.message : e)
+    };
+  }
+}
+
+// Remove zeros à esquerda de um código de loja, para comparar "0035" com "35"
+function removerZerosEsquerda_(codigo) {
+  if (codigo == null) return "";
+  var s = String(codigo).trim();
+  s = s.replace(/^0+/, "");
+  return s || "0";
+}
+
+// Gera um texto curto de período: "Últimos 30 dias" ou "de 01/12/2025 a 10/12/2025"
+function montarDescricaoPeriodoSimples_(iniDate, fimDate) {
+  try {
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var iniBr = Utilities.formatDate(iniDate, tz, "dd/MM/yyyy");
+    var fimBr = Utilities.formatDate(fimDate, tz, "dd/MM/yyyy");
+    return "de " + iniBr + " a " + fimBr;
+  } catch (e) {
+    return "";
+  }
+}
+
+/**
+ * Retorna as maiores transações individuais da BaseClara,
+ * filtrando por time (grupo) e/ou loja, em um período.
+ *
+ * @param {string} grupoNome      - nome do time (coluna "Grupos")
+ * @param {string} lojaCodigo     - código da loja (coluna "LojaNum")
+ * @param {string} dataInicioStr  - ISO string do início (pode vir vazio)
+ * @param {string} dataFimStr     - ISO string do fim (pode vir vazio)
+ * @param {number} topN           - quantidade de linhas desejadas (Top N)
+ */
+function getMaioresTransacoesIndividuais(grupoNome, lojaCodigo, dataInicioStr, dataFimStr, topN) {
+  try {
+    // Flag para saber se o período veio do usuário (frase) ou se é o default (últimos 30 dias)
+    var periodoFoiInformadoPeloUsuario = !!(dataInicioStr && dataFimStr);
+
+    var info = carregarLinhasBaseClara_();
+    if (!info || info.error) {
+      return { ok: false, error: info && info.error ? info.error : "Não foi possível ler a BaseClara." };
+    }
+
+    var header = info.header || [];
+    var linhas = info.linhas || [];
+
+    // Índices das colunas
+    var idxData   = encontrarIndiceColuna_(header, "Data da Transação");
+    var idxValor  = encontrarIndiceColuna_(header, "Valor em R$");
+    var idxGrupo  = encontrarIndiceColuna_(header, "Grupos");
+    var idxLoja   = encontrarIndiceColuna_(header, "LojaNum");
+    var idxStatus    = encontrarIndiceColuna_(header, "Status");
+    var idxCategoria = encontrarIndiceColuna_(header, "Categoria da Compra");
+    var idxTitular   = encontrarIndiceColuna_(header, "Titular");
+
+    // Validação das novas colunas
+    if (idxStatus < 0 || idxCategoria < 0 || idxTitular < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei Status, Categoria da Compra ou Titular na BaseClara."
+      };
+    }
+
+    // ATENÇÃO: aqui queremos a coluna C = "Transação" (nome do estabelecimento).
+    // Não podemos usar encontrarIndiceColuna_ de forma vaga,
+    // senão ele pega "Data da Transação".
+    var idxDescricaoEst = -1;
+    for (var i = 0; i < header.length; i++) {
+      var hNorm = normalizarTexto_(header[i] || "");
+      if (hNorm === "transacao") { // igualdade exata após normalização
+        idxDescricaoEst = i;
+        break;
+      }
+    }
+
+    if (idxData < 0 || idxValor < 0 || idxLoja < 0 || idxDescricaoEst < 0) {
+      return {
+        ok: false,
+        error: "Não encontrei alguma das colunas obrigatórias na BaseClara (Data da Transação, Valor em R$, LojaNum, Transação)."
+      };
+    }
+
+    // Se não vier período, usamos últimos 30 dias
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var hoje = new Date();
+    var iniDate, fimDate;
+
+    if (dataInicioStr && dataFimStr) {
+      iniDate = new Date(dataInicioStr);
+      fimDate = new Date(dataFimStr);
+    } else {
+      fimDate = hoje;
+      iniDate = new Date();
+      iniDate.setDate(hoje.getDate() - 30);
+    }
+
+    var dataInicioIso = iniDate.toISOString();
+    var dataFimIso    = fimDate.toISOString();
+
+    // Texto do período
+    var periodoDescricao;
+    if (periodoFoiInformadoPeloUsuario) {
+      periodoDescricao = montarDescricaoPeriodoSimples_(iniDate, fimDate);
+    } else {
+      periodoDescricao = "Últimos 30 dias";
+    }
+
+    // Filtra por período
+    var filtradas = filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioIso, dataFimIso) || [];
+
+    // Normalizações para filtros
+    var grupoNorm  = grupoNome ? normalizarTexto_(grupoNome) : "";
+    var lojaFiltro = lojaCodigo ? String(lojaCodigo).trim() : "";
+
+    if (lojaFiltro) {
+      // compara sempre sem zeros à esquerda
+      lojaFiltro = removerZerosEsquerda_(lojaFiltro);
+    }
+
+    var lista = [];
+
+    filtradas.forEach(function (linha) {
+      if (!linha) return;
+
+      var valor = Number(linha[idxValor]) || 0;
+      if (valor <= 0) return;
+
+      // Valores de loja da linha
+      var lojaLinha     = (linha[idxLoja] || "").toString().trim();
+      var lojaLinhaNorm = removerZerosEsquerda_(lojaLinha);
+
+      // Regra de filtro:
+      // 1) Se veio loja, ela manda: ignora grupo (filtra só por loja).
+      // 2) Só usa grupo quando NÃO houver lojaFiltro.
+      if (lojaFiltro) {
+        if (lojaLinhaNorm !== lojaFiltro) return;
+      } else if (grupoNorm) {
+        var grupoLinhaNorm = normalizarTexto_(linha[idxGrupo] || "");
+        if (grupoLinhaNorm !== grupoNorm) return;
+      }
+
+      // Data em dd/MM/yyyy
+      var dataCel = linha[idxData];
+      var dataBr;
+      if (dataCel instanceof Date) {
+        dataBr = Utilities.formatDate(dataCel, tz, "dd/MM/yyyy");
+      } else {
+        dataBr = dataCel || "";
+      }
+
+      lista.push({
+        loja: String(linha[idxLoja] || ""),
+        estabelecimento: String(linha[idxDescricaoEst] || ""),
+        data: dataBr,
+        valor: valor,
+        status: String(linha[idxStatus] || ""),
+        categoria: String(linha[idxCategoria] || ""),
+        titular: String(linha[idxTitular] || "")
+      });
+    }); // ← FALTAVA FECHAR O forEach AQUI
+
+    // Se não houve nenhuma linha após filtros
+    if (!lista.length) {
+      return {
+        ok: true,
+        linhas: [],
+        dataInicioIso: dataInicioIso,
+        dataFimIso: dataFimIso,
+        periodoDescricao: periodoDescricao,
+        grupo: grupoNome || "",
+        loja: lojaCodigo || "",
+        topN: topN || null,
+        totalSelecionadas: 0
+      };
+    }
+
+    // Ordena do maior valor para o menor
+    lista.sort(function (a, b) {
+      return b.valor - a.valor;
+    });
+
+    var limite = (typeof topN === "number" && topN > 0) ? topN : 10;
+    var selecionadas = lista.slice(0, limite);
+
+    // Soma dos valores das linhas exibidas
+    var totalSelecionadas = 0;
+    for (var j = 0; j < selecionadas.length; j++) {
+      totalSelecionadas += Number(selecionadas[j].valor) || 0;
+    }
+
+    return {
+      ok: true,
+      linhas: selecionadas,
+      dataInicioIso: dataInicioIso,
+      dataFimIso: dataFimIso,
+      periodoDescricao: periodoDescricao,
+      grupo: grupoNome || "",
+      loja: lojaCodigo || "",
+      topN: limite,
+      totalSelecionadas: totalSelecionadas
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: "Erro em getMaioresTransacoesIndividuais: " + (e && e.message ? e.message : e)
     };
   }
 }
@@ -2225,6 +2590,155 @@ function getResumoTransacoesPorCategoriaLoja(dataInicioStr, dataFimStr, criterio
   }
 }
 
+function getTransacoesIndividuaisPorEstabelecimento(dataInicioStr, dataFimStr, estabelecimento) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (!info || info.error) {
+      return { ok: false, error: info && info.error ? info.error : "Não foi possível ler a BaseClara." };
+    }
+
+    var header = info.header || [];
+    var linhas = info.linhas || [];
+
+    // Índices
+    var idxData  = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
+    var idxValor = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLoja  = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja Número", "Loja Numero", "Loja"]);
+
+    // Coluna C fixa (Transação / nome do estabelecimento) = índice 2
+    var idxTransacao = 2;
+
+    var idxRecibo = encontrarIndiceColuna_(header, ["Recibo"]);
+    if (idxRecibo < 0) idxRecibo = 14; // O
+
+    var idxTitular = encontrarIndiceColuna_(header, ["Titular"]);
+    if (idxTitular < 0) idxTitular = 16; // Q
+
+    var idxGrupos = encontrarIndiceColuna_(header, ["Grupos", "Grupo", "Time"]);
+    if (idxGrupos < 0) idxGrupos = 17; // R
+
+    var idxEtiquetas = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    if (idxEtiquetas < 0) idxEtiquetas = 19; // T
+
+    var idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao"]);
+    if (idxDescricao < 0) idxDescricao = 20; // U
+
+    if (idxData < 0 || idxValor < 0 || idxLoja < 0 || idxTransacao < 0) {
+      return { ok: false, error: "Não encontrei colunas necessárias (Data/Valor/LojaNum/Transação) na BaseClara." };
+    }
+
+    // Período default (últimos 30 dias) se vier vazio
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var hoje = new Date();
+    var iniDate, fimDate;
+
+    if (dataInicioStr && dataFimStr) {
+      iniDate = new Date(dataInicioStr);
+      fimDate = new Date(dataFimStr);
+    } else {
+      fimDate = hoje;
+      iniDate = new Date();
+      iniDate.setDate(hoje.getDate() - 30);
+    }
+
+    var dataInicioIso = iniDate.toISOString();
+    var dataFimIso    = fimDate.toISOString();
+
+    // Filtra período
+    var filtradas = filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioIso, dataFimIso) || [];
+    if (!filtradas.length) {
+      return {
+        ok: true,
+        linhas: [],
+        estabelecimento: estabelecimento || "",
+        dataInicioIso: dataInicioIso,
+        dataFimIso: dataFimIso
+      };
+    }
+
+    // Normaliza estabelecimento (como o clique vem da própria tabela, normalmente bate exato)
+    var estabNorm = normalizarTexto_((estabelecimento || "").toString().trim());
+
+    var lista = [];
+    var contPorLoja = {};
+
+    filtradas.forEach(function(row) {
+      if (!row) return;
+
+      var estabLinha = (row[idxTransacao] || "").toString().trim();
+      if (!estabLinha) return;
+
+      // match por normalização (igualdade)
+      var estabLinhaNorm = normalizarTexto_(estabLinha);
+      if (estabNorm && estabLinhaNorm !== estabNorm) return;
+
+      var valor = Number(row[idxValor]) || 0;
+
+      var loja = (row[idxLoja] || "").toString().trim();
+
+      // data BR
+      var dataCel = row[idxData];
+      var dataBr = "";
+      if (dataCel instanceof Date) {
+        dataBr = Utilities.formatDate(dataCel, tz, "dd/MM/yyyy");
+      } else {
+        dataBr = (dataCel || "").toString();
+      }
+
+      // conta por loja (para ordenação por qtd)
+      var lojaKey = loja || "—";
+      contPorLoja[lojaKey] = (contPorLoja[lojaKey] || 0) + 1;
+
+      lista.push({
+        loja: loja,
+        estabelecimento: estabLinha,
+        data: dataBr,
+        valor: valor,
+         // novos
+        titular: String(row[idxTitular] || ""),
+        grupos: String(row[idxGrupos] || ""),
+        recibo: String(row[idxRecibo] || ""),
+        etiquetas: String(row[idxEtiquetas] || ""),
+        descricao: String(row[idxDescricao] || "")
+      });
+    });
+
+    if (!lista.length) {
+      return {
+        ok: true,
+        linhas: [],
+        estabelecimento: estabelecimento || "",
+        dataInicioIso: dataInicioIso,
+        dataFimIso: dataFimIso
+      };
+    }
+
+    // Ordena por: (1) loja com mais transações, (2) valor desc, (3) data
+    lista.sort(function(a, b) {
+      var ca = contPorLoja[a.loja || "—"] || 0;
+      var cb = contPorLoja[b.loja || "—"] || 0;
+      if (cb !== ca) return cb - ca;
+
+      var va = Number(a.valor) || 0;
+      var vb = Number(b.valor) || 0;
+      if (vb !== va) return vb - va;
+
+      return (a.data || "").localeCompare(b.data || "");
+    });
+
+    return {
+      ok: true,
+      linhas: lista,
+      estabelecimento: estabelecimento || "",
+      dataInicioIso: dataInicioIso,
+      dataFimIso: dataFimIso
+    };
+
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : e };
+  }
+}
+
 /**
  * Resumo de transações por ESTABELECIMENTO (coluna "Transação" da BaseClara).
  *
@@ -2395,7 +2909,10 @@ Logger.log("VALOR TRANSACAO PRIMEIRA LINHA = " + linhas[0][idxTransacao]);
       grupoOriginal: grupoOriginal,
       lojaOriginal: lojaOriginal,
       estabelecimentos: arr,
-      top: top
+      top: top,
+      // 🔹 período usado no cálculo (vai para o front)
+      dataInicioIso: dataInicioStr || "",
+      dataFimIso:    dataFimStr    || ""
     };
 
   } catch (e) {
