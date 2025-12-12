@@ -658,7 +658,7 @@ document.addEventListener("DOMContentLoaded", () => {
 renderBotMessage(
   "HTML:" +
   "<p class='text-sm text-slate-700' style='margin-top:8px;'>" +
-    "Antes de começarmos, aqui estão alguns exemplos do que eu posso fazer por você:" +
+    "Aqui estão alguns exemplos do que eu posso fazer por você:" +
   "</p>" +
   "<ul class='text-sm text-slate-700' style='margin-left:14px;margin-top:4px;line-height:1.45;'>" +
     "<li>• Consultar <b>pendências</b> e <b>justificativas</b> das lojas.</li>" +
@@ -687,6 +687,18 @@ setTimeout(() => {
         );
     }
 }, 2000);
+
+setTimeout(function () {
+  try {
+    vektorPerguntarInformacoesIniciais();
+  } catch (e) {
+    console.error("Erro ao disparar pergunta de info iniciais:", e);
+  }
+}, 2500);
+
+      // Variáveis vindas do Apps Script (template do doGet)
+      const USER_EMAIL_REPLACED = "<?= userEmail ?>";
+      const USER_ROLE_REPLACED  = "<?= userRole ?>";
 
     /* ========= ESTADOS ========= */
     let estadoPendencias = "nenhum"; // "nenhum" | "aguardando_loja" | "aguardando_confirmacao_email" | "aguardando_email"
@@ -808,9 +820,10 @@ const VEKTOR_INTENTS = [
   "Gerente mudou de loja",
   "Troca de gerente entre lojas",
   "Servicenow",
-  "Como abrir chamado no servinow?",
+  "Como abrir chamado no servicenow?",
   "Lojas com mais pendências",
   "Pendências do time",
+  "Pendências da loja",
   "Time com mais pendências",
   "Ver justificativas completas de uma loja",
   "Vídeo de justificativas",
@@ -818,10 +831,11 @@ const VEKTOR_INTENTS = [
   "Ver justificativas completas de um time",
   "Loja com maior valor de transações neste mês",
   "Loja com mais transações neste mês",
-  "Ranking de categorias por valor",
-  "Lista de categorias por valor",
   "Treinamento Clara",
   "Termo de responsabilidade Clara",
+  "Maiores transações do time",
+  "Maiores transações da loja",
+  "Maiores transações",
   "Valor da fatura atual",
   "Valor da fatura do mês passado",
   "Valor das últimas 3 faturas",
@@ -845,17 +859,10 @@ const VEKTOR_INTENTS = [
   "Quais lojas fazem parte de um time?",
   "Resumo de um time neste mês",
   "Resumo de um time no período",
-  "Times com maior valor de transações",
-  "Times com maior número de transações",
-  "Categoria que mais gastou no período",
-  "Categorias por loja",
-  "Categorias por time",
-  "Ranking de categorias",
-  "Gastos por categoria no período",
+  "Time com maior valor de transações",
+  "Time com maior número de transações",
+  "Categorias com maior valor de transações",
   "Estabelecimentos mais usados",
-  "Ranking de estabelecimentos por valor",
-  "Ranking de estabelecimentos por quantidade",
-  "Gastos por estabelecimento no período",
   "O que posso comprar com o cartão Clara?",
   "Tipos de compra permitidos",
   "Tipos de compra proibidos",
@@ -866,7 +873,6 @@ const VEKTOR_INTENTS = [
   "Como desbloquear o cartão Clara?",
   "Meu cartão não passou, o que pode ser?",
   "Abrir relatório gerencial da Clara",
-  "Ver dashboard no Looker Studio",
   "Como aumento o limite do cartão?",
   "Como usar bem o limite do cartão Clara?",
   "Quero gráficos das transações",
@@ -908,36 +914,40 @@ function vektorHighlightSelected() {
   });
 }
 
-// Aplica a sugestão substituindo apenas o último "bloco" digitado
 function vektorApplySuggestion(textoSugestao) {
-  const raw = vektorInput.value || "";
+  const sugestao = textoSugestao || "";
+  const atual = vektorInput.value || "";
 
-  // Se o campo está vazio ou só tem espaço -> vira apenas a sugestão
-  if (!raw.trim()) {
-    vektorInput.value = textoSugestao;
-    return;
-  }
+  // Normaliza a sugestão pra comparar com a lista de times
+  const normSug = vektorNormAutocomplete(sugestao);
 
-  // Remove espaços do fim pra achar a última palavra "inteira"
-  const base = raw.replace(/\s+$/g, "");
-  const m = base.match(/^(.*\s)(\S+)$/);
+  // É um TIME se a sugestão bater exatamente com algum VEKTOR_TIMES normalizado
+  const isTime = VEKTOR_TIMES.some(
+    (t) => vektorNormAutocomplete(t) === normSug
+  );
 
-  let novoTexto;
+  // É uma LOJA se vier no formato "0001 - NOME" (é assim que você monta lá embaixo)
+  const isLoja = /^\d{3,4}\s*-/.test(sugestao);
 
-  if (m) {
-    // m[1] = tudo até o último espaço (prefixo)
-    // m[2] = última palavra
-    const prefixo = m[1] || "";
+  // Para time/loja: NÃO apagar tudo, só trocar a última palavra digitada
+  if (isTime || isLoja) {
+    // remove espaços do fim
+    const base = atual.replace(/\s+$/g, "");
+    const m = base.match(/^(.*\s)(\S+)$/); // tudo antes + última palavra
 
-    // "loja 12 " + sugestão -> "loja " + "0012 - Nome da Loja"
-    novoTexto = prefixo + textoSugestao;
+    if (m) {
+      const antes = m[1];   // frase antes da última palavra
+      vektorInput.value = antes + sugestao; // substitui só a última palavra
+    } else {
+      // se só tinha uma palavra no campo, aí não tem muito o que fazer
+      vektorInput.value = sugestao;
+    }
   } else {
-    // Se não tem espaço (só uma palavra digitada), substitui tudo
-    // "pendencias " -> só sugestão
-    novoTexto = textoSugestao;
+    // Sugestões genéricas (intents): mantém comportamento antigo
+    vektorInput.value = sugestao;
   }
 
-  vektorInput.value = novoTexto;
+  vektorInput.focus();
 }
 
 // 4) Carregar lista de LOJAS vinda do back-end
@@ -955,7 +965,7 @@ const VEKTOR_TIMES = [
   "Esquadrão Valente",
   "Falcões SP",
   "Flechas do Norte",
-  "Furacão Sul",
+  "Furacão Sul I",
   "Ultra High",
   "Fúria do Interior",
   "Gigante Paulista",
@@ -993,15 +1003,6 @@ vektorInput.addEventListener("input", function () {
 
   // Se o campo está vazio, limpa e sai
   if (!raw.trim()) {
-    vektorBox.style.display = "none";
-    vektorCurrentSuggestions = [];
-    vektorSelectedIndex = -1;
-    return;
-  }
-
-  // 🔹 Só mostra autocomplete quando o usuário encerrou a palavra com espaço
-  // Ex.: "pendencias " -> ok; "pendencias" (sem espaço) -> não mostra
-  if (!/\s$/.test(raw)) {
     vektorBox.style.display = "none";
     vektorCurrentSuggestions = [];
     vektorSelectedIndex = -1;
@@ -1327,8 +1328,6 @@ function vektorDetectarFuncaoOrigem() {
   chatWindow.appendChild(wrapper);
 
   scrollToBottom();
-  // 👇 dispara notificação de nova mensagem do bot
-  notificarNovaMensagem(text);
 
   // ============================================================
   // 🔹 LOG CENTRALIZADO DE SAÍDA DO BOT → GOOGLE SHEETS
@@ -1627,6 +1626,214 @@ window.vektorExpandirLinha = function (tr, base) {
   }
 };
 
+window.vektorDrillTransacoesCategoria = function (nomeCategoria) {
+  try {
+    if (!nomeCategoria) return;
+
+    // Usa o último período entendido pelo Vektor
+    var periodo = window.__vektorUltimoPeriodo || null;
+    var dataInicioStr = "";
+    var dataFimStr    = "";
+
+    if (periodo && periodo.dataInicio && periodo.dataFim) {
+      dataInicioStr = periodo.dataInicio.toISOString();
+      dataFimStr    = periodo.dataFim.toISOString();
+    }
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        "Detalhando a categoria <b>" + nomeCategoria + "</b> " +
+        "pelas transações individuais no mesmo período da consulta…</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        try {
+          var html = vektorRenderTransacoesPorCategoria(res, nomeCategoria);
+          if (html) {
+            renderBotMessage("HTML:" + html);
+          } else {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>" +
+                "Não encontrei transações para essa categoria neste período." +
+              "</p>"
+            );
+          }
+        } catch (e) {
+          console.error("Erro ao renderizar transações por categoria:", e);
+          renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>" +
+              "Falha ao detalhar as transações dessa categoria." +
+            "</p>"
+          );
+        }
+      })
+      .withFailureHandler(function (err) {
+        console.error("Erro Apps Script getTransacoesPorCategoria:", err);
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>" +
+            "Não consegui consultar as transações dessa categoria agora." +
+          "</p>"
+        );
+      })
+      .getTransacoesPorCategoria(
+        dataInicioStr,
+        dataFimStr,
+        nomeCategoria
+      );
+
+  } catch (e) {
+    console.error("Erro geral em vektorDrillTransacoesCategoria:", e);
+  }
+};
+
+window.vektorDrillTransacoesEstabelecimento = function (nomeEstab) {
+  try {
+    // Pega período do cache global (mesma lógica que você já usa em categorias)
+    let dataInicioIso = "";
+    let dataFimIso = "";
+
+    if (window.__vektorUltimoPeriodo && window.__vektorUltimoPeriodo.dataInicio && window.__vektorUltimoPeriodo.dataFim) {
+      dataInicioIso = window.__vektorUltimoPeriodo.dataInicio.toISOString();
+      dataFimIso    = window.__vektorUltimoPeriodo.dataFim.toISOString();
+    } else if (window.__vektorUltimoPeriodoIso && window.__vektorUltimoPeriodoIso.inicio && window.__vektorUltimoPeriodoIso.fim) {
+      dataInicioIso = window.__vektorUltimoPeriodoIso.inicio;
+      dataFimIso    = window.__vektorUltimoPeriodoIso.fim;
+    }
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Buscando transações do estabelecimento <b>" +
+        nomeEstab +
+      "</b> por loja no mesmo período...</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        renderTransacoesEstabelecimentoPorLoja(res);
+      })
+      .withFailureHandler(function(err) {
+        console.error("Erro ao buscar transações por estabelecimento:", err);
+        renderBotMessage("HTML:<p class='text-sm text-slate-700'>Não consegui carregar as transações desse estabelecimento agora.</p>");
+      })
+      .getTransacoesIndividuaisPorEstabelecimento(dataInicioIso, dataFimIso, nomeEstab);
+
+  } catch (e) {
+    console.error("Falha em vektorDrillTransacoesEstabelecimento:", e);
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Ocorreu um erro ao tentar expandir o estabelecimento.</p>");
+  }
+}
+
+function renderTransacoesEstabelecimentoPorLoja(res) {
+  if (!res || !res.ok) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Não encontrei transações para esse estabelecimento no período.</p>"
+    );
+    return;
+  }
+
+  const linhas = res.linhas || [];
+  if (!linhas.length) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Não encontrei transações para esse estabelecimento no período.</p>"
+    );
+    return;
+  }
+
+  // período
+  let periodoHtml = "";
+  try {
+    const di = res.dataInicioIso ? new Date(res.dataInicioIso) : null;
+    const df = res.dataFimIso ? new Date(res.dataFimIso) : null;
+    if (di && df && !isNaN(di.getTime()) && !isNaN(df.getTime())) {
+      periodoHtml =
+        "<p style='font-size:11px;color:#475569;margin-top:2px;'>" +
+          "Período da consulta: de " + di.toLocaleDateString("pt-BR") +
+          " a " + df.toLocaleDateString("pt-BR") + "." +
+        "</p>";
+    }
+  } catch (e) {}
+
+  // monta tabela
+  let html = [];
+  html.push("<div class='text-sm text-slate-700'>");
+  html.push("<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>Transações por loja – " + (res.estabelecimento || "") + "</p>");
+  html.push(periodoHtml);
+
+  html.push("<div style='overflow-x:auto;'>");
+  html.push("<table style='border-collapse:collapse;width:100%;font-size:12px;text-align:center;border:1px solid #000;'>");
+
+  // ✅ Valor (R$) movido para a ÚLTIMA coluna
+  html.push(
+    "<thead><tr style='background:#06167d;color:#fff;'>" +
+      "<th style='border:1px solid #000;padding:4px;'>Loja</th>" +
+      "<th style='border:1px solid #000;padding:4px;'>Estabelecimento</th>" +
+      "<th style='border:1px solid #000;padding:4px;'>Data</th>" +
+
+      "<th style='border:1px solid #000;padding:4px;'>Titular</th>" +
+      "<th style='border:1px solid #000;padding:4px;'>Grupos</th>" +
+
+      "<th style='border:1px solid #000;padding:4px;background:#FECACA;color:#7F1D1D;font-weight:700;'>Recibo</th>" +
+      "<th style='border:1px solid #000;padding:4px;background:#FECACA;color:#7F1D1D;font-weight:700;'>Etiquetas</th>" +
+      "<th style='border:1px solid #000;padding:4px;background:#FECACA;color:#7F1D1D;font-weight:700;'>Descrição</th>" +
+
+      "<th style='border:1px solid #000;padding:4px;'>Valor (R$)</th>" +
+    "</tr></thead><tbody>"
+  );
+
+  let soma = 0;
+  for (let i = 0; i < linhas.length; i++) {
+    const l = linhas[i] || {};
+    const valor = Number(l.valor || 0);
+    soma += valor;
+
+    // ✅ Valor movido para o ÚLTIMO <td>
+    html.push(
+      "<tr>" +
+        "<td style='border:1px solid #000;padding:4px;'>" + (l.loja || "") + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;'>" + (l.estabelecimento || "") + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;'>" + (l.data || "") + "</td>" +
+
+        "<td style='border:1px solid #000;padding:4px;'>" + (l.titular || "") + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;'>" + (l.grupos || "") + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;'>" + (l.recibo || "") + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;'>" + (l.etiquetas || "") + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;'>" + (l.descricao || "") + "</td>" +
+
+        "<td style='border:1px solid #000;padding:4px;text-align:right;'>" +
+          valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+      "</tr>"
+    );
+  }
+
+  // total (colspan continua correto: 8)
+  html.push(
+    "<tr style='font-weight:bold;background:#f2f2f2;'>" +
+      "<td style='border:1px solid #000;padding:4px;' colspan='8'>TOTAL</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:right;'>" +
+        soma.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+    "</tr>"
+  );
+
+  html.push("</tbody></table></div>");
+
+  // botão CSV abaixo (igual padrão)
+  html.push(
+    "<div style='margin-top:8px;text-align:right;'>" +
+      "<button type='button' " +
+        "onclick=\"exportTableToCSV(this, 'transacoes_estabelecimento_por_loja')\" " +
+        "style='background:#005E27;color:#fff;border:none;padding:6px 10px;border-radius:4px;font-size:11px;cursor:pointer;'>" +
+        "⬇ Exportar CSV" +
+      "</button>" +
+    "</div>"
+  );
+
+  html.push("</div>");
+
+  renderBotMessage("HTML:" + html.join(""));
+}
+
     /* ========= NORMALIZAÇÃO ========= */
     function normalize(str) {
         return (str || "")
@@ -1758,7 +1965,7 @@ const TIMES_OFICIAIS = [
   "Esquadrão Valente",
   "Falcões SP",
   "Flechas do Norte",
-  "Furacão Sul",
+  "Furacão Sul I",
   "Ultra High",
   "Fúria do Interior",
   "Gigante Paulista",
@@ -2258,59 +2465,29 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
         "o que não comprar"
     ].map(normalize);
 
-
-    // Pede permissão pro navegador mostrar notificações
-            function solicitarPermissaoNotificacao() {
-              if (!("Notification" in window)) {
-                console.log("Navegador não suporta Notification API.");
-                return;
-              }
-
-              if (Notification.permission === "default") {
-                // Só pede se ainda não tiver "granted" nem "denied"
-                Notification.requestPermission().then((result) => {
-                  console.log("Permissão de notificação:", result);
-                });
-              }
-            }
-
-          // Dispara notificação quando chega mensagem nova do bot
-            function notificarNovaMensagem(text) {
-              if (!("Notification" in window)) return;
-              if (Notification.permission !== "granted") return;
-
-              let conteudo = "";
-
-              if (typeof text === "string") {
-                if (text.startsWith("HTML:")) {
-                  const semPrefixo = text.replace(/^HTML:/, "");
-                  conteudo = semPrefixo.replace(/<[^>]+>/g, " ");
-                } else {
-                  conteudo = text;
-                }
-              }
-
-              conteudo = conteudo.trim();
-              if (!conteudo) return;
-
-              if (conteudo.length > 140) {
-                conteudo = conteudo.slice(0, 137) + "...";
-              }
-
-              new Notification("Vektor - nova resposta", {
-                body: conteudo,
-                icon: ROBOT_IMG_URL
-              });
-            }
-
-
-
     /* ========= INTENÇÃO ========= */
 
     function detectarIntencaoPergunta(msgNorm) {
         // garante que msgNorm é sempre string e cria um alias "norm"
       msgNorm = msgNorm || "";
       const norm = msgNorm;
+
+      // RESPOSTAS SOBRE O QUE O VEKTOR FAZ
+if (
+    msgNorm.includes("o que voce faz") ||
+    msgNorm.includes("o que voce pode fazer") ||
+    msgNorm.includes("o que o vektor pode fazer") ||
+    msgNorm.includes("pra que serve") ||
+    msgNorm.includes("qual sua função") ||
+    msgNorm.includes("quem é você") ||
+    msgNorm.includes("quem e voce") ||
+    msgNorm.includes("qual o seu nome") ||
+    msgNorm.includes("me explique o que faz") ||
+    msgNorm.includes("sobre o que voce fala") ||
+    msgNorm.includes("sobre o que você fala")
+) {
+    return "sobreBot";
+}
 
   const foraEscopoPadroes = [
     "palmeiras","corinthians","bolsonaro","lula","eleicao","eleição",
@@ -2501,6 +2678,7 @@ if (falaServiceNow && !falaChamado) {
     msgNorm.includes("transação recusada") ||
     msgNorm.includes("compra negada") ||
     msgNorm.includes("compra recusada") ||
+    msgNorm.includes("compra foi recusada") ||
     msgNorm.includes("compra rejeitada") ||
     msgNorm.includes("compra nao passou") ||
     msgNorm.includes("compra não passou") ||
@@ -2960,99 +3138,6 @@ if (
     return "podeNaoPode";
   }
 
-  // BOT: SOBRE O QUE ELE PODE FAZER
-  if (
-    msgNorm.includes("o que voce faz") ||
-    msgNorm.includes("qual o seu nome") ||
-    msgNorm.includes("qual seu nome") ||
-    msgNorm.includes("qual é o seu nome") ||
-    msgNorm.includes("qual eh o seu nome") ||
-    msgNorm.includes("qual eh seu nome") ||
-    msgNorm.includes("como vc se chama") ||
-    msgNorm.includes("como voce se chama") ||
-    msgNorm.includes("como você se chama") ||
-    msgNorm.includes("como vc chama") ||
-    msgNorm.includes("como voce chama") ||
-    msgNorm.includes("como você chama") ||
-    msgNorm.includes("o que você faz") ||
-    msgNorm.includes("o que vc faz") ||
-    msgNorm.includes("pra que serve") ||
-    msgNorm.includes("qual sua função") ||
-    msgNorm.includes("qual é sua função") ||
-    msgNorm.includes("qual e sua função") ||
-    msgNorm.includes("qual sua funcao") ||
-    msgNorm.includes("qual é sua funcao") ||
-    msgNorm.includes("quem é você") ||
-    msgNorm.includes("quem e voce") ||
-    msgNorm.includes("quem é vc") ||
-    msgNorm.includes("qm é vc") ||
-    msgNorm.includes("qm e vc") ||
-    msgNorm.includes("qm eh vc") ||
-    msgNorm.includes("qm eh voce") ||
-    msgNorm.includes("qm eh você") ||
-    msgNorm.includes("quem e vc") ||
-    msgNorm.includes("quem é você clara") ||
-    msgNorm.includes("quem é o vektor") ||
-    msgNorm.includes("quem é você vektor") ||
-    msgNorm.includes("qual seu papel") ||
-    msgNorm.includes("como pode me ajudar") ||
-    msgNorm.includes("o que pode fazer") ||
-    msgNorm.includes("o que voce pode fazer") ||
-    msgNorm.includes("o que você pode fazer") ||
-    msgNorm.includes("sobre o que voce fala") ||
-    msgNorm.includes("sobre o que você fala") ||
-    msgNorm.includes("o que pode me orientar")||
-    msgNorm.includes("pra que fui criado") ||
-    msgNorm.includes("qual e meu proposito") ||
-    msgNorm.includes("qual é o seu proposito") ||
-    msgNorm.includes("qual eh o seu proposito") ||
-    msgNorm.includes("qual eh o seu fim") ||
-    msgNorm.includes("meu proposito") ||
-    msgNorm.includes("diga o que sabe")	||
-    msgNorm.includes("me fale sobre voce") ||
-    msgNorm.includes("me fale o que faz") ||
-    msgNorm.includes("qual a sua utilidade") ||
-    msgNorm.includes("função") ||
-    msgNorm.includes("sua função") ||
-    msgNorm.includes("utilidade") ||
-    msgNorm.includes("quais suas funcoes") ||
-    msgNorm.includes("o q c faz") ||
-    msgNorm.includes("o q faz") ||
-    msgNorm.includes("o que é isso") ||
-    msgNorm.includes("oque é isso") ||
-    msgNorm.includes("oq é isso") ||
-    msgNorm.includes("oq eh isso") ||
-    msgNorm.includes("o que você pode responder") ||
-    msgNorm.includes("o que você pode responde") ||
-    msgNorm.includes("oq vc faz?") ||
-    msgNorm.includes("oq vc faz") ||
-    msgNorm.includes("oq vc pode fazer") ||
-    msgNorm.includes("oq vc consegue responder") ||
-    msgNorm.includes("quais perguntas vc consegue responder") ||
-    msgNorm.includes("quais perguntas voce consegue responder") ||
-    msgNorm.includes("quais perguntas você consegue responder") ||
-    msgNorm.includes("quais perguntas você pode responder") ||
-    msgNorm.includes("quais perguntas você responder") ||
-    msgNorm.includes("quais perguntas você responde") ||
-    msgNorm.includes("o que vc pode fazer") ||
-    msgNorm.includes("oque vc pode fazer") ||
-    msgNorm.includes("oq você pode fazer") ||
-    msgNorm.includes("oq voce pode fazer") ||
-    msgNorm.includes("oq voce faz?") ||
-    msgNorm.includes("o que voce faz?") ||
-    msgNorm.includes("o que vc faz?") ||
-    msgNorm.includes("o que vc pode fazer") ||
-    msgNorm.includes("o que vc sabe fazer") ||
-    msgNorm.includes("pra que voce serve") ||
-    msgNorm.includes("pra que você serve") ||
-    msgNorm.includes("pra que vc serve") ||
-    msgNorm.includes("me explica o que faz") ||
-    msgNorm.includes("me diga o que faz") ||
-    msgNorm.includes("explica sua função")
-  ) {
-    return "sobreBot";
-  }
-
   // Conversa geral sobre cartão Clara
   if (
     msgNorm.includes("cartao clara") ||
@@ -3159,6 +3244,8 @@ function respProcedimentosServiceNow() {
         'Eu não abro o chamado por você, mas te ajudo a escolher <b>qual tipo de solicitação</b> faz sentido' +
         ' e a chegar com o texto certo no ServiceNow.' +
       '</p>' +
+
+      '<p class="mt-2"><a href="https://sn.gruposbf.com.br/sp?id=sc_cat_item&sys_id=97ee1f9f8714e910d26c63d30cbb35f9" target="_blank" class="text-blue-600 underline">Clique aqui e acesse o ServiceNow para abertura de chamados.</a></p>' +
 
       '<p class="mt-3 text-xs text-slate-500">' +
         'Estrutura baseada no Anexo II – Solicitações no ServiceNow da Política de Utilização dos Cartões Clara.' +
@@ -4030,21 +4117,18 @@ function respNovoCartaoSegundaVia() {
   return `HTML:
 <div class="text-sm text-slate-700">
 
-  <b>Segunda via de cartão Clara (cartão já existia)</b>
+  <b>Segunda via de cartão Clara (cartão já existia)
 
   <p style="margin-top:6px;">
-    A solicitação de <b>segunda via</b> (perda, roubo, dano ou troca de portador)
-    deve seguir o fluxo previsto na Política de Uso dos Cartões Clara:
+    A solicitação de <b>segunda via</b> (perda, roubo, dano ou troca de portador) deve seguir o fluxo previsto na Política de Uso dos Cartões Clara:
 
   <p style="margin-top:6px; margin-bottom:4px;">
-    • Bloquear imediatamente o cartão antigo na plataforma / app da Clara
-    através da funcionalidade de <b>"Congelar"</b>;<br>
+    • Bloquear imediatamente o cartão antigo na plataforma / app da Clara através da funcionalidade de <b>"Congelar"</b>;<br>
     • Registrar o motivo (perda, roubo, quebra, etc.) conforme orientações internas;<br>
-    • Abrir chamado no <b>ServiceNow</b> solicitando a emissão de segunda via do cartão Clara.
+    • Enviar email para o time de Contas a Receber solicitando a emissão de segunda via do cartão Clara.
 
   <p style="margin-top:6px;">
-    Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clara</b>
-    para casos de reemissão/segunda via.
+    Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clara</b> para casos de reemissão/segunda via.
 
 </div>`;
 }
@@ -6470,6 +6554,69 @@ if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
     </p>`;
 }
 
+// ===== NOVA AÇÃO: Maiores transações individuais (loja / time) =====
+var detTopTrans = detectarMaioresTransacoesIndividuais(msgUsuario, norm);
+if (detTopTrans) {
+  var grupo = detTopTrans.grupo || "";
+  var loja  = detTopTrans.loja  || "";
+  var periodo = detTopTrans.periodo || null;
+  var topN = detTopTrans.topN;
+
+  if (!topN || topN <= 0) {
+    topN = 10; // default se o usuário não falar Top
+  }
+
+  var dataInicioIso = "";
+  var dataFimIso = "";
+
+  if (periodo && periodo.dataInicio && periodo.dataFim) {
+    try {
+      dataInicioIso = periodo.dataInicio.toISOString();
+      dataFimIso    = periodo.dataFim.toISOString();
+    } catch (e) {
+      console.warn("Não consegui converter período para ISO em maiores transações:", e);
+    }
+  }
+
+  // feedback rápido no chat
+  var textoLoading = "Vou buscar as <b>maiores transações individuais</b> ";
+  if (loja)  textoLoading += "da loja <b>" + loja + "</b> ";
+  if (grupo) textoLoading += "do time <b>" + grupo + "</b> ";
+  if (periodo) {
+    textoLoading += "no período informado...";
+  } else {
+    textoLoading += "nos últimos 30 dias...";
+  }
+
+  renderBotMessage("HTML:<p class='text-sm text-slate-700'>" + textoLoading + "</p>");
+
+  try {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        renderMaioresTransacoesIndividuais(res);
+      })
+      .withFailureHandler(function (err) {
+        console.error("Erro Apps Script maiores transações:", err);
+        renderBotMessage("Não consegui consultar as maiores transações individuais agora.");
+      })
+      .getMaioresTransacoesIndividuais(
+        grupo,
+        loja,
+        dataInicioIso,
+        dataFimIso,
+        topN
+      );
+  } catch (e) {
+    console.error("Falha geral ao chamar getMaioresTransacoesIndividuais:", e);
+    renderBotMessage("Ocorreu um erro ao buscar as maiores transações individuais.");
+  }
+
+  // registra intenção para métricas
+  try { ultimaIntencao = "maiores_transacoes_individuais"; } catch (e) {}
+
+  return; // importante para não cair no fluxo genérico
+}
+
   // 🆕 TIMES ESPECÍFICOS (ex.: "times Águias do Cerrado e Lobos SP no período ...")
 
   const detTimesEspec = detectarTimesEspecificosLista(msgUsuario, norm);
@@ -6480,6 +6627,12 @@ if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
 
     const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
     const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+    // 🆕 Guarda período em formato ISO para os insights (times/lojas)
+    window.__vektorUltimoPeriodoIso = {
+      inicio: dataInicioStr || "",
+      fim:    dataFimStr    || ""
+    };
 
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>" +
@@ -6515,6 +6668,12 @@ if (detRankTimes) {
   const topN = detRankTimes.topN ?? 10;           // padrão: 10
   const dataInicioStr = (p && p.dataInicio) ? p.dataInicio.toISOString() : "";
   const dataFimStr    = (p && p.dataFim)    ? p.dataFim.toISOString()    : "";
+
+   // 🆕 Guarda período em ISO para os insights de maior transação
+  window.__vektorUltimoPeriodoIso = {
+    inicio: dataInicioStr || "",
+    fim:    dataFimStr    || ""
+  };
 
   renderBotMessage(
     "HTML:<p class='text-sm text-slate-700'>Montando <b>ranking de times</b> por " +
@@ -6770,13 +6929,19 @@ if (detEstab) {
   );
 
   google.script.run
-          .withSuccessHandler(function (res) {
-      // 1) Monta a tabela normal (como já fazia)
+    .withSuccessHandler(function (res) {
+      // Monta o título com destaque e indicação de Top N
+      const tituloBase = (tipo === "valor"
+        ? "<b>Locais com maior valor de gastos</b> - Top 10"
+        : "<b>Locais com maior quantidade de transações</b>");
+
+      const sufixoTop = (typeof topN === "number" && topN > 0)
+        ? (" - Top " + topN)
+        : "";
+
       renderResumoPorChaveGenerico(res, {
         tipoChave: "Estabelecimento",
-        titulo: (tipo === "valor"
-          ? "Locais com maior valor de gastos"
-          : "Locais com maior quantidade de transações"),
+        titulo: tituloBase + sufixoTop,
         topN: topN
       });
 
@@ -6790,7 +6955,6 @@ if (detEstab) {
         }
       }
     })
-
     .withFailureHandler(function () {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar os dados por estabelecimento.</p>");
     })
@@ -6876,8 +7040,25 @@ if (detTimeCampeao) {
   }
 
     // >>> BLOCO: perguntas de FATURA (Extrato da conta / BaseClara)
+
   const detFatura = detectarPerguntaFaturaClara(msgUsuario, norm);
   if (detFatura) {
+
+     // 🔒 Restrição de acesso para faturas completas
+  if (USER_ROLE_REPLACED === "Acesso padrão") {
+    renderBotMessage(
+      "HTML:" +
+      "<div class='text-sm text-slate-700'>" +
+        "<p>As informações detalhadas das <b>faturas corporativas completas</b> " +
+        "são restritas a perfis administrativos.</p>" +
+        "<p class='mt-1'>Você continua com acesso normal a consultas de " +
+        "<b>pendências, rankings, categorias, estabelecimentos</b> e demais " +
+        "visões da Clara.</p>" +
+      "</div>"
+    );
+    return; // não chama o backend de faturas
+  } 
+
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>" +
         "Vou consultar o <b>valor das faturas</b> da Clara " +
@@ -7459,11 +7640,9 @@ window.__vektorUltimoGrupoBaseClara = grupoNome || grupo || "";
         return null;
     }
 
-    // se chegou aqui, não mudou de assunto e não mandou código de loja válido
-    return `HTML:<p class="text-sm text-slate-700">
-        Pra eu consultar as pendências, preciso do código numérico da loja (ex.: <b>0999</b>).<br/>
-        Se quiser tratar de outro assunto, é só me perguntar diretamente. 😉
-        </p>`;
+            // se chegou aqui, não mudou de assunto e não mandou código de loja válido
+        // NÃO repetir frases infinitamente — apenas não responde e mantém o fluxo aguardando.
+        return "";
 }
 
         // 6) Fluxo pendências - aguardando confirmação de envio por e-mail
@@ -7692,54 +7871,75 @@ Sem problemas, vamos falar de outro assunto então. 😉
         }
 
         // 13) Demais casos:
-        //    Se a frase não fala claramente de cartão/fatura/pendências,
-        //    em vez de chutar uma resposta de política, faz uma pergunta de clarificação.
-        const falaDeCartaoOuFatura =
+//    Se a frase não fala claramente de cartão/fatura/pendências,
+//    em vez de chutar uma resposta de política, faz uma pergunta de clarificação.
+const falaDeCartaoOuFatura =
 
-          norm.includes("clara") ||
-          norm.includes("cartao") ||
-          norm.includes("cartão") ||
-          norm.includes("fatura") ||
-          norm.includes("pendencia") ||
-          norm.includes("pendência") ||
-          norm.includes("limite") ||
-          norm.includes("estacionamento") ||
-          norm.includes("posso comprar") ||
-          norm.includes("pode comprar") ||
-          // 🔹 perguntas sobre ETIQUETA também são assunto da Clara
-          norm.includes("etiqueta") ||
-          norm.includes("etiquetas") ||
-          // 🔹 tudo que menciona gerente/gestor é claramente assunto de Clara
-          norm.includes("gerente") ||
-          norm.includes("gerentes") ||
-          norm.includes("gestor") ||
-          norm.includes("gestora") ||
+  norm.includes("clara") ||
+  norm.includes("cartao") ||
+  norm.includes("cartão") ||
+  norm.includes("fatura") ||
+  norm.includes("pendencia") ||
+  norm.includes("pendência") ||
+  norm.includes("limite") ||
+  norm.includes("estacionamento") ||
+  norm.includes("posso comprar") ||
+  norm.includes("pode comprar") ||
+  // 🔹 perguntas sobre ETIQUETA também são assunto da Clara
+  norm.includes("etiqueta") ||
+  norm.includes("etiquetas") ||
+  // 🔹 tudo que menciona gerente/gestor é claramente assunto de Clara
+  norm.includes("gerente") ||
+  norm.includes("gerentes") ||
+  norm.includes("gestor") ||
+  norm.includes("gestora") ||
 
-            // 🔹 menção direta a loja/unidade (no contexto desse bot faz sentido tratar como Clara)
-          norm.includes("loja")     ||
-          norm.includes("unidade")  ||
+  // 🔹 menção direta a loja/unidade (no contexto desse bot faz sentido tratar como Clara)
+  norm.includes("loja")     ||
+  norm.includes("unidade")  ||
 
-          // 🔹 tudo que menciona ServiceNow/procedimento de chamado
-          norm.includes("servicenow") ||
-          norm.includes("service now") ||
-          norm.includes("chamado") ||
-          norm.includes("chamados") ||
-          norm.includes("ticket") ||
-          norm.includes("solicitacao") ||
-          norm.includes("solicitação") ||
-          norm.includes("procedimento") ||
-          norm.includes("procedimentos");
+  // 🔹 tudo que menciona ServiceNow/procedimento de chamado
+  norm.includes("servicenow") ||
+  norm.includes("service now") ||
+  norm.includes("chamado") ||
+  norm.includes("chamados") ||
+  norm.includes("ticket") ||
+  norm.includes("solicitacao") ||
+  norm.includes("solicitação") ||
+  norm.includes("procedimento") ||
+  norm.includes("procedimentos");
 
-        if (!falaDeCartaoOuFatura) {
-          const perguntaClara = gerarPerguntaDeClarificacao(norm);
-          if (perguntaClara) {
-            return perguntaClara;
-          }
-        }
+// 👇 Frases genéricas de compra/uso em primeira pessoa
+const falaDeCompraOuUso =
+  norm.includes("comprar") ||
+  norm.includes("comprei") ||
+  norm.includes("preciso comprar") ||
+  norm.includes("quero comprar");
 
-        // 14) Ainda assim sobrou → motor da política
-        return gerarRespostaPolitica(msgUsuario);
-    }
+// 👇 Frases claramente sobre o próprio Vektor
+const falaSobreBot =
+  norm.includes("o que voce faz") ||
+  norm.includes("o que vc faz") ||
+  norm.includes("o que você faz") ||
+  norm.includes("o que o vektor pode fazer") ||
+  norm.includes("quem e voce") ||
+  norm.includes("quem é você") ||
+  norm.includes("qual o seu nome") ||
+  norm.includes("pra que voce serve") ||
+  norm.includes("pra que vc serve");
+
+// 👇 Só pergunta “sobre o que você fala?” se NÃO for nada disso
+if (!falaDeCartaoOuFatura && !falaDeCompraOuUso && !falaSobreBot) {
+  const perguntaClara = gerarPerguntaDeClarificacao(norm);
+  if (perguntaClara) {
+    return perguntaClara;
+  }
+}
+
+// 14) Ainda assim sobrou → motor da política
+return gerarRespostaPolitica(msgUsuario);
+
+}
 
     // ========= INTERVALOS DE DATA PARA PERGUNTAS DE RELATÓRIO ========= //
 
@@ -7829,6 +8029,16 @@ if (norm.includes("neste trimestre") || norm.includes("este trimestre")) {
   const ini = new Date(anoAtual, inicioMes, 1);
   const fim = hoje;
   return { tipo: "trimestre_atual", dataInicio: ini, dataFim: fim };
+}
+
+// "neste semestre" / "este semestre"
+if (norm.includes("nesse semestre") || norm.includes("este semestre") || norm.includes("neste semestre")) {
+  const mesAtual = hoje.getMonth();        // 0..11
+  const semestreAtual = Math.floor(mesAtual / 6); // 0 ou 1
+  const inicioMes = semestreAtual * 6;     // 0 ou 6
+  const ini = new Date(anoAtual, inicioMes, 1);
+  const fim = hoje;
+  return { tipo: "semestre_atual", dataInicio: ini, dataFim: fim };
 }
 
 // 0) Intervalo numérico: aceita com/sem "de" e com/sem ano
@@ -8589,6 +8799,10 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
   partes.push(
     "<div class='text-sm text-slate-700' style='max-width:1000px;margin:12px auto 0;'>",
       "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>",
+      // NOVA linha de orientação
+    "<p style='margin-bottom:8px;text-align:center;font-size:12px;color:#64748B;'>" +
+      "Clique na linha da fatura para verificar o valor detalhado por times." +
+    "</p>",
       "<div style='overflow-x:auto;'>",
         "<table border='1' cellspacing='0' cellpadding='8' " +
         "style='border-collapse:collapse;width:100%;font-size:13px;border:2px double #000;'>",
@@ -8827,7 +9041,7 @@ function vektorGerarInsightsTimes(times) {
            "background:#F8FAFC;border-radius:4px;padding:6px;" +
            "border:1px solid #E2E8F0;'>" +
       "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre os times:</b></p>" +
-      "<ul style='margin:0;padding-left:16px;'>" +
+      "<ul id='insights-times-ul' style='margin:0;padding-left:16px;'>" +
         comentarios.map(function (c) {
           return "<li>" + c + "</li>";
         }).join("") +
@@ -8912,7 +9126,7 @@ function vektorGerarInsightsRankingLojas(lojas) {
            "background:#F8FAFC;border-radius:4px;padding:6px;" +
            "border:1px solid #E2E8F0;'>" +
       "<p style='margin:0 0 4px 0;'><b>Insights automáticos sobre as lojas:</b></p>" +
-      "<ul style='margin:0;padding-left:16px;'>" +
+      "<ul id='insights-lojas-ul' style='margin:0;padding-left:16px;'>" +
         comentarios.map(function (c) {
           return "<li>" + c + "</li>";
         }).join("") +
@@ -10147,6 +10361,272 @@ function vektorMostrarPendenciasPorTimeTodos(dataInicioIso, dataFimIso) {
     );
 }
 
+// ===== RENDER: Maiores transações individuais (loja / time) =====
+function renderMaioresTransacoesIndividuais(res) {
+  if (!res || res.ok === false) {
+    var msgErro = (res && res.error) ? res.error : "Erro desconhecido ao consultar as maiores transações.";
+    renderBotMessage("HTML:<p class='text-sm text-red-700'>" + msgErro + "</p>");
+    return;
+  }
+
+  var linhas = Array.isArray(res.linhas) ? res.linhas : [];
+  var loja   = res.loja  || "";
+  var grupo  = res.grupo || "";
+  var topN   = res.topN  || null;
+
+  var periodoDescricao   = res.periodoDescricao || "";
+  var dataInicioIso      = res.dataInicioIso || "";
+  var dataFimIso         = res.dataFimIso    || "";
+  var totalSelecionadas  = Number(res.totalSelecionadas || 0);
+
+  // Se não houver linhas
+  if (!linhas.length) {
+    var msgVazio = "Não encontrei transações no período selecionado ";
+    if (loja)  msgVazio += "para a loja <b>" + loja + "</b> ";
+    if (grupo) msgVazio += "do time <b>" + grupo + "</b> ";
+    if (periodoDescricao) {
+      msgVazio += "(" + periodoDescricao + ").";
+    } else {
+      msgVazio += ".";
+    }
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>" + msgVazio + "</p>");
+    return;
+  }
+
+  var titulo = "Maiores transações individuais";
+  if (loja)  titulo += " - Loja " + loja;
+  if (grupo) titulo += (loja ? " | " : " - ") + "Time " + grupo;
+  if (topN) {
+    titulo += " (Top " + topN + ")";
+  }
+
+  var linhasHtml = [];
+
+  linhasHtml.push("<div class='text-sm text-slate-700'>");
+  linhasHtml.push("<p style='margin:0 0 4px 0;'><b>" + titulo + "</b></p>");
+
+  if (periodoDescricao) {
+    linhasHtml.push(
+      "<p style='margin:0 0 8px 0;font-size:12px;color:#334155;'>" +
+        "Período da consulta: " + periodoDescricao + "." +
+      "</p>"
+    );
+  } else if (dataInicioIso && dataFimIso) {
+    var frasePeriodo = vektorFraseResumoPeriodo(dataInicioIso, dataFimIso);
+    if (frasePeriodo) {
+      linhasHtml.push(
+        "<p style='margin:0 0 8px 0;font-size:12px;color:#334155;'>" +
+          "Período da consulta: " + frasePeriodo + "." +
+        "</p>"
+      );
+    }
+  }
+
+  // Tabela
+  linhasHtml.push(
+    "<table border='1' cellspacing='0' cellpadding='4' " +
+      "style='border-collapse:collapse;width:100%;font-size:12px;text-align:center;border:1px solid #000;'>"
+  );
+
+  // Cabeçalho
+  linhasHtml.push(
+    "<thead>" +
+      "<tr style='background:#06167d;color:#fff;'>" +
+        "<th style='border:1px solid #000;padding:4px;'>Loja</th>" +
+        "<th style='border:1px solid #000;padding:4px;'>Estabelecimento</th>" +
+        "<th style='border:1px solid #000;padding:4px;'>Data</th>" +
+        "<th style='border:1px solid #000;padding:4px;'>Status</th>" +
+        "<th style='border:1px solid #000;padding:4px;'>Categoria</th>" +
+        "<th style='border:1px solid #000;padding:4px;'>Titular</th>" +
+        "<th style='border:1px solid #000;padding:4px;'>Valor (R$)</th>" +
+      "</tr>" +
+    "</thead><tbody>"
+  );
+
+      // Linhas da tabela
+    for (var i = 0; i < linhas.length; i++) {
+      var l = linhas[i] || {};
+      var lojaVal     = l.loja || "";
+      var estabVal    = l.estabelecimento || "";
+      var dataVal     = l.data || "";
+      var statusVal   = l.status || "";
+      var categoriaVal= l.categoria || "";
+      var titularVal  = l.titular || "";
+      var valorVal    = Number(l.valor || 0);
+
+      linhasHtml.push(
+        "<tr>" +
+          "<td style='border:1px solid #000;padding:4px;'>" + lojaVal + "</td>" +
+          "<td style='border:1px solid #000;padding:4px;'>" + estabVal + "</td>" +
+          "<td style='border:1px solid #000;padding:4px;'>" + dataVal + "</td>" +
+          "<td style='border:1px solid #000;padding:4px;'>" + statusVal + "</td>" +
+          "<td style='border:1px solid #000;padding:4px;'>" + categoriaVal + "</td>" +
+          "<td style='border:1px solid #000;padding:4px;'>" + titularVal + "</td>" +
+          "<td style='border:1px solid #000;padding:4px;'>" +
+            valorVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+          "</td>" +
+        "</tr>"
+      );
+    }
+
+  // Linha de TOTAL no final da coluna de valor
+  linhasHtml.push(
+    "<tr style='background:#e5e7eb;font-weight:bold;'>" +
+      "<td colspan='6' style='border:1px solid #000;padding:4px;text-align:right;'>Total</td>" +
+      "<td style='border:1px solid #000;padding:4px;'>" +
+        totalSelecionadas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+    "</tr>"
+  );
+
+  linhasHtml.push("</tbody></table>");
+
+  // Botão Exportar CSV ABAIXO da tabela
+  linhasHtml.push(
+    "<div style='margin-top:6px;text-align:right;'>" +
+      "<button type='button' " +
+        "onclick=\"exportTableToCSV(this, 'maiores_transacoes_individuais')\" " +
+        "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+               "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+        "⬇ Exportar CSV" +
+      "</button>" +
+    "</div>"
+  );
+
+  linhasHtml.push("</div>");
+
+  var html = linhasHtml.join("");
+
+  try { ultimaIntencao = "maiores_transacoes_individuais"; } catch (e) {}
+
+  renderBotMessage("HTML:" + html);
+}
+
+function vektorRenderTransacoesPorCategoria(res, nomeCategoria) {
+  if (!res || !res.ok) {
+    return "<p class='text-sm text-slate-700'>Não consegui montar a tabela de transações dessa categoria.</p>";
+  }
+
+  var linhas = res.linhas || [];
+  var dataInicioIso = res.dataInicioIso || "";
+  var dataFimIso    = res.dataFimIso || "";
+  var total = Number(res.total || 0);
+
+  // Se não tiver linhas
+  if (!linhas.length) {
+    return (
+      "<p class='text-sm text-slate-700'>" +
+        "Não encontrei transações para a categoria <b>" + (nomeCategoria || "") +
+        "</b> nesse período." +
+      "</p>"
+    );
+  }
+
+  // Período em dd/MM/yyyy
+  var periodoHtml = "";
+  try {
+    if (dataInicioIso && dataFimIso) {
+      var di = new Date(dataInicioIso);
+      var df = new Date(dataFimIso);
+      var diBr = di.toLocaleDateString("pt-BR");
+      var dfBr = df.toLocaleDateString("pt-BR");
+      periodoHtml =
+        "<p class='text-xs text-slate-500 mt-1'>" +
+          "Período da consulta: de " + diBr + " a " + dfBr + "." +
+        "</p>";
+    }
+  } catch (e) {
+    console.error("Erro ao formatar período em vektorRenderTransacoesPorCategoria:", e);
+  }
+
+  var linhasHtml = [];
+
+  linhasHtml.push(
+    "<p class='mb-1'>Transações da categoria <b>" + (nomeCategoria || "") + "</b>.</p>" +
+    periodoHtml
+  );
+
+  linhasHtml.push("<div style='overflow-x:auto;margin-top:4px;'>");
+
+  // ✅ Valor (R$) movido para a ÚLTIMA coluna
+  linhasHtml.push(
+    "<table style='border-collapse:collapse;width:100%;font-size:12px;'>" +
+      "<thead><tr>" +
+        "<th style='border:1px solid #000;padding:4px;text-align:center;background:#E5E7EB;'>Loja</th>" +
+        "<th style='border:1px solid #000;padding:4px;text-align:left;background:#E5E7EB;'>Transação</th>" +
+        "<th style='border:1px solid #000;padding:4px;text-align:center;background:#E5E7EB;'>Data</th>" +
+
+        "<th style='border:1px solid #000;padding:4px;text-align:left;background:#E5E7EB;'>Titular</th>" +
+        "<th style='border:1px solid #000;padding:4px;text-align:left;background:#E5E7EB;'>Grupos</th>" +
+
+        "<th style='border:1px solid #000;padding:4px;text-align:left;background:#FECACA;color:#7F1D1D;font-weight:700;'>Recibo</th>" +
+        "<th style='border:1px solid #000;padding:4px;text-align:left;background:#FECACA;color:#7F1D1D;font-weight:700;'>Etiquetas</th>" +
+        "<th style='border:1px solid #000;padding:4px;text-align:left;background:#FECACA;color:#7F1D1D;font-weight:700;'>Descrição</th>" +
+
+        "<th style='border:1px solid #000;padding:4px;text-align:right;background:#E5E7EB;'>Valor (R$)</th>" +
+      "</tr></thead><tbody>"
+  );
+
+  for (var i = 0; i < linhas.length; i++) {
+    var l = linhas[i] || {};
+    var loja  = l.loja || "";
+    var trans = l.transacao || "";
+    var data  = l.data || "";
+    var val   = Number(l.valor || 0);
+
+    var titular   = l.titular || "";
+    var grupos    = l.grupos || "";
+    var recibo    = l.recibo || "";
+    var etiquetas = l.etiquetas || "";
+    var descricao = l.descricao || "";
+
+    // ✅ Valor movido para o ÚLTIMO <td>
+    linhasHtml.push(
+      "<tr>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + loja + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:left;'>" + trans + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:center;'>" + data + "</td>" +
+
+        "<td style='border:1px solid #000;padding:4px;text-align:left;'>" + titular + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:left;'>" + grupos + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:left;'>" + recibo + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:left;'>" + etiquetas + "</td>" +
+        "<td style='border:1px solid #000;padding:4px;text-align:left;'>" + descricao + "</td>" +
+
+        "<td style='border:1px solid #000;padding:4px;text-align:right;'>" +
+          val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+      "</tr>"
+    );
+  }
+
+  // Linha TOTAL (colspan continua correto: 8)
+  linhasHtml.push(
+    "<tr style='font-weight:bold;background:#F1F5F9;'>" +
+      "<td colspan='8' style='border:1px solid #000;padding:4px;text-align:right;'>Total</td>" +
+      "<td style='border:1px solid #000;padding:4px;text-align:right;'>" +
+        total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+    "</tr>"
+  );
+
+  linhasHtml.push("</tbody></table></div>");
+
+  // Botão de CSV
+  linhasHtml.push(
+    "<div style='margin-top:8px;display:flex;justify-content:flex-end;'>" +
+      "<button type='button' " +
+        "onclick=\"exportTableToCSV(this, 'transacoes_categoria')\" " +
+        "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+               "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+        "⬇ Exportar CSV" +
+      "</button>" +
+    "</div>"
+  );
+
+  return "<div class='text-sm text-slate-700'>" + linhasHtml.join("") + "</div>";
+}
+
 // 🔽 Drilldown da fatura para TIMES, respeitando o período da fatura
 window.vektorDetalharFaturaPorTime = function (tr) {
   try {
@@ -10231,10 +10711,20 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   opts = opts || {};
   var tipoChave = opts.tipoChave || "Categoria"; // "Categoria" ou "Estabelecimento"
   var titulo    = opts.titulo || ("Resumo por " + tipoChave.toLowerCase());
-  var topN      = (typeof opts.topN === "number" && opts.topN > 0) ? opts.topN : null;
+  
+  // ✅ aceita topN como número OU string numérica ("10")
+var topN = null;
+if (opts.topN !== undefined && opts.topN !== null && opts.topN !== "") {
+  var n = Number(opts.topN);
+  if (!isNaN(n) && n > 0) topN = n;
+}
 
   // ===== Definição da base da tabela (categoria/estabelecimento/loja/time)
   var tipoChaveLower = tipoChave.toLowerCase();
+  // ✅ Default Top 10 somente para Estabelecimento quando não vier topN
+if (tipoChaveLower === "estabelecimento" && topN === null) {
+  topN = 10;
+}
   var baseTabela      = "categoria";    // usado no data-base do <select>
   var tipoTabelaExpand = "categoria";   // parâmetro passado para vektorExpandirLinha
   var hintBase        = "";
@@ -10299,11 +10789,11 @@ function renderResumoPorChaveGenerico(resumo, opts) {
 
   var linhasTabela = [];
 
-  // 🔹 Flag: só tem drilldown se a base for TIME ou LOJA
-  var temDrilldown = !(baseTabela === "categoria" || baseTabela === "estabelecimento");
+  // 🔹 Agora também queremos drilldown em ESTABELECIMENTO (clique direto na linha)
+  var temDrilldown = true;
 
   // ===== 🔽 DROPDOWN DE DRILLDOWN (somente se tiver drilldown) =====
-  if (temDrilldown) {
+  if (temDrilldown && baseTabela !== "categoria" && baseTabela !== "estabelecimento") {
     var opcoes = [];
     // Regra: todas as dimensões menos a própria baseTabela
     if (baseTabela !== "time")            opcoes.push("<option value='time'>Times</option>");
@@ -10340,27 +10830,60 @@ function renderResumoPorChaveGenerico(resumo, opts) {
   );
 
   for (var j = 0; j < lista.length; j++) {
-    var l = lista[j];
-    var nome =
-      l.estabelecimento ||
-      l.categoria ||
-      l.chave ||
-      "—";
+  var l = lista[j];
+  var nome =
+    l.estabelecimento ||
+    l.categoria ||
+    l.chave ||
+    "—";
 
-    var qtd   = Number(l.total || l.qtd || 0);
-    var valor = Number(l.valorTotal || l.valor || 0);
+  var qtd   = Number(l.total || l.qtd || 0);
+  var valor = Number(l.valorTotal || l.valor || 0);
 
-    var pctQtd = totalQtd   > 0 ? ((qtd   / totalQtd)   * 100).toFixed(1) + "%" : "—";
-    var pctVal = totalValor > 0 ? ((valor / totalValor) * 100).toFixed(1) + "%" : "—";
+  var pctQtd = totalQtd   > 0 ? ((qtd   / totalQtd)   * 100).toFixed(1) + "%" : "—";
+  var pctVal = totalValor > 0 ? ((valor / totalValor) * 100).toFixed(1) + "%" : "—";
 
-    // ===== LINHA: com ou sem onclick dependendo do drilldown =====
-    if (temDrilldown) {
-      var hint = hintBase ||
-        "Clique para detalhar pela dimensão escolhida no seletor acima, respeitando o mesmo período da pergunta inicial.";
+  // ========== CATEGORIAS RESTRITAS: fundo vermelho claro ==========
+  var estiloLinhaExtra = "";
+  if (tipoChaveLower === "categoria") {
+    var nomeNorm = (nome || "")
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
+    var categoriasRestritas = [
+      "combustiveis",
+      "transporte",
+      "eletronicos",
+      "imoveis",
+      "entretenimento",
+      "pagamentos do governo",
+      "causas sociais",
+      "educacao",
+      "joias e cassino",
+      "joias",
+      "cassino",
+      "saude",
+      "viagem e hospedagem",
+      "aluguel de veiculos",
+      "assinaturas"
+    ];
+
+    if (categoriasRestritas.indexOf(nomeNorm) !== -1) {
+      // vermelho claro
+      estiloLinhaExtra = "background:#FFB3B3;";
+    }
+  }
+
+  // ===== LINHA: com ou sem onclick dependendo do drilldown =====
+  if (temDrilldown) {
+    // Categoria → drilldown específico para transações (vamos criar já já)
+    if (tipoChaveLower === "categoria" && baseTabela === "categoria") {
       linhasTabela.push(
-        "<tr onclick=\"vektorExpandirLinha(this,'" + tipoTabelaExpand + "')\" " +
-          "style='cursor:pointer;' title=\"" + hint + "\">" +
+        "<tr onclick=\"vektorDrillTransacoesCategoria('" + nome.replace(/'/g, "\\'") + "')\" " +
+          "style='cursor:pointer;" + estiloLinhaExtra + "' " +
+          "title=\"Clique para ver as transações dessa categoria no mesmo período.\">" +
           "<td style='border:1px solid #000;'>" + nome + "</td>" +
           "<td style='border:1px solid #000;'>" + qtd + "</td>" +
           "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
@@ -10370,10 +10893,31 @@ function renderResumoPorChaveGenerico(resumo, opts) {
           "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
         "</tr>"
       );
-    } else {
-      // 🔹 Categoria / Estabelecimento → SEM drilldown
+    } 
+    
+    // Estabelecimento → drilldown específico para transações por loja
+else if (tipoChaveLower === "estabelecimento" && baseTabela === "estabelecimento") {
+  linhasTabela.push(
+    "<tr onclick=\"vektorDrillTransacoesEstabelecimento('" + nome.replace(/'/g, "\\'") + "')\" " +
+      "style='cursor:pointer;" + estiloLinhaExtra + "' " +
+      "title=\"Clique para ver as transações desse estabelecimento por loja no mesmo período.\">" +
+      "<td style='border:1px solid #000;'>" + nome + "</td>" +
+      "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+      "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+      "<td style='border:1px solid #000;'>" +
+        valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+      "</td>" +
+      "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+    "</tr>"
+  );
+}
+    
+    else {
+      // Drilldown padrão (times, lojas, estabelecimentos, etc.)
+      var hint = hintBase;
       linhasTabela.push(
-        "<tr>" +
+        "<tr onclick=\"vektorExpandirLinha(this,'" + tipoTabelaExpand + "')\" " +
+          "style='cursor:pointer;" + estiloLinhaExtra + "' title=\"" + hint + "\">" +
           "<td style='border:1px solid #000;'>" + nome + "</td>" +
           "<td style='border:1px solid #000;'>" + qtd + "</td>" +
           "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
@@ -10384,7 +10928,21 @@ function renderResumoPorChaveGenerico(resumo, opts) {
         "</tr>"
       );
     }
+  } else {
+    // Sem drilldown → apenas aplica cor quando necessário
+    linhasTabela.push(
+      "<tr style='" + estiloLinhaExtra + "'>" +
+        "<td style='border:1px solid #000;'>" + nome + "</td>" +
+        "<td style='border:1px solid #000;'>" + qtd + "</td>" +
+        "<td style='border:1px solid #000;'>" + pctQtd + "</td>" +
+        "<td style='border:1px solid #000;'>" +
+          valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) +
+        "</td>" +
+        "<td style='border:1px solid #000;'>" + pctVal + "</td>" +
+      "</tr>"
+    );
   }
+}
 
   // Linha de TOTAL
   linhasTabela.push(
@@ -10416,9 +10974,104 @@ function renderResumoPorChaveGenerico(resumo, opts) {
       "</div>";
   }
 
+    // ===== Período da consulta (apenas para Categorias) =====
+  var periodoHtml = "";
+  if (tipoChaveLower === "categoria") {
+    var dataInicioIso = "";
+    var dataFimIso    = "";
+
+    // 1) Tenta vir do próprio resumo (caso o backend envie)
+    if (resumo.dataInicioIso && resumo.dataFimIso) {
+      dataInicioIso = resumo.dataInicioIso;
+      dataFimIso    = resumo.dataFimIso;
+    }
+    // 2) Senão, cai no cache global do período
+    else if (
+      window.__vektorUltimoPeriodo &&
+      window.__vektorUltimoPeriodo.dataInicio &&
+      window.__vektorUltimoPeriodo.dataFim
+    ) {
+      dataInicioIso = window.__vektorUltimoPeriodo.dataInicio.toISOString();
+      dataFimIso    = window.__vektorUltimoPeriodo.dataFim.toISOString();
+    }
+
+    if (dataInicioIso && dataFimIso) {
+      try {
+        var di = new Date(dataInicioIso);
+        var df = new Date(dataFimIso);
+        var diBr = di.toLocaleDateString("pt-BR");
+        var dfBr = df.toLocaleDateString("pt-BR");
+
+        periodoHtml =
+          "<p style='font-size:11px;color:#475569;margin-top:2px;'>" +
+            "Período da consulta: de " + diBr + " a " + dfBr + "." +
+          "</p>";
+      } catch (e) {
+        console.error("Não consegui formatar período em renderResumoPorChaveGenerico:", e);
+      }
+    }
+  }
+
+      // ===== Período da consulta (prioriza o que vem do back-end) =====
+  var periodoHtml = "";
+  if (tipoChaveLower === "categoria" || tipoChaveLower === "estabelecimento") {
+    try {
+      var di = null, df = null;
+
+      // 1) Tenta pegar diretamente do objeto resumo retornado pelo Apps Script
+      if (resumo && resumo.dataInicioIso && resumo.dataFimIso) {
+        di = new Date(resumo.dataInicioIso);
+        df = new Date(resumo.dataFimIso);
+      }
+
+      // 2) Se não tiver no resumo, usa o cache global do último período interpretado
+      if (
+        (!di || !df || isNaN(di.getTime()) || isNaN(df.getTime())) &&
+        window.__vektorUltimoPeriodo &&
+        window.__vektorUltimoPeriodo.dataInicio &&
+        window.__vektorUltimoPeriodo.dataFim
+      ) {
+        di = window.__vektorUltimoPeriodo.dataInicio;
+        df = window.__vektorUltimoPeriodo.dataFim;
+      }
+
+      if (di && df && !isNaN(di.getTime()) && !isNaN(df.getTime())) {
+        var diBr = di.toLocaleDateString("pt-BR");
+        var dfBr = df.toLocaleDateString("pt-BR");
+
+        periodoHtml =
+          "<p style='font-size:11px;color:#475569;margin-top:2px;'>" +
+            "Período da consulta: de " + diBr + " a " + dfBr + "." +
+          "</p>";
+      }
+    } catch (e) {
+      console.error("Erro ao montar periodoHtml em renderResumoPorChaveGenerico:", e);
+    }
+  }
+
+  // Dica de drilldown – só para categorias
+  var dicaDrilldown = "";
+  if (tipoChaveLower === "categoria") {
+    dicaDrilldown =
+      "<p style='font-size:12px;color:#64748B;margin-top:2px;'>" +
+        "Clique em uma categoria para ver as transações individuais dela no mesmo período." +
+      "</p>";
+  }
+
+  // Dica de drilldown – para estabelecimentos
+if (tipoChaveLower === "estabelecimento") {
+  dicaDrilldown =
+    "<p style='font-size:12px;color:#64748B;margin-top:2px;'>" +
+      "Clique em um estabelecimento para ver as transações individuais por loja no mesmo período." +
+    "</p>";
+}
+
+  // HTML final
   var html =
     "<div class='text-sm text-slate-700'>" +
-      "<p>" + titulo + "</p>" +
+      "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>" +
+      periodoHtml +
+      dicaDrilldown +
       linhasTabela.join("") +
       botaoCsv +
     "</div>";
@@ -10457,13 +11110,76 @@ function renderResumoPorChaveGenerico(resumo, opts) {
     opts &&
     (opts.tipoChave === "Categoria" || opts.tipoChave === "Estabelecimento")
   ) {
-    const htmlInsightsExtra = gerarInsightsResumoChaveCategoriaEstab(res, {
+    const htmlInsightsExtra = gerarInsightsResumoChaveCategoriaEstab(resumo, {
       tipoChave: opts.tipoChave
     });
 
     if (htmlInsightsExtra) {
       renderBotMessage("HTML:" + htmlInsightsExtra);
     }
+  }
+}
+
+// ================= INFORMAÇÕES INICIAIS (APENAS ADMIN) ===================
+
+function vektorMostrarPerguntaInfoInicial() {
+  try {
+    // Só ADM recebe essa pergunta
+    if (USER_ROLE_REPLACED !== "Administrador") {
+      return;
+    }
+
+    const chatWindow = document.getElementById("chatWindow");
+    if (!chatWindow) return;
+
+    // Evita duplicar se o usuário recarregar
+    if (document.getElementById("vektor-info-inicial-pergunta")) return;
+
+    const div = document.createElement("div");
+    div.id = "vektor-info-inicial-pergunta";
+    div.className = "flex items-start gap-3 mt-3";
+
+    div.innerHTML = `
+      <div class="bot-bubble px-4 py-3 max-w-[80%]">
+        <p class="text-sm text-slate-700">
+          Você quer ver as principais informações de utilização dos cartões Clara,
+          como <b>maiores transações</b>, <b>times com mais pendências</b>,
+          <b>estabelecimentos</b> e <b>categorias</b> com maior volume de gastos?
+        </p>
+        <div class="mt-3 flex gap-3">
+          <button
+            id="btnInfoInicialSim"
+            class="px-3 py-1 text-xs rounded bg-emerald-600 text-white hover:bg-emerald-700">
+            Sim, mostrar
+          </button>
+          <button
+            id="btnInfoInicialNao"
+            class="px-3 py-1 text-xs rounded bg-slate-200 text-slate-700 hover:bg-slate-300">
+            Não, obrigado
+          </button>
+        </div>
+      </div>
+    `;
+
+    chatWindow.appendChild(div);
+    chatWindow.scrollTop = chatWindow.scrollHeight;
+
+    const btnSim = document.getElementById("btnInfoInicialSim");
+    const btnNao = document.getElementById("btnInfoInicialNao");
+
+    if (btnSim) {
+      btnSim.addEventListener("click", function () {
+        vektorCarregarInformacoesIniciais();
+      });
+    }
+    if (btnNao) {
+      btnNao.addEventListener("click", function () {
+        const bloco = document.getElementById("vektor-info-inicial-pergunta");
+        if (bloco) bloco.remove();
+      });
+    }
+  } catch (e) {
+    console.warn("Erro ao montar pergunta de informações iniciais:", e);
   }
 }
 
@@ -10623,9 +11339,26 @@ function detectarPerguntaCategorias(msgOriginal, norm) {
 
 function detectarPerguntaEstabelecimentos(msgOriginal, norm) {
   const t = norm || "";
-  const periodo = extrairIntervaloDatas(msgOriginal);
   const tipo    = extrairCriterioGeral(t);
   let   topN    = extrairTopN(t); // let para conseguirmos ajustar para 1
+
+  // Se não tem “top” mas a pessoa perguntou “qual local/estabelecimento” → força topN = 1
+if (!topN) {
+  const temQualLocal =
+    /\bqual\s+local\b/.test(t) || /\bqual\s+locais\b/.test(t);
+  const temQualEstab =
+    /\bqual\s+estabelecimento\b/.test(t) ||
+    /\bqual\s+estabelecimentos\b/.test(t);
+
+  if (temQualLocal || temQualEstab) {
+    topN = 1;
+  }
+}
+
+// ✅ DEFAULT: se ainda não definiu topN, usa Top 10
+if (!topN) {
+  topN = 10;
+}
 
   // Palavras que DEFINEM claramente a intenção de estabelecimento
   const falaLocalBase =
@@ -10669,6 +11402,7 @@ function detectarPerguntaEstabelecimentos(msgOriginal, norm) {
 
   // Se não tem “top” mas a pessoa perguntou “qual local/estabelecimento” → força topN = 1
   if (!topN) {
+    topN = 10;
     const temQualLocal =
       /\bqual\s+local\b/.test(t) || /\bqual\s+locais\b/.test(t);
     const temQualEstab =
@@ -10680,20 +11414,26 @@ function detectarPerguntaEstabelecimentos(msgOriginal, norm) {
     }
   }
 
-  // Tenta extrair time (opcional)
-  const grupo = encontrarTimeNaMensagem(msgOriginal) || "";
+   // Só tenta achar time se a frase falar explicitamente de time/grupo/equipe
+  let grupo = "";
+  const falaDeTime =
+    t.includes("time ")   ||
+    t.includes("times ")  ||
+    t.includes("grupo ")  ||
+    t.includes("equipe")  ||
+    t.includes("equipes");
 
-  // Tenta extrair loja
-  let loja = "";
-  const mLoja = t.match(/loja\s+([a-z0-9\-]+)/);
-  if (mLoja) loja = mLoja[1];
+  if (falaDeTime) {
+    grupo = encontrarTimeNaMensagem(msgOriginal) || "";
+  }
+
+  const periodo = extrairIntervaloDatas(msgOriginal);
+  const criterio = extrairCriterioGeral(t);
 
   return {
-    periodo,
-    tipo,
-    topN,
     grupo,
-    loja
+    periodo,
+    criterio
   };
 }
 
@@ -10830,9 +11570,10 @@ function detectarRankingTimes(msgOriginal, norm) {
   if (texto.includes("lojas") || texto.includes("loja")) return null;
 
   const falaDeTime =
-    texto.includes("ranking de times") ||
-    texto.includes("ranking geral de times") ||
-    (texto.includes("top") && (texto.includes("times") || texto.includes("time")));
+  texto.includes("ranking de times") ||
+  texto.includes("ranking geral de times") ||
+  // Só trata frases do tipo "top 5 times", não "top 5 transações do time X"
+  (texto.includes("top") && texto.includes("times"));
 
   if (!falaDeTime) return null;
 
@@ -10895,12 +11636,20 @@ function detectarRankingLojas(msgOriginal, norm) {
     return null;
   }
 
-  // Aceita: "ranking de lojas", "ranking geral de lojas", "top 5 lojas",
-  // "ranking loja", "top 3 loja" (singular/plural)
-  const mencionaRankingOuTop = texto.includes("ranking") || texto.includes("top");
-  const mencionaLojas = texto.includes("lojas") || texto.includes("loja");
+    // Aceita apenas pedidos CLAROS de ranking de lojas:
+  // - "ranking de lojas"
+  // - "ranking geral de lojas"
+  // - "top 5 lojas", "top 10 lojas", etc.
+  const falaRankingLojasDireto =
+    texto.includes("ranking de lojas") ||
+    texto.includes("ranking geral de lojas");
 
-  if (!(mencionaRankingOuTop && mencionaLojas)) return null;
+  const falaTopLojas = /top\s*\d+\s+lojas?/.test(texto); // ex.: "top 5 lojas"
+
+  // Se não falar explicitamente de "ranking de lojas" ou "top X lojas",
+  // NÃO trata como ranking de lojas.
+  if (!falaRankingLojasDireto && !falaTopLojas) return null;
+
 
   // Time opcional (usa seu matcher)
   const grupoNomeOficial = encontrarTimeNaMensagem(msgOriginal) || "";
@@ -11152,6 +11901,63 @@ function detectarPerguntaTimeMaisTransacoes(msgOriginal, norm) {
   return { periodo, tipo };
 }
 
+// ===== NOVO DETECTOR: Maiores transações individuais (loja / time) =====
+function detectarMaioresTransacoesIndividuais(msgOriginal, norm) {
+  if (!msgOriginal) return null;
+  norm = norm || "";
+
+  // Texto normalizado em minúsculas
+  var t = norm.toLowerCase();
+
+  // tem palavra "transacao/transações"
+  var temTransacao = t.indexOf("transacao") >= 0 || t.indexOf("transacoes") >= 0;
+  if (!temTransacao) return null;
+
+  // quer "maiores" OU "top N"
+  var temMaior = t.indexOf("maiores transacoes") >= 0 || t.indexOf("maior transacao") >= 0;
+  var temTop   = t.indexOf("top") >= 0;
+  if (!temMaior && !temTop) return null;
+
+  // Evita pegar perguntas de ranking já existentes (ranking de lojas/times)
+  if (t.indexOf("ranking de lojas") >= 0 || t.indexOf("ranking de times") >= 0) {
+    return null;
+  }
+
+  // ------------------------------
+  // LOJA: detectada normalmente pelos códigos
+  // ------------------------------
+  var lojasCodigos = extrairCodigosLojasDaMensagem(msgOriginal) || [];
+  var lojaCodigo = lojasCodigos.length ? lojasCodigos[0] : "";
+
+  // ------------------------------
+  // TIME: só detecta se o usuário citar explicitamente "time", "grupo" ou "equipe"
+  // ------------------------------
+  var mencionaEstruturaTime =
+    t.indexOf("time")   >= 0 ||
+    t.indexOf("grupo")  >= 0 ||
+    t.indexOf("equipe") >= 0;
+
+  var grupoNomeOficial = "";
+  if (mencionaEstruturaTime) {
+    grupoNomeOficial = encontrarTimeNaMensagem(msgOriginal) || "";
+  }
+
+  // período (pode ser nulo)
+  var periodo = extrairIntervaloDatas(msgOriginal) || null;
+
+  // "top N" se existir
+  var topN = extrairTopN(t);
+
+  var grupoFinal = grupoNomeOficial;
+
+  return {
+    grupo: grupoFinal,
+    loja: lojaCodigo,
+    periodo: periodo,
+    topN: topN
+  };
+}
+
 // Lista as etiquetas disponíveis na BaseClara (coluna T) e mostra no chat
 
 function listarEtiquetasClara() {
@@ -11277,9 +12083,6 @@ function listarEtiquetasClara() {
         clearTimeout(pendenciasTimeoutId);
         pendenciasTimeoutId = null;
     }
-
-    // 👇 pede permissão de notificação logo na primeira interação
-    solicitarPermissaoNotificacao();
 
     const texto = userInput.value.trim();
     if (!texto) return;
@@ -11411,6 +12214,218 @@ function listarEtiquetasClara() {
     console.error("Erro em vektorResponderConfirmacaoPendencias:", e);
   }
 };
+
+// ====== INFO INICIAL POR PERFIL (apenas Administrador) ======
+let vektorJaPerguntouInfoIniciais = false;
+
+window.vektorPerguntarInformacoesIniciais = function () {
+  try {
+    // Só pergunta para Administrador
+    if (USER_ROLE_CLEAN !== "Administrador") return;
+
+    // Evita perguntar repetidamente
+    if (vektorJaPerguntouInfoIniciais) return;
+    vektorJaPerguntouInfoIniciais = true;
+
+    const html =
+      "HTML:" +
+      "<div class='text-sm text-slate-700'>" +
+        "<p>" +
+          "Antes de começarmos, você quer ver um resumo das principais informações de utilização do cartão Clara " +
+          "(maiores transações, times com mais pendências, estabelecimentos mais usados, categorias de gasto e últimas faturas)?" +
+        "</p>" +
+        "<div class='mt-2 flex gap-2'>" +
+          "<button type='button' " +
+                  "class='px-3 py-1 rounded bg-emerald-600 text-white text-xs' " +
+                  "onclick=\"window.vektorRespostaInfoIniciais('sim')\">" +
+            "Sim, mostrar agora" +
+          "</button>" +
+
+          "<button type='button' " +
+                  "class='px-3 py-1 rounded border border-slate-300 text-xs' " +
+                  "onclick=\"window.vektorRespostaInfoIniciais('nao')\">" +
+            "Não, deixar para depois" +
+          "</button>" +
+        "</div>" +
+      "</div>";
+
+    renderBotMessage(html);
+  } catch (e) {
+    console.error("Erro ao perguntar info iniciais:", e);
+  }
+};
+
+window.vektorRespostaInfoIniciais = function (resposta) {
+  try {
+    if (resposta === "nao") {
+      renderBotMessage(
+        "HTML:" +
+        "<p class='text-sm text-slate-700'>" +
+          "Perfeito, seguimos normalmente. Se depois quiser ver esses resumos gerenciais, é só pedir no chat. 👍" +
+        "</p>"
+      );
+      return;
+    }
+
+    // Caso SIM
+    renderBotMessage(
+      "HTML:" +
+      "<div class='text-sm text-slate-700'>" +
+        "<p>Beleza! Vou te mostrar algumas visões gerenciais separadas, conforme abaixo, e também alguns insights sobre essas visões:</p>" +
+        "<ul class='list-disc ml-4 mt-1 space-y-1'>" +
+          "<li><b>Maiores transações individuais</b> dos últimos 30 dias (Top 10);</li>" +
+          "<li><b>Times com mais pendências</b> nos últimos 30 dias;</li>" +
+          "<li><b>Estabelecimentos mais usados</b> (Top 10);</li>" +
+          "<li><b>Categorias com maior valor de transações</b> nos últimos 30 dias;</li>" +
+          "<li><b>Valor das últimas 6 faturas</b> Clara.</li>" +
+        "</ul>" +
+        "<p class='mt-2'>Irei enviar cada tabela em sequência.</p>" +
+      "</div>"
+    );
+
+    // Aguarda 1,5s e dispara o carregamento das tabelas
+    setTimeout(function () {
+      vektorCarregarInformacoesIniciais();
+    }, 2500);
+  } catch (e) {
+    console.error("Erro ao tratar resposta info iniciais:", e);
+  }
+};
+
+function vektorCarregarInformacoesIniciais() {
+  try {
+    if (USER_ROLE_CLEAN !== "Administrador") return;
+
+    const hoje = new Date();
+    const fim = hoje;
+    const ini = new Date();
+    ini.setDate(hoje.getDate() - 30);
+
+    const dataInicioIso = ini.toISOString();
+    const dataFimIso    = fim.toISOString();
+
+    // 1) Maiores transações individuais
+    try {
+      google.script.run
+        .withSuccessHandler(function (res) {
+          try { renderMaioresTransacoesIndividuais(res); }
+          catch (e) { console.error("Erro ao renderizar Maiores Transações (inicial):", e); }
+        })
+        .withFailureHandler(err => console.error("Erro Apps Script Maiores Transações (inicial):", err))
+        .getMaioresTransacoesIndividuais("", "", dataInicioIso, dataFimIso, 10);
+    } catch (e) {
+      console.error("Falha geral ao chamar Maiores Transações (inicial):", e);
+    }
+
+    // 2) Pendências por time (últimos 30 dias)
+          setTimeout(function () {
+            try {
+              google.script.run
+                .withSuccessHandler(function (res) {
+                  try {
+                    const htmlTabela = vektorRenderTabelaPendenciasPorTime(res, dataInicioIso, dataFimIso);
+                    renderBotMessage("HTML:" + htmlTabela);
+                  } catch (e) {
+                    console.error("Erro ao renderizar Pendências por time (inicial):", e);
+                  }
+                })
+                .withFailureHandler(function (err) {
+                  console.error("Erro Apps Script Pendências por time (inicial):", err);
+                })
+                .getResumoPendenciasPorTime(dataInicioIso, dataFimIso, "");
+            } catch (e) {
+              console.error("Falha geral ao chamar Pendências por time (inicial):", e);
+            }
+          }, 3000);
+
+    // 3) Estabelecimentos mais usados (Top 10)
+    setTimeout(function () {
+      try {
+        const tipo = "valor";
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            try {
+              renderResumoPorChaveGenerico(res, {
+                tipoChave: "Estabelecimento",
+                titulo: "<b>Locais com maior valor de gastos</b> - Top 10",
+                topN: 10
+              });
+            } catch (e) {
+              console.error("Erro ao renderizar Estabelecimentos (inicial):", e);
+            }
+          })
+          .withFailureHandler(err => console.error("Erro Apps Script Estabelecimentos (inicial):", err))
+          .getResumoTransacoesPorEstabelecimento(
+            dataInicioIso,   // <– CORRIGIDO
+            dataFimIso,      // <– CORRIGIDO
+            tipo,            // "valor"
+            "",              // grupo
+            ""               // loja
+          );
+      } catch (e) {
+        console.error("Falha geral ao chamar Estabelecimentos (inicial):", e);
+      }
+    }, 6000);
+
+    // 4) Categorias (já estava ok)
+    setTimeout(function () {
+      try {
+        const tipo = "valor";
+
+        google.script.run
+          .withSuccessHandler(function (res) {
+            try {
+              renderResumoPorChaveGenerico(res, {
+                tipoChave: "Categoria",
+                titulo: "Categorias com maior valor de transações"
+              });
+            } catch (e) {
+              console.error("Erro ao renderizar Categorias (inicial):", e);
+            }
+          })
+          .withFailureHandler(err => console.error("Erro Apps Script Categorias (inicial):", err))
+          .getResumoTransacoesPorCategoria(dataInicioIso, dataFimIso, tipo);
+      } catch (e) {
+        console.error("Falha geral ao chamar Categorias (inicial):", e);
+      }
+    }, 9000);
+
+    // 5) Últimas 6 faturas (já estava ok)
+    setTimeout(function () {
+      try {
+        google.script.run
+          .withSuccessHandler(function (res) {
+            try {
+              const todas = (res && res.faturas) || [];
+              if (!todas.length) return;
+
+              const selecionadas = vektorFiltrarFaturasPeloModo_(todas, "ultimas", 6);
+              if (!selecionadas.length) return;
+
+              const titulo = "VALOR DAS ÚLTIMAS " + selecionadas.length + " FATURAS";
+              const htmlTabela = vektorMontarTabelaFaturas_(titulo, selecionadas);
+
+              renderBotMessage("HTML:" + htmlTabela);
+
+              const htmlInsights = analisarFaturas(selecionadas);
+              if (htmlInsights) renderBotMessage("HTML:" + htmlInsights);
+
+            } catch (e) {
+              console.error("Erro ao renderizar Faturas (inicial):", e);
+            }
+          })
+          .withFailureHandler(err => console.error("Erro Apps Script Faturas (inicial):", err))
+          .getResumoFaturasClara();
+      } catch (e) {
+        console.error("Falha geral ao chamar Faturas (inicial):", e);
+      }
+    }, 12000);
+
+  } catch (e) {
+    console.error("Erro geral em vektorCarregarInformacoesIniciais:", e);
+  }
+}
 
 userInput.addEventListener("keydown", (e) => {
     const boxVisivel   = vektorBox && vektorBox.style.display === "block";
