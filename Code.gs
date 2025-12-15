@@ -70,6 +70,96 @@ const PROJECT_ID = 'cnto-data-lake';
 const BQ_TABLE_LOJAS = '`cnto-data-lake.refined.cnt_ref_gld_dim_estrutura_loja`';
 
 /**
+ * Busca demissões de gerentes (Senior/RH via BigQuery) a partir de uma data (inclusive).
+ * Retorna colunas: matricula, des_email_corporativo, des_titulo_cargo,
+ * nom_apelido_filial, nom_afastamento, dat_afastamento (dd/MM/yyyy)
+ *
+ * @param {string} desdeIso - "YYYY-MM-DD" (ex: "2025-12-01")
+ * @return {object} { ok: true, rows: [...] } ou { ok: false, error: "..." }
+ */
+function normalizarDataParaISO_(input) {
+  var s = (input || "").toString().trim();
+
+  // já está ISO (YYYY-MM-DD)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // está DD/MM/YYYY -> converte para YYYY-MM-DD
+  var m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return m[3] + "-" + m[2] + "-" + m[1];
+
+  // fallback seguro
+  return "2025-12-01";
+}
+
+function getUltimasDemissoesGerentes() {
+  try {
+    var query = `
+      WITH base AS (
+        SELECT
+          cod_matricula_colaborador AS matricula,
+          des_email_corporativo,
+          des_titulo_cargo,
+          nom_apelido_filial,
+          nom_afastamento,
+          COALESCE(
+            SAFE_CAST(dat_afastamento AS DATE),
+            DATE(SAFE_CAST(dat_afastamento AS TIMESTAMP)),
+            DATE(SAFE_CAST(dat_afastamento AS DATETIME)),
+            SAFE.PARSE_DATE('%d/%m/%Y', CAST(dat_afastamento AS STRING))
+          ) AS dat_afastamento_date
+        FROM \`cnto-data-lake.refined.cnt_ref_gld_dim_snr_funcionarios\`
+        WHERE dat_chave >= "2023-01-01"
+          AND des_titulo_cargo LIKE '%GERENTE%'
+          AND nom_afastamento = "Demitido"
+      )
+      SELECT
+        matricula,
+        des_email_corporativo,
+        des_titulo_cargo,
+        nom_apelido_filial,
+        nom_afastamento,
+        FORMAT_DATE('%d/%m/%Y', dat_afastamento_date) AS dat_afastamento
+      FROM base
+      WHERE dat_afastamento_date IS NOT NULL
+        AND dat_afastamento_date >= DATE_TRUNC(CURRENT_DATE("America/Sao_Paulo"), MONTH)
+        AND dat_afastamento_date < DATE_ADD(DATE_TRUNC(CURRENT_DATE("America/Sao_Paulo"), MONTH), INTERVAL 1 MONTH)
+      ORDER BY dat_afastamento_date DESC
+    `;
+
+    var request = {
+      query: query,
+      useLegacySql: false
+    };
+
+    var result = BigQuery.Jobs.query(request, PROJECT_ID);
+
+    if (!result || result.jobComplete !== true) {
+      throw new Error("Falha ao executar consulta no BigQuery (demissões).");
+    }
+
+    var rows = [];
+    if (result.rows && result.rows.length) {
+      rows = result.rows.map(function (r) {
+        var f = r.f || [];
+        return {
+          matricula:             (f[0] && f[0].v) ? f[0].v : "",
+          des_email_corporativo: (f[1] && f[1].v) ? f[1].v : "",
+          des_titulo_cargo:      (f[2] && f[2].v) ? f[2].v : "",
+          nom_apelido_filial:    (f[3] && f[3].v) ? f[3].v : "",
+          nom_afastamento:       (f[4] && f[4].v) ? f[4].v : "",
+          dat_afastamento:       (f[5] && f[5].v) ? f[5].v : ""
+        };
+      });
+    }
+
+    return { ok: true, rows: rows };
+
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : String(e) };
+  }
+}
+
+/**
  * Normaliza o código da loja (ex: "297" -> "0297")
  * e verifica se existe na tabela BigQuery
  * `cnto-data-lake.refined.cnt_ref_gld_dim_estrutura_loja` (coluna cod_loja).
@@ -3648,9 +3738,4 @@ function registrarMetricaVektor(payload) {
   } catch (e) {
     console.error('Erro ao registrar métrica do Vektor: ' + e);
   }
-}
-
-function testarUrlFetchScope() {
-  var resp = UrlFetchApp.fetch("https://www.google.com", { muteHttpExceptions: true });
-  Logger.log(resp.getResponseCode());
 }
