@@ -1761,6 +1761,106 @@ function getResumoTransacoesPorTimeExtrato(extratoConta, criterio) {
   }
 }
 
+function exportarTransacoesFaturaXlsx(extratoConta) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (info.error) {
+      return { ok: false, error: info.error };
+    }
+
+    var header = info.header || [];
+    var linhas = info.linhas || [];
+
+    // Coluna B = "Extrato da conta"
+    var idxExtrato = encontrarIndiceColuna_(header, ["Extrato da conta", "Extrato"]);
+    if (idxExtrato < 0) {
+      return { ok: false, error: "Coluna 'Extrato da conta' não encontrada." };
+    }
+
+    var alvo = String(extratoConta || "").trim();
+    var alvoNorm = normalizarTexto_(alvo);
+    if (!alvo) {
+      return { ok: false, error: "Extrato não informado." };
+    }
+
+    // A até W = 23 colunas
+    var COLS = 23;
+    var dados = [];
+    dados.push(header.slice(0, COLS));
+
+    for (var i = 0; i < linhas.length; i++) {
+      var row = linhas[i];
+      if (!row) continue;
+
+        var extratoLinha = String(row[idxExtrato] || "").trim();
+        var extratoNorm = normalizarTexto_(extratoLinha);
+        if (!extratoNorm || extratoNorm !== alvoNorm) continue;
+
+      dados.push(row.slice(0, COLS));
+    }
+
+    if (dados.length <= 1) {
+      return { ok: false, error: "Nenhuma transação encontrada para essa fatura." };
+    }
+
+    // Cria planilha temporária
+var ss = SpreadsheetApp.create("TMP_EXPORT_FATURA");
+var sh = ss.getActiveSheet();
+sh.getRange(1, 1, dados.length, dados[0].length).setValues(dados);
+
+// Garante que os dados foram gravados
+SpreadsheetApp.flush();
+
+// URL oficial de exportação do Drive (XLSX)
+var fileId = ss.getId();
+var url =
+  "https://www.googleapis.com/drive/v3/files/" +
+  fileId +
+  "/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+// Token OAuth do script
+var token = ScriptApp.getOAuthToken();
+
+// Faz download do XLSX
+var resp = UrlFetchApp.fetch(url, {
+  headers: {
+    Authorization: "Bearer " + token
+  },
+  muteHttpExceptions: true
+});
+
+// Apaga planilha temporária
+DriveApp.getFileById(fileId).setTrashed(true);
+
+// Valida resposta
+if (resp.getResponseCode() !== 200) {
+  return {
+    ok: false,
+    error: "Falha ao exportar XLSX (HTTP " + resp.getResponseCode() + ")"
+  };
+}
+
+// Converte para Base64
+var bytes = resp.getBlob().getBytes();
+var base64 = Utilities.base64Encode(bytes);
+
+// Nome do arquivo
+var filename =
+  "transacoes_fatura_" +
+  alvo.replace(/[^\w]+/g, "_") +
+  ".xlsx";
+
+return {
+  ok: true,
+  filename: filename,
+  xlsxBase64: base64
+};
+
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
 /**
  * Resumo de transações por CATEGORIA DA COMPRA (BaseClara).
  * 
@@ -3548,4 +3648,9 @@ function registrarMetricaVektor(payload) {
   } catch (e) {
     console.error('Erro ao registrar métrica do Vektor: ' + e);
   }
+}
+
+function testarUrlFetchScope() {
+  var resp = UrlFetchApp.fetch("https://www.google.com", { muteHttpExceptions: true });
+  Logger.log(resp.getResponseCode());
 }
