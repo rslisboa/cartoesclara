@@ -671,23 +671,6 @@ renderBotMessage(
   "</ul>"
 );
 
-// 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
-setTimeout(() => {
-    if (displayName) {
-        // Versão com nome
-        renderBotMessage(
-            "HTML:<p class='text-sm text-slate-700'><b>" +
-            displayName +
-            "</b>, como posso te ajudar agora?</p>"
-        );
-    } else {
-        // Versão sem nome (fallback)
-        renderBotMessage(
-            "HTML:<p class='text-sm text-slate-700'>Como posso te ajudar agora?</p>"
-        );
-    }
-}, 2000);
-
 setTimeout(function () {
   try {
     vektorPerguntarInformacoesIniciais();
@@ -6549,8 +6532,7 @@ if (!norm.includes("pendencia") && !norm.includes("pendencias")) {
     ultimaPendenciaResumo = null;
 
     return `HTML:<p class="text-sm text-slate-700">
-    Consigo consultar as pendências Clara da sua loja.<br/>
-    Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
+    Consigo consultar as pendências de justificativas Clara da sua loja. Me informe o código da loja (somente números), por exemplo: <b>0123</b>.
     </p>`;
 }
 
@@ -8800,8 +8782,12 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
     "<div class='text-sm text-slate-700' style='max-width:1000px;margin:12px auto 0;'>",
       "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>",
       // NOVA linha de orientação
-    "<p style='margin-bottom:8px;text-align:center;font-size:12px;color:#64748B;'>" +
-      "Clique na linha da fatura para verificar o valor detalhado por times." +
+    "<p style='margin-bottom:8px;text-align:center;font-size:13px;color:#000000;'>" +
+      "Clique na linha da fatura para verificar o valor detalhado por times." +  
+     "</p>" +  
+     
+     "<p style='margin-bottom:8px;text-align:center;font-size:13px;color:#000000;'>" +
+  "E clique em <b>Extrair dados</b> para verificar o relatório de transações da fatura." +
     "</p>",
       "<div style='overflow-x:auto;'>",
         "<table border='1' cellspacing='0' cellpadding='8' " +
@@ -8811,6 +8797,7 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
               "<th style='border:2px double #000;padding:6px;text-align:center;'>Fatura (período / extrato da conta)</th>",
               "<th style='border:2px double #000;padding:6px;text-align:center;'>Valor total (R$)</th>",
               "<th style='border:2px double #000;padding:6px;text-align:center;'>Variação</th>",
+              "<th style='border:2px double #000;padding:6px;text-align:center;'>Extração</th>",
             "</tr>",
           "</thead>",
           "<tbody>"
@@ -8862,24 +8849,47 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
     }
 
     // 🔽 linha clicável para drilldown por time (usando EXTRATO e período)
+
+    // dentro do forEach das faturas, onde você faz partes.push("<tr ...>", "<td>...</td>", ...)
+
     partes.push(
-      "<tr onclick=\"window.vektorDrillTimesFatura(this)\" " +
-          "style='cursor:pointer;' " +
-          "data-extrato-fatura='" + (f.extrato || "") + "' " +
-          "data-inicio-fatura='" + (f.dataInicioIso || "") + "' " +
-          "data-fim-fatura='" + (f.dataFimIso || "") + "' " +
-          "title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\">",
-        "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-          (f.extrato || "") +
-        "</td>",
-        "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-          valorFmt +
-        "</td>",
-        "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-          variacaoTexto +
-        "</td>",
-      "</tr>"
-    );
+  "<tr onclick=\"window.vektorDrillTimesFatura(this)\" " +
+      "style='cursor:pointer;' " +
+      "data-extrato-fatura='" + (f.extrato || "") + "' " +
+      "data-inicio-fatura='" + (f.dataInicioIso || "") + "' " +
+      "data-fim-fatura='" + (f.dataFimIso || "") + "'>",
+
+    // TD 1 (com tooltip)
+    "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
+        "style='border:2px double #000;padding:6px;text-align:center;'>" +
+      (f.extrato || "") +
+    "</td>",
+
+    // TD 2 (com tooltip)
+    "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
+        "style='border:2px double #000;padding:6px;text-align:center;'>" +
+      valorFmt +
+    "</td>",
+
+    // TD 3 (com tooltip)
+    "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
+        "style='border:2px double #000;padding:6px;text-align:center;'>" +
+      variacaoTexto +
+    "</td>",
+
+    // TD 4 (SEM tooltip e SEM string quebrável)
+"<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+  "<a href='#' title='' " +
+     "data-extrato=\"" + encodeURIComponent(String(f.extrato || "")) + "\" " +
+     "onclick=\"return window.vektorBaixarTransacoesFaturaLink(event, this); return false;\" " +
+     "style='color:#005E27;font-weight:700;text-decoration:underline;'>" +
+    "Extrair dados" +
+  "</a>" +
+"</td>",
+
+
+  "</tr>"
+);
 
     valorAnterior = valor;
   });
@@ -8891,17 +8901,16 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
   });
 
   partes.push(
-    "<tr style='background:#f1f5f9;font-weight:bold;'>",
-      "<td style='border:2px double #000;padding:6px;text-align:center;'>TOTAL</td>",
-      "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-        somaFmt +
-      "</td>",
-      "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
-    "</tr>",
-    "</tbody>",
-    "</table>",
-    "</div>"
-  );
+  "<tr style='background:#f1f5f9;font-weight:bold;'>",
+    "<td style='border:2px double #000;padding:6px;text-align:center;'>TOTAL</td>",
+    "<td style='border:2px double #000;padding:6px;text-align:center;'>" + somaFmt + "</td>",
+    "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
+    "<td style='border:2px double #000;padding:6px;text-align:center;'></td>", // ✅ nova coluna
+  "</tr>",
+  "</tbody>",
+  "</table>",
+  "</div>"
+);
 
   // ─────────────────────────────────────────────────────────────
   // BLOCO NOVO: comentários automáticos (insights) sobre as faturas
@@ -9431,6 +9440,81 @@ window.vektorDrillTimesFatura = function (tr) {
       .getResumoTransacoesPorTimeExtrato(extrato, "valor");  // usa EXTRATO
   } catch (e) {
     console.error("Erro em vektorDrillTimesFatura:", e);
+  }
+};
+
+window.vektorBaixarTransacoesFaturaLink = function (ev, el) {
+  try {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation(); // ✅ impede disparar o onclick do <tr>
+    }
+
+    var extratoEnc = (el && el.getAttribute("data-extrato")) || "";
+    var extrato = decodeURIComponent(extratoEnc || "");
+
+    return window.vektorBaixarTransacoesFatura(ev, extrato);
+  } catch (e) {
+    console.error("Erro em vektorBaixarTransacoesFaturaLink:", e);
+    return false;
+  }
+};
+
+window.vektorBaixarTransacoesFatura = function (ev, extrato) {
+  try {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation(); // ✅ evita disparar o drilldown da <tr>
+    }
+
+    extrato = (extrato || "").toString().trim();
+    if (!extrato) {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Não consegui identificar o extrato para exportar.</p>");
+      return false;
+    }
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Gerando arquivo em excel da fatura <b>" + extrato + " "
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+                if (!res || !res.ok || !res.xlsxBase64) {
+                var msg = (res && res.error) ? res.error : "Não consegui gerar o Excel dessa fatura.";
+                renderBotMessage("HTML:<p class='text-sm text-slate-700'><b>Falha ao exportar:</b> " + msg + "</p>");
+                console.error("Resposta export XLSX:", res);
+                return;
+              }
+
+        // base64 -> bytes
+        var b64 = res.xlsxBase64;
+        var byteChars = atob(b64);
+        var byteNumbers = new Array(byteChars.length);
+        for (var i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+        var byteArray = new Uint8Array(byteNumbers);
+
+        var blob = new Blob([byteArray], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+        var url = URL.createObjectURL(blob);
+
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = res.filename || "transacoes_fatura.xlsx";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      })
+      .withFailureHandler(function (err) {
+        console.error("Erro ao gerar CSV da fatura:", err);
+        renderBotMessage("HTML:<p class='text-sm text-slate-700'>Erro ao gerar o CSV dessa fatura.</p>");
+      })
+      .exportarTransacoesFaturaXlsx(extrato);
+
+    return false;
+  } catch (e) {
+    console.error("Erro em vektorBaixarTransacoesFatura:", e);
+    return false;
   }
 };
 
@@ -12231,20 +12315,15 @@ window.vektorPerguntarInformacoesIniciais = function () {
       "HTML:" +
       "<div class='text-sm text-slate-700'>" +
         "<p>" +
-          "Antes de começarmos, você quer ver um resumo das principais informações de utilização do cartão Clara " +
-          "(maiores transações, times com mais pendências, estabelecimentos mais usados, categorias de gasto e últimas faturas)?" +
+          "Se você quer ver um resumo das principais informações de utilização do cartão Clara " +
+          "(maiores transações, times com mais pendências, estabelecimentos mais usados, categorias de gasto e últimas faturas), clique no botão abaixo" +
         "</p>" +
         "<div class='mt-2 flex gap-2'>" +
           "<button type='button' " +
                   "class='px-3 py-1 rounded bg-emerald-600 text-white text-xs' " +
                   "onclick=\"window.vektorRespostaInfoIniciais('sim')\">" +
-            "Sim, mostrar agora" +
-          "</button>" +
+            "Mostrar resumo" +
 
-          "<button type='button' " +
-                  "class='px-3 py-1 rounded border border-slate-300 text-xs' " +
-                  "onclick=\"window.vektorRespostaInfoIniciais('nao')\">" +
-            "Não, deixar para depois" +
           "</button>" +
         "</div>" +
       "</div>";
