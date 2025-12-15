@@ -671,9 +671,32 @@ renderBotMessage(
   "</ul>"
 );
 
+// 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
+// ✅ Só para NÃO Administrador
+setTimeout(() => {
+
+    // Se for ADM, NÃO mostra essa saudação (ADM já tem o fluxo do informativo + pergunta inicial)
+    if (USER_ROLE_CLEAN === "Administrador") return;
+
+    if (displayName) {
+        // Versão com nome
+        renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'><b>" +
+            displayName +
+            "</b>, como posso te ajudar hoje?</p>"
+        );
+    } else {
+        // Versão sem nome (fallback)
+        renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Como posso te ajudar hoje?</p>"
+        );
+    }
+}, 2000);
+
 setTimeout(function () {
   try {
-    vektorPerguntarInformacoesIniciais();
+    // ✅ Agora NÃO mostra demissões no carregamento
+    window.vektorPerguntarInformacoesIniciais();
   } catch (e) {
     console.error("Erro ao disparar pergunta de info iniciais:", e);
   }
@@ -1971,7 +1994,13 @@ function encontrarTimeNaMensagem(msgOriginal) {
     // separa em palavras e tira preposições/coisas fracas
     const tokens = nomeNorm
       .split(" ")
-      .filter(t => !["do","da","de","dos","das","sp","sul"].includes(t));
+      .filter(t => {
+          if (!t) return false;
+          if (["do","da","de","dos","das","sp","sul"].includes(t)) return false;
+          if (t.length < 3) return false; // elimina "i", "ii", etc.
+          return true;
+        });
+
 
     let score = 0;
 
@@ -5616,6 +5645,27 @@ const INTENT_RULES = [
   run: function (msgOriginal, norm) {
     return "ACAO_LISTAR_ETIQUETAS_CLARA";
   }}
+
+  ,{
+  id: "INTENT_LISTA_DEMISSOES",
+  minScore: 2,
+  score: function (norm, msgOriginal) {
+    // aceita variações simples
+    const falaDemissoes =
+      norm.includes("lista de demissoes") ||
+      norm.includes("lista de demissões");
+
+    // força ser bem intencional: "lista" + "demissões"
+    const falaLista =
+      norm.includes("lista") || norm.includes("listagem");
+
+    return (falaDemissoes && falaLista) ? 3 : 0;
+  },
+  run: function (msgOriginal, norm) {
+    return "ACAO_LISTA_DEMISSOES";
+  }
+}
+
 ];
 
   // ➜ Futuro: aqui você adiciona novas regras:
@@ -11614,8 +11664,17 @@ function detectarPerguntaLojaMaisTransacoes(msgOriginal, norm) {
   // intervalo de datas (ontem, esse mês, mês passado, "de 1 a 30 de outubro", etc.)
   const periodo = extrairIntervaloDatas(msgOriginal);
 
-  // tenta achar um dos TIMES_OFICIAIS no texto
-  const grupoNomeOficial = encontrarTimeNaMensagem(msgOriginal); // pode ser null
+  // Só tenta achar time se a frase falar explicitamente de time/grupo/equipe
+  const falaDeTime =
+    texto.includes("time ")  ||
+    texto.includes("times ") ||
+    texto.includes("grupo ") ||
+    texto.includes("equipe") ||
+    texto.includes("equipes");
+
+  // tenta achar um dos TIMES_OFICIAIS no texto APENAS se fez sentido procurar
+  const grupoNomeOficial = falaDeTime ? encontrarTimeNaMensagem(msgOriginal) : null;
+
 
   // se falou de "valor" (gastou/comprou), é consulta por valor; senão, por quantidade
   const tipo = falaDeValor ? "valor" : "quantidade";
@@ -12257,6 +12316,19 @@ function listarEtiquetasClara() {
         return;
     }
 
+    // Se a intenção for listar demissões, só ADM pode ver
+if (resposta === "ACAO_LISTA_DEMISSOES") {
+  if (USER_ROLE_CLEAN !== "Administrador") {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil Administrador.</p>"
+    );
+    return;
+  }
+
+  window.vektorMostrarTabelaDemissoesAdmin();
+  return;
+}
+
     if (resposta) renderBotMessage(resposta);
 
     // Depois de responder normalmente, avalia se faz sentido sugerir algo do Manual da Clara
@@ -12334,6 +12406,89 @@ window.vektorPerguntarInformacoesIniciais = function () {
   }
 };
 
+window.vektorMostrarTabelaDemissoesAdmin = function () {
+  try {
+    // Só Administrador
+    if (USER_ROLE_CLEAN !== "Administrador") return;
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        try {
+          if (!res || !res.ok) {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Não consegui consultar as demissões no momento.</p>"
+            );
+            return;
+          }
+
+          const rows = Array.isArray(res.rows) ? res.rows : [];
+
+          // Se não tiver demissões desde a data, mostra mensagem curta e segue o fluxo
+          if (!rows.length) {
+            renderBotMessage(
+              "HTML:<div class='text-sm text-slate-700'>" +
+                "<p><b>Conforme consulta efetuada no sistema de informações do RH (Senior)</b>, não há demissões de gerentes registradas desde <b>01/12/2025</b>.</p>" +
+              "</div>"
+            );
+            return;
+          }
+
+          // Monta tabela
+                let html =
+                  "<div class='text-sm'>" +
+                    "<p>Conforme consulta efetuada no sistema de informações do RH (Senior), segue abaixo tabela com as últimas demissões ocorridas.</p>" +
+                    "<div class='mt-2 overflow-x-auto'>" +
+                      "<table class='min-w-full text-xs border border-slate-200'>" +
+                        "<thead class='bg-slate-100'>" +
+                          "<tr>" +
+                            "<th class='border px-2 py-1 text-center'>Matrícula</th>" +
+                            "<th class='border px-2 py-1 text-center'>E-mail</th>" +
+                            "<th class='border px-2 py-1 text-center'>Cargo</th>" +
+                            "<th class='border px-2 py-1 text-center'>Filial</th>" +
+                            "<th class='border px-2 py-1 text-center'>Afastamento</th>" +
+                            "<th class='border px-2 py-1 text-center'>Data Afastamento</th>" +
+                          "</tr>" +
+                        "</thead>" +
+                        "<tbody class='!text-black'>";
+
+                rows.forEach(function (r) {
+                  html +=
+                    "<tr>" +
+                      "<td class='border px-2 py-1 !text-black'>" + (r.matricula || "") + "</td>" +
+                      "<td class='border px-2 py-1 !text-black'>" + (r.des_email_corporativo || "") + "</td>" +
+                      "<td class='border px-2 py-1 !text-black'>" + (r.des_titulo_cargo || "") + "</td>" +
+                      "<td class='border px-2 py-1 !text-black'>" + (r.nom_apelido_filial || "") + "</td>" +
+                      "<td class='border px-2 py-1 !text-black'>" + (r.nom_afastamento || "") + "</td>" +
+                      "<td class='border px-2 py-1 !text-black'>" + (r.dat_afastamento || "") + "</td>" +
+                    "</tr>";
+                });
+
+          html +=
+                  "</tbody>" +
+                "</table>" +
+              "</div>" +
+              "<p class='mt-2'><b>Atenção:</b> Verifique se o cartão do(a) Gerente já está bloqueado e cancelado, assim como o perfil deve ser desabilitado na base da Clara também.</p>" +
+            "</div>";
+
+          renderBotMessage("HTML:" + html);
+
+        } catch (e) {
+          console.error("Erro ao renderizar tabela de demissões:", e);
+        }
+      })
+      .withFailureHandler(function (err) {
+        console.error("Erro Apps Script (demissões):", err);
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Tive um erro ao consultar as demissões no BigQuery.</p>"
+        );
+      })
+      .getUltimasDemissoesGerentes();
+
+  } catch (e) {
+    console.error("Erro geral em vektorMostrarTabelaDemissoesAdmin:", e);
+  }
+};
+
 window.vektorRespostaInfoIniciais = function (resposta) {
   try {
     if (resposta === "nao") {
@@ -12365,7 +12520,7 @@ window.vektorRespostaInfoIniciais = function (resposta) {
     // Aguarda 1,5s e dispara o carregamento das tabelas
     setTimeout(function () {
       vektorCarregarInformacoesIniciais();
-    }, 2500);
+    }, 1500);
   } catch (e) {
     console.error("Erro ao tratar resposta info iniciais:", e);
   }
