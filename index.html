@@ -8797,6 +8797,116 @@ function vektorRenderTabelaFrequenciaUso(resp) {
   renderBotMessage("HTML:" + html);
 }
 
+function vektorRenderTabelaListaItensComprados(res) {
+  if (!res || !res.ok) {
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>" + (res && res.error ? res.error : "Erro ao buscar itens.") + "</p>");
+    return;
+  }
+
+  const rows = res.rows || [];
+  if (!rows.length) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Não encontrei itens para <b>" +
+      (res.tipoFiltro || "") + ": " + (res.valorFiltro || "") +
+      "</b> no período <b>" + res.periodo.inicio + "</b> a <b>" + res.periodo.fim + "</b>.</p>"
+    );
+    return;
+  }
+
+  // Insights rápidos
+  const total = (res.resumo && res.resumo.total) || rows.length;
+  const alertas = (res.resumo && res.resumo.alertas) || 0;
+  const revisar = (res.resumo && res.resumo.revisar) || 0;
+
+  const insightsHtml = [
+    "<div class='mt-2 text-sm text-slate-700'>",
+      "<b>Resumo:</b> ", total, " itens | ",
+      "<b>ALERTA:</b> ", alertas, " | ",
+      "<b>REVISAR:</b> ", revisar,
+      "<div class='mt-1 text-xs text-slate-500'>Observação: a classificação é heurística baseada em descrição livre; use como triagem e valide comprovantes/etiquetas.",
+  ].join("");
+
+          // Tabela
+          let thead = `
+            <thead>
+              <tr style="background:#00FFFF;color:#0F172A; position: sticky; top: 0; z-index: 2;">
+                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Data</th>
+                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Valor (R$)</th>
+                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Lojas</th>
+                <th class="px-3 py-2 text-left text-sm font-semibold">Item Comprado</th>
+                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Conformidade</th>
+                <th class="px-3 py-2 text-left text-sm font-semibold">Motivo</th>
+                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Reincidência</th>
+              </tr>
+            </thead>
+          `;
+
+
+
+  let tbody = rows.map(r => {
+    const v = (Number(r.valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const status = r.status || "";
+    const badge =
+      status === "ALERTA" ? "<span class='px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700'>ALERTA</span>" :
+      status === "OK"     ? "<span class='px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700'>OK</span>" :
+                            "<span class='px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-700'>REVISAR</span>";
+
+    return `
+              <tr class="border-t border-slate-200">
+              <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">${r.data || ""}</td>
+              <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">R$ ${v}</td>
+              <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">${(r.loja || "").replace(/</g,"&lt;")}</td>
+
+              <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">
+                <div style="white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.35;">
+                  ${(r.item || "").replace(/</g,"&lt;")}
+                </div>
+              </td>
+
+              <td class="px-3 py-2 text-sm border-r border-slate-400">${badge}</td>
+
+              <td class="px-3 py-2 text-sm text-slate-700 border-r border-slate-400">
+                <div style="white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.35;">
+                  ${(r.motivo || "").replace(/</g,"&lt;")}
+                </div>
+              </td>
+
+              <td class="px-3 py-2 text-sm text-slate-700">
+                ${(r.reincidencia || "").replace(/</g,"&lt;")}
+              </td>
+            </tr>
+        `;
+        }).join("");
+
+  const tabelaHtml = `
+        <div class="mt-2" style="max-width:100%; width:100%; min-width:0; overflow:hidden;">
+          <div class="text-sm text-slate-700">
+            <b>Lista de itens comprados</b> — ${res.tipoFiltro}: <b>${res.valorFiltro}</b> — período <b>${res.periodo.inicio}</b> a <b>${res.periodo.fim}</b>
+
+          ${insightsHtml}
+
+          <div class="mt-3 overflow-x-auto" style="max-width:100%;">
+            <table class="min-w-full border border-slate-200 rounded-lg">
+              ${thead}
+              <tbody>${tbody}</tbody>
+            </table>
+          </div>
+
+          <div class="mt-3" style="width:100%; display:flex; justify-content:flex-end;">
+
+            <button type="button"
+              onclick="exportTableToCSV(this, 'lista_itens_comprados.csv')"
+              style="all:unset; cursor:pointer; background:#005E27; color:#fff; padding:10px 16px; border-radius:10px; font-weight:700; display:inline-flex; align-items:center; white-space:nowrap;">
+              Exportar CSV
+            </button>
+
+          </div>
+        </div>
+      `;
+
+  renderBotMessage("HTML:" + tabelaHtml);
+}
+
 // ========= Botões "Verificar pendências / justificativas" (tabelas de LOJAS) ========= //
 
 function vektorMontarTabelaPendJust_(titulo, colunas, linhas) {
@@ -12440,53 +12550,52 @@ function listarEtiquetasClara() {
         );
 
         google.script.run
-  .withSuccessHandler(function (res) {
-    if (res && res.ok) {
-      // Mensagem principal + link do Drive na mesma frase
-      renderBotMessage(
-        "HTML:" +
-        "<p class='text-sm text-slate-700'>" +
-          "Termo de Responsabilidade salvo com sucesso para <b>" + nomeCompleto + "</b>. " +
-          (res.fileUrl
-            ? "Link interno (Drive): <a href='" + res.fileUrl +
-              "' target='_blank' class='text-slate-700 underline'>Abrir Termo</a>."
-            : ""
-          ) +
-        "</p>"
-      );
+            .withSuccessHandler(function (res) {
+                if (res && res.ok) {
+                    // Mensagem principal + link do Drive na mesma frase
+                    renderBotMessage(
+                        "HTML:" +
+                        "<p class='text-sm text-slate-700'>" +
+                        "Termo de Responsabilidade salvo com sucesso para <b>" + nomeCompleto + "</b>. " +
+                        (res.fileUrl
+                            ? "Link interno (Drive): <a href='" + res.fileUrl +
+                            "' target='_blank' class='text-slate-700 underline'>Abrir Termo</a>."
+                            : ""
+                        ) +
+                        "</p>"
+                    );
 
-      // Mensagem complementar em outra bolha
-      setTimeout(function () {
-        renderBotMessage(
-          "HTML:" +
-          "<p class='text-sm text-slate-700'>" +
-            "Caso o cartão ainda esteja impossibilitado de uso devido ao não envio do Termo assinado, " +
-            "em breve ele estará ativo. Fique de olho no aplicativo da Clara." +
-          "</p>"
-        );
-      }, 3000);
+                    // Mensagem complementar em outra bolha
+                    setTimeout(function () {
+                        renderBotMessage(
+                            "HTML:" +
+                            "<p class='text-sm text-slate-700'>" +
+                            "Caso o cartão ainda esteja impossibilitado de uso devido ao não envio do Termo assinado, " +
+                            "em breve ele estará ativo. Fique de olho no aplicativo da Clara." +
+                            "</p>"
+                        );
+                    }, 3000);
 
-    } else {
-      // Caso o backend tenha retornado ok: false
-      renderBotMessage(
-        "HTML:" +
-        "<p class='text-sm text-red-700'>Não consegui salvar o termo. Motivo: " +
-        (res && res.error ? res.error : "erro desconhecido") +
-        "</p>"
-      );
-    }
-  })
-  .withFailureHandler(function (err) {
-    // Erro de comunicação Apps Script
-    renderBotMessage(
-      "HTML:" +
-      "<p class='text-sm text-red-700'>Falha na comunicação ao salvar o termo: " +
-      (err && err.message ? err.message : err) +
-      "</p>"
-    );
-  })
-  .salvarTermoResponsabilidade(payload);
-
+                } else {
+                    // Caso o backend tenha retornado ok: false
+                    renderBotMessage(
+                        "HTML:" +
+                        "<p class='text-sm text-red-700'>Não consegui salvar o termo. Motivo: " +
+                        (res && res.error ? res.error : "erro desconhecido") +
+                        "</p>"
+                    );
+                }
+            })
+            .withFailureHandler(function (err) {
+                // Erro de comunicação Apps Script
+                renderBotMessage(
+                    "HTML:" +
+                    "<p class='text-sm text-red-700'>Falha na comunicação ao salvar o termo: " +
+                    (err && err.message ? err.message : err) +
+                    "</p>"
+                );
+            })
+            .salvarTermoResponsabilidade(payload);
 
         // IMPORTANTE: não segue para o fluxo normal de pergunta/resposta
         return;
@@ -12496,83 +12605,173 @@ function listarEtiquetasClara() {
 
     // Normaliza o texto para busca de intenção
     const norm = normalize(texto || "");
-    const resposta = gerarRespostaDoBot(texto);
 
     // =====================================================
-// ✅ FREQUÊNCIA DE USO CLARA (POR TIME OU LOJA)
-// =====================================================
-if (norm.startsWith("frequencia de uso clara")) {
+    // ✅ FREQUÊNCIA DE USO CLARA (POR TIME OU LOJA)
+    // =====================================================
+    if (norm.startsWith("frequencia de uso clara")) {
 
-  let tipo = "";
-  let valor = "";
+        let tipo = "";
+        let valor = "";
 
-  // Captura "para time ..." ou "para o time ..." e para antes do período ("nos ultimos X meses")
-  const mTime = norm.match(/\bpara\s+(?:o\s+)?time\b\s*[:\-]?\s*([\s\S]+?)(?=\s+\b(?:no|nos|na|nas)\s+ultim[oa]s?\b|$)/i);
+        // Captura "para time ..." ou "para o time ..." e para antes do período ("nos ultimos X meses")
+        const mTime = norm.match(/\bpara\s+(?:o\s+)?time\b\s*[:\-]?\s*([\s\S]+?)(?=\s+\b(?:no|nos|na|nas)\s+ultim[oa]s?\b|$)/i);
 
-  // Captura "para loja ..." ou "para a loja ..." e para antes do período
-  const mLoja = norm.match(/\bpara\s+(?:a\s+)?loja\b\s*[:\-]?\s*([\s\S]+?)(?=\s+\b(?:no|nos|na|nas)\s+ultim[oa]s?\b|$)/i);
+        // Captura "para loja ..." ou "para a loja ..." e para antes do período
+        const mLoja = norm.match(/\bpara\s+(?:a\s+)?loja\b\s*[:\-]?\s*([\s\S]+?)(?=\s+\b(?:no|nos|na|nas)\s+ultim[oa]s?\b|$)/i);
 
-  if (mLoja) {
-    tipo = "loja";
+        if (mLoja) {
+            tipo = "loja";
 
-    // ✅ pega SOMENTE o número da loja (funciona com autocomplete: "0242 - Loja X")
-    const matchNum = (mLoja[1] || "").match(/\d{1,6}/);
-    valor = matchNum ? matchNum[0] : "";
+            // ✅ pega SOMENTE o número da loja (funciona com autocomplete: "0242 - Loja X")
+            const matchNum = (mLoja[1] || "").match(/\d{1,6}/);
+            valor = matchNum ? matchNum[0] : "";
 
-    if (!valor) {
-      renderBotMessage(
-        "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o número da loja. Ex.: <b>frequência de uso Clara para a loja 242</b>.</p>"
-      );
-      return;
+            if (!valor) {
+                renderBotMessage(
+                    "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o número da loja. Ex.: <b>frequência de uso Clara para a loja 242</b>.</p>"
+                );
+                return;
+            }
+
+        } else if (mTime) {
+            tipo = "time";
+            valor = (mTime[1] || "").trim();
+
+            // ✅ remove complemento de período do "valor" do time (caso venha colado)
+            valor = valor
+                .replace(/\s+(no|nos|na|nas)\s+ultim[oa]s?\s+.*$/i, "")
+                .trim();
+
+            // fallback: corta em " ultimos " ou " ultimo " se ainda sobrar algo
+            valor = valor
+                .split(" ultimos ")[0]
+                .split(" ultimo ")[0]
+                .trim();
+
+            if (!valor) {
+                renderBotMessage(
+                    "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o nome do time. Ex.: <b>frequência de uso Clara para o time Furacão Sul</b>.</p>"
+                );
+                return;
+            }
+
+        } else {
+            renderBotMessage(
+                "HTML:<p class='text-sm text-slate-700'>Me diga se é por <b>time</b> ou por <b>loja</b>. Ex.: <b>frequência de uso Clara para a loja 242</b>.</p>"
+            );
+            return;
+        }
+
+        const mesesBack = vektorParseMesesBack(norm);
+
+        renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Consultando frequência de uso…</p>"
+        );
+
+        google.script.run
+            .withSuccessHandler(vektorRenderTabelaFrequenciaUso)
+            .withFailureHandler(function (err) {
+                console.error(err);
+                renderBotMessage(
+                    "HTML:<p class='text-sm text-slate-700'>Falha ao consultar frequência de uso.</p>"
+                );
+            })
+            .getFrequenciaUsoClara(tipo, valor, mesesBack);
+
+        return; // ⛔ IMPORTANTE: impede cair no fluxo genérico
     }
 
-  } else if (mTime) {
-    tipo = "time";
-    valor = (mTime[1] || "").trim();
+    // =====================================================
+    // ✅ LISTA ITENS COMPRADOS (ADM) — por TIME ou LOJA + período
+    // =====================================================
+    // ✅ aceita: "lista itens comprados..." e também "itens comprados..."
+        const isCmdListaItens =
+          /^\s*lista(\s+de)?\s+itens\s+comprad/i.test(norm) ||
+          /^\s*itens\s+comprad/i.test(norm);
 
-    // ✅ remove complemento de período do "valor" do time (caso venha colado)
-    valor = valor
-      .replace(/\s+(no|nos|na|nas)\s+ultim[oa]s?\s+.*$/i, "")
-      .trim();
+        if (isCmdListaItens) {
 
-    // fallback: corta em " ultimos " ou " ultimo " se ainda sobrar algo
-    valor = valor
-      .split(" ultimos ")[0]
-      .split(" ultimo ")[0]
-      .trim();
 
-    if (!valor) {
-      renderBotMessage(
-        "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o nome do time. Ex.: <b>frequência de uso Clara para o time Furacão Sul</b>.</p>"
-      );
-      return;
+        // 🔒 Apenas Administrador
+        if (typeof USER_ROLE_REPLACED !== "undefined" && USER_ROLE_REPLACED !== "Administrador") {
+            renderBotMessage(
+                "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil <b>Administrador</b>.</p>"
+            );
+            return;
+        }
+
+        let tipo = "";
+        let valor = "";
+
+        // Captura “por time ...”
+        const mTime = norm.match(/\b(?:por|para)\s+(?:o|os)?\s*times?\b\s*[:\-]?\s*([\s\S]+?)(?=\s+\b(?:de|no|nos|na|nas|nessa|nesta|neste|ultima|última|ultimos|últimos|semana|mes|mês)\b|$)/i);
+
+        // Captura “por loja ...”
+        const mLoja = norm.match(/\b(?:por|para)\s+(?:a|as)?\s*lojas?\b\s*[:\-]?\s*([\s\S]+?)(?=\s+\b(?:de|no|nos|na|nas|nessa|nesta|neste|ultima|última|ultimos|últimos|semana|mes|mês)\b|$)/i);
+
+        if (mTime && mTime[1]) {
+            tipo = "time";
+            valor = (mTime[1] || "").trim();
+        } else if (mLoja && mLoja[1]) {
+            tipo = "loja";
+
+            // ✅ pega SOMENTE o número da loja (evita "0255 - CE255 - ..." quebrar filtro)
+            const matchNum = (mLoja[1] || "").match(/\d{1,6}/);
+            valor = matchNum ? matchNum[0] : "";
+        } else {
+            renderBotMessage(
+                "HTML:<p class='text-sm text-slate-700'>Me diga se é por <b>loja</b> ou por <b>time</b>. Ex.: <b>lista itens comprados por loja 0287 de 01/12/2025 a 15/12/2025</b>.</p>"
+            );
+            return;
+        }
+
+        // ✅ remove "este mês / neste mês" que veio grudado no nome do time/loja
+        valor = valor.replace(/\b(neste|nesta|este|esta)\s+mes\b.*$/i, "").trim();
+
+        if (!valor) {
+            renderBotMessage(
+                "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o filtro. Ex.: <b>lista itens comprados por loja 0287 este mês</b> ou <b>...por time Lobos SP este mês</b>.</p>"
+            );
+            return;
+        }
+
+        // Extrai período usando o parser padrão do projeto
+        const periodo = extrairIntervaloDatas(texto);
+        if (!periodo || !periodo.dataInicio || !periodo.dataFim) {
+            renderBotMessage(
+                "HTML:<p class='text-sm text-slate-700'>Informe um período. Ex.: <b>de 01/12/2025 a 15/12/2025</b> (ou use <b>este mês</b>, <b>últimos 30 dias</b> etc.).</p>"
+            );
+            return;
+        }
+
+        function fmtBR(d) {
+            const dd = String(d.getDate()).padStart(2, "0");
+            const mm = String(d.getMonth() + 1).padStart(2, "0");
+            const yyyy = d.getFullYear();
+            return `${dd}/${mm}/${yyyy}`;
+        }
+
+        const dataIni = fmtBR(periodo.dataInicio);
+        const dataFim = fmtBR(periodo.dataFim);
+
+        renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Consultando itens comprados (" + tipo + ": <b>" + valor + "</b>) de <b>" + dataIni + "</b> a <b>" + dataFim + "</b>…</p>"
+        );
+
+        google.script.run
+            .withSuccessHandler(vektorRenderTabelaListaItensComprados)
+            .withFailureHandler(function (err) {
+                console.error(err);
+                renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao listar itens comprados.</p>");
+            })
+            .getListaItensCompradosClara(tipo, valor, dataIni, dataFim, 15);
+
+        return; // ⛔ não cair no fluxo genérico
     }
 
-  } else {
-    renderBotMessage(
-      "HTML:<p class='text-sm text-slate-700'>Me diga se é por <b>time</b> ou por <b>loja</b>. Ex.: <b>frequência de uso Clara para a loja 242</b>.</p>"
-    );
-    return;
-  }
-
-  const mesesBack = vektorParseMesesBack(norm);
-
-  renderBotMessage(
-    "HTML:<p class='text-sm text-slate-700'>Consultando frequência de uso…</p>"
-  );
-
-  google.script.run
-    .withSuccessHandler(vektorRenderTabelaFrequenciaUso)
-    .withFailureHandler(function (err) {
-      console.error(err);
-      renderBotMessage(
-        "HTML:<p class='text-sm text-slate-700'>Falha ao consultar frequência de uso.</p>"
-      );
-    })
-    .getFrequenciaUsoClara(tipo, valor, mesesBack);
-
-  return; // ⛔ IMPORTANTE: impede cair no fluxo genérico
-}
+    // ✅ Agora sim: gera a resposta (e então usa ACOES)
+    const resposta = gerarRespostaDoBot(texto);
 
     // Se a intenção for listar etiquetas, chama a função específica e para aqui
     if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
@@ -12580,23 +12779,23 @@ if (norm.startsWith("frequencia de uso clara")) {
         return;
     }
 
-        if (resposta === "ACAO_FREQUENCIA_USO_CLARA") {
-            vektorMostrarFrequenciaUsoClara(texto);
-            return;
-          }
+    if (resposta === "ACAO_FREQUENCIA_USO_CLARA") {
+        vektorMostrarFrequenciaUsoClara(texto);
+        return;
+    }
 
     // Se a intenção for listar demissões, só ADM pode ver
-if (resposta === "ACAO_LISTA_DEMISSOES") {
-  if (USER_ROLE_CLEAN !== "Administrador") {
-    renderBotMessage(
-      "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil Administrador.</p>"
-    );
-    return;
-  }
+    if (resposta === "ACAO_LISTA_DEMISSOES") {
+        if (USER_ROLE_CLEAN !== "Administrador") {
+            renderBotMessage(
+                "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil Administrador.</p>"
+            );
+            return;
+        }
 
-  window.vektorMostrarTabelaDemissoesAdmin();
-  return;
-}
+        window.vektorMostrarTabelaDemissoesAdmin();
+        return;
+    }
 
     if (resposta) renderBotMessage(resposta);
 
