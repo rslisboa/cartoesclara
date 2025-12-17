@@ -874,6 +874,8 @@ const VEKTOR_INTENTS = [
   "Tipos de compra proibidos",
   "Regras da Política de Uso dos Cartões Clara",
   "Quando o cartão é bloqueado?",
+  "Frequência de uso Clara para o time",
+  "Frequência de uso Clara para a loja",
   "Perdi meu cartão Clara, o que fazer?",
   "Cartão Clara bloqueado, como resolver?",
   "Como desbloquear o cartão Clara?",
@@ -5666,6 +5668,32 @@ const INTENT_RULES = [
   }
 }
 
+,{ id: "INTENT_FREQUENCIA_USO_CLARA",
+  minScore: 2,
+  score: function (norm, msgOriginal) {
+    let s = 0;
+
+    // gatilho principal
+    const falaFreq =
+      norm.includes("frequencia de uso") ||
+      norm.includes("frequência de uso");
+
+    const falaClara = norm.includes("clara");
+
+    if (falaFreq) s += 3;
+    if (falaClara) s += 1;
+
+    // reforços: "para o time" / "para a loja"
+    if (norm.includes("para o time") || norm.includes("time ")) s += 1;
+    if (norm.includes("para a loja") || norm.includes("loja ")) s += 1;
+
+    return s;
+  },
+  run: function (msgOriginal, norm) {
+    return "ACAO_FREQUENCIA_USO_CLARA";
+  }
+}
+
 ];
 
   // ➜ Futuro: aqui você adiciona novas regras:
@@ -8605,6 +8633,166 @@ function renderResumoTransacoesSemana(resumo, opts) {
   } catch (e) {
     console.warn("Falha ao registrar contexto de ranking_lojas:", e);
   }
+
+  renderBotMessage("HTML:" + html);
+}
+
+function vektorParseMesesBack(textoNorm) {
+  // defaults
+  if (!textoNorm) return 1;
+
+  // últimos 3 meses / ultimos 2 meses
+  let m = textoNorm.match(/ultim[oa]s?\s+(\d+)\s+mes/);
+  if (m) return Math.max(1, Math.min(24, parseInt(m[1], 10)));
+
+  // último semestre
+  if (textoNorm.includes("ultimo semestre") || textoNorm.includes("último semestre")) return 6;
+
+  // último ano
+  if (textoNorm.includes("ultimo ano") || textoNorm.includes("último ano")) return 12;
+
+  // mês corrente
+  if (textoNorm.includes("mes corrente") || textoNorm.includes("mês corrente")) return 1;
+
+  return 1;
+}
+
+function vektorRenderTabelaFrequenciaUso(resp) {
+  if (!resp || !resp.ok) {
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Não consegui montar a tabela de frequência agora.</p>");
+    return;
+  }
+
+  const rows = Array.isArray(resp.rows) ? resp.rows : [];
+  if (!rows.length) {
+    const aviso = resp.aviso ? ` (${resp.aviso})` : "";
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Não encontrei transações para esse filtro no período analisado" + aviso + ".</p>");
+    return;
+  }
+
+  const periodoTxt = resp.periodo ? `${resp.periodo.inicio} a ${resp.periodo.fim}` : "—";
+
+  // Tooltips (title no TH)
+  const th = (label, tip) =>
+    `<th title="${tip}" class="border px-2 py-1 text-center"
+        style="background:#B5FF20;color:#000;white-space:nowrap;">${label}</th>`;
+
+  const insightLinha = resp.insight ? resp.insight : "";
+  const leituraAuto =
+    "Leitura automática: lojas com mais <b>Freq. Dias</b> tendem a ter maior recorrência; valide também <b>Top Valor</b> e <b>Última Data</b>.";
+
+  const limiteTxt = Array.isArray(resp.insightLimite) && resp.insightLimite.length
+    ? `<div style="margin-top:6px;"><b>Ajuste de limite:</b><br>${resp.insightLimite.join("<br>")}`
+    : "";
+
+  const atencaoTxt = Array.isArray(resp.insightAtencao) && resp.insightAtencao.length
+      ? `<div style="margin-top:6px;">
+          <b>Atenção:</b>
+          <div style="font-size:13px;color:#475569;margin:2px 0 6px 0;">
+            Lojas abaixo apresentam <b>padrões de uso atípicos ou instáveis</b> no período analisado. Os motivos estão descritos individualmente para apoiar análise e acompanhamento.
+          </div>
+          ${resp.insightAtencao.join("<br>")}
+        </div>`
+      : "";
+
+
+  
+  const observacaoHistorico =
+  "Observação: as métricas históricas consideram o <b>histórico completo da loja</b>, classificada pelo <b>time atual</b>.";
+
+  const insightBox =
+        `<div style="margin-top:6px;padding:8px;border:1px solid #E2E8F0;border-radius:6px;background:#F8FAFC;color:#000;font-size:13px;line-height:1.35;">
+          ${insightLinha ? `<div><b>Insight:</b> ${insightLinha}</div>` : ""}
+          ${limiteTxt}
+          ${atencaoTxt}
+          <div style="margin-top:4px;">${leituraAuto}</div>
+          <div style="margin-top:6px;font-style:italic;color:#475569;">
+          ${observacaoHistorico}
+        </div>`;
+
+  let html =
+    `<div class="text-sm" style="color:#000;margin:0;padding:0;">
+       <div style="margin:0 0 6px 0;padding:0;">
+         Período analisado: <b>${periodoTxt}</b>.
+
+       <div style="margin:0 0 8px 0;padding:0;font-size:13px;line-height:1.4;color:#334155;">
+         A análise considera <b>dias distintos com uso</b> do cartão no período informado, avaliando frequência, regularidade e impacto financeiro.
+
+         Priorize as colunas <b>Freq. Dias</b>, <b>Padrão de uso</b> e <b>Top Valor</b>. Passe o mouse sobre os títulos da tabela para ver a descrição de cada métrica.
+
+       <div class="overflow-x-auto" style="margin:0;padding:0;">
+         <table class="min-w-full text-xs border border-slate-200" style="border-collapse:collapse;margin:0;">
+           <thead>
+             <tr>
+               ${th("Loja","Código identificador da loja (4 dígitos). Todas as métricas da linha referem-se exclusivamente a esta loja.")}
+               ${th("Freq. Uso Sem.","Indica com que frequência a loja utilizou o cartão na semana corrente (Seg–Dom), considerando dias distintos com transação.")}
+               ${th("Freq. Uso Per.","Frequência média de uso da loja dentro do período analisado (ex.: mês corrente, últimos 3 meses), baseada em dias distintos com transação.")}
+               ${th("Freq. Uso Total","Frequência média histórica de uso da loja desde a primeira até a última transação registrada, considerando dias distintos.")}
+               ${th("Freq. Dias","Quantidade de dias distintos em que a loja utilizou o cartão dentro do período analisado. Quanto maior, mais recorrente é o uso.")}
+               ${th("Intervalo Médio","Número médio de dias que a loja ficou sem usar o cartão entre uma data de uso e outra, ao longo do histórico. Valores menores indicam uso mais frequente.")}
+               ${th("Padrão de uso","Classificação automática da loja com base na quantidade de dias de uso no período analisado: diário, frequente, moderado ou esporádico.")}
+               ${th("Freq. x Valor","Leitura combinada entre frequência de uso e impacto financeiro. Ajuda a identificar lojas com alto valor e baixa frequência ou vice-versa.")}
+               ${th("Top Valor","Maior valor individual de transação realizado pela loja dentro do período analisado.")}
+               ${th("Última Data","Data mais recente em que a loja utilizou o cartão dentro do período analisado.")}
+               ${th("Consistência","Avalia se o padrão de uso da loja vem se mantendo estável, aumentando ou diminuindo ao longo dos últimos meses.")}
+             </tr>
+           </thead>
+           <tbody>`;
+
+  rows.forEach(r => {
+    const top = (Number(r.topValor) || 0).toLocaleString('pt-BR', { style:'currency', currency:'BRL' });
+    const intervalo = (r.intervaloMedio === null || r.intervaloMedio === undefined)
+      ? "—"
+      : (Math.round(r.intervaloMedio * 10) / 10).toString().replace(".", ",") + " d";
+
+    html +=
+      `<tr>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.loja || ""}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.freqUsoSem || "—"}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.freqUsoMes || "—"}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.freqUsoTotal || "—"}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.freqDias ?? 0}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${intervalo}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.padrao || "—"}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.freqXValor || "—"}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${top}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.ultimaDataTrans || "—"}</td>
+         <td class="border px-2 py-1" style="color:#000;text-align:center;">${r.consistencia || "—"}</td>
+       </tr>`;
+  });
+
+  html +=
+        `</tbody>
+         </table>
+       </div>
+
+       ${insightBox}
+
+       <div style="margin-top:6px;display:flex;justify-content:flex-end;">
+         <button type="button"
+           onclick="exportTableToCSV(this, 'frequencia_uso_clara')"
+           style="
+             display:inline-flex;
+             align-items:center;
+             gap:6px;
+             width:auto;
+             height:auto;
+             min-width:unset;
+             min-height:unset;
+             padding:8px 12px;
+             line-height:1;
+             white-space:nowrap;
+             background:#005E27;
+             color:#fff;
+             border:none;
+             border-radius:6px;
+             font-size:12px;
+             font-weight:600;
+             cursor:pointer;">
+           ⬇ Exportar CSV
+         </button>
+       </div>
+     </div>`;
 
   renderBotMessage("HTML:" + html);
 }
@@ -12310,11 +12498,92 @@ function listarEtiquetasClara() {
     const norm = normalize(texto || "");
     const resposta = gerarRespostaDoBot(texto);
 
+    // =====================================================
+// ✅ FREQUÊNCIA DE USO CLARA (POR TIME OU LOJA)
+// =====================================================
+if (norm.startsWith("frequencia de uso clara")) {
+
+  let tipo = "";
+  let valor = "";
+
+  // Captura "para time ..." ou "para o time ..." e para antes do período ("nos ultimos X meses")
+  const mTime = norm.match(/\bpara\s+(?:o\s+)?time\b\s*[:\-]?\s*([\s\S]+?)(?=\s+\b(?:no|nos|na|nas)\s+ultim[oa]s?\b|$)/i);
+
+  // Captura "para loja ..." ou "para a loja ..." e para antes do período
+  const mLoja = norm.match(/\bpara\s+(?:a\s+)?loja\b\s*[:\-]?\s*([\s\S]+?)(?=\s+\b(?:no|nos|na|nas)\s+ultim[oa]s?\b|$)/i);
+
+  if (mLoja) {
+    tipo = "loja";
+
+    // ✅ pega SOMENTE o número da loja (funciona com autocomplete: "0242 - Loja X")
+    const matchNum = (mLoja[1] || "").match(/\d{1,6}/);
+    valor = matchNum ? matchNum[0] : "";
+
+    if (!valor) {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o número da loja. Ex.: <b>frequência de uso Clara para a loja 242</b>.</p>"
+      );
+      return;
+    }
+
+  } else if (mTime) {
+    tipo = "time";
+    valor = (mTime[1] || "").trim();
+
+    // ✅ remove complemento de período do "valor" do time (caso venha colado)
+    valor = valor
+      .replace(/\s+(no|nos|na|nas)\s+ultim[oa]s?\s+.*$/i, "")
+      .trim();
+
+    // fallback: corta em " ultimos " ou " ultimo " se ainda sobrar algo
+    valor = valor
+      .split(" ultimos ")[0]
+      .split(" ultimo ")[0]
+      .trim();
+
+    if (!valor) {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o nome do time. Ex.: <b>frequência de uso Clara para o time Furacão Sul</b>.</p>"
+      );
+      return;
+    }
+
+  } else {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Me diga se é por <b>time</b> ou por <b>loja</b>. Ex.: <b>frequência de uso Clara para a loja 242</b>.</p>"
+    );
+    return;
+  }
+
+  const mesesBack = vektorParseMesesBack(norm);
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Consultando frequência de uso…</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(vektorRenderTabelaFrequenciaUso)
+    .withFailureHandler(function (err) {
+      console.error(err);
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Falha ao consultar frequência de uso.</p>"
+      );
+    })
+    .getFrequenciaUsoClara(tipo, valor, mesesBack);
+
+  return; // ⛔ IMPORTANTE: impede cair no fluxo genérico
+}
+
     // Se a intenção for listar etiquetas, chama a função específica e para aqui
     if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
         listarEtiquetasClara();
         return;
     }
+
+        if (resposta === "ACAO_FREQUENCIA_USO_CLARA") {
+            vektorMostrarFrequenciaUsoClara(texto);
+            return;
+          }
 
     // Se a intenção for listar demissões, só ADM pode ver
 if (resposta === "ACAO_LISTA_DEMISSOES") {
@@ -12486,6 +12755,145 @@ window.vektorMostrarTabelaDemissoesAdmin = function () {
 
   } catch (e) {
     console.error("Erro geral em vektorMostrarTabelaDemissoesAdmin:", e);
+  }
+};
+
+window.vektorMostrarFrequenciaUsoClara = function (textoOriginal) {
+  try {
+    const norm = normalize(textoOriginal || "");
+
+    // 1) Detecta filtro: time ou loja
+    let filtroTipo = "";
+    let filtroValor = "";
+
+    // tenta achar time pelo seu dicionário oficial
+    const timeEncontrado = encontrarTimeNaMensagem(textoOriginal || "");
+
+    // tenta achar loja (número)
+    const mLoja = (textoOriginal || "").match(/\bloja\s*(\d{1,6})\b/i);
+    const lojaEncontrada = mLoja ? mLoja[1] : "";
+
+    if (lojaEncontrada) {
+      filtroTipo = "loja";
+      filtroValor = lojaEncontrada;
+    } else if (timeEncontrado) {
+      filtroTipo = "time";
+      filtroValor = timeEncontrado;
+    } else {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Para eu calcular a frequência, digite exatamente assim: <b>frequência de uso Clara para o time NOME_DO_TIME</b> ou <b>frequência de uso Clara para a loja 123</b>.</p>"
+      );
+      return;
+    }
+
+    // 2) Chama backend
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Beleza. Vou calcular a <b>frequência de uso</b> do Clara " +
+      (filtroTipo === "time" ? "para o time <b>" + filtroValor + "</b>" : "para a loja <b>" + filtroValor + "</b>") +
+      " e já te trago a tabela.</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        try {
+          if (!res || !res.ok) {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Não consegui calcular a frequência de uso no momento.</p>"
+            );
+            return;
+          }
+
+          const linhas = Array.isArray(res.linhas) ? res.linhas : [];
+          const insight = res.insight || "";
+
+          if (!linhas.length) {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-slate-700'>Não encontrei transações para esse filtro no período analisado.</p>"
+            );
+            return;
+          }
+
+          // 3) Monta tabela (cabeçalho centralizado e texto preto nas linhas)
+          let html =
+            "<div class='text-sm text-slate-700'>" +
+              "<p><b>Frequência de uso do cartão Clara</b> (" +
+                (filtroTipo === "time" ? "Time: " + filtroValor : "Loja: " + filtroValor) +
+              ")</p>" +
+              "<div class='mt-2 overflow-x-auto'>" +
+                "<table class='min-w-full text-xs border border-slate-200' style='color:#000;'>" +
+                  "<thead class='bg-slate-100'>" +
+                    "<tr>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Loja</th>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Freq. Uso Sem.</th>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Freq. Uso Mês</th>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Freq. Uso Total</th>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Freq. Dias</th>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Intervalo Médio</th>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Padrão de uso</th>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Freq. x Valor</th>" +
+                      "<th class='border px-2 py-1' style='text-align:center;'>Consistência</th>" +
+                    "</tr>" +
+                  "</thead>" +
+                  "<tbody>";
+
+          linhas.forEach(function (r) {
+            html +=
+              "<tr style='color:#000;'>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.loja || "") + "</td>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.freqSem || "") + "</td>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.freqMes || "") + "</td>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.freqTotal || "") + "</td>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.freqDias || "") + "</td>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.intervaloMedio || "") + "</td>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.padraoUso || "") + "</td>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.freqXValor || "") + "</td>" +
+                "<td class='border px-2 py-1' style='text-align:center;'>" + (r.consistencia || "") + "</td>" +
+              "</tr>";
+          });
+
+          html +=
+                  "</tbody>" +
+                "</table>" +
+              "</div>";
+
+          // botão CSV (igual você já usa em outras tabelas) :contentReference[oaicite:7]{index=7}
+          html +=
+            "<div style='margin-top:8px;display:flex;justify-content:flex-end;'>" +
+              "<button type='button' " +
+                "onclick=\"exportTableToCSV(this, 'frequencia_uso_clara')\" " +
+                "style='background:#005E27;color:#fff;border:none;padding:6px 10px;" +
+                       "border-radius:4px;font-size:11px;cursor:pointer;'>" +
+                "⬇ Exportar CSV" +
+              "</button>" +
+            "</div>";
+
+          if (insight) {
+            html +=
+              "<div style='margin-top:10px;font-size:12px;color:#0F172A;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:4px;padding:8px;'>" +
+                "<p style='margin:0 0 4px 0;'><b>Insight:</b></p>" +
+                "<p style='margin:0;'>" + insight + "</p>" +
+              "</div>";
+          }
+
+          html += "</div>";
+
+          renderBotMessage("HTML:" + html);
+        } catch (e) {
+          renderBotMessage(
+            "HTML:<p class='text-sm text-slate-700'>Falha ao montar a tabela de frequência.</p>"
+          );
+        }
+      })
+      .withFailureHandler(function (err) {
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Falha de comunicação ao calcular frequência: " +
+          (err && err.message ? err.message : err) + "</p>"
+        );
+      })
+      .getFrequenciaUsoClara(filtroTipo, filtroValor);
+
+  } catch (e) {
+    console.error("Erro em vektorMostrarFrequenciaUsoClara:", e);
   }
 };
 
