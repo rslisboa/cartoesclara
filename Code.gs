@@ -1,4 +1,3 @@
-
 function isAdminEmail(email) {
   if (!email) return false;
   email = email.toLowerCase();
@@ -1041,6 +1040,540 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, criterio)
     lojas: lojasArr,
     top: top
   };
+}
+
+/**
+ * Frequência de uso Clara (por TIME ou por LOJA), com período configurável.
+ *
+ * @param {"time"|"loja"} tipoFiltro
+ * @param {string} valorFiltro
+ * @param {number} mesesBack  // ex.: 1 = mês corrente, 3 = últimos 3 meses, 6 = último semestre
+ */
+function getFrequenciaUsoClara(tipoFiltro, valorFiltro, mesesBack) {
+  try {
+    tipoFiltro = (tipoFiltro || "").toString().toLowerCase().trim();
+    valorFiltro = (valorFiltro || "").toString().trim();
+    mesesBack = Number(mesesBack) || 1;
+
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return { ok: false, error: info.error };
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Índices
+    var idxData  = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
+    var idxLoja  = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja", "Loja Número", "Loja Numero"]);
+    var idxGrupo = encontrarIndiceColuna_(header, ["Grupos", "Grupo", "Time"]);
+    var idxValor = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor"]);
+
+    if (idxData < 0 || idxLoja < 0 || idxGrupo < 0 || idxValor < 0) {
+      return { ok: false, error: "Não encontrei colunas necessárias (Data / Loja / Grupo / Valor) na BaseClara." };
+    }
+
+    // ---------- Período analisado ----------
+    // Regra:
+    // - Se mesesBack >= 2: mantém lógica atual (meses calendário, incluindo mês corrente)
+    // - Se mesesBack = 1 (padrão): usa últimos 30 dias (janela móvel)
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var hoje = new Date();
+
+    var inicioPeriodo, fimPeriodo;
+
+    // fim sempre é "agora" (fim do dia de hoje)
+    fimPeriodo = new Date(hoje);
+    fimPeriodo.setHours(23, 59, 59, 999);
+
+    if (mesesBack >= 2) {
+      // ✅ mantém a lógica atual por meses calendário
+      inicioPeriodo = new Date(hoje.getFullYear(), hoje.getMonth() - (mesesBack - 1), 1);
+      inicioPeriodo.setHours(0, 0, 0, 0);
+
+      // fim do mês corrente (como era antes)
+      fimPeriodo = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+      fimPeriodo.setHours(23, 59, 59, 999);
+    } else {
+      // ✅ default: últimos 30 dias (janela móvel)
+      inicioPeriodo = new Date(hoje);
+      inicioPeriodo.setDate(inicioPeriodo.getDate() - 29);
+      inicioPeriodo.setHours(0, 0, 0, 0);
+    }
+
+    // ---------- Semana corrente (Seg–Dom) ----------
+    var dow = hoje.getDay(); // 0=Dom
+    var diffToMonday = (dow === 0) ? -6 : (1 - dow);
+    var inicioSemana = new Date(hoje);
+    inicioSemana.setDate(hoje.getDate() + diffToMonday);
+    inicioSemana.setHours(0, 0, 0, 0);
+
+    var fimSemana = new Date(inicioSemana);
+    fimSemana.setDate(inicioSemana.getDate() + 6);
+    fimSemana.setHours(23, 59, 59, 999);
+
+    // ---------- Consistência (últimos 6 meses, incluindo o mês corrente) ----------
+    var inicioConsistencia = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1);
+    inicioConsistencia.setHours(0, 0, 0, 0);
+
+    // ---------- Normalização do filtro ----------
+    var filtroTimeNorm = "";
+    var filtroLojaNum = null; // compara como número para ignorar zeros à esquerda
+
+    if (tipoFiltro === "loja") {
+      var digits = (valorFiltro || "").replace(/\D/g, "");
+      if (!digits) return { ok: true, rows: [], aviso: "Loja inválida." };
+
+      filtroLojaNum = Number(digits); // 242 == 0242
+      if (!isFinite(filtroLojaNum)) return { ok: true, rows: [], aviso: "Loja inválida." };
+    } else if (tipoFiltro === "time") {
+      filtroTimeNorm = normalizarTexto_(valorFiltro);
+      if (!filtroTimeNorm) return { ok: true, rows: [], aviso: "Time inválido." };
+    } else {
+      return { ok: false, error: "Filtro inválido. Use 'time' ou 'loja'." };
+    }
+
+    // ---------- Helpers ----------
+    function toDateKey(d) { return Utilities.formatDate(d, tz, "yyyy-MM-dd"); }
+    function toMonthKey(d) { return Utilities.formatDate(d, tz, "yyyy-MM"); }
+    function countSet(obj) { return Object.keys(obj || {}).length; }
+
+    function grupoMatchTime_(grupoLinhaRaw, filtroTimeNorm) {
+      if (!grupoLinhaRaw) return false;
+
+      // normaliza texto do campo "Grupos"
+      var g = normalizarTexto_(grupoLinhaRaw.toString());
+      if (!g) return false;
+
+      // separadores comuns em "Grupos": | ; , / -
+      var partes = g.split(/[\|\;\,\/\-]+/)
+        .map(function(s){ return s.trim(); })
+        .filter(function(s){ return !!s; });
+
+      // 1) tenta match exato por parte
+      for (var i = 0; i < partes.length; i++) {
+        if (partes[i] === filtroTimeNorm) return true;
+      }
+
+      // 2) fallback: contém (apenas um lado, mais previsível)
+      return g.indexOf(filtroTimeNorm) !== -1;
+    }
+
+    function mediaIntervaloDias(datas) {
+      if (!datas || datas.length < 2) return null;
+      datas.sort(function(a,b){ return a - b; });
+
+      var gaps = [];
+      for (var j = 1; j < datas.length; j++) {
+        var diffDias = (datas[j] - datas[j - 1]) / 86400000;
+        if (diffDias >= 0) gaps.push(diffDias);
+      }
+      if (!gaps.length) return null;
+
+      var soma = gaps.reduce(function(acc,v){ return acc + v; }, 0);
+      return soma / gaps.length;
+    }
+
+    function classificarPadrao(diasNoPeriodo) {
+      if (diasNoPeriodo >= 20) return "Uso diário";
+      if (diasNoPeriodo >= 10) return "Uso frequente";
+      if (diasNoPeriodo >= 4)  return "Uso moderado";
+      if (diasNoPeriodo >= 1)  return "Uso esporádico";
+      return "Sem uso";
+    }
+
+    function rotuloCadencia(intervaloMedio) {
+      if (intervaloMedio === null) return "—";
+      if (intervaloMedio <= 1.2) return "Diariamente";
+      if (intervaloMedio <= 2.2) return "De 2 em 2 dias";
+      if (intervaloMedio <= 3.2) return "De 3 em 3 dias";
+      if (intervaloMedio <= 7.5) return "Semanalmente";
+      if (intervaloMedio <= 15)  return "Quinzenal";
+      return "Mensal / esporádico";
+    }
+
+    function calcConsistencia(mesesObj) {
+      var meses = Object.keys(mesesObj || {}).sort();
+      if (meses.length < 2) return "Sem histórico";
+
+      var ult = meses.slice(-6);
+      var serie = ult.map(function(mk){ return countSet(mesesObj[mk]); });
+
+      var n = serie.length;
+      var mean = serie.reduce(function(a,b){ return a + b; }, 0) / n;
+
+      var varSum = 0;
+      for (var i = 0; i < n; i++) varSum += Math.pow(serie[i] - mean, 2);
+      var sd = Math.sqrt(varSum / n);
+
+      var delta = serie[serie.length - 1] - serie[0];
+
+      if (sd <= 2 && Math.abs(delta) <= 2) return "Estável";
+      if (delta >= 3) return "Crescendo";
+      if (delta <= -3) return "Caindo";
+      return "Oscilando";
+    }
+
+    function fmtMoedaBR_(v) {
+      var n = Number(v) || 0;
+      try {
+        return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      } catch (e) {
+        // fallback seguro
+        var s = (Math.round(n * 100) / 100).toFixed(2).replace(".", ",");
+        return "R$ " + s;
+      }
+    }
+
+    // ---------- Time atual por loja (janela fixa: últimos 30 dias) ----------
+    var janelaDiasTimeAtual = 30;
+
+    // ✅ time atual baseado no FIM do período analisado (não em "hoje")
+    var inicioTimeAtual = new Date(fimPeriodo);
+    inicioTimeAtual.setDate(inicioTimeAtual.getDate() - (janelaDiasTimeAtual - 1));
+    inicioTimeAtual.setHours(0, 0, 0, 0);
+
+    // lojaNorm -> { timeRaw, timeNorm, dataMaisRecente }
+    var timeAtualPorLoja = {};
+
+    // Só faz sentido para filtro por TIME
+    if (filtroTimeNorm) {
+      for (var t = 0; t < linhas.length; t++) {
+        var rowTA = linhas[t];
+        if (!rowTA) continue;
+
+        var dTA = parseDateClara_(rowTA[idxData]);
+        if (!dTA || isNaN(dTA.getTime())) continue;
+
+        // considera apenas últimos 30 dias
+        if (dTA < inicioTimeAtual || dTA > fimPeriodo) continue;
+
+        var lojaRawTA = (rowTA[idxLoja] || "").toString();
+        var lojaDigitsTA = lojaRawTA.replace(/\D/g, "");
+        if (!lojaDigitsTA) continue;
+
+        var lojaNormTA = ("0000" + lojaDigitsTA).slice(-4);
+
+        var grupoRawTA = (rowTA[idxGrupo] || "").toString();
+        if (!grupoRawTA) continue;
+
+        var grupoNormTA = normalizarTexto_(grupoRawTA);
+        if (!grupoNormTA) continue;
+
+        // guarda o grupo mais recente nessa janela
+        if (!timeAtualPorLoja[lojaNormTA] || dTA > timeAtualPorLoja[lojaNormTA].dataMaisRecente) {
+          timeAtualPorLoja[lojaNormTA] = {
+            timeRaw: grupoRawTA,
+            timeNorm: grupoNormTA,
+            dataMaisRecente: new Date(dTA)
+          };
+        }
+      }
+    }
+
+    // ---------- Varredura / agregação ----------
+    var mapa = {}; // lojaNorm -> stats
+
+    for (var i = 0; i < linhas.length; i++) {
+      var row = linhas[i];
+      if (!row) continue;
+
+      // Data
+      var d = parseDateClara_(row[idxData]);
+      if (!d || isNaN(d.getTime())) continue;
+
+      // Loja
+      var lojaRaw = (row[idxLoja] || "").toString();
+      var lojaDigits = lojaRaw.replace(/\D/g, "");
+      if (!lojaDigits) continue;
+
+      var lojaNum = Number(lojaDigits);
+      if (!isFinite(lojaNum)) continue;
+
+      var lojaNorm = ("0000" + lojaDigits).slice(-4);
+
+      // Time (para filtro) — usa TIME ATUAL da loja (últimos 30 dias)
+      if (filtroTimeNorm) {
+        var ta = timeAtualPorLoja[lojaNorm];
+
+        if (!ta || !ta.timeRaw) {
+          // ✅ OPÇÃO A: exclui do relatório por time (mais correto para sua regra)
+          continue;
+        }
+
+        // compara o time atual da loja com o time solicitado
+        if (!grupoMatchTime_(ta.timeRaw, filtroTimeNorm)) continue;
+      }
+
+      // filtro por loja
+      if (filtroLojaNum !== null && lojaNum !== filtroLojaNum) continue;
+
+      var valor = Number(row[idxValor]) || 0;
+      var keyDia = toDateKey(d);
+
+      if (!mapa[lojaNorm]) {
+        mapa[lojaNorm] = {
+          loja: lojaNorm,
+          diasSemanaSet: {},
+          diasPeriodoSet: {},
+          diasTotalSet: {},
+          datasTotal: [],
+          topValorPeriodo: 0,
+          ultimaDataPeriodo: null,
+          picoPeriodoPorDia: {},
+          meses: {}
+        };
+      }
+
+      var obj = mapa[lojaNorm];
+
+      // Total
+      obj.diasTotalSet[keyDia] = true;
+      obj.datasTotal.push(new Date(d));
+
+      // Semana
+      if (d >= inicioSemana && d <= fimSemana) {
+        obj.diasSemanaSet[keyDia] = true;
+      }
+
+      // Período analisado
+      if (d >= inicioPeriodo && d <= fimPeriodo) {
+        obj.diasPeriodoSet[keyDia] = true;
+
+        if (valor > obj.topValorPeriodo) obj.topValorPeriodo = valor;
+        if (!obj.ultimaDataPeriodo || d > obj.ultimaDataPeriodo) obj.ultimaDataPeriodo = new Date(d);
+
+        if (!obj.picoPeriodoPorDia[keyDia]) obj.picoPeriodoPorDia[keyDia] = { qtd: 0, valor: 0 };
+        obj.picoPeriodoPorDia[keyDia].qtd += 1;
+        obj.picoPeriodoPorDia[keyDia].valor += valor;
+      }
+
+      // Consistência
+      if (d >= inicioConsistencia && d <= fimPeriodo) {
+        var mk = toMonthKey(d);
+        if (!obj.meses[mk]) obj.meses[mk] = {};
+        obj.meses[mk][keyDia] = true;
+      }
+    }
+
+    // ---------- Monta linhas ----------
+    var rows = [];
+
+    Object.keys(mapa).forEach(function(loja){
+      var it = mapa[loja];
+
+      var diasSem = countSet(it.diasSemanaSet);
+      var diasPer = countSet(it.diasPeriodoSet);
+      var diasTot = countSet(it.diasTotalSet);
+
+      var intervaloMedio = mediaIntervaloDias(it.datasTotal);
+      var padrao = classificarPadrao(diasPer);
+
+      var freqUsoSem = rotuloCadencia(diasSem >= 2 ? (6 / Math.max(1, diasSem - 1)) : null);
+      var freqUsoPer = rotuloCadencia(diasPer >= 2 ? ((mesesBack * 30) / Math.max(1, diasPer - 1)) : null);
+      var freqUsoTot = rotuloCadencia(intervaloMedio);
+
+      var ultimaDataPeriodoFmt = it.ultimaDataPeriodo
+        ? Utilities.formatDate(it.ultimaDataPeriodo, tz, "dd/MM/yyyy")
+        : "—";
+
+      rows.push({
+        loja: it.loja,
+        freqUsoSem: freqUsoSem,
+        freqUsoMes: freqUsoPer,
+        freqUsoTotal: freqUsoTot,
+        freqDias: diasPer,
+        intervaloMedio: (intervaloMedio === null ? null : intervaloMedio),
+        padrao: padrao,
+        freqXValor: (padrao.indexOf("Uso") >= 0
+          ? (diasPer >= 10 ? "Alta freq" : "Baixa freq") + " + " + (it.topValorPeriodo >= 1000 ? "alto valor" : "baixo valor")
+          : "Sem uso"),
+        topValor: it.topValorPeriodo || 0,
+        ultimaDataTrans: ultimaDataPeriodoFmt,
+        consistencia: calcConsistencia(it.meses),
+
+        __diasPer: diasPer,
+        __topValor: it.topValorPeriodo || 0,
+        __picoDia: it.picoPeriodoPorDia
+      });
+    });
+
+    rows.sort(function(a,b){
+      if ((b.__diasPer||0) !== (a.__diasPer||0)) return (b.__diasPer||0) - (a.__diasPer||0);
+      return (b.__topValor||0) - (a.__topValor||0);
+    });
+
+    // ---------- Insight principal ----------
+    var insight = "";
+    if (rows.length) {
+      var top = rows[0];
+
+      var picoData = "";
+      var picoQtd = 0;
+      var picoValor = 0;
+
+      var m = top.__picoDia || {};
+      Object.keys(m).forEach(function(dk){
+        var x = m[dk] || {qtd:0, valor:0};
+        if (x.qtd > picoQtd || (x.qtd === picoQtd && x.valor > picoValor)) {
+          picoQtd = x.qtd;
+          picoValor = x.valor;
+          picoData = dk;
+        }
+      });
+
+      var dataFmt = picoData ? (picoData.split("-")[2] + "/" + picoData.split("-")[1] + "/" + picoData.split("-")[0]) : "—";
+
+      insight =
+        "Maior impacto no período: loja <b>" + top.loja + "</b> (" + top.__diasPer + " dias distintos com uso). " +
+        (picoData ? ("Pico de uso em <b>" + dataFmt + "</b> (" + picoQtd + " transações no dia).") : "");
+    }
+
+    // ---------- Novos insights: Limite / Atenção ----------
+    function scoreAumentar(r) {
+      var s = 0;
+      if ((r.freqDias || 0) >= 12) s += 4;
+      else if ((r.freqDias || 0) >= 8) s += 3;
+      else if ((r.freqDias || 0) >= 4) s += 1;
+
+      if (r.intervaloMedio !== null && r.intervaloMedio !== undefined) {
+        if (r.intervaloMedio <= 2) s += 3;
+        else if (r.intervaloMedio <= 4) s += 2;
+        else if (r.intervaloMedio <= 7) s += 1;
+      }
+
+      if (r.padrao === "Uso diário") s += 3;
+      else if (r.padrao === "Uso frequente") s += 2;
+      else if (r.padrao === "Uso moderado") s += 1;
+
+      if (r.consistencia === "Crescendo") s += 2;
+      else if (r.consistencia === "Estável") s += 1;
+
+      if ((r.freqXValor || "").indexOf("Alta freq") >= 0) s += 2;
+      if ((r.freqXValor || "").indexOf("alto valor") >= 0) s += 1;
+
+      if ((r.topValor || 0) >= 2000) s += 2;
+      else if ((r.topValor || 0) >= 1000) s += 1;
+
+      return s;
+    }
+
+    function scoreReduzir(r) {
+      var s = 0;
+      if ((r.freqDias || 0) <= 1) s += 4;
+      else if ((r.freqDias || 0) <= 2) s += 3;
+      else if ((r.freqDias || 0) <= 3) s += 1;
+
+      if (r.intervaloMedio !== null && r.intervaloMedio !== undefined) {
+        if (r.intervaloMedio >= 15) s += 3;
+        else if (r.intervaloMedio >= 10) s += 2;
+        else if (r.intervaloMedio >= 7) s += 1;
+      }
+
+      if (r.padrao === "Sem uso") s += 3;
+      else if (r.padrao === "Uso esporádico") s += 2;
+
+      if (r.consistencia === "Caindo") s += 2;
+      else if (r.consistencia === "Oscilando") s += 1;
+
+      if ((r.freqXValor || "").indexOf("Baixa freq") >= 0 && (r.freqXValor || "").indexOf("alto valor") >= 0) {
+        s -= 1; // não reduzir automaticamente em caso de alto valor com baixa freq (vira atenção)
+      }
+
+      return s;
+    }
+
+    function isAtencao(r) {
+      var fxv = (r.freqXValor || "");
+      var topv = (r.topValor || 0);
+
+      if (r.consistencia === "Oscilando" && topv >= 1000) return true;
+      if (fxv.indexOf("Baixa freq") >= 0 && fxv.indexOf("alto valor") >= 0) return true;
+      if ((r.freqDias || 0) >= 8 && r.consistencia === "Caindo") return true;
+      return false;
+    }
+
+    var bestInc = null, bestIncScore = -999;
+    var bestDec = null, bestDecScore = -999;
+    var listaAtencao = [];
+
+    rows.forEach(function(r){
+      var si = scoreAumentar(r);
+      var sd = scoreReduzir(r);
+
+      if (si > bestIncScore) { bestIncScore = si; bestInc = r; }
+      if (sd > bestDecScore) { bestDecScore = sd; bestDec = r; }
+
+      if (isAtencao(r)) listaAtencao.push(r);
+    });
+
+    listaAtencao.sort(function(a,b){
+      if ((b.topValor||0) !== (a.topValor||0)) return (b.topValor||0) - (a.topValor||0);
+      return (b.freqDias||0) - (a.freqDias||0);
+    });
+    listaAtencao = listaAtencao.slice(0, 3);
+
+    var insightLimite = [];
+    if (bestInc && bestIncScore >= 6) {
+      insightLimite.push(
+        "Sugestão de <b>aumento de limite</b>: loja <b>" + bestInc.loja + "</b> — uso recorrente (<b>" + (bestInc.freqDias||0) + " dias</b>), padrão <b>" + (bestInc.padrao||"—") + "</b>, consistência <b>" + (bestInc.consistencia||"—") + "</b>."
+      );
+    }
+    if (bestDec && bestDecScore >= 6) {
+      var im = (bestDec.intervaloMedio === null || bestDec.intervaloMedio === undefined) ? "—" : (Math.round(bestDec.intervaloMedio * 10) / 10).toString().replace(".", ",");
+      insightLimite.push(
+        "Sugestão de <b>redução de limite</b>: loja <b>" + bestDec.loja + "</b> — baixa recorrência (<b>" + (bestDec.freqDias||0) + " dias</b>), padrão <b>" + (bestDec.padrao||"—") + "</b>, intervalo médio <b>" + im + "</b> dias."
+      );
+    }
+
+    // ✅ AQUI ESTÁ A CORREÇÃO: 1 linha por loja, com motivo claro
+    var insightAtencao = [];
+    if (listaAtencao.length) {
+      listaAtencao.forEach(function(r){
+        var tvFmt = fmtMoedaBR_(r.topValor || 0);
+        var motivo = "";
+
+        if ((r.freqXValor || "").indexOf("Baixa freq") >= 0 && (r.freqXValor || "").indexOf("alto valor") >= 0) {
+          motivo = "Alto valor pontual com baixa frequência (risco de compra fora do padrão)";
+        } else if (r.consistencia === "Oscilando" && (r.topValor || 0) >= 1000) {
+          motivo = "Tendência de uso <b>oscilante</b> nos últimos meses, com transação de alto valor no período, validar se é sazonalidade ou mudança operacional”.";
+        } else if ((r.freqDias || 0) >= 8 && r.consistencia === "Caindo") {
+          motivo = "Queda recente de uso (pode indicar mudança operacional ou desnecessidade de limite atual)";
+        } else {
+          motivo = "Padrão de uso que merece acompanhamento";
+        }
+
+        insightAtencao.push(
+          "• Loja <b>" + r.loja + "</b>: " + motivo +
+          ". Padrão <b>" + (r.padrao||"—") + "</b>, consistência <b>" + (r.consistencia||"—") +
+          "</b>, Top Valor <b>" + tvFmt + "</b>."
+        );
+      });
+    }
+
+    // limpa internos
+    rows.forEach(function(r){
+      delete r.__diasPer;
+      delete r.__topValor;
+      delete r.__picoDia;
+    });
+
+    return {
+      ok: true,
+      tipoFiltro: tipoFiltro,
+      valorFiltro: valorFiltro,
+      mesesBack: mesesBack,
+      periodo: {
+        inicio: Utilities.formatDate(inicioPeriodo, tz, "dd/MM/yyyy"),
+        fim: Utilities.formatDate(fimPeriodo, tz, "dd/MM/yyyy")
+      },
+      insight: insight,
+      insightLimite: insightLimite,
+      insightAtencao: insightAtencao,
+      rows: rows
+    };
+
+  } catch (e) {
+    return { ok: false, error: e && e.message ? e.message : String(e) };
+  }
 }
 
 /**
@@ -2218,6 +2751,8 @@ function getTransacoesPorCategoria(dataInicioStr, dataFimStr, categoriaNome) {
     };
   }
 }
+
+
 
 // Remove zeros à esquerda de um código de loja, para comparar "0035" com "35"
 function removerZerosEsquerda_(codigo) {
