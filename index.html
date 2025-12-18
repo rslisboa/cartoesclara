@@ -327,7 +327,7 @@
  <div class="h-screen flex px-4 py-6 gap-4 items-stretch">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
    
-   <aside class="hidden md:flex w-72 flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 space-y-4 h-full">
+   <aside class="hidden md:flex w-72 shrink-0 flex-none flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 space-y-4 h-full">
 
   <!-- Bloco Vektor + título -->
   <div class="w-full flex flex-col items-center mb-4">
@@ -376,7 +376,7 @@
 </aside>
  
    <!-- COLUNA DIREITA: CHAT -->
-   <div class="flex-1">
+   <div class="flex-1 min-w-0">
      <div class="chat-wrapper">
 
     <!-- HEADER -->
@@ -9182,6 +9182,8 @@ function vektorRenderTabelaRelacaoSaldos(res, tipo) {
   th += "<th style='border:1px solid #000;padding:6px;'>Valor Utilizado</th>";
   th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;'>ℹ️ Projeção Gasto</th>";
   th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;'>% da Projeção</th>";
+  th += "<th style='border:1px solid #000;padding:6px;'>Limite Recomendado</th>";
+  th += "<th style='border:1px solid #000;padding:6px;'>Ação</th>";
   th += "<th style='border:1px solid #000;padding:6px;'>Saldo</th>";
   
 
@@ -9201,15 +9203,17 @@ function vektorRenderTabelaRelacaoSaldos(res, tipo) {
       ? ((r.utilizado / r.projecao) * 100).toFixed(1) + "%"
       : "—";
     trs += "<td style='border:1px solid #000;padding:6px;'>" + pctProj + "</td>";
+    trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;'>" + money(r.limiteRecomendado) + "</td>";
+    trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;font-weight:700;'>" + (r.acao || "") + "</td>";
     trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.saldo) + "</td>";
     
     trs += "</tr>";
   });
 
   const table =
-    "<div style='margin:0;padding:0;'>" +
+    "<div style='width:100%; overflow-x:auto;'>" +
       insights +
-      "<table style='width:100%;border-collapse:collapse;margin-top:2px;'>" +
+      "<table style='min-width:1300px;width:100%;border-collapse:collapse;margin-top:2px;'>" +
         "<thead><tr style='background:#0b2a5b;color:#fff;'>" + th + "</tr></thead>" +
         "<tbody>" + trs + "</tbody>" +
       "</table>" +
