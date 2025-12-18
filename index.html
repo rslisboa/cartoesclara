@@ -885,6 +885,8 @@ const VEKTOR_INTENTS = [
   "Itens comprados para o time",
   "Itens comprados para a loja",
   "Itens comprados no geral",
+  "Relação de saldos geral",
+  "Relação de saldos do time",
   "Como usar bem o limite do cartão Clara?",
   "Quero gráficos das transações",
   "O que o Vektor pode fazer?",
@@ -9116,6 +9118,97 @@ function vektorRenderTabelaListaItensComprados(res) {
   renderBotMessage("HTML:" + tabelaHtml);
 }
 
+function vektorRenderTabelaRelacaoSaldos(res, tipo) {
+  if (!res || !res.ok) {
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>" + (res && res.error ? res.error : "Erro ao buscar saldos.") + "</p>");
+    return;
+  }
+
+  const rows = res.rows || [];
+  const periodo = res.periodo || {};
+  const totals = res.totals || {};
+  const h = (res.highlights || {});
+
+  if (!rows.length) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Sem dados para o período <b>" + (periodo.inicio || "") + "</b> a <b>" + (periodo.fim || "") + "</b>.</p>"
+    );
+    return;
+  }
+
+  function money(n) {
+    const v = Number(n) || 0;
+    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  // Insights (1 linha por item, sem espaçamento)
+  let insights = "";
+  insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Período:</b> " + (periodo.inicio || "") + " a " + (periodo.fim || "") + "</p>";
+
+        if (h.menorSaldo) {
+        const lojaTxt = h.menorSaldo.loja ? ("Loja " + h.menorSaldo.loja) : "Loja (N/D)";
+        insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Menor saldo:</b> "
+          + lojaTxt + " — " + money(h.menorSaldo.saldo) + "</p>";
+      }
+
+      if (h.maiorSaldo) {
+        const lojaTxt = h.maiorSaldo.loja ? ("Loja " + h.maiorSaldo.loja) : "Loja (N/D)";
+        insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Maior saldo:</b> "
+          + lojaTxt + " — " + money(h.maiorSaldo.saldo) + "</p>";
+      }
+
+  if (h.predisposicao) {
+    insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Predisposição (projeção no ciclo):</b> " + money(h.predisposicao.projFinal) + " (média/dia " + money(h.predisposicao.mediaDia) + ")</p>";
+  }
+  insights += "<div style='height:8px'></div>";
+
+  // Cabeçalho dinâmico
+  const showLoja = (tipo === "geral" || tipo === "time"); // decisão operacional (time mostra loja)
+  const showTime = (tipo === "geral"); // conforme você pediu: time/loja sem coluna Time
+
+  let th = "";
+  th += "<th style='border:1px solid #000;padding:6px;'>Nome do cartão</th>";
+  if (showLoja) th += "<th style='border:1px solid #000;padding:6px;'>Loja</th>";
+  if (showTime) th += "<th style='border:1px solid #000;padding:6px;'>Time</th>";
+  th += "<th style='border:1px solid #000;padding:6px;'>Tipo</th>";
+  th += "<th style='border:1px solid #000;padding:6px;'>Titular</th>";
+  th += "<th style='border:1px solid #000;padding:6px;'>Limite</th>";
+  th += "<th style='border:1px solid #000;padding:6px;'>Valor Utilizado</th>";
+  th += "<th style='border:1px solid #000;padding:6px;'>Saldo</th>";
+
+  // Linhas
+  let trs = "";
+  rows.forEach(function(r) {
+    trs += "<tr>";
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.nomeCartao || "") + "</td>";
+    if (showLoja) trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.loja || "") + "</td>";
+    if (showTime) trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.time || "") + "</td>";
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.tipo || "") + "</td>";
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.titular || "") + "</td>";
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.limite) + "</td>";
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.utilizado) + "</td>";
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.saldo) + "</td>";
+    trs += "</tr>";
+  });
+
+  const table =
+    "<div style='margin:0;padding:0;'>" +
+      insights +
+      "<table style='width:100%;border-collapse:collapse;margin-top:2px;'>" +
+        "<thead><tr style='background:#0b2a5b;color:#fff;'>" + th + "</tr></thead>" +
+        "<tbody>" + trs + "</tbody>" +
+      "</table>" +
+      "<div style='text-align:right; margin-top:6px;'>" +
+        "<button type='button' onclick=\"exportTableToCSV(this, 'relacao_saldos')\" " +
+          "style='background:#005E27;color:#fff;border:none;padding:6px 12px;border-radius:4px;font-size:11px;cursor:pointer;'>" +
+          "⬇ Exportar CSV" +
+        "</button>" +
+      "</div>" +
+    "</div>";
+
+  renderBotMessage("HTML:" + table);
+}
+
 // ========= Botões "Verificar pendências / justificativas" (tabelas de LOJAS) ========= //
 
 function vektorMontarTabelaPendJust_(titulo, colunas, linhas) {
@@ -13013,6 +13106,62 @@ if (/\bno\s+geral\b/i.test(norm)) {
 
         return; // ⛔ não cair no fluxo genérico
     }
+
+    // =====================================================
+// ✅ RELAÇÃO DE SALDOS (ADM) — por TIME / LOJA / GERAL
+// Exemplos:
+// - "relação de saldos geral"
+// - "relação de saldos do time lobos sp"
+// - "relação de saldos da loja 0242"
+// =====================================================
+const isCmdRelacaoSaldos = /^\s*rela[cç][aã]o\s+de\s+saldos\b/i.test(norm);
+
+if (isCmdRelacaoSaldos) {
+
+  // 🔒 Apenas Administrador
+  if (typeof USER_ROLE_REPLACED !== "undefined" && USER_ROLE_REPLACED !== "Administrador") {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil <b>Administrador</b>.</p>"
+    );
+    return;
+  }
+
+  let tipo = "geral";
+let valor = "";
+
+// Geral
+if (/\b(no\s+geral|geral)\b/i.test(norm)) {
+  tipo = "geral";
+  valor = "";
+} else {
+  // Time
+  const mTime = norm.match(/\bdo\s+time\s+(.+?)\s*$/i);
+
+  if (mTime && mTime[1]) {
+    tipo = "time";
+    valor = (mTime[1] || "").trim();
+  } else {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Use: <b>Relação de saldos geral</b> ou <b>Relação de saldos do time X</b>.</p>"
+    );
+    return;
+  }
+}
+
+  renderBotMessage("HTML:<p class='text-sm text-slate-700'>Consultando relação de saldos…</p>");
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      vektorRenderTabelaRelacaoSaldos(res, tipo);
+    })
+    .withFailureHandler(function (err) {
+      console.error(err);
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar relação de saldos.</p>");
+    })
+    .getRelacaoSaldosClara(tipo, valor);
+
+  return; // ⛔ importante
+}
 
     // ✅ Agora sim: gera a resposta (e então usa ACOES)
     const resposta = gerarRespostaDoBot(texto);
