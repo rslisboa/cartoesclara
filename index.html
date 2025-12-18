@@ -882,6 +882,8 @@ const VEKTOR_INTENTS = [
   "Meu cartão não passou, o que pode ser?",
   "Abrir relatório gerencial da Clara",
   "Como aumento o limite do cartão?",
+  "Itens comprados para o time",
+  "Itens comprados para a loja",
   "Como usar bem o limite do cartão Clara?",
   "Quero gráficos das transações",
   "O que o Vektor pode fazer?",
@@ -1442,6 +1444,59 @@ function vektorDetectarFuncaoOrigem() {
       alert("Não consegui gerar o CSV desta tabela.");
     }
   };
+
+  window.vektorAplicarFiltrosItensComprados = function (wrapId) {
+  try {
+    const wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+
+    const sel = wrap.querySelector('select[data-filtro="status"]');
+    const chk = wrap.querySelector('input[data-filtro="reinc"]');
+
+    const statusFiltro = (sel && sel.value) ? sel.value : "";
+    const somenteReinc = !!(chk && chk.checked);
+
+    const rows = wrap.querySelectorAll("tbody tr[data-status]");
+    rows.forEach(tr => {
+      const st = (tr.getAttribute("data-status") || "").toUpperCase();
+      const reinc = tr.getAttribute("data-reinc") === "1";
+
+      let ok = true;
+      if (statusFiltro && st !== statusFiltro) ok = false;
+      if (somenteReinc && !reinc) ok = false;
+
+      tr.style.display = ok ? "" : "none";
+    });
+  } catch (e) {
+    console.warn("Filtro itens comprados falhou:", e);
+  }
+};
+
+window.vektorLimparFiltrosItensComprados = function (wrapId) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+
+  const sel = wrap.querySelector('select[data-filtro="status"]');
+  const chk = wrap.querySelector('input[data-filtro="reinc"]');
+
+  if (sel) sel.value = "";
+  if (chk) chk.checked = false;
+
+  window.vektorAplicarFiltrosItensComprados(wrapId);
+};
+
+function vektorLimparFiltrosItensComprados(wrapId) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+
+  const sel = wrap.querySelector('select[data-filtro="status"]');
+  const chk = wrap.querySelector('input[data-filtro="reinc"]');
+
+  if (sel) sel.value = "";
+  if (chk) chk.checked = false;
+
+  vektorAplicarFiltrosItensComprados(wrapId);
+}
 
 
 // ========= DRILL-DOWN: EXPANDIR LINHA DA TABELA (com dropdown + mesmo período) ========= //
@@ -8818,18 +8873,20 @@ function vektorRenderTabelaListaItensComprados(res) {
   const alertas = (res.resumo && res.resumo.alertas) || 0;
   const revisar = (res.resumo && res.resumo.revisar) || 0;
 
-  const insightsHtml = [
-    "<div class='mt-2 text-sm text-slate-700'>",
-      "<b>Resumo:</b> ", total, " itens | ",
-      "<b>ALERTA:</b> ", alertas, " | ",
-      "<b>REVISAR:</b> ", revisar,
-      "<div class='mt-1 text-xs text-slate-500'>Observação: a classificação é heurística baseada em descrição livre; use como triagem e valide comprovantes/etiquetas.",
-  ].join("");
+  const insightsHtml =
+  "<div class='text-sm text-slate-700' style='margin:0;padding:0;line-height:1.2;'>" +
+    "<b>Resumo:</b> " + total + " itens | " +
+    "<b>ALERTA:</b> " + alertas + " | " +
+    "<b>REVISAR:</b> " + revisar +
+  "</div>" +
+  "<div class='text-xs text-slate-500' style='margin:0;padding:0;line-height:1.2;'>" +
+    "Observação: a classificação é heurística baseada em descrição livre; use como triagem e valide comprovantes/etiquetas." +
+  "</div>";
 
           // Tabela
           let thead = `
             <thead>
-              <tr style="background:#00FFFF;color:#0F172A; position: sticky; top: 0; z-index: 2;">
+              <tr style="background:#00FFFF;color:#0F172A;">
                 <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Data</th>
                 <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Valor (R$)</th>
                 <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Lojas</th>
@@ -8841,8 +8898,6 @@ function vektorRenderTabelaListaItensComprados(res) {
             </thead>
           `;
 
-
-
   let tbody = rows.map(r => {
     const v = (Number(r.valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const status = r.status || "";
@@ -8851,8 +8906,13 @@ function vektorRenderTabelaListaItensComprados(res) {
       status === "OK"     ? "<span class='px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700'>OK</span>" :
                             "<span class='px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-700'>REVISAR</span>";
 
+    const statusKey = (r.status || r.conformidade || "").toString().trim().toUpperCase() || "REVISAR";
+    const reincTxt = (r.reincidencia || "").toString().trim();
+    const reincFlag = reincTxt ? "1" : "0";
+
+
     return `
-              <tr class="border-t border-slate-200">
+              <tr class="border-t border-slate-200" data-status="${(r.conformidade || r.status || '').toString().trim().toUpperCase()}" data-reinc="${(r.reincidencia || '').toString().trim() ? '1' : '0'}">
               <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">${r.data || ""}</td>
               <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">R$ ${v}</td>
               <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">${(r.loja || "").replace(/</g,"&lt;")}</td>
@@ -8878,31 +8938,118 @@ function vektorRenderTabelaListaItensComprados(res) {
         `;
         }).join("");
 
-  const tabelaHtml = `
-        <div class="mt-2" style="max-width:100%; width:100%; min-width:0; overflow:hidden;">
-          <div class="text-sm text-slate-700">
-            <b>Lista de itens comprados</b> — ${res.tipoFiltro}: <b>${res.valorFiltro}</b> — período <b>${res.periodo.inicio}</b> a <b>${res.periodo.fim}</b>
+        const tableWrapId = "itensWrap_" + Date.now();
 
-          ${insightsHtml}
+          const filtrosHtml = `
+            <div style="
+                margin:0;
+                padding:0;
+                width:100%;
+                display:flex;
+                align-items:center;
+                gap:12px;
+                flex-wrap:nowrap;          /* ✅ não cria “faixa alta” */
+                line-height:1;            /* ✅ elimina altura fantasma */
+              ">
 
-          <div class="mt-3 overflow-x-auto" style="max-width:100%;">
-            <table class="min-w-full border border-slate-200 rounded-lg">
-              ${thead}
-              <tbody>${tbody}</tbody>
-            </table>
-          </div>
+              <div class="text-sm text-slate-700 font-semibold" style="margin:0; padding:0; white-space:nowrap;">
+                Filtros:
+              </div>
 
-          <div class="mt-3" style="width:100%; display:flex; justify-content:flex-end;">
+              <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
+                <span class="text-sm text-slate-700" style="margin:0; padding:0;">Conformidade</span>
 
-            <button type="button"
-              onclick="exportTableToCSV(this, 'lista_itens_comprados.csv')"
-              style="all:unset; cursor:pointer; background:#005E27; color:#fff; padding:10px 16px; border-radius:10px; font-weight:700; display:inline-flex; align-items:center; white-space:nowrap;">
-              Exportar CSV
-            </button>
+                <select
+                  data-filtro="status"
+                  onchange="vektorAplicarFiltrosItensComprados('${tableWrapId}')"
+                  style="
+                    height:32px;
+                    padding:0 10px;
+                    border:1px solid #cbd5e1;
+                    border-radius:10px;
+                    font-size:14px;
+                    line-height:32px;
+                    background:#fff;
+                    color:#334155;
+                  ">
+                  <option value="">Todos</option>
+                  <option value="OK">OK</option>
+                  <option value="REVISAR">REVISAR</option>
+                  <option value="ALERTA">ALERTA</option>
+                </select>
+              </div>
 
-          </div>
-        </div>
-      `;
+              <label style="display:flex; align-items:center; gap:8px; margin:0; padding:0; white-space:nowrap;">
+                <input type="checkbox"
+                      data-filtro="reinc"
+                      onchange="vektorAplicarFiltrosItensComprados('${tableWrapId}')"
+                      style="width:16px; height:16px; margin:0;" />
+                <span class="text-sm text-slate-700" style="margin:0; padding:0;">Somente com reincidência</span>
+              </label>
+
+              <button type="button"
+                onclick="vektorLimparFiltrosItensComprados('${tableWrapId}')"
+                style="
+                  height:32px;
+                  padding:0 12px;
+                  border:1px solid #cbd5e1;
+                  border-radius:10px;
+                  font-size:13px;
+                  font-weight:700;
+                  line-height:32px;        /* ✅ texto no meio */
+                  background:#fff;
+                  color:#334155;
+                  cursor:pointer;
+                  display:inline-flex;     /* ✅ centraliza vertical */
+                  align-items:center;
+                  justify-content:center;
+                  white-space:nowrap;
+                ">
+                Limpar
+              </button>
+
+            </div>
+          `;
+
+        const tabelaHtml = `
+  <div id="${tableWrapId}" style="max-width:100%; width:100%; margin:0; padding:0; line-height:1.2;">
+  <div style="margin:0; padding:0; display:flex; flex-direction:column; gap:8px;">
+
+
+    <!-- Título/Período -->
+    <div style="margin:0; padding:0;" class="text-sm text-slate-700">
+    <b>Lista de itens comprados</b> — ${res.tipoFiltro}: <b>${res.valorFiltro}</b> — período <b>${res.periodo.inicio}</b> a <b>${res.periodo.fim}</b>
+    </div>
+
+    <!-- Insights (se existir variável insightsHtml) -->
+    <div style="margin:0; padding:0; line-height:1.2;">
+      ${typeof insightsHtml !== "undefined" ? insightsHtml : ""}
+    </div>
+
+    <!-- ✅ Filtros (abaixo do insight principal e acima da tabela) -->
+    ${filtrosHtml}
+
+    <!-- Tabela -->
+    <div class="mt-1 overflow-x-auto" style="max-width:100%;">
+      <table class="min-w-full border border-slate-200 rounded-lg">
+        ${thead}
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>
+
+    <!-- Botão CSV -->
+    <div class="mt-1" style="width:100%; display:flex; justify-content:flex-end;">
+      <button type="button"
+        onclick="exportTableToCSV(this, 'lista_itens_comprados.csv')"
+        style="all:unset; cursor:pointer; background:#005E27; color:#fff; padding:10px 16px; border-radius:10px; font-weight:700; display:inline-flex; align-items:center; white-space:nowrap;">
+        Exportar CSV
+      </button>
+    </div>
+  </div>
+
+    </div>  <!-- fecha a div flex column -->
+    </div>     <!-- fecha a div id="${tableWrapId}" -->
+`;
 
   renderBotMessage("HTML:" + tabelaHtml);
 }
@@ -12700,6 +12847,8 @@ function listarEtiquetasClara() {
             );
             return;
         }
+
+        
 
         let tipo = "";
         let valor = "";
