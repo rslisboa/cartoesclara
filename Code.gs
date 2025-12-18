@@ -283,11 +283,7 @@ function _obterPendenciasLoja(lojaCodigo) {
     throw new Error("Código de loja inválido.");
   }
 
-  var ss  = SpreadsheetApp.getActiveSpreadsheet();
-  var aba = ss.getSheetByName("CLARA_PEND");
-  if (!aba) {
-    throw new Error("Aba 'CLARA_PEND' não encontrada.");
-  }
+  var aba = getClaraPendSheet_();
 
   var values = aba.getDataRange().getValues();
   if (!values || values.length <= 5) {
@@ -577,11 +573,13 @@ function getPendenciasParaBloqueio(lojaCodigo) {
     var lojaNumero = lojaNormalizada.replace(/^0+/, ""); // "0171" -> "171"
 
     // Mesma planilha / aba usada no fluxo normal de pendências
-    var ss  = SpreadsheetApp.getActiveSpreadsheet();
-    var aba = ss.getSheetByName("CLARA_PEND");
-    if (!aba) {
-      return { ok: false, error: "Aba 'CLARA_PEND' não encontrada." };
-    }
+      var aba;
+      try {
+        aba = getClaraPendSheet_();
+      } catch (e) {
+        return { ok: false, error: e.toString() };
+      }
+
 
     var values = aba.getDataRange().getValues();
     if (!values || values.length <= 5) {
@@ -820,6 +818,19 @@ function normalizarTexto_(str) {
 
 var SPREADSHEET_ID_CLARA = '1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI'; // Captura_Clara
 var SHEET_NOME_BASE_CLARA = 'BaseClara';
+
+// ========= PLANILHA ANTIGA (onde fica a aba CLARA_PEND) ========= //
+var SPREADSHEET_ID_CLARA_PEND = "1jcNdVTxdDYqwHwsOkT7gb_2BdZke9qIb39RiwgTKxUQ"; // planilha antiga
+var SHEET_NOME_CLARA_PEND = "CLARA_PEND";
+
+// Abre a aba CLARA_PEND na planilha antiga
+function getClaraPendSheet_() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID_CLARA_PEND);
+  var aba = ss.getSheetByName(SHEET_NOME_CLARA_PEND);
+  if (!aba) throw new Error("Aba '" + SHEET_NOME_CLARA_PEND + "' não encontrada na planilha antiga.");
+  return aba;
+}
+
 
 // Abre a aba BaseClara
 function getBaseClaraSheet_() {
@@ -1573,6 +1584,324 @@ function getFrequenciaUsoClara(tipoFiltro, valorFiltro, mesesBack) {
 
   } catch (e) {
     return { ok: false, error: e && e.message ? e.message : String(e) };
+  }
+}
+
+/**
+ * Lista de itens comprados na Clara (coluna "Descrição"), com data/valor/loja e análise de conformidade.
+ *
+ * @param {"time"|"loja"} tipoFiltro
+ * @param {string} valorFiltro
+ * @param {string|Date} dataIni  (dd/MM/yyyy ou Date)
+ * @param {string|Date} dataFim  (dd/MM/yyyy ou Date)
+ * @param {number} janelaDiasReincidencia (default 15)
+ */
+function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, janelaDiasReincidencia) {
+  try {
+    tipoFiltro = (tipoFiltro || "").toString().toLowerCase().trim(); // "time" | "loja"
+    valorFiltro = (valorFiltro || "").toString().trim();
+    janelaDiasReincidencia = Number(janelaDiasReincidencia) || 15;
+
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return { ok: false, error: info.error };
+
+    var header = info.header;
+    var linhas = info.linhas;
+
+    // Índices (seguindo padrão do projeto)
+    var idxData = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
+    var idxValor = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLojaNum = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja", "Loja Número", "Loja Numero"]);
+    var idxGrupo = encontrarIndiceColuna_(header, ["Grupos", "Grupo", "Time"]);
+    // ✅ Alias do Cartão (H) — match estrito para não cair em "Cartão" (G)
+    var idxAlias = -1;
+    for (var iA = 0; iA < header.length; iA++) {
+      var hn = normalizarTexto_((header[iA] || "").toString());
+      if (hn === "alias do cartao" || hn === "alias do cartão") { idxAlias = iA; break; }
+    }
+    if (idxAlias < 0) {
+      for (var jA = 0; jA < header.length; jA++) {
+        var hn2 = normalizarTexto_((header[jA] || "").toString());
+        if (hn2.indexOf("alias") !== -1 && hn2.indexOf("cartao") !== -1) { idxAlias = jA; break; }
+      }
+    }
+    var idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao", "Item", "Histórico", "Historico"]);
+
+    if (idxData < 0 || idxValor < 0 || idxDescricao < 0) {
+      return { ok: false, error: "Não encontrei colunas necessárias (Data / Valor / Descrição) na BaseClara." };
+    }
+
+    // Se não tiver alias, a gente ainda consegue entregar com LojaNum
+    // Mas se não tiver lojaNum nem alias, não dá para “por loja”
+    if (tipoFiltro === "loja" && idxLojaNum < 0 && idxAlias < 0) {
+      return { ok: false, error: "Não encontrei colunas de Loja (LojaNum/Alias) na BaseClara para filtrar por loja." };
+    }
+
+    // Se for por time e não tiver grupo/time, não dá
+    if (tipoFiltro === "time" && idxGrupo < 0) {
+      return { ok: false, error: "Não encontrei coluna de Time/Grupo (Grupos/Grupo/Time) na BaseClara para filtrar por time." };
+    }
+
+    // Período
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var dtIni = parseDateClara_(dataIni);
+    var dtFim = parseDateClara_(dataFim);
+
+    // fallback: se vier ISO string do front, tenta new Date
+    if (!dtIni && typeof dataIni === "string") {
+      var tmp = new Date(dataIni);
+      if (!isNaN(tmp.getTime())) dtIni = tmp;
+    }
+    if (!dtFim && typeof dataFim === "string") {
+      var tmp2 = new Date(dataFim);
+      if (!isNaN(tmp2.getTime())) dtFim = tmp2;
+    }
+
+    if (!dtIni || !dtFim) {
+      return { ok: false, error: "Período inválido. Informe data inicial e final (dd/MM/aaaa)." };
+    }
+
+    // Normalizadores
+    function grupoMatchTime_(grupoLinhaRaw, filtroTimeNorm) {
+      if (!grupoLinhaRaw) return false;
+      var g = normalizarTexto_(grupoLinhaRaw.toString());
+      if (!g) return false;
+
+      var partes = g.split(/[\|\;\,\/\-]+/)
+        .map(function(s){ return s.trim(); })
+        .filter(function(s){ return !!s; });
+
+      for (var i = 0; i < partes.length; i++) {
+        if (partes[i] === filtroTimeNorm) return true;
+      }
+      return g.indexOf(filtroTimeNorm) !== -1;
+    }
+
+    function normalizarItem_(txt) {
+      var n = normalizarTexto_(txt || "");
+      // remove pontuação básica
+      n = n.replace(/[^\p{L}\p{N}\s]/gu, " ");
+      n = n.replace(/\s+/g, " ").trim();
+      // remove stopwords comuns (mantém termos relevantes)
+      n = (" " + n + " ")
+        .replace(/ (de|da|do|das|dos|para|pra|com|sem|um|uma|uns|umas|ao|aos|na|no|nas|nos|e) /g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      return n;
+    }
+
+    // Classificação por política (heurística conservadora)
+    
+    function classificarPolitica_(descricaoNorm) {
+  var d = (descricaoNorm || "").trim();
+
+  // Palavras-chave “permitidas prováveis” (operacionais recorrentes)
+  // Obs.: como d já está normalizado (sem acento), use sempre sem acento.
+  var permitidosProv = [
+    // Comunicação / gráfica / sinalização
+    "impressao", "imprimir", "grafica", "plotagem", "encadernacao",
+    "banner", "placa", "adesivo", "folder", "panfleto",
+    "comunicacao", "comunicacao loja", "sinalizacao", "placas", "cartaz", "cartazes",
+    "papel couche", "couche", "laminacao", "recorte", "vinil",
+
+    // Água / consumo básico
+    "agua", "agua potavel", "potavel", "agua mineral", "galao", "garrafa",
+
+    // Lanches / apoio operacional
+    "lanche", "lanches", "coffee", "cafe", "cafezinho", "snack",
+
+    // Materiais de escritório (comuns)
+    "caneta", "lapis", "borracha", "apontador", "marcador", "pilot", "pincel",
+    "papel a4", "papel sulfite", "sulfite", "pasta", "arquivo", "etiqueta", "etiquetas",
+    "grampo", "grampeador", "clipes", "cola", "fita adesiva", "tesoura",
+
+    // Materiais de limpeza (comuns)
+    "detergente", "sabao", "desinfetante", "alcool", "agua sanitaria",
+    "papel toalha", "papel higienico", "limpeza", "pano", "esponja", "vassoura", "rodo",
+
+    // Copa/cozinha (comuns)
+    "copo", "copos", "guardanapo", "prato", "talher", "talheres", "mexedor",
+
+    // Postagens/correios (comuns)
+    "correios", "sedex", "postagem", "ar"
+  ];
+
+  // Palavras-chave “alerta” (potencialmente proibido/patrimonial/restrito)
+  var alerta = [
+    "notebook", "computador", "pc", "tablet", "celular", "smartphone", "iphone",
+    "impressora", "scanner", "monitor", "tv", "televisao", "camera", "fone", "headset",
+    "geladeira", "microondas", "ar condicionado", "ventilador",
+    "movel", "moveis", "cadeira", "mesa", "compressor", "microondas", "steamer", "capa",
+    "combustivel", "gasolina", "etanol", "diesel", "posto",
+    "uber", "taxi", "corrida", "hospedagem", "hotel", "passagem", "viagem",
+    "assinatura", "mensalidade", "streaming",
+    "bebida", "alcool", "cerveja", "vinho", "whisky",
+    "presente", "gift"
+  ];
+
+  // =========================
+  // 1) ALERTA sempre primeiro
+  // =========================
+  for (var i = 0; i < alerta.length; i++) {
+    if (d.indexOf(alerta[i]) !== -1) {
+      return { status: "ALERTA", motivo: "Possível item restrito/patrimonial (revisar política e comprovante)." };
+    }
+  }
+
+  // ============================================
+  // 2) Regras combinadas (menos falso positivo)
+  // ============================================
+  // Lanche + equipe / treinamento (quando explicitado)
+  if (d.indexOf("lanche") !== -1 && (d.indexOf("equipe") !== -1 || d.indexOf("trein") !== -1)) {
+    return { status: "OK", motivo: "Despesa operacional (lanche para equipe/treinamento) conforme descrição." };
+  }
+
+  // Água (bem objetivo)
+  if (d.indexOf("agua") !== -1 || d.indexOf("potavel") !== -1) {
+    return { status: "OK", motivo: "Despesa operacional (água) conforme descrição." };
+  }
+
+  // Comunicação (bem objetivo)
+  if (d.indexOf("comunicacao") !== -1) {
+    return { status: "OK", motivo: "Despesa operacional (comunicação) conforme descrição." };
+  }
+
+  // ===================================
+  // 3) OK por palavras-chave permitidas
+  // ===================================
+  for (var j = 0; j < permitidosProv.length; j++) {
+    if (d.indexOf(permitidosProv[j]) !== -1) {
+      return { status: "OK", motivo: "Compatível com despesa operacional provável, conforme descrição." };
+    }
+  }
+
+  // ====================
+  // 4) Genéricos → revisar
+  // ====================
+  if (d.length < 6 || d === "material" || d === "impressao" || d === "compra" || d === "servico") {
+    return { status: "REVISAR", motivo: "Descrição genérica. Necessário validar comprovante e detalhamento." };
+  }
+
+  return { status: "REVISAR", motivo: "Não foi possível confirmar apenas pela descrição. Revisar comprovante." };
+}
+
+    var filtroNorm = normalizarTexto_(valorFiltro);
+
+    // Filtra linhas
+    var rows = [];
+    for (var r = 0; r < linhas.length; r++) {
+      var row = linhas[r];
+
+      var d = parseDateClara_(row[idxData]);
+      if (!d) continue;
+
+      // dentro do período
+      if (d < dtIni || d > dtFim) continue;
+
+      // filtro por loja ou time
+      if (tipoFiltro === "loja") {
+        var lojaNum = (idxLojaNum >= 0 ? (row[idxLojaNum] || "").toString().trim() : "");
+        var alias = (idxAlias >= 0 ? (row[idxAlias] || "").toString().trim() : "");
+
+        // se valorFiltro for numérico, compara com LojaNum
+        var soDigitos = valorFiltro.replace(/\D/g, "");
+        if (soDigitos && soDigitos.length >= 2) {
+            var ln = Number((lojaNum || "").toString().replace(/\D/g, "")) || 0;
+        var vf = Number(soDigitos) || 0;
+        if (ln !== vf) continue;
+        } else {
+          // senão tenta match por alias (contém)
+          var aliasNorm = normalizarTexto_(alias);
+          if (!aliasNorm || aliasNorm.indexOf(filtroNorm) === -1) continue;
+        }
+      } else if (tipoFiltro === "time") {
+        var grupoLinha = row[idxGrupo];
+        if (!grupoMatchTime_(grupoLinha, filtroNorm)) continue;
+      }
+
+      var valor = row[idxValor];
+      var lojaAlias = (idxAlias >= 0 ? (row[idxAlias] || "").toString().trim() : "");
+      var lojaNumOut = (idxLojaNum >= 0 ? (row[idxLojaNum] || "").toString().trim() : "");
+      var descRaw = (row[idxDescricao] || "").toString().trim();
+      var descNorm = normalizarItem_(descRaw);
+
+      var cls = classificarPolitica_(descNorm);
+
+      rows.push({
+        data: Utilities.formatDate(d, tz, "dd/MM/yyyy"),
+        dataISO: Utilities.formatDate(d, tz, "yyyy-MM-dd"),
+        valor: (typeof valor === "number" ? valor : Number(valor) || 0),
+        loja: lojaAlias || lojaNumOut || "—",
+        item: descRaw,
+        itemNorm: descNorm,
+        status: cls.status,
+        motivo: cls.motivo
+      });
+    }
+
+    // Ordena por data desc e valor desc (para facilitar auditoria)
+    rows.sort(function(a,b){
+      if (a.dataISO < b.dataISO) return 1;
+      if (a.dataISO > b.dataISO) return -1;
+      return (b.valor || 0) - (a.valor || 0);
+    });
+
+    // Reincidência por loja + itemNorm (janela curta)
+    var porChave = {};
+    for (var i2 = 0; i2 < rows.length; i2++) {
+      var rr = rows[i2];
+      var chave = normalizarTexto_(rr.loja) + "||" + rr.itemNorm;
+      if (!porChave[chave]) porChave[chave] = [];
+      porChave[chave].push(rr);
+    }
+
+    // marca reincidência analisando datas (ordem asc dentro do grupo)
+    Object.keys(porChave).forEach(function(ch){
+      var arr = porChave[ch].slice().sort(function(a,b){
+        return a.dataISO < b.dataISO ? -1 : (a.dataISO > b.dataISO ? 1 : 0);
+      });
+
+      var ultima = null;
+      var countJanela = 0;
+      for (var k = 0; k < arr.length; k++) {
+        var cur = arr[k];
+        var curD = new Date(cur.dataISO + "T00:00:00");
+        if (ultima) {
+          var diff = (curD - ultima) / 86400000;
+          if (diff <= janelaDiasReincidencia) {
+            countJanela++;
+            cur.reincidencia = "Sim (" + (countJanela + 1) + "x em " + Math.round(diff) + " dias)";
+          } else {
+            countJanela = 0;
+            cur.reincidencia = "";
+          }
+        } else {
+          cur.reincidencia = "";
+        }
+        ultima = curD;
+      }
+    });
+
+    // Insights rápidos
+    var total = rows.length;
+    var alertas = rows.filter(function(x){ return x.status === "ALERTA"; }).length;
+    var revisar = rows.filter(function(x){ return x.status === "REVISAR"; }).length;
+
+    return {
+      ok: true,
+      tipoFiltro: tipoFiltro,
+      valorFiltro: valorFiltro,
+      periodo: {
+        inicio: Utilities.formatDate(dtIni, tz, "dd/MM/yyyy"),
+        fim: Utilities.formatDate(dtFim, tz, "dd/MM/yyyy")
+      },
+      janelaDiasReincidencia: janelaDiasReincidencia,
+      resumo: { total: total, alertas: alertas, revisar: revisar },
+      rows: rows
+    };
+
+  } catch (e) {
+    return { ok: false, error: "Erro ao listar itens comprados: " + (e && e.message ? e.message : e) };
   }
 }
 
