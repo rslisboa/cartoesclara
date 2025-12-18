@@ -884,6 +884,7 @@ const VEKTOR_INTENTS = [
   "Como aumento o limite do cartão?",
   "Itens comprados para o time",
   "Itens comprados para a loja",
+  "Itens comprados no geral",
   "Como usar bem o limite do cartão Clara?",
   "Quero gráficos das transações",
   "O que o Vektor pode fazer?",
@@ -1445,30 +1446,80 @@ function vektorDetectarFuncaoOrigem() {
     }
   };
 
-  window.vektorAplicarFiltrosItensComprados = function (wrapId) {
-  try {
-    const wrap = document.getElementById(wrapId);
-    if (!wrap) return;
 
-    const sel = wrap.querySelector('select[data-filtro="status"]');
-    const chk = wrap.querySelector('input[data-filtro="reinc"]');
+window.vektorAplicarFiltrosItensComprados = function (wrapId) {
+  const wrap = document.getElementById(wrapId);
+  if (!wrap) return;
 
-    const statusFiltro = (sel && sel.value) ? sel.value : "";
-    const somenteReinc = !!(chk && chk.checked);
+  const selStatus = wrap.querySelector('select[data-filtro="status"]');
+  const chkReinc = wrap.querySelector('input[data-filtro="reinc"]');
 
-    const rows = wrap.querySelectorAll("tbody tr[data-status]");
-    rows.forEach(tr => {
-      const st = (tr.getAttribute("data-status") || "").toUpperCase();
-      const reinc = tr.getAttribute("data-reinc") === "1";
+  // ✅ agora serão MULTI (no item C), mas já deixo compatível:
+  const selTime = wrap.querySelector('select[data-filtro="time"]');
+  const selLoja = wrap.querySelector('select[data-filtro="loja"]');
 
-      let ok = true;
-      if (statusFiltro && st !== statusFiltro) ok = false;
-      if (somenteReinc && !reinc) ok = false;
+  const statusFiltro = selStatus ? selStatus.value : "";
+  const somenteReinc = !!(chkReinc && chkReinc.checked);
 
-      tr.style.display = ok ? "" : "none";
+  const timesSel = selTime ? Array.from(selTime.selectedOptions).map(o => o.value).filter(Boolean) : [];
+  const lojasSel = selLoja ? Array.from(selLoja.selectedOptions).map(o => o.value).filter(Boolean) : [];
+
+  const trs = Array.from(wrap.querySelectorAll("tbody tr[data-status]"));
+
+  // 1) aplica filtro nas linhas
+  trs.forEach(tr => {
+    const st = (tr.getAttribute("data-status") || "").toUpperCase();
+    const reinc = tr.getAttribute("data-reinc") === "1";
+    const t = (tr.getAttribute("data-time") || "");
+    const l = (tr.getAttribute("data-loja") || "");
+
+    let ok = true;
+
+    if (statusFiltro && st !== statusFiltro) ok = false;
+    if (somenteReinc && !reinc) ok = false;
+
+    if (timesSel.length && !timesSel.includes(t)) ok = false;
+    if (lojasSel.length && !lojasSel.includes(l)) ok = false;
+
+    tr.style.display = ok ? "" : "none";
+  });
+
+  // 2) recalcula opções disponíveis (cascata)
+  // base: linhas VISÍVEIS após filtros (exceto o próprio filtro do select que vamos recalcular)
+  const visibleTrs = trs.filter(tr => tr.style.display !== "none");
+
+  // Times disponíveis com base nas lojas selecionadas (ou nas linhas visíveis)
+  if (selTime) {
+    const setTimes = new Set();
+    visibleTrs.forEach(tr => {
+      const t = (tr.getAttribute("data-time") || "");
+      if (t) setTimes.add(t);
     });
-  } catch (e) {
-    console.warn("Filtro itens comprados falhou:", e);
+
+    // Rebuild options mantendo seleção válida
+    const prev = new Set(timesSel);
+    const opts = ["<option value=''>Todos</option>"]
+      .concat(Array.from(setTimes).sort().map(t => {
+        const sel = prev.has(t) ? " selected" : "";
+        return `<option value="${t.replace(/"/g,'&quot;')}"${sel}>${t}</option>`;
+      }));
+    selTime.innerHTML = opts.join("");
+  }
+
+  if (selLoja) {
+    const setLojas = new Set();
+    visibleTrs.forEach(tr => {
+      const l = (tr.getAttribute("data-loja") || "");
+      if (l) setLojas.add(l);
+    });
+
+    const prev = new Set(lojasSel);
+    const opts = ["<option value=''>Todas</option>"]
+      .concat(Array.from(setLojas).sort().map(l => {
+        const sel = prev.has(l) ? " selected" : "";
+        return `<option value="${l.replace(/"/g,'&quot;')}"${sel}>${l}</option>`;
+      }));
+    selLoja.innerHTML = opts.join("");
   }
 };
 
@@ -1476,28 +1527,20 @@ window.vektorLimparFiltrosItensComprados = function (wrapId) {
   const wrap = document.getElementById(wrapId);
   if (!wrap) return;
 
-  const sel = wrap.querySelector('select[data-filtro="status"]');
-  const chk = wrap.querySelector('input[data-filtro="reinc"]');
+  const selStatus = wrap.querySelector('select[data-filtro="status"]');
+  const chkReinc  = wrap.querySelector('input[data-filtro="reinc"]');
+  const selTime   = wrap.querySelector('select[data-filtro="time"]');
+  const selLoja   = wrap.querySelector('select[data-filtro="loja"]');
 
-  if (sel) sel.value = "";
-  if (chk) chk.checked = false;
+  if (selStatus) selStatus.value = "";
+  if (chkReinc) chkReinc.checked = false;
+
+  // limpa multi-seleção (se existir)
+  if (selTime) Array.from(selTime.options).forEach(o => o.selected = false);
+  if (selLoja) Array.from(selLoja.options).forEach(o => o.selected = false);
 
   window.vektorAplicarFiltrosItensComprados(wrapId);
 };
-
-function vektorLimparFiltrosItensComprados(wrapId) {
-  const wrap = document.getElementById(wrapId);
-  if (!wrap) return;
-
-  const sel = wrap.querySelector('select[data-filtro="status"]');
-  const chk = wrap.querySelector('input[data-filtro="reinc"]');
-
-  if (sel) sel.value = "";
-  if (chk) chk.checked = false;
-
-  vektorAplicarFiltrosItensComprados(wrapId);
-}
-
 
 // ========= DRILL-DOWN: EXPANDIR LINHA DA TABELA (com dropdown + mesmo período) ========= //
 
@@ -3842,8 +3885,7 @@ Sou um agente especializado na Política de Uso dos Cartões Clara nas lojas. N�
             <li>Se a despesa for necessária para a operação da loja, abra um chamado no <b>ServiceNow</b> em:<br/>
             <b>Contas a Receber &gt; Cartão Clara &gt; Solicitação de Liberação de Categoria para Compra</b>;</li>
             <li>Explique o contexto da compra, qual tipo de serviço/produto precisa ser liberado e se a liberação é pontual ou recorrente.</li>
-
-            <p class="mt-2">Depois da liberação pelo Financeiro no ServiceNow, você pode tentar a compra novamente com o cartão Clara.</p>
+            <li>Depois da liberação pelo Financeiro no ServiceNow, você pode tentar a compra novamente com o cartão Clara.</li>
             </div>`;
                 }
 
@@ -8873,15 +8915,16 @@ function vektorRenderTabelaListaItensComprados(res) {
   const alertas = (res.resumo && res.resumo.alertas) || 0;
   const revisar = (res.resumo && res.resumo.revisar) || 0;
 
-  const insightsHtml =
-  "<div class='text-sm text-slate-700' style='margin:0;padding:0;line-height:1.2;'>" +
-    "<b>Resumo:</b> " + total + " itens | " +
-    "<b>ALERTA:</b> " + alertas + " | " +
-    "<b>REVISAR:</b> " + revisar +
-  "</div>" +
-  "<div class='text-xs text-slate-500' style='margin:0;padding:0;line-height:1.2;'>" +
-    "Observação: a classificação é heurística baseada em descrição livre; use como triagem e valide comprovantes/etiquetas." +
-  "</div>";
+  const insightsHtml = `
+        <div class="text-sm text-slate-700" style="margin:0; padding:0; white-space:nowrap;">
+          <b>Resumo:</b> ${total} itens&nbsp; |&nbsp;
+          <b>ALERTA:</b> ${alertas}&nbsp; |&nbsp;
+          <b>REVISAR:</b> ${revisar}
+        </div>
+        <div class="text-xs text-slate-500" style="margin:0; padding:0;">
+          Observação: a classificação é heurística baseada em descrição livre; use como triagem e valide comprovantes/etiquetas.
+        </div>
+      `;
 
           // Tabela
           let thead = `
@@ -8910,9 +8953,12 @@ function vektorRenderTabelaListaItensComprados(res) {
     const reincTxt = (r.reincidencia || "").toString().trim();
     const reincFlag = reincTxt ? "1" : "0";
 
-
     return `
-              <tr class="border-t border-slate-200" data-status="${(r.conformidade || r.status || '').toString().trim().toUpperCase()}" data-reinc="${(r.reincidencia || '').toString().trim() ? '1' : '0'}">
+              <tr class="border-t border-slate-200"
+              data-status="${(r.conformidade || r.status || '').toString().trim().toUpperCase()}"
+              data-reinc="${(r.reincidencia || '').toString().trim() ? '1' : '0'}"
+              data-time="${((r.time || '').toString().trim()).replace(/"/g,'&quot;')}"
+              data-loja="${((r.loja || '').toString().trim()).replace(/"/g,'&quot;')}">
               <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">${r.data || ""}</td>
               <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">R$ ${v}</td>
               <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">${(r.loja || "").replace(/</g,"&lt;")}</td>
@@ -8940,38 +8986,48 @@ function vektorRenderTabelaListaItensComprados(res) {
 
         const tableWrapId = "itensWrap_" + Date.now();
 
+        const isGeral = (res.tipoFiltro || "").toString().toLowerCase() === "geral";
+
+            let opcoesTime = "";
+            let opcoesLoja = "";
+
+            if (isGeral) {
+              const times = Array.from(
+                new Set(
+                  rows
+                    .map(r => (r.time || "").toString().trim())
+                    .filter(Boolean)
+                )
+              ).sort();
+
+              const lojas = Array.from(
+                new Set(
+                  rows
+                    .map(r => (r.loja || "").toString().trim())
+                    .filter(Boolean)
+                )
+              ).sort();
+
+              opcoesTime = times
+                .map(t => `<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`)
+                .join("");
+
+              opcoesLoja = lojas
+                .map(l => `<option value="${l.replace(/"/g,'&quot;')}">${l}</option>`)
+                .join("");
+            }
+
+
           const filtrosHtml = `
-            <div style="
-                margin:0;
-                padding:0;
-                width:100%;
-                display:flex;
-                align-items:center;
-                gap:12px;
-                flex-wrap:nowrap;          /* ✅ não cria “faixa alta” */
-                line-height:1;            /* ✅ elimina altura fantasma */
-              ">
+            <div style="margin:0;padding:0;width:100%;display:flex;align-items:center;gap:12px;flex-wrap:wrap;line-height:1;">
 
-              <div class="text-sm text-slate-700 font-semibold" style="margin:0; padding:0; white-space:nowrap;">
-                Filtros:
-              </div>
+              <div class="text-sm text-slate-700 font-semibold" style="white-space:nowrap;">Filtros:</div>
 
-              <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
-                <span class="text-sm text-slate-700" style="margin:0; padding:0;">Conformidade</span>
-
-                <select
-                  data-filtro="status"
+              <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;">
+                <span class="text-sm text-slate-700">Conformidade</span>
+                <select data-filtro="status"
                   onchange="vektorAplicarFiltrosItensComprados('${tableWrapId}')"
-                  style="
-                    height:32px;
-                    padding:0 10px;
-                    border:1px solid #cbd5e1;
-                    border-radius:10px;
-                    font-size:14px;
-                    line-height:32px;
-                    background:#fff;
-                    color:#334155;
-                  ">
+                  style="height:32px;padding:0 10px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;line-height:32px;background:#fff;color:#334155;">
                   <option value="">Todos</option>
                   <option value="OK">OK</option>
                   <option value="REVISAR">REVISAR</option>
@@ -8979,32 +9035,39 @@ function vektorRenderTabelaListaItensComprados(res) {
                 </select>
               </div>
 
-              <label style="display:flex; align-items:center; gap:8px; margin:0; padding:0; white-space:nowrap;">
-                <input type="checkbox"
-                      data-filtro="reinc"
-                      onchange="vektorAplicarFiltrosItensComprados('${tableWrapId}')"
-                      style="width:16px; height:16px; margin:0;" />
-                <span class="text-sm text-slate-700" style="margin:0; padding:0;">Somente com reincidência</span>
+              ${isGeral ? `
+                <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;">
+                  <span class="text-sm text-slate-700">Time</span>
+                  <select multiple size="1" data-filtro="time"
+                    onchange="vektorAplicarFiltrosItensComprados('${tableWrapId}')"
+                    style="min-height:32px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;background:#fff;color:#334155;max-width:240px;">
+                    <option value="">Todos</option>
+                    ${opcoesTime}
+                  </select>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:8px;white-space:nowrap;">
+                <span class="text-sm text-slate-700">Loja</span>
+                <select multiple size="1" data-filtro="loja"
+                  onchange="vektorAplicarFiltrosItensComprados('${tableWrapId}')"
+                  style="min-height:32px;padding:6px 10px;border:1px solid #cbd5e1;border-radius:10px;font-size:14px;background:#fff;color:#334155;min-width:260px;max-width:420px;">
+                  <option value="">Todas</option>
+                  ${opcoesLoja}
+                </select>
+              </div>
+
+              ` : ""}
+
+              <label style="display:flex;align-items:center;gap:8px;margin:0;padding:0;white-space:nowrap;">
+                <input type="checkbox" data-filtro="reinc"
+                  onchange="vektorAplicarFiltrosItensComprados('${tableWrapId}')"
+                  style="width:16px;height:16px;margin:0;" />
+                <span class="text-sm text-slate-700">Somente com reincidência</span>
               </label>
 
               <button type="button"
-                onclick="vektorLimparFiltrosItensComprados('${tableWrapId}')"
-                style="
-                  height:32px;
-                  padding:0 12px;
-                  border:1px solid #cbd5e1;
-                  border-radius:10px;
-                  font-size:13px;
-                  font-weight:700;
-                  line-height:32px;        /* ✅ texto no meio */
-                  background:#fff;
-                  color:#334155;
-                  cursor:pointer;
-                  display:inline-flex;     /* ✅ centraliza vertical */
-                  align-items:center;
-                  justify-content:center;
-                  white-space:nowrap;
-                ">
+                onclick="window.vektorLimparFiltrosItensComprados('${tableWrapId}')"
+                style="height:32px;padding:0 12px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-weight:700;line-height:32px;background:#fff;color:#334155;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;white-space:nowrap;">
                 Limpar
               </button>
 
@@ -9012,9 +9075,8 @@ function vektorRenderTabelaListaItensComprados(res) {
           `;
 
         const tabelaHtml = `
-  <div id="${tableWrapId}" style="max-width:100%; width:100%; margin:0; padding:0; line-height:1.2;">
-  <div style="margin:0; padding:0; display:flex; flex-direction:column; gap:8px;">
-
+  <div id="${tableWrapId}" style="max-width:100%; width:100%; min-width:0; margin:0; padding:0; line-height:1.2; overflow:hidden;">
+  <div style="margin:0; padding:0; display:flex; flex-direction:column; gap:4px;">
 
     <!-- Título/Período -->
     <div style="margin:0; padding:0;" class="text-sm text-slate-700">
@@ -9030,7 +9092,7 @@ function vektorRenderTabelaListaItensComprados(res) {
     ${filtrosHtml}
 
     <!-- Tabela -->
-    <div class="mt-1 overflow-x-auto" style="max-width:100%;">
+    <div class="mt-1" style="max-width:100%; min-width:0; overflow-x:auto;">
       <table class="min-w-full border border-slate-200 rounded-lg">
         ${thead}
         <tbody>${tbody}</tbody>
@@ -12848,7 +12910,40 @@ function listarEtiquetasClara() {
             return;
         }
 
-        
+        // ✅ Caso geral (sem loja/time)
+if (/\bno\s+geral\b/i.test(norm)) {
+  const periodo = extrairIntervaloDatas(texto);
+  if (!periodo || !periodo.dataInicio || !periodo.dataFim) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Informe um período. Ex.: <b>itens comprados no geral de 01/12/2025 a 15/12/2025</b> (ou use <b>este mês</b>, <b>últimos 30 dias</b> etc.).</p>"
+    );
+    return;
+  }
+
+  function fmtBR(d) {
+    const dd = String(d.getDate()).padStart(2,"0");
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  const dataIni = fmtBR(periodo.dataInicio);
+  const dataFim = fmtBR(periodo.dataFim);
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Consultando itens comprados <b>no geral</b> de <b>" + dataIni + "</b> a <b>" + dataFim + "</b>…</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(vektorRenderTabelaListaItensComprados)
+    .withFailureHandler(function(err){
+      console.error(err);
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao listar itens comprados.</p>");
+    })
+    .getListaItensCompradosClara("geral", "", dataIni, dataFim, 300); // <- ajuste o limite como preferir
+
+  return;
+}
 
         let tipo = "";
         let valor = "";
