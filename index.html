@@ -9144,50 +9144,65 @@ function vektorRenderTabelaRelacaoSaldos(res, tipo) {
   // Insights (1 linha por item, sem espaçamento)
   let insights = "";
   insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Período:</b> " + (periodo.inicio || "") + " a " + (periodo.fim || "") + "</p>";
+    insights += "<div style='height:8px;'></div>";
 
         if (h.menorSaldo) {
         const lojaTxt = h.menorSaldo.loja ? ("Loja " + h.menorSaldo.loja) : "Loja (N/D)";
         insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Menor saldo:</b> "
           + lojaTxt + " — " + money(h.menorSaldo.saldo) + "</p>";
       }
+      insights += "<div style='height:8px;'></div>";
+
 
       if (h.maiorSaldo) {
         const lojaTxt = h.maiorSaldo.loja ? ("Loja " + h.maiorSaldo.loja) : "Loja (N/D)";
         insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Maior saldo:</b> "
           + lojaTxt + " — " + money(h.maiorSaldo.saldo) + "</p>";
       }
+      insights += "<div style='height:8px;'></div>";
 
-  if (h.predisposicao) {
-    insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Predisposição (projeção no ciclo):</b> " + money(h.predisposicao.projFinal) + " (média/dia " + money(h.predisposicao.mediaDia) + ")</p>";
-  }
-  insights += "<div style='height:8px'></div>";
+      insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'>"
+      + "<b>Projeção de gasto:</b> estimativa do valor que a loja tende a gastar até o fim do ciclo de faturamento (06→05), "
+      + "calculada pela média dos últimos 3 ciclos completos. "
+      + "Na ausência de histórico suficiente, utiliza 2 ciclos ou, em último caso, os últimos 30 dias."
+      + "</p>";
+    insights += "<div style='height:8px;'></div>";
+
 
   // Cabeçalho dinâmico
-  const showLoja = (tipo === "geral" || tipo === "time"); // decisão operacional (time mostra loja)
+  const showLoja = false;
   const showTime = (tipo === "geral"); // conforme você pediu: time/loja sem coluna Time
 
   let th = "";
   th += "<th style='border:1px solid #000;padding:6px;'>Nome do cartão</th>";
-  if (showLoja) th += "<th style='border:1px solid #000;padding:6px;'>Loja</th>";
   if (showTime) th += "<th style='border:1px solid #000;padding:6px;'>Time</th>";
   th += "<th style='border:1px solid #000;padding:6px;'>Tipo</th>";
   th += "<th style='border:1px solid #000;padding:6px;'>Titular</th>";
   th += "<th style='border:1px solid #000;padding:6px;'>Limite</th>";
   th += "<th style='border:1px solid #000;padding:6px;'>Valor Utilizado</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;'>ℹ️ Projeção Gasto</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;'>% da Projeção</th>";
   th += "<th style='border:1px solid #000;padding:6px;'>Saldo</th>";
+  
 
   // Linhas
   let trs = "";
   rows.forEach(function(r) {
     trs += "<tr>";
     trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.nomeCartao || "") + "</td>";
-    if (showLoja) trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.loja || "") + "</td>";
     if (showTime) trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.time || "") + "</td>";
     trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.tipo || "") + "</td>";
     trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.titular || "") + "</td>";
     trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.limite) + "</td>";
     trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.utilizado) + "</td>";
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.projecao) + "</td>";
+    // % da Projeção
+    var pctProj = (r.projecao && r.projecao > 0)
+      ? ((r.utilizado / r.projecao) * 100).toFixed(1) + "%"
+      : "—";
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + pctProj + "</td>";
     trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.saldo) + "</td>";
+    
     trs += "</tr>";
   });
 
