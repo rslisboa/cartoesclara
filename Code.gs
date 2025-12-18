@@ -1125,23 +1125,6 @@ function getFrequenciaUsoClara(tipoFiltro, valorFiltro, mesesBack) {
     var inicioConsistencia = new Date(hoje.getFullYear(), hoje.getMonth() - 5, 1);
     inicioConsistencia.setHours(0, 0, 0, 0);
 
-    // ---------- Normalização do filtro ----------
-    var filtroTimeNorm = "";
-    var filtroLojaNum = null; // compara como número para ignorar zeros à esquerda
-
-    if (tipoFiltro === "loja") {
-      var digits = (valorFiltro || "").replace(/\D/g, "");
-      if (!digits) return { ok: true, rows: [], aviso: "Loja inválida." };
-
-      filtroLojaNum = Number(digits); // 242 == 0242
-      if (!isFinite(filtroLojaNum)) return { ok: true, rows: [], aviso: "Loja inválida." };
-    } else if (tipoFiltro === "time") {
-      filtroTimeNorm = normalizarTexto_(valorFiltro);
-      if (!filtroTimeNorm) return { ok: true, rows: [], aviso: "Time inválido." };
-    } else {
-      return { ok: false, error: "Filtro inválido. Use 'time' ou 'loja'." };
-    }
-
     // ---------- Helpers ----------
     function toDateKey(d) { return Utilities.formatDate(d, tz, "yyyy-MM-dd"); }
     function toMonthKey(d) { return Utilities.formatDate(d, tz, "yyyy-MM"); }
@@ -1785,59 +1768,105 @@ function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, 
   return { status: "REVISAR", motivo: "Não foi possível confirmar apenas pela descrição. Revisar comprovante." };
 }
 
-    var filtroNorm = normalizarTexto_(valorFiltro);
+var filtroNorm = normalizarTexto_(valorFiltro);
 
-    // Filtra linhas
-    var rows = [];
-    for (var r = 0; r < linhas.length; r++) {
-      var row = linhas[r];
+// garante fim do dia no período (evita “vazar” datas)
+if (dtIni instanceof Date) dtIni.setHours(0,0,0,0);
+if (dtFim instanceof Date) dtFim.setHours(23,59,59,999);
 
-      var d = parseDateClara_(row[idxData]);
-      if (!d) continue;
+// extrai código da loja do texto do autocomplete (ex.: "0046 - ...")
+var soDigitos = (valorFiltro || "").replace(/\D/g, "");
+var dig4 = "";
+var m4 = soDigitos.match(/\d{4}/);
+if (m4) dig4 = m4[0];
+else if (soDigitos.length >= 4) dig4 = soDigitos.slice(-4);
 
-      // dentro do período
-      if (d < dtIni || d > dtFim) continue;
+// 1) primeiro filtra as linhas (matriz crua)
+var linhasFiltradas = [];
+for (var r = 0; r < linhas.length; r++) {
+  var row = linhas[r];
 
-      // filtro por loja ou time
-      if (tipoFiltro === "loja") {
-        var lojaNum = (idxLojaNum >= 0 ? (row[idxLojaNum] || "").toString().trim() : "");
-        var alias = (idxAlias >= 0 ? (row[idxAlias] || "").toString().trim() : "");
+  var d = parseDateClara_(row[idxData]);
+  if (!d || isNaN(d.getTime())) continue;
 
-        // se valorFiltro for numérico, compara com LojaNum
-        var soDigitos = valorFiltro.replace(/\D/g, "");
-        if (soDigitos && soDigitos.length >= 2) {
-            var ln = Number((lojaNum || "").toString().replace(/\D/g, "")) || 0;
-        var vf = Number(soDigitos) || 0;
-        if (ln !== vf) continue;
-        } else {
-          // senão tenta match por alias (contém)
-          var aliasNorm = normalizarTexto_(alias);
-          if (!aliasNorm || aliasNorm.indexOf(filtroNorm) === -1) continue;
-        }
-      } else if (tipoFiltro === "time") {
-        var grupoLinha = row[idxGrupo];
-        if (!grupoMatchTime_(grupoLinha, filtroNorm)) continue;
-      }
+  // dentro do período
+  if (d < dtIni || d > dtFim) continue;
 
-      var valor = row[idxValor];
-      var lojaAlias = (idxAlias >= 0 ? (row[idxAlias] || "").toString().trim() : "");
-      var lojaNumOut = (idxLojaNum >= 0 ? (row[idxLojaNum] || "").toString().trim() : "");
-      var descRaw = (row[idxDescricao] || "").toString().trim();
-      var descNorm = normalizarItem_(descRaw);
+  // ===============================
+  // filtro por loja / time / geral
+  // ===============================
+  if (tipoFiltro === "geral") {
+    // não filtra
+  } else if (tipoFiltro === "time") {
+    var grupoLinha = row[idxGrupo];
+    if (!grupoMatchTime_(grupoLinha, filtroNorm)) continue;
 
-      var cls = classificarPolitica_(descNorm);
+  } else if (tipoFiltro === "loja") {
+    var lojaNum = (idxLojaNum >= 0 ? (row[idxLojaNum] || "").toString().trim() : "");
+    var alias   = (idxAlias   >= 0 ? (row[idxAlias]   || "").toString().trim() : "");
 
-      rows.push({
-        data: Utilities.formatDate(d, tz, "dd/MM/yyyy"),
-        dataISO: Utilities.formatDate(d, tz, "yyyy-MM-dd"),
-        valor: (typeof valor === "number" ? valor : Number(valor) || 0),
-        loja: lojaAlias || lojaNumOut || "—",
-        item: descRaw,
-        itemNorm: descNorm,
-        status: cls.status,
-        motivo: cls.motivo
-      });
+    var aliasNorm   = normalizarTexto_(alias);
+    var lojaNumNorm = lojaNum.replace(/\D/g, "");
+    var bateu = false;
+
+    // match por número (o mais confiável)
+    if (dig4) {
+      if (lojaNumNorm === dig4) bateu = true;
+      // base costuma ter "CE0xxx" no Alias, então basta conter o 4 dígitos
+      if (aliasNorm && aliasNorm.indexOf(dig4) !== -1) bateu = true;
     }
+
+    // fallback textual (quando não veio número)
+    if (!bateu && filtroNorm) {
+      if (aliasNorm && aliasNorm.indexOf(filtroNorm) !== -1) bateu = true;
+    }
+
+    if (!bateu) continue;
+  } else {
+    continue;
+  }
+
+  linhasFiltradas.push(row);
+}
+
+// 2) agora monta a saída (objetos), SEM misturar com a matriz crua
+var rows = [];
+for (var i = 0; i < linhasFiltradas.length; i++) {
+  var row = linhasFiltradas[i];
+
+  var valor = Number(row[idxValor]) || 0;
+
+  // data BR
+  var dataCel = row[idxData];
+  var dataBr = "";
+  if (dataCel instanceof Date) {
+    dataBr = Utilities.formatDate(dataCel, tz, "dd/MM/yyyy");
+  } else {
+    dataBr = (dataCel || "").toString();
+  }
+
+  var lojaOut = (idxAlias >= 0 ? String(row[idxAlias] || "") : "");
+  var timeOut = (idxGrupo >= 0 ? String(row[idxGrupo] || "") : "");
+
+  var itemRaw = (idxDescricao >= 0 ? String(row[idxDescricao] || "") : "");
+  var itemNorm = normalizarItem_(itemRaw);
+
+  var cls = classificarPolitica_(itemNorm);
+
+
+  rows.push({
+    data: dataBr,
+    valor: valor,
+    loja: lojaOut,
+    time: timeOut,
+    item: itemRaw,
+    status: cls.status,
+    conformidade: cls.status,
+    motivo: cls.motivo,
+    reincidencia: "",
+    itemNorm: itemNorm
+  });
+}
 
     // Ordena por data desc e valor desc (para facilitar auditoria)
     rows.sort(function(a,b){
