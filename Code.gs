@@ -939,6 +939,125 @@ function filtrarLinhasPorPeriodo_(linhas, idxData, dataInicioStr, dataFimStr) {
 }
 
 /**
+ * Retorna os limites de ciclo (06 -> 05) para um "offset" de meses.
+ * offsetMeses = 0 => ciclo atual
+ * offsetMeses = 1 => ciclo anterior
+ * offsetMeses = 2 => 2 ciclos atrás, etc.
+ */
+function getPeriodoCicloOffset_(offsetMeses) {
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var hoje = new Date();
+  var y = hoje.getFullYear();
+  var m = hoje.getMonth(); // 0..11
+
+  // Se hoje ainda não chegou no dia 06, ciclo atual começou no mês anterior
+  var cicloStartMonth = (hoje.getDate() >= 6) ? m : (m - 1);
+
+  // Aplica offset (volta ciclos)
+  cicloStartMonth = cicloStartMonth - (offsetMeses || 0);
+
+  // Ajusta ano/mês
+  var start = new Date(y, cicloStartMonth, 6, 0, 0, 0, 0);
+  var end = new Date(y, cicloStartMonth + 1, 5, 23, 59, 59, 999);
+
+  return { inicio: start, fim: end, tz: tz };
+}
+
+/**
+ * Calcula projeção de gasto por loja para o ciclo atual.
+ *
+ * Regra:
+ * 1) Média dos últimos 3 ciclos completos (06→05)
+ * 2) Se não existir, média dos últimos 2 ciclos completos
+ * 3) Se não existir, projeção pelos últimos 30 dias corridos
+ * 4) Se não existir, retorna 0
+ *
+ * Retorna: { "0287": 5400.25, "0197": 1320.10, ... }
+ */
+function calcularProjecaoPorLojaUltimosCiclos_(linhas, idxData, idxValor, idxLoja) {
+
+  // ---------- helpers internos ----------
+  function somaPorPeriodo(inicio, fim) {
+    var soma = {};
+    for (var i = 0; i < linhas.length; i++) {
+      var row = linhas[i];
+      if (!row) continue;
+
+      var d = parseDateClara_(row[idxData]);
+      if (!d || d < inicio || d > fim) continue;
+
+      var lojaRaw = (row[idxLoja] || "").toString().trim();
+      var dig = lojaRaw.replace(/\D/g, "");
+      if (!dig) continue;
+
+      var loja = String(Number(dig)).padStart(4, "0");
+      var v = parseNumberSafe_(row[idxValor]);
+      if (!v) continue;
+
+      soma[loja] = (soma[loja] || 0) + v;
+    }
+    return soma;
+  }
+
+  function mediaPorCiclos(qtdCiclos) {
+    var somaTotal = {};
+    var cont = {};
+
+    for (var c = 1; c <= qtdCiclos; c++) {
+      var per = getPeriodoCicloOffset_(c);
+      var somaCiclo = somaPorPeriodo(per.inicio, per.fim);
+
+      Object.keys(somaCiclo).forEach(function(loja) {
+        somaTotal[loja] = (somaTotal[loja] || 0) + somaCiclo[loja];
+        cont[loja] = (cont[loja] || 0) + 1;
+      });
+    }
+
+    var media = {};
+    Object.keys(somaTotal).forEach(function(loja) {
+      media[loja] = somaTotal[loja] / cont[loja];
+    });
+
+    return media;
+  }
+
+  function projecaoUltimos30Dias() {
+    var hoje = new Date();
+    var ini = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 30, 0, 0, 0, 0);
+    return somaPorPeriodo(ini, hoje);
+  }
+
+  // ---------- execução com fallback ----------
+  var media3 = mediaPorCiclos(3);
+  var media2 = mediaPorCiclos(2);
+  var ult30  = projecaoUltimos30Dias();
+
+  var resultado = {};
+  var lojas = {};
+
+  // coleta todas as lojas existentes
+  [media3, media2, ult30].forEach(function(obj) {
+    Object.keys(obj || {}).forEach(function(loja) {
+      lojas[loja] = true;
+    });
+  });
+
+  Object.keys(lojas).forEach(function(loja) {
+    if (media3[loja] != null) {
+      resultado[loja] = media3[loja];
+    } else if (media2[loja] != null) {
+      resultado[loja] = media2[loja];
+    } else if (ult30[loja] != null) {
+      resultado[loja] = ult30[loja];
+    } else {
+      resultado[loja] = 0;
+    }
+  });
+
+  return resultado;
+}
+
+/**
  * Retorna, para um determinado time/grupo (ou geral se grupo vazio), um resumo de transações por loja:
  * - total de transações
  * - valor total em R$
@@ -2026,6 +2145,10 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
     if (idxLoja < 0)   return { ok: false, error: "Não encontrei a coluna de Loja (ex.: LojaNum) na BaseClara." };
     if (idxGrupos < 0) return { ok: false, error: "Não encontrei a coluna 'Grupos' (Time) na BaseClara." };
 
+    // Projeção por loja baseada nos últimos 3 ciclos completos (06->05)
+    var projPorLoja = calcularProjecaoPorLojaUltimosCiclos_(linhas, idxData, idxValor, idxLoja, 3);
+
+
     // --- 4) Agregação ---
     var agg = {}; // key -> { cartaoKey, nomeCartao, loja, time, usado }
 
@@ -2117,7 +2240,8 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
         titular: titular,
         limite: limite,
         utilizado: a.usado || 0,
-        saldo: saldo
+        saldo: saldo,
+        projecao: (projPorLoja && a.loja && projPorLoja[a.loja]) ? projPorLoja[a.loja] : 0
       });
     });
 
