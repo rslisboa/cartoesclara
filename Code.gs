@@ -964,19 +964,19 @@ function getPeriodoCicloOffset_(offsetMeses) {
 }
 
 /**
- * Calcula projeção de gasto por loja para o ciclo atual.
+ * Projeção de gasto por loja para o ciclo atual (06->05), usando sazonalidade:
+ * - Base: média dos últimos 6 ciclos completos
+ * - Sazonal (Nov/Dez): usa o MAIOR ciclo dos últimos 6 (conservador para evitar estouro)
+ * - Fallback: se não tiver ciclos suficientes, usa os disponíveis; em último caso últimos 30 dias (projetado para um ciclo)
  *
- * Regra:
- * 1) Média dos últimos 3 ciclos completos (06→05)
- * 2) Se não existir, média dos últimos 2 ciclos completos
- * 3) Se não existir, projeção pelos últimos 30 dias corridos
- * 4) Se não existir, retorna 0
- *
- * Retorna: { "0287": 5400.25, "0197": 1320.10, ... }
+ * Retorna:
+ *  {
+ *    proj: { "0287": 5400.25, ... },
+ *    meta: { "0287": { fonte:"media6|max6|mediaN|ult30", nCiclos:6 }, ... }
+ *  }
  */
 function calcularProjecaoPorLojaUltimosCiclos_(linhas, idxData, idxValor, idxLoja) {
 
-  // ---------- helpers internos ----------
   function somaPorPeriodo(inicio, fim) {
     var soma = {};
     for (var i = 0; i < linhas.length; i++) {
@@ -999,62 +999,80 @@ function calcularProjecaoPorLojaUltimosCiclos_(linhas, idxData, idxValor, idxLoj
     return soma;
   }
 
-  function mediaPorCiclos(qtdCiclos) {
-    var somaTotal = {};
-    var cont = {};
+  function getCicloLenDias_(inicio, fim) {
+    return Math.max(1, Math.round((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  }
 
-    for (var c = 1; c <= qtdCiclos; c++) {
-      var per = getPeriodoCicloOffset_(c);
-      var somaCiclo = somaPorPeriodo(per.inicio, per.fim);
-
-      Object.keys(somaCiclo).forEach(function(loja) {
-        somaTotal[loja] = (somaTotal[loja] || 0) + somaCiclo[loja];
-        cont[loja] = (cont[loja] || 0) + 1;
-      });
-    }
-
-    var media = {};
-    Object.keys(somaTotal).forEach(function(loja) {
-      media[loja] = somaTotal[loja] / cont[loja];
+  // --- 6 ciclos completos anteriores (1..6) ---
+  var ciclos = []; // [{ini,fim,somaPorLoja}]
+  for (var c = 1; c <= 6; c++) {
+    var per = getPeriodoCicloOffset_(c);
+    ciclos.push({
+      ini: per.inicio,
+      fim: per.fim,
+      soma: somaPorPeriodo(per.inicio, per.fim)
     });
-
-    return media;
   }
 
-  function projecaoUltimos30Dias() {
-    var hoje = new Date();
-    var ini = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 30, 0, 0, 0, 0);
-    return somaPorPeriodo(ini, hoje);
-  }
+  // --- Últimos 30 dias corridos (fallback final) ---
+  var hoje = new Date();
+  var ini30 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 30, 0, 0, 0, 0);
+  var soma30 = somaPorPeriodo(ini30, hoje);
 
-  // ---------- execução com fallback ----------
-  var media3 = mediaPorCiclos(3);
-  var media2 = mediaPorCiclos(2);
-  var ult30  = projecaoUltimos30Dias();
+  // ciclo atual para “projetar” 30 dias -> ciclo
+  var perAtual = getPeriodoCicloOffset_(0);
+  var diasCiclo = getCicloLenDias_(perAtual.inicio, new Date(perAtual.inicio.getFullYear(), perAtual.inicio.getMonth() + 1, 5, 23, 59, 59, 999));
+  var fator30 = diasCiclo / 30;
 
-  var resultado = {};
+  // lojas universo
   var lojas = {};
-
-  // coleta todas as lojas existentes
-  [media3, media2, ult30].forEach(function(obj) {
-    Object.keys(obj || {}).forEach(function(loja) {
-      lojas[loja] = true;
-    });
+  ciclos.forEach(function(cy) {
+    Object.keys(cy.soma).forEach(function(loja) { lojas[loja] = true; });
   });
+  Object.keys(soma30).forEach(function(loja) { lojas[loja] = true; });
+
+  var proj = {};
+  var meta = {};
+
+  // sazonalidade: se ciclo atual cai em novembro/dezembro (mês do início do ciclo)
+  var mesInicio = perAtual.inicio.getMonth() + 1; // 1..12
+  var sazonal = (mesInicio === 11 || mesInicio === 12);
 
   Object.keys(lojas).forEach(function(loja) {
-    if (media3[loja] != null) {
-      resultado[loja] = media3[loja];
-    } else if (media2[loja] != null) {
-      resultado[loja] = media2[loja];
-    } else if (ult30[loja] != null) {
-      resultado[loja] = ult30[loja];
+    // coleta totais dos ciclos em que a loja apareceu
+    var vals = [];
+    for (var i = 0; i < ciclos.length; i++) {
+      var v = ciclos[i].soma[loja];
+      if (v != null) vals.push(v);
+    }
+
+    if (vals.length >= 6) {
+      var soma = vals.reduce(function(a,b){return a+b;}, 0);
+      var media6 = soma / 6;
+      var max6 = Math.max.apply(null, vals);
+
+      proj[loja] = sazonal ? max6 : media6;
+      meta[loja] = { fonte: sazonal ? "max6" : "media6", nCiclos: 6 };
+
+    } else if (vals.length >= 1) {
+      // se tem 1..5 ciclos: usa média do que tiver
+      var somaN = vals.reduce(function(a,b){return a+b;}, 0);
+      var mediaN = somaN / vals.length;
+
+      // em sazonal, ainda pode usar o máximo do que tiver (evita estouro)
+      var maxN = Math.max.apply(null, vals);
+      proj[loja] = sazonal ? maxN : mediaN;
+      meta[loja] = { fonte: sazonal ? "maxN" : "mediaN", nCiclos: vals.length };
+
     } else {
-      resultado[loja] = 0;
+      // fallback final: últimos 30 dias projetados para um ciclo
+      var v30 = soma30[loja] || 0;
+      proj[loja] = v30 * fator30;
+      meta[loja] = { fonte: "ult30", nCiclos: 0 };
     }
   });
 
-  return resultado;
+  return { proj: proj, meta: meta };
 }
 
 /**
@@ -2108,8 +2126,8 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
 
       var k = cartaoKeyCE_(nome);
       if (!k) continue;
-      limites[k] = { nomeCartao: nome, tipo: tipo, titular: titular, limite: limite };
 
+      limites[k] = { nomeCartao: nome, tipo: tipo, titular: titular, limite: limite };
     }
 
     // --- 3) Lê BaseClara ---
@@ -2120,34 +2138,22 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
     var linhas = info.linhas || [];
     if (!linhas.length) return { ok: true, rows: [], periodo: formatPeriodoBR_(inicio, fim) };
 
-    // Índices
-    // ✅ FIXOS (você garantiu que o índice nunca muda)
-    // BaseClara: Alias Do Cartão = coluna H => índice 7 (0-based)
-    // BaseClara: Grupos = coluna R => índice 17 (0-based)
-    var idxAlias  = 7;
-    var idxGrupos = 17;
+    // Índices fixos (conforme você definiu)
+    var idxAlias  = 7;   // H
+    var idxGrupos = 17;  // R
 
-    // Mantém dinâmico para Data/Valor/Loja (se você quiser fixar depois, dá)
-    var idxValor  = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor", "Total"]);
-    var idxData   = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
-    var idxLoja   = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja Número", "Loja Numero", "Loja"]);
+    // Dinâmicos
+    var idxValor = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor", "Total"]);
+    var idxData  = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
+    var idxLoja  = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja Número", "Loja Numero", "Loja"]);
 
-    if (idxAlias < 0)  return { ok: false, error: "Índice do Alias Do Cartão inválido." };
-    if (idxGrupos < 0) return { ok: false, error: "Índice do Grupos (Time) inválido." };
-    if (idxValor < 0)  return { ok: false, error: "Não encontrei a coluna de Valor na BaseClara." };
-    if (idxData < 0)   return { ok: false, error: "Não encontrei a coluna de Data na BaseClara." };
-    if (idxLoja < 0)   return { ok: false, error: "Não encontrei a coluna de Loja na BaseClara." };
+    if (idxValor < 0) return { ok: false, error: "Não encontrei a coluna de Valor na BaseClara." };
+    if (idxData  < 0) return { ok: false, error: "Não encontrei a coluna de Data na BaseClara." };
+    if (idxLoja  < 0) return { ok: false, error: "Não encontrei a coluna de Loja na BaseClara." };
 
-
-    if (idxAlias < 0)  return { ok: false, error: "Não encontrei a coluna 'Alias Do Cartão' na BaseClara." };
-    if (idxValor < 0)  return { ok: false, error: "Não encontrei a coluna 'Valor' na BaseClara." };
-    if (idxData < 0)   return { ok: false, error: "Não encontrei a coluna 'Data' na BaseClara." };
-    if (idxLoja < 0)   return { ok: false, error: "Não encontrei a coluna de Loja (ex.: LojaNum) na BaseClara." };
-    if (idxGrupos < 0) return { ok: false, error: "Não encontrei a coluna 'Grupos' (Time) na BaseClara." };
-
-    // Projeção por loja baseada nos últimos 3 ciclos completos (06->05)
-    var projPorLoja = calcularProjecaoPorLojaUltimosCiclos_(linhas, idxData, idxValor, idxLoja, 3);
-
+    // Projeção por loja (6 ciclos + sazonalidade) — assume que você já substituiu a função para retornar {proj,meta}
+    var projInfo = calcularProjecaoPorLojaUltimosCiclos_(linhas, idxData, idxValor, idxLoja);
+    var projPorLoja = (projInfo && projInfo.proj) ? projInfo.proj : {};
 
     // --- 4) Agregação ---
     var agg = {}; // key -> { cartaoKey, nomeCartao, loja, time, usado }
@@ -2187,14 +2193,11 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
       var v = parseNumberSafe_(row[idxValor]);
       if (!v) continue;
 
-      // Cartão (chave padronizada CE#### + virtual opcional)
+      // Cartão (chave padronizada)
       var cartaoKey = cartaoKeyCE_(alias);
       if (!cartaoKey) continue;
 
-
-      // Chave de agregação:
-      // - Geral: Cartão + Loja + Time (para aparecer Loja e Time na tabela geral)
-      // - Time : Cartão + Loja (sem coluna Time, mas mantém Loja para contexto)
+      // chave de agregação
       var key;
       if (tipoFiltro === "geral") {
         key = cartaoKey + "||" + lojaKey + "||" + normalizarTexto_(gruposRaw);
@@ -2214,9 +2217,8 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
       agg[key].usado += v;
     }
 
-    // --- 5) Monta rows com limites ---
+    // --- 5) Monta rows com limites + recomendação ---
     var rows = [];
-    var totalLimite = 0, totalUsado = 0, totalSaldo = 0;
 
     Object.keys(agg).forEach(function(k) {
       var a = agg[k];
@@ -2228,9 +2230,39 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
 
       var saldo = limite - (a.usado || 0);
 
-      totalLimite += limite;
-      totalUsado += (a.usado || 0);
-      totalSaldo += saldo;
+      // Projeção por loja
+      var projLoja = (projPorLoja && a.loja && projPorLoja[a.loja]) ? Number(projPorLoja[a.loja]) : 0;
+
+      // margem (mais conservador em Nov/Dez)
+      var mesInicio = getPeriodoCicloOffset_(0).inicio.getMonth() + 1;
+      var margem = (mesInicio === 11 || mesInicio === 12) ? 0.25 : 0.20;
+
+      var restante = Math.max(projLoja - (a.usado || 0), 0);
+      var bufferMin = Math.max(200, projLoja * 0.05);
+
+      var limiteRec = (a.usado || 0) + Math.max(restante * (1 + margem), bufferMin);
+      limiteRec = Math.ceil(limiteRec / 100) * 100;
+
+      // Ação
+      var acao = "Manter";
+      var delta = limiteRec - (limite || 0);
+
+      var tol = 0.05;
+      var minDelta = 200;
+      var limiteAtual = (limite || 0);
+
+      var nomeNorm = normalizarTexto_(lim ? lim.nomeCartao : a.nomeCartao);
+      var bloqueiaReducao = nomeNorm.indexOf("temporario") !== -1
+                         || nomeNorm.indexOf("virtual") !== -1
+                         || nomeNorm.indexOf("virual") !== -1;
+
+      if (limiteAtual <= 0) {
+        acao = "Definir " + Utilities.formatString("R$ %.0f", limiteRec);
+      } else if (limiteAtual < (limiteRec * (1 - tol)) && delta >= minDelta) {
+        acao = "Aumentar +" + moneyBR_(delta);
+      } else if (!bloqueiaReducao && limiteAtual > (limiteRec * (1 + tol)) && (-delta) >= minDelta) {
+        acao = "Reduzir -" + moneyBR_(-delta);
+      }
 
       rows.push({
         nomeCartao: lim ? lim.nomeCartao : a.nomeCartao,
@@ -2240,28 +2272,27 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
         titular: titular,
         limite: limite,
         utilizado: a.usado || 0,
-        saldo: saldo,
-        projecao: (projPorLoja && a.loja && projPorLoja[a.loja]) ? projPorLoja[a.loja] : 0
+        projecao: projLoja,
+        limiteRecomendado: limiteRec,
+        acao: acao,
+        saldo: saldo
       });
-    });
+    }); // ✅ FECHA O forEach corretamente aqui
 
+    // Ordena por menor saldo
     rows.sort(function(x, y) { return (x.saldo || 0) - (y.saldo || 0); });
 
     var minRow = rows.length ? rows[0] : null;
     var maxRow = rows.length ? rows[rows.length - 1] : null;
 
-    var proj = projeçãoCiclo_(inicio, fim, totalUsado);
+    // Se você ainda usa esse campo em insights, mantém; se não, pode remover depois
+    var proj = projeçãoCiclo_(inicio, fim, 0);
 
     return {
       ok: true,
       tipoFiltro: tipoFiltro,
       valorFiltro: valorFiltro,
       periodo: formatPeriodoBR_(inicio, fim),
-      totals: {
-        limite: totalLimite,
-        utilizado: totalUsado,
-        saldo: totalSaldo
-      },
       highlights: {
         menorSaldo: minRow ? { nomeCartao: minRow.nomeCartao, saldo: minRow.saldo, loja: minRow.loja, time: minRow.time } : null,
         maiorSaldo: maxRow ? { nomeCartao: maxRow.nomeCartao, saldo: maxRow.saldo, loja: maxRow.loja, time: maxRow.time } : null,
@@ -2364,6 +2395,12 @@ function cartaoKeyCE_(raw) {
   var isVirtual = (norm.indexOf("virtual") !== -1) || (norm.indexOf("virual") !== -1);
 
   return "ce" + dig + (isVirtual ? "|virtual" : "");
+}
+
+function moneyBR_(n) {
+  var v = Number(n) || 0;
+  // retorna ex: "R$ 1.200"
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 /**
