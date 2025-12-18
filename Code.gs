@@ -818,6 +818,7 @@ function normalizarTexto_(str) {
 
 var SPREADSHEET_ID_CLARA = '1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI'; // Captura_Clara
 var SHEET_NOME_BASE_CLARA = 'BaseClara';
+var SHEET_NOME_INFO_LIMITES = 'Info_limites';
 
 // ========= PLANILHA ANTIGA (onde fica a aba CLARA_PEND) ========= //
 var SPREADSHEET_ID_CLARA_PEND = "1jcNdVTxdDYqwHwsOkT7gb_2BdZke9qIb39RiwgTKxUQ"; // planilha antiga
@@ -1932,6 +1933,313 @@ for (var i = 0; i < linhasFiltradas.length; i++) {
   } catch (e) {
     return { ok: false, error: "Erro ao listar itens comprados: " + (e && e.message ? e.message : e) };
   }
+}
+
+// =====================================================
+// ✅ RELAÇÃO DE SALDOS (ADM) — ciclo 06 -> hoje (volátil)
+// Aceita filtro: geral | loja | time
+// - Geral: agrega por Cartão+Loja+Time (Grupos)
+// - Time:  agrega por Cartão+Loja (sem coluna Time na tabela)
+// - Loja:  agrega por Cartão
+// =====================================================
+
+function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
+  try {
+    // 🔒 Apenas Administrador
+    var email = Session.getActiveUser().getEmail();
+    if (!isAdminEmail(email)) {
+      return { ok: false, error: "Acesso restrito: apenas Administrador pode consultar a relação de saldos." };
+    }
+
+    tipoFiltro = (tipoFiltro || "geral").toString().toLowerCase().trim();
+    valorFiltro = (valorFiltro || "").toString().trim();
+
+    // ✅ Loja desabilitada (você pediu só time e geral)
+    if (tipoFiltro === "loja") {
+      return { ok: false, error: "Consulta por loja não está habilitada. Use 'Relação de saldos geral' ou 'Relação de saldos do time X'." };
+    }
+
+    // --- 1) Período volátil (06 -> hoje; se dia 01–05, começa em 06 do mês anterior) ---
+    var periodo = getPeriodoCicloClara_();
+    var inicio = periodo.inicio;
+    var fim = periodo.fim;
+
+    // --- 2) Lê Info_limites ---
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID_CLARA);
+    var shLim = ss.getSheetByName(SHEET_NOME_INFO_LIMITES);
+    if (!shLim) {
+      return { ok: false, error: "Aba '" + SHEET_NOME_INFO_LIMITES + "' não encontrada na planilha Captura_Clara." };
+    }
+
+    var limValues = shLim.getDataRange().getValues();
+    if (!limValues || limValues.length < 2) {
+      return { ok: false, error: "Aba Info_limites sem dados." };
+    }
+
+    // Mapa: chaveCartao -> {nome, tipo, titular, limite}
+    var limites = {};
+    for (var i = 1; i < limValues.length; i++) {
+      var r = limValues[i];
+      var nome = (r[0] || "").toString().trim();   // A
+      if (!nome) continue;
+
+      var tipo = (r[1] || "").toString().trim();   // B
+      var titular = (r[3] || "").toString().trim();// D
+      var limite = Number(r[4]) || 0;              // E
+
+      var k = cartaoKeyCE_(nome);
+      if (!k) continue;
+      limites[k] = { nomeCartao: nome, tipo: tipo, titular: titular, limite: limite };
+
+    }
+
+    // --- 3) Lê BaseClara ---
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return { ok: false, error: info.error };
+
+    var header = info.header || [];
+    var linhas = info.linhas || [];
+    if (!linhas.length) return { ok: true, rows: [], periodo: formatPeriodoBR_(inicio, fim) };
+
+    // Índices
+    // ✅ FIXOS (você garantiu que o índice nunca muda)
+    // BaseClara: Alias Do Cartão = coluna H => índice 7 (0-based)
+    // BaseClara: Grupos = coluna R => índice 17 (0-based)
+    var idxAlias  = 7;
+    var idxGrupos = 17;
+
+    // Mantém dinâmico para Data/Valor/Loja (se você quiser fixar depois, dá)
+    var idxValor  = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor", "Total"]);
+    var idxData   = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
+    var idxLoja   = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja Número", "Loja Numero", "Loja"]);
+
+    if (idxAlias < 0)  return { ok: false, error: "Índice do Alias Do Cartão inválido." };
+    if (idxGrupos < 0) return { ok: false, error: "Índice do Grupos (Time) inválido." };
+    if (idxValor < 0)  return { ok: false, error: "Não encontrei a coluna de Valor na BaseClara." };
+    if (idxData < 0)   return { ok: false, error: "Não encontrei a coluna de Data na BaseClara." };
+    if (idxLoja < 0)   return { ok: false, error: "Não encontrei a coluna de Loja na BaseClara." };
+
+
+    if (idxAlias < 0)  return { ok: false, error: "Não encontrei a coluna 'Alias Do Cartão' na BaseClara." };
+    if (idxValor < 0)  return { ok: false, error: "Não encontrei a coluna 'Valor' na BaseClara." };
+    if (idxData < 0)   return { ok: false, error: "Não encontrei a coluna 'Data' na BaseClara." };
+    if (idxLoja < 0)   return { ok: false, error: "Não encontrei a coluna de Loja (ex.: LojaNum) na BaseClara." };
+    if (idxGrupos < 0) return { ok: false, error: "Não encontrei a coluna 'Grupos' (Time) na BaseClara." };
+
+    // --- 4) Agregação ---
+    var agg = {}; // key -> { cartaoKey, nomeCartao, loja, time, usado }
+
+    // Filtro por time (somente quando tipoFiltro="time")
+    var filtroTimeNorm = "";
+    if (tipoFiltro === "time") {
+      filtroTimeNorm = normalizarTexto_(valorFiltro);
+      if (!filtroTimeNorm) return { ok: true, rows: [], aviso: "Time inválido." };
+    }
+
+    for (var j = 0; j < linhas.length; j++) {
+      var row = linhas[j];
+
+      var alias = (row[idxAlias] || "").toString().trim();
+      if (!alias) continue;
+
+      var dt = row[idxData];
+      var data = (dt instanceof Date) ? dt : new Date(dt);
+      if (!(data instanceof Date) || isNaN(data.getTime())) continue;
+      if (data < inicio || data > fim) continue;
+
+      // Loja
+      var lojaRaw = (row[idxLoja] || "").toString().trim();
+      var lojaDigits = lojaRaw.replace(/\D/g, "");
+      var lojaKey = lojaDigits ? String(Number(lojaDigits)).padStart(4, "0") : "";
+
+      // Time (Grupos)
+      var gruposRaw = (row[idxGrupos] || "").toString().trim();
+      var gruposNorm = normalizarTexto_(gruposRaw);
+
+      if (tipoFiltro === "time") {
+        if (!gruposNorm || gruposNorm.indexOf(filtroTimeNorm) === -1) continue;
+      }
+
+      // Valor
+      var v = parseNumberSafe_(row[idxValor]);
+      if (!v) continue;
+
+      // Cartão (chave padronizada CE#### + virtual opcional)
+      var cartaoKey = cartaoKeyCE_(alias);
+      if (!cartaoKey) continue;
+
+
+      // Chave de agregação:
+      // - Geral: Cartão + Loja + Time (para aparecer Loja e Time na tabela geral)
+      // - Time : Cartão + Loja (sem coluna Time, mas mantém Loja para contexto)
+      var key;
+      if (tipoFiltro === "geral") {
+        key = cartaoKey + "||" + lojaKey + "||" + normalizarTexto_(gruposRaw);
+      } else {
+        key = cartaoKey + "||" + lojaKey;
+      }
+
+      if (!agg[key]) {
+        agg[key] = {
+          cartaoKey: cartaoKey,
+          nomeCartao: alias, // fallback
+          loja: lojaKey,
+          time: gruposRaw,
+          usado: 0
+        };
+      }
+      agg[key].usado += v;
+    }
+
+    // --- 5) Monta rows com limites ---
+    var rows = [];
+    var totalLimite = 0, totalUsado = 0, totalSaldo = 0;
+
+    Object.keys(agg).forEach(function(k) {
+      var a = agg[k];
+      var lim = limites[a.cartaoKey];
+
+      var limite = lim ? (Number(lim.limite) || 0) : 0;
+      var tipo = lim ? (lim.tipo || "") : "";
+      var titular = lim ? (lim.titular || "") : "";
+
+      var saldo = limite - (a.usado || 0);
+
+      totalLimite += limite;
+      totalUsado += (a.usado || 0);
+      totalSaldo += saldo;
+
+      rows.push({
+        nomeCartao: lim ? lim.nomeCartao : a.nomeCartao,
+        loja: a.loja,
+        time: a.time,
+        tipo: tipo,
+        titular: titular,
+        limite: limite,
+        utilizado: a.usado || 0,
+        saldo: saldo
+      });
+    });
+
+    rows.sort(function(x, y) { return (x.saldo || 0) - (y.saldo || 0); });
+
+    var minRow = rows.length ? rows[0] : null;
+    var maxRow = rows.length ? rows[rows.length - 1] : null;
+
+    var proj = projeçãoCiclo_(inicio, fim, totalUsado);
+
+    return {
+      ok: true,
+      tipoFiltro: tipoFiltro,
+      valorFiltro: valorFiltro,
+      periodo: formatPeriodoBR_(inicio, fim),
+      totals: {
+        limite: totalLimite,
+        utilizado: totalUsado,
+        saldo: totalSaldo
+      },
+      highlights: {
+        menorSaldo: minRow ? { nomeCartao: minRow.nomeCartao, saldo: minRow.saldo, loja: minRow.loja, time: minRow.time } : null,
+        maiorSaldo: maxRow ? { nomeCartao: maxRow.nomeCartao, saldo: maxRow.saldo, loja: maxRow.loja, time: maxRow.time } : null,
+        predisposicao: proj
+      },
+      rows: rows
+    };
+
+  } catch (e) {
+    return { ok: false, error: "Falha ao calcular relação de saldos: " + (e && e.message ? e.message : e) };
+  }
+}
+
+function chaveCartaoClara_(raw) {
+  var s = (raw || "").toString().trim();
+  if (!s) return "";
+
+  var norm = normalizarTexto_(s); // seu normalizador atual
+  var isVirtual = norm.indexOf("virtual") !== -1;
+
+  // Extrai dígitos
+  var dig = s.replace(/\D/g, "");
+  if (!dig) return "";
+
+  // Pad para 4 dígitos (se vier 223 vira 0223)
+  dig = String(Number(dig)).padStart(4, "0");
+
+  // Chave padrão: ce#### + marcador virtual
+  return "ce" + dig + (isVirtual ? "|virtual" : "");
+}
+
+// --- Helpers locais (não conflitam com seu projeto) ---
+
+function getPeriodoCicloClara_() {
+  var hoje = new Date();
+  var y = hoje.getFullYear();
+  var m = hoje.getMonth();
+  var d = hoje.getDate();
+
+  var inicio;
+  if (d >= 6) inicio = new Date(y, m, 6, 0, 0, 0);
+  else inicio = new Date(y, m - 1, 6, 0, 0, 0);
+
+  var fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
+  return { inicio: inicio, fim: fim };
+}
+
+function parseNumberSafe_(v) {
+  if (v === null || v === undefined || v === "") return 0;
+  if (typeof v === "number") return v;
+  var s = String(v).trim();
+  // aceita "1234,56" e "1.234,56"
+  s = s.replace(/\./g, "").replace(",", ".");
+  var n = Number(s);
+  return isFinite(n) ? n : 0;
+}
+
+function formatPeriodoBR_(ini, fim) {
+  return {
+    inicio: Utilities.formatDate(ini, "America/Sao_Paulo", "dd/MM/yyyy"),
+    fim: Utilities.formatDate(fim, "America/Sao_Paulo", "dd/MM/yyyy")
+  };
+}
+
+function projeçãoCiclo_(ini, fim, totalUsado) {
+  try {
+    var hoje = new Date();
+    var diasDecorridos = Math.max(1, Math.floor((hoje.getTime() - ini.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    // ciclo 06->05 tem ~30/31 dias; projetar até o próximo dia 05
+    var prox05 = new Date(ini.getFullYear(), ini.getMonth() + 1, 5, 23, 59, 59);
+    var diasCiclo = Math.max(1, Math.floor((prox05.getTime() - ini.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    var mediaDia = (Number(totalUsado) || 0) / diasDecorridos;
+    var projFinal = mediaDia * diasCiclo;
+
+    return {
+      diasDecorridos: diasDecorridos,
+      diasCiclo: diasCiclo,
+      mediaDia: mediaDia,
+      projFinal: projFinal
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+function cartaoKeyCE_(raw) {
+  var s = (raw || "").toString();
+  var norm = normalizarTexto_(s); // já remove acentos etc.
+  if (!norm) return "";
+
+  // captura CE + 4 dígitos em qualquer lugar do texto
+  var m = norm.match(/\bce\s*0*(\d{1,4})\b/);
+  if (!m) return "";
+
+  var dig = String(Number(m[1] || "")).padStart(4, "0");
+
+  // virtual: aceita "virtual" e também o typo "virual"
+  var isVirtual = (norm.indexOf("virtual") !== -1) || (norm.indexOf("virual") !== -1);
+
+  return "ce" + dig + (isVirtual ? "|virtual" : "");
 }
 
 /**
