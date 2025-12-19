@@ -9174,46 +9174,73 @@ function vektorRenderTabelaRelacaoSaldos(res, tipo) {
   const showTime = (tipo === "geral"); // conforme você pediu: time/loja sem coluna Time
 
   let th = "";
-  th += "<th style='border:1px solid #000;padding:6px;'>Nome do cartão</th>";
-  if (showTime) th += "<th style='border:1px solid #000;padding:6px;'>Time</th>";
-  th += "<th style='border:1px solid #000;padding:6px;'>Tipo</th>";
-  th += "<th style='border:1px solid #000;padding:6px;'>Titular</th>";
-  th += "<th style='border:1px solid #000;padding:6px;'>Limite</th>";
-  th += "<th style='border:1px solid #000;padding:6px;'>Valor Utilizado</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;'>ℹ️ Projeção Gasto</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;'>% da Projeção</th>";
-  th += "<th style='border:1px solid #000;padding:6px;'>Limite Recomendado</th>";
-  th += "<th style='border:1px solid #000;padding:6px;'>Ação</th>";
-  th += "<th style='border:1px solid #000;padding:6px;'>Saldo</th>";
-  
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Nome do cartão</th>";
+  if (showTime) th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Time</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Tipo</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Titular</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Limite</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Valor Utilizado</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;position:sticky;top:0;z-index:3;'>ℹ️ Projeção Gasto</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;position:sticky;top:0;z-index:3;'>% da Projeção</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Ritmo de Consumo</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Limite Recomendado</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Ação</th>";
+  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Saldo</th>";
 
-  // Linhas
-  let trs = "";
-  rows.forEach(function(r) {
-    trs += "<tr>";
-    trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.nomeCartao || "") + "</td>";
-    if (showTime) trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.time || "") + "</td>";
-    trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.tipo || "") + "</td>";
-    trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.titular || "") + "</td>";
-    trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.limite) + "</td>";
-    trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.utilizado) + "</td>";
-    trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.projecao) + "</td>";
-    // % da Projeção
-    var pctProj = (r.projecao && r.projecao > 0)
-      ? ((r.utilizado / r.projecao) * 100).toFixed(1) + "%"
-      : "—";
-    trs += "<td style='border:1px solid #000;padding:6px;'>" + pctProj + "</td>";
-    trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;'>" + money(r.limiteRecomendado) + "</td>";
-    trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;font-weight:700;'>" + (r.acao || "") + "</td>";
-    trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.saldo) + "</td>";
-    
-    trs += "</tr>";
-  });
+        // Linhas
+      let trs = "";
+      rows.forEach(function(r) {
+        trs += "<tr>";
+
+        trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.nomeCartao || "") + "</td>";
+
+        if (showTime) {
+          trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.time || "") + "</td>";
+        }
+
+        trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.tipo || "") + "</td>";
+        trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.titular || "") + "</td>";
+
+        trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.limite) + "</td>";
+        trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.utilizado) + "</td>";
+
+        // ℹ️ Projeção Gasto
+        trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.projecao) + "</td>";
+
+        // % da Projeção
+        var pctProj = (r.projecao && r.projecao > 0)
+          ? ((r.utilizado / r.projecao) * 100).toFixed(1) + "%"
+          : "—";
+        trs += "<td style='border:1px solid #000;padding:6px;'>" + pctProj + "</td>";
+
+        // Ritmo de consumo (com ícone)
+          var ritmoTxt = r.ritmo || "—";
+          var ritmoIcon = "";
+
+          if (ritmoTxt === "Alto") {
+            ritmoIcon = "🚨 ";
+          } else if (ritmoTxt === "Médio") {
+            ritmoIcon = "⚠️ ";
+          } else if (ritmoTxt === "Baixo") {
+            ritmoIcon = "⬇️ ";
+          }
+
+          trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;'>" 
+            + ritmoIcon + ritmoTxt 
+            + "</td>";
+
+
+        trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;'>" + money(r.limiteRecomendado) + "</td>";
+        trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;font-weight:700;'>" + (r.acao || "") + "</td>";
+        trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.saldo) + "</td>";
+
+        trs += "</tr>";
+      });
 
   const table =
-    "<div style='width:100%; overflow-x:auto;'>" +
+    "<div style='max-width:100%; overflow:auto; max-height:420px;'>" +
       insights +
-      "<table style='min-width:1300px;width:100%;border-collapse:collapse;margin-top:2px;'>" +
+      "<table style='min-width:1300px; width:100%; border-collapse:collapse;'>" +
         "<thead><tr style='background:#0b2a5b;color:#fff;'>" + th + "</tr></thead>" +
         "<tbody>" + trs + "</tbody>" +
       "</table>" +
