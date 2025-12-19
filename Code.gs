@@ -1,3 +1,10 @@
+function LIMPAR_ANTI_SPAM() {
+var props = PropertiesService.getScriptProperties();
+  var cicloKey = getCicloKey06a05_();
+  props.deleteProperty("VEKTOR_ALERTS_SENT_" + cicloKey);
+  Logger.log("Limpou anti-spam do ciclo: " + cicloKey);
+}
+
 function isAdminEmail(email) {
   if (!email) return false;
   email = email.toLowerCase();
@@ -2230,22 +2237,131 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
 
       var saldo = limite - (a.usado || 0);
 
+      // --- dias restantes até o fechamento do ciclo (dia 05) ---
+      var hoje = new Date();
+      var hoje0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      var dHoje = hoje0.getDate();
+
+      // fim do ciclo: se hoje >= 6, fecha dia 05 do próximo mês; senão, dia 05 do mês atual
+      var fimCiclo = (dHoje >= 6)
+        ? new Date(hoje0.getFullYear(), hoje0.getMonth() + 1, 5)
+        : new Date(hoje0.getFullYear(), hoje0.getMonth(), 5);
+
+      var msDia = 24 * 60 * 60 * 1000;
+      var diasRestantes = Math.max(0, Math.ceil((fimCiclo.getTime() - hoje0.getTime()) / msDia));
+
       // Projeção por loja
       var projLoja = (projPorLoja && a.loja && projPorLoja[a.loja]) ? Number(projPorLoja[a.loja]) : 0;
+
+      // --- Tempo do ciclo + ritmo atual (run-rate) ---
+      var pc = getPeriodoCicloClara_();
+      var ini = pc.inicio;
+      var hoje = new Date();
+
+      // normaliza datas para evitar erro por horário
+      var hoje0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      var ini0  = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate());
+
+      // fim do ciclo é sempre dia 05 (mês corrente se hoje<=05; senão próximo mês)
+      var dHoje = hoje0.getDate();
+      var fimCiclo = (dHoje >= 6)
+        ? new Date(hoje0.getFullYear(), hoje0.getMonth() + 1, 5)
+        : new Date(hoje0.getFullYear(), hoje0.getMonth(), 5);
+
+      var msDia = 24*60*60*1000;
+      var diasDecorridos = Math.max(1, Math.floor((hoje0.getTime() - ini0.getTime()) / msDia) + 1);
+      var diasRestantes  = Math.max(0, Math.ceil((fimCiclo.getTime() - hoje0.getTime()) / msDia));
+
+      // Projeção por ritmo do ciclo atual
+      var usado = (a.usado || 0);
+      var mediaDiaAtual = usado / diasDecorridos;
+      var projRunRate = usado + (mediaDiaAtual * diasRestantes);
 
       // margem (mais conservador em Nov/Dez)
       var mesInicio = getPeriodoCicloOffset_(0).inicio.getMonth() + 1;
       var margem = (mesInicio === 11 || mesInicio === 12) ? 0.25 : 0.20;
 
-      var restante = Math.max(projLoja - (a.usado || 0), 0);
-      var bufferMin = Math.max(200, projLoja * 0.05);
+      // --- Projeção final: histórico vs ritmo atual (controlada por Ritmo) ---
 
-      var limiteRec = (a.usado || 0) + Math.max(restante * (1 + margem), bufferMin);
-      limiteRec = Math.ceil(limiteRec / 100) * 100;
+      // suaviza run-rate no início do ciclo
+      var fatorRunRate = (diasDecorridos <= 7) ? 0.85 : 1.0;
+
+      var projBase = projLoja || 0;                 // histórico (média ciclos)
+      var rr = projRunRate * fatorRunRate;          // run-rate suavizado
+
+      // Classificação de ritmo (mesma lógica que você já usa para a coluna "Ritmo de consumo")
+      var pctCiclo = (diasTotal > 0) ? (diasDecorridos / diasTotal) : 0;
+      var pctUsoLim = (limiteAtual > 0) ? (usado / limiteAtual) : null;
+      var ritmoRatio = (pctUsoLim !== null && pctCiclo > 0) ? (pctUsoLim / pctCiclo) : null;
+
+      var ritmo = "—";
+      if (ritmoRatio !== null && isFinite(ritmoRatio)) {
+        if (ritmoRatio > 1.20) ritmo = "Alto";
+        else if (ritmoRatio < 0.85) ritmo = "Baixo";
+        else ritmo = "Médio";
+      }
+
+      // Política de projeção:
+      // - Ritmo Alto: proteger operação => usa o maior (histórico vs run-rate)
+      // - Ritmo Médio/Baixo: não deixa histórico dominar => usa run-rate com teto no histórico
+      var projFinal;
+      if (ritmo === "Alto") {
+        // Aqui faz sentido ser conservador
+        projFinal = Math.max(projBase, rr);
+      } else {
+        // Aqui o histórico alto não deve inflar recomendação quando o ciclo está calmo
+        // teto do histórico: no máximo +20% sobre o run-rate (evita “CE0234” inflando)
+        var tetoHistorico = rr * 1.20;
+
+        // também evita cair demais se run-rate estiver muito baixo por poucos dias
+        // piso: pelo menos 60% do histórico (ajuste fino)
+        var pisoHistorico = projBase > 0 ? (projBase * 0.60) : rr;
+
+        projFinal = Math.max(pisoHistorico, Math.min(projBase, tetoHistorico));
+      }
+
+      // quanto ainda tende a gastar no ciclo
+      var restante = Math.max(projFinal - usado, 0);
+
+      // buffer mínimo
+      var bufferMin = Math.max(200, projFinal * 0.05);
+
+      // limite recomendado: utilizado + folga para o restante
+      var limiteRec = usado + Math.max(restante * (1 + margem), bufferMin);
+
+
+
+      // --- trava de redução por tempo do ciclo ---
+      var hoje = new Date();
+      var pc = getPeriodoCicloClara_();
+      var ini = pc.inicio, fim = pc.fim;
+      var msDia = 24 * 60 * 60 * 1000;
+
+      var diasTot = Math.max(1, Math.round((fim.getTime() - ini.getTime()) / msDia) + 1);
+      var diasDec = Math.max(1, Math.floor((hoje.getTime() - ini.getTime()) / msDia) + 1);
+      var passouMetade = diasDec >= Math.ceil(diasTot / 2);
+
+      var pctProj = (projLoja > 0) ? ((a.usado || 0) / projLoja) : null;
+
+      // Se passou metade e já consumiu >50% da projeção, não reduzir
+      var travaReducaoTempo = (passouMetade && pctProj !== null && pctProj > 0.50);
+
 
       // Ação
       var acao = "Manter";
       var delta = limiteRec - (limite || 0);
+
+      // --- gatilho de aumento por risco (override) ---
+      var limiteAtual = (limite || 0);
+      var utilizado = (a.usado || 0);
+      var pctUsoLim = (limiteAtual > 0) ? (utilizado / limiteAtual) : null;
+
+      var saldoBaixo = (saldo <= 500);
+      var faltamMuitosDias = (diasRestantes >= 10);
+      var jaPassouMetadeLimite = (pctUsoLim !== null && pctUsoLim >= 0.50);
+
+      // Se apertado + tempo suficiente: sugerir aumento mesmo com delta pequeno
+      var forcarAumentoPorRisco = (saldoBaixo && faltamMuitosDias && jaPassouMetadeLimite);
 
       var tol = 0.05;
       var minDelta = 200;
@@ -2255,17 +2371,99 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
       var bloqueiaReducao = nomeNorm.indexOf("temporario") !== -1
                          || nomeNorm.indexOf("virtual") !== -1
                          || nomeNorm.indexOf("virual") !== -1;
+      
+
+      // TRAVAS PARA "REDUZIR" (coerência com projeção e risco operacional)
+
+      // % da projeção (se projeção existir)
+      var pctProj = (projLoja > 0) ? ((a.usado || 0) / projLoja) : null;
+
+      // 1) Se já bateu/ultrapassou a projeção, NUNCA reduzir
+      var travaReducaoPorProj = (pctProj !== null && pctProj >= 1.0);
+
+      // 2) Se o saldo já está "apertado", evitar redução (não piorar risco)
+      var saldoAtual = (limite || 0) - (a.usado || 0);
+      var travaReducaoPorSaldoApertado = saldoAtual <= 500; // alinhado com saldo crítico atual
+
+      // Trava final: se qualquer uma for verdadeira, não permitir "Reduzir"
+      var travaReducao = travaReducaoPorProj || travaReducaoPorSaldoApertado;
 
       if (limiteAtual <= 0) {
-        acao = "Definir " + Utilities.formatString("R$ %.0f", limiteRec);
+      acao = "Definir " + Utilities.formatString("R$ %.0f", limiteRec);
+
+    } else if (forcarAumentoPorRisco) {
+      // Override: saldo baixo + muitos dias restantes + já consumiu metade do limite
+      // alvo mínimo: pelo menos +200 ou até o limiteRec (o que for maior)
+      var alvo = Math.max(limiteRec, limiteAtual + 200);
+
+      // arredonda para múltiplos de 100
+      alvo = Math.ceil(alvo / 100) * 100;
+
+      var deltaRisco = alvo - limiteAtual;
+      if (deltaRisco > 0) {
+        acao = "Aumentar +" + moneyBR_(deltaRisco);
+
+        // opcional (mas recomendado): alinhar o limiteRec com o alvo para consistência
+        limiteRec = alvo;
+        delta = limiteRec - limiteAtual;
+      }
+
       } else if (limiteAtual < (limiteRec * (1 - tol)) && delta >= minDelta) {
         acao = "Aumentar +" + moneyBR_(delta);
-      } else if (!bloqueiaReducao && limiteAtual > (limiteRec * (1 + tol)) && (-delta) >= minDelta) {
+
+      } else if (!bloqueiaReducao && !travaReducaoTempo && limiteAtual > (limiteRec * (1 + tol)) && (-delta) >= minDelta) {
         acao = "Reduzir -" + moneyBR_(-delta);
       }
 
+      // 🔕 Exclusão pontual: CE0234 - VIRTUAL MARKETING (somente este alias)
+      var nomeCartaoFinal = (lim ? lim.nomeCartao : a.nomeCartao) || "";
+      var nomeNorm = normalizarTexto_(nomeCartaoFinal);
+
+      // Regra: CE0234 + VIRTUAL + MARKETING
+      var ehCE0234 = nomeNorm.indexOf("ce0234") === 0;
+      var ehVirtual = nomeNorm.indexOf("virtual") !== -1 || nomeNorm.indexOf("virual") !== -1;
+      var ehMarketing = nomeNorm.indexOf("marketing") !== -1;
+
+      if (ehCE0234 && ehVirtual && ehMarketing) {
+        return; // pula APENAS este cartão
+      }
+
+      // ------------------------------
+      // Ritmo de consumo no ciclo (06→05)
+      // ------------------------------
+      var usado = (a.usado || 0);
+      var limiteAtual = (limite || 0);
+
+      var hoje = new Date();
+      var hoje0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+      // "inicio" já existe na função (periodo.inicio). Normaliza:
+      var ini0 = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate());
+
+      // Fim do ciclo: dia 05 do mês correto
+      var dHoje = hoje0.getDate();
+      var fimCiclo = (dHoje >= 6)
+        ? new Date(hoje0.getFullYear(), hoje0.getMonth() + 1, 5)
+        : new Date(hoje0.getFullYear(), hoje0.getMonth(), 5);
+
+      var msDia = 24 * 60 * 60 * 1000;
+      var diasDecorridos = Math.max(1, Math.floor((hoje0.getTime() - ini0.getTime()) / msDia) + 1);
+      var diasTotal = Math.max(diasDecorridos, Math.round((fimCiclo.getTime() - ini0.getTime()) / msDia) + 1);
+
+      var pctCiclo = diasTotal > 0 ? (diasDecorridos / diasTotal) : 0;
+      var pctUsoLim = (limiteAtual > 0) ? (usado / limiteAtual) : null;
+
+      var ritmoRatio = (pctUsoLim !== null && pctCiclo > 0) ? (pctUsoLim / pctCiclo) : null;
+
+      var ritmo = "—";
+      if (ritmoRatio !== null && isFinite(ritmoRatio)) {
+        if (ritmoRatio > 1.20) ritmo = "Alto";
+        else if (ritmoRatio < 0.85) ritmo = "Baixo";
+        else ritmo = "Médio";
+      }
+
       rows.push({
-        nomeCartao: lim ? lim.nomeCartao : a.nomeCartao,
+        nomeCartao: nomeCartaoFinal,
         loja: a.loja,
         time: a.time,
         tipo: tipo,
@@ -2275,6 +2473,8 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
         projecao: projLoja,
         limiteRecomendado: limiteRec,
         acao: acao,
+        ritmo: ritmo,              // ✅ NOVO
+        //ritmoRatio: ritmoRatio,  // opcional (não exibir na tabela)
         saldo: saldo
       });
     }); // ✅ FECHA O forEach corretamente aqui
@@ -2304,6 +2504,573 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
   } catch (e) {
     return { ok: false, error: "Falha ao calcular relação de saldos: " + (e && e.message ? e.message : e) };
   }
+}
+
+// ============================
+// ALERTAS LIMITES (E-MAIL ADM)
+// ============================
+
+const VEKTOR_ALERT_SALDO_CRITICO = 500;      // R$ 500,00 (definido internamente)
+const VEKTOR_ALERT_REDUCAO_MIN = 500;        // Redução relevante (R$ 500)
+const VEKTOR_ALERT_MAX_RISCO = 15;           // Limite de itens no e-mail (risco)
+const VEKTOR_ALERT_MAX_EFICIENCIA = 10;      // Limite de itens no e-mail (eficiência)
+const VEKTOR_ALERT_MAX_ADMIN = 20;           // Limite de itens no e-mail (admin)
+const VEKTOR_ALERT_TOL_PCT = 0.0000001;
+
+// Disparo principal (use no gatilho diário)
+function enviarAlertasLimitesClaraDiario() {
+
+  if (typeof periodoStr !== "string") {
+  try {
+    if (periodoStr && (periodoStr.inicio || periodoStr.fim)) {
+      periodoStr = (periodoStr.inicio || "06") + " a " + (periodoStr.fim || "05");
+    } else {
+      periodoStr = "06→05";
+    }
+  } catch (e) {
+    periodoStr = "06→05";
+  }
+}
+
+  // Segurança: só roda para Admin
+  var email = Session.getActiveUser().getEmail();
+  if (!isAdminEmail(email)) {
+    return { ok: false, error: "Acesso restrito: apenas Administrador pode disparar alertas." };
+  }
+
+  // Pega base já calculada (mesma da tabela)
+  var res = getRelacaoSaldosClara("geral", "");
+  if (!res || !res.ok) {
+    return { ok: false, error: (res && res.error) ? res.error : "Falha ao obter relação de saldos." };
+  }
+
+  var periodo = "";
+if (typeof res.periodo === "string") {
+  periodo = res.periodo;
+} else if (res.periodo && (res.periodo.inicio || res.periodo.fim)) {
+  periodo = (res.periodo.inicio || "06") + " a " + (res.periodo.fim || "05");
+} else {
+  periodo = "06→05";
+}
+  var rows = res.rows || [];
+  if (!rows.length) return { ok: true, sent: false, msg: "Sem dados para alertar." };
+
+  // Classifica
+  var packs = classificarAlertasLimites_(rows);
+
+  // Anti-spam por ciclo (06->05)
+  var cicloKey = getCicloKey06a05_(); // ex: "2025-12-06_2026-01-05"
+  var filtrados = aplicarAntiSpamCiclo_(cicloKey, packs);
+
+  var risco = filtrados.risco;
+  var monitoramento = filtrados.monitoramento;
+  var eficiencia = filtrados.eficiencia;
+  var admin = filtrados.admin;
+
+  Logger.log("ALERT COUNTS: risco=%s monitoramento=%s eficiencia=%s admin=%s",
+  risco.length, monitoramento.length, eficiencia.length, admin.length);
+
+  if (!risco.length && !monitoramento.length && !eficiencia.length && !admin.length) {
+    return { ok: true, sent: false, msg: "Sem alertas novos (anti-spam por ciclo)." };
+  }
+
+
+  // Monta e-mail
+  var assunto = risco.length
+    ? "❗[ALERTA CRÍTICO] Risco de estouro de limite – Vektor"
+    : "⚠️[ALERTA] Ajustes de limite recomendados – Vektor";
+
+  var html = montarEmailAlertasLimites_(periodo, risco, monitoramento, eficiencia, admin);
+
+  // Envia somente para ADM’s
+  var destinatarios = getAdminEmails_();
+  if (!destinatarios.length) return { ok: false, error: "Lista de admins vazia." };
+
+  MailApp.sendEmail({
+    to: destinatarios.join(","),
+    subject: assunto,
+    htmlBody: html,
+    name: "Vektor – Grupo SBF"
+  });
+
+  // Registra enviados no ciclo para anti-spam
+  registrarEnviadosCiclo_(cicloKey, filtrados._enviadosKeys);
+
+  return {
+    ok: true,
+    sent: true,
+    counts: { risco: risco.length, eficiencia: eficiencia.length, admin: admin.length },
+    ciclo: cicloKey
+  };
+}
+
+/**
+ * Porteiro: só dispara envio se a aba BaseClara mudou de fato.
+ * Coloque o trigger nesta função (não direto no enviarAlertasLimitesClaraDiario).
+ */
+
+function ENVIAR_EMAIL_LIMITE_CLARA() {
+  var props = PropertiesService.getScriptProperties();
+
+  // 1) calcula assinatura atual da BaseClara
+  var sigAtual = calcularAssinaturaBaseClara_();
+  if (!sigAtual || sigAtual.error) {
+    Logger.log("Falha ao calcular assinatura BaseClara: " + (sigAtual && sigAtual.error ? sigAtual.error : sigAtual));
+    return;
+  }
+
+  var keySig = "VEKTOR_SIG_BASECLARA_PROCESSADA";
+  var sigAnterior = props.getProperty(keySig) || "";
+
+  // 2) se não mudou, não envia
+  if (sigAtual.sig === sigAnterior) {
+    Logger.log("BaseClara não mudou desde a última verificação. Não envia alertas.");
+    return;
+  }
+
+  // 3) janela de segurança opcional (para evitar disparar enquanto carga ainda está em andamento)
+  // Se você não quiser atraso, pode remover este bloco inteiro.
+  var AGUARDAR_MIN = 12; // ajuste aqui (10–20 costuma ser bom)
+  var agora = new Date();
+  var diffMin = (agora.getTime() - sigAtual.maxDataMs) / 60000;
+
+  // Só aplica a janela se maxData veio preenchida (quando a coluna Data é válida)
+  if (sigAtual.maxDataMs > 0 && diffMin >= 0 && diffMin < AGUARDAR_MIN) {
+    Logger.log("BaseClara mudou, mas ainda dentro da janela de segurança (" + diffMin.toFixed(1) + " min).");
+    return;
+  }
+
+  // 4) marca assinatura como processada e dispara envio
+  props.setProperty(keySig, sigAtual.sig);
+
+  Logger.log("BaseClara mudou (sig anterior ≠ atual). Enviando alertas...");
+  enviarAlertasLimitesClaraDiario();
+}
+
+
+/**
+ * Calcula uma assinatura leve da BaseClara, suficiente para detectar atualização real da aba.
+ * Estratégia:
+ * - usa header para localizar colunas Data/Valor (robusto)
+ * - usa Alias fixo (col H) se você quiser; aqui mantive robusto por nome também
+ * - lê só as últimas N linhas das 3 colunas (Alias, Data, Valor) e faz hash
+ * - inclui maxData e lastRow para reforçar detecção
+ */
+function calcularAssinaturaBaseClara_() {
+  try {
+    var info = carregarLinhasBaseClara_(); // seu helper
+    if (info.error) return { error: info.error };
+
+    var header = info.header || [];
+    var linhas = info.linhas || [];
+    var lastRow = linhas.length;
+    if (lastRow <= 0) return { sig: "EMPTY", maxDataMs: 0, lastRow: 0 };
+
+    // Índices: Alias fixo e Data/Valor por nome (para não confundir com "Cartão")
+    // Alias Do Cartão = coluna H => índice 7 (0-based) (você já validou que isso é fixo)
+    var idxAlias = 7;
+
+    // Data/Valor: mantém por nome para suportar variações de header
+    var idxValor = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor", "Total"]);
+    var idxData  = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
+
+    if (idxValor < 0) return { error: "Não encontrei a coluna de Valor na BaseClara para assinatura." };
+    if (idxData < 0)  return { error: "Não encontrei a coluna de Data na BaseClara para assinatura." };
+
+    // lê só as últimas N linhas para a assinatura (evita custo alto)
+    var N = 250; // ajuste se quiser (200–500 geralmente ok)
+    var start = Math.max(0, lastRow - N);
+
+    // calcula maxData do conjunto total (não só das últimas N)
+    // (se preferir leve, pode calcular só em N; mas maxData total é mais “forte”)
+    var maxDataMs = 0;
+    for (var i = 0; i < lastRow; i++) {
+      var dt = linhas[i][idxData];
+      var d = (dt instanceof Date) ? dt : new Date(dt);
+      if (d instanceof Date && !isNaN(d.getTime())) {
+        var ms = d.getTime();
+        if (ms > maxDataMs) maxDataMs = ms;
+      }
+    }
+
+    // monta um payload determinístico das últimas N linhas usando só Alias/Data/Valor
+    var parts = [];
+    for (var j = start; j < lastRow; j++) {
+      var r = linhas[j];
+
+      var alias = (r[idxAlias] || "").toString().trim();
+      var v = r[idxValor];
+      var dt2 = r[idxData];
+
+      var d2 = (dt2 instanceof Date) ? dt2 : new Date(dt2);
+      var d2s = (d2 instanceof Date && !isNaN(d2.getTime())) ? d2.toISOString().slice(0, 10) : "";
+
+      // valor como string estável
+      var vs = (typeof v === "number") ? v.toFixed(2) : (v || "").toString().trim();
+
+      parts.push(alias + "|" + d2s + "|" + vs);
+    }
+
+    var payload = "LR=" + lastRow + ";MAX=" + maxDataMs + ";DATA=" + parts.join("||");
+    var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, payload, Utilities.Charset.UTF_8);
+    var sig = digest.map(function(b) {
+      var v = (b < 0 ? b + 256 : b).toString(16);
+      return v.length === 1 ? "0" + v : v;
+    }).join("");
+
+    return { sig: sig, maxDataMs: maxDataMs, lastRow: lastRow };
+
+  } catch (e) {
+    return { error: "Falha ao calcular assinatura BaseClara: " + (e && e.message ? e.message : e) };
+  }
+}
+
+// -------------------------
+// Classificação de alertas
+// -------------------------
+function classificarAlertasLimites_(rows) {
+  var risco = [];
+  var monitoramento = [];
+  var eficiencia = [];
+  var admin = [];
+
+  var hoje = new Date();
+  var infoCiclo = getPeriodoCicloClara_(); // você já usa no projeto
+  var inicio = infoCiclo.inicio;
+  var diaDoMes = hoje.getDate();
+
+  // ------------------------------
+// Regra de risco combinada por fase do ciclo
+// 1ª quinzena: saldo<=500 e %uso>=50%
+// depois:      saldo<=500 e %uso>=70%
+// ------------------------------
+var msDia = 24 * 60 * 60 * 1000;
+var diasDesdeInicio = Math.floor((hoje.getTime() - inicio.getTime()) / msDia) + 1;
+var limiarPctUsoRisco = (diasDesdeInicio <= 14) ? 0.50 : 0.70;
+
+// saldo crítico fixo (valor), mas combinado com %uso por fase
+var saldoCriticoValor = 500;
+
+
+  // metade do ciclo: regra simples pedida (até dia 15)
+  var antesMetade = (diaDoMes <= 15);
+
+  rows.forEach(function(r) {
+    var limite = Number(r.limite) || 0;
+    var utilizado = Number(r.utilizado) || 0;
+    var saldo = Number(r.saldo);
+    if (!isFinite(saldo)) saldo = limite - utilizado;
+
+    var proj = Number(r.projecao) || 0;
+    var pctProj = (proj > 0) ? (utilizado / proj) : null;
+    var pctLim = (limite > 0) ? (utilizado / limite) : null;
+
+    var acao = (r.acao || "").toString().trim();
+    var acaoLower = acao.toLowerCase();
+
+    // 1) ADMIN: definir
+    if (acaoLower.indexOf("definir") === 0) {
+      admin.push(enriquecerRowAlerta_(r, { motivo: "Limite não cadastrado/zerado (ação: Definir)." }));
+      return;
+    }
+
+    // 2) RISCO (alto)
+    var ehAumentar = (acaoLower.indexOf("aumentar") === 0);
+
+    // gatilho de projeção vira MONITORAMENTO (não crítico)
+    var monitorPorProj = ehAumentar && (pctProj !== null) && (pctProj + VEKTOR_ALERT_TOL_PCT >= 0.90);
+
+    // risco crítico só por sinais “duros”
+    var riscoPorSaldoUso = (saldo <= saldoCriticoValor) && (pctLim !== null) && ((pctLim + VEKTOR_ALERT_TOL_PCT) >= limiarPctUsoRisco);
+    var riscoPorAcelerado = false; // desativado (regra nova já cobre)
+
+    if (riscoPorSaldoUso || riscoPorAcelerado) {
+    var motivos = [];
+    if (riscoPorSaldoUso) motivos.push("Saldo ≤ R$ " + saldoCriticoValor.toFixed(2) + " e %uso ≥ " + Math.round(limiarPctUsoRisco * 100) + "%");
+    if (riscoPorAcelerado) motivos.push("Uso acelerado");
+    risco.push(enriquecerRowAlerta_(r, { motivo: motivos.join(" | "), pctProj: pctProj, pctLim: pctLim }));
+    return;
+  }
+
+
+    if (monitorPorProj) {
+    monitoramento.push(enriquecerRowAlerta_(r, {
+      motivo: "Ação=Aumentar e %Projeção ≥ 90% (monitoramento, não crítico)",
+      pctProj: pctProj,
+      pctLim: pctLim
+    }));
+    return;
+  }
+
+    // 3) EFICIÊNCIA (médio)
+    var ehReduzir = (acaoLower.indexOf("reduzir") === 0);
+    var deltaReducao = extrairDeltaReducao_(acao); // retorna número positivo se "Reduzir -R$ X"
+    var eficienciaPorReducao = ehReduzir && deltaReducao >= VEKTOR_ALERT_REDUCAO_MIN;
+
+    // regra de "≤50% por ciclos repetidos" é melhor baseada em histórico, mas aqui deixo sinal simples:
+    // se %Projeção existe e está muito baixa no ciclo atual, marca candidato (não “repetido” ainda).
+    // Para “repetido”, você pode ligar depois usando soma por ciclos. (Eu deixo preparado no e-mail como "observação".)
+    var eficienciaPorPctProj = (pctProj !== null) && (pctProj + VEKTOR_ALERT_TOL_PCT <= 0.50);
+
+    if (eficienciaPorReducao || eficienciaPorPctProj) {
+      var motivosEf = [];
+      if (eficienciaPorReducao) motivosEf.push("Ação=Reduzir e redução sugerida ≥ R$ " + VEKTOR_ALERT_REDUCAO_MIN.toFixed(2));
+      if (eficienciaPorPctProj) motivosEf.push("%Projeção ≤ 50% (avaliar recorrência nos ciclos)");
+
+      eficiencia.push(enriquecerRowAlerta_(r, { motivo: motivosEf.join(" | "), pctProj: pctProj, pctLim: pctLim }));
+      return;
+    }
+
+    // caso contrário: não alerta
+  });
+
+  // Ordenações úteis
+  risco.sort(function(a,b){ return (a.saldo||0) - (b.saldo||0); }); // menor saldo primeiro
+  eficiencia.sort(function(a,b){ return (b.deltaReducao||0) - (a.deltaReducao||0); }); // maior redução primeiro
+  admin.sort(function(a,b){ return (a.nomeCartao||"").localeCompare(b.nomeCartao||""); });
+
+  // corta para evitar e-mails gigantes
+  risco = risco.slice(0, VEKTOR_ALERT_MAX_RISCO);
+  eficiencia = eficiencia.slice(0, VEKTOR_ALERT_MAX_EFICIENCIA);
+  admin = admin.slice(0, VEKTOR_ALERT_MAX_ADMIN);
+
+  monitoramento.sort(function(a,b){ return (b.pctProj||0) - (a.pctProj||0); });
+  monitoramento = monitoramento.slice(0, 15);
+
+  return { risco: risco, monitoramento: monitoramento, eficiencia: eficiencia, admin: admin };
+
+}
+
+// -------------------------
+// Anti-spam por ciclo (06→05)
+// -------------------------
+function aplicarAntiSpamCiclo_(cicloKey, packs) {
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty("VEKTOR_ALERTS_SENT_" + cicloKey) || "[]";
+  var sentKeys = {};
+  try {
+    JSON.parse(raw).forEach(function(k){ sentKeys[k] = true; });
+  } catch(e) {}
+
+  function rowKey(r) {
+    // chave estável: cartaoKey + loja + time + tipoAlerta
+    var loja = (r.loja || "").toString().trim();
+    var time = (r.time || "").toString().trim();
+    var cartao = (r.nomeCartao || "").toString().trim();
+    return cartao + "||" + loja + "||" + time;
+  }
+
+  var enviadosKeys = [];
+
+  function filtrar(lista, tipo) {
+    var out = [];
+    lista.forEach(function(r){
+      var k = rowKey(r) + "||" + tipo;
+      if (sentKeys[k]) return;
+      out.push(r);
+      enviadosKeys.push(k);
+    });
+    return out;
+  }
+
+  var risco = filtrar(packs.risco || [], "risco");
+  var monitoramento = filtrar(packs.monitoramento || [], "monitoramento");
+  var eficiencia = filtrar(packs.eficiencia || [], "eficiencia");
+  var admin = filtrar(packs.admin || [], "admin");
+
+  return { risco: risco, monitoramento: monitoramento, eficiencia: eficiencia, admin: admin, _enviadosKeys: enviadosKeys };
+
+}
+
+function registrarEnviadosCiclo_(cicloKey, keys) {
+  if (!keys || !keys.length) return;
+  var props = PropertiesService.getScriptProperties();
+  var propName = "VEKTOR_ALERTS_SENT_" + cicloKey;
+
+  var raw = props.getProperty(propName) || "[]";
+  var arr = [];
+  try { arr = JSON.parse(raw) || []; } catch(e) { arr = []; }
+
+  // evita crescer infinito
+  keys.forEach(function(k){ arr.push(k); });
+  arr = arr.slice(-1000);
+
+  props.setProperty(propName, JSON.stringify(arr));
+}
+
+// -------------------------
+// Montagem do e-mail
+// -------------------------
+function montarEmailAlertasLimites_(periodoStr, risco, monitoramento, eficiencia, admin) {
+  function money(n){ return (Number(n)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); }
+  function pct(p){ return (p===null || p===undefined) ? "—" : (p*100).toFixed(1)+"%"; }
+
+    var html = "";
+    html += "<div style='font-family:Arial,sans-serif;font-size:13px;color:#0f172a;'>";
+    html += "<h2 style='margin:0 0 8px 0;'>Vektor – Grupo SBF | Alertas de Limites (Clara)</h2>";
+
+    // Dias restantes para o fim do ciclo (06→05)
+    // Regra: se hoje é dia 06+ => fecha dia 05 do próximo mês
+    //        se hoje é dia 01–05 => fecha dia 05 do mês corrente
+    var hoje = new Date();
+
+    // "hoje" normalizado para início do dia (evita erro por horário)
+    var hoje0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+    // fim do ciclo: dia 05 no mês correto, às 23:59:59
+    var y = hoje0.getFullYear();
+    var m = hoje0.getMonth(); // 0-based
+    var d = hoje0.getDate();
+
+    var fimCiclo;
+    if (d >= 6) {
+      // próximo mês
+      fimCiclo = new Date(y, m + 1, 5, 23, 59, 59);
+    } else {
+      // mês atual
+      fimCiclo = new Date(y, m, 5, 23, 59, 59);
+    }
+
+    var msDia = 24 * 60 * 60 * 1000;
+    var diasRestantes = Math.max(0, Math.ceil((fimCiclo.getTime() - hoje0.getTime()) / msDia));
+
+    html += "<p style='margin:0 0 10px 0;'><b>Período do ciclo:</b> " 
+    + (periodoStr || "06→05") 
+    + " | <b>Dias restantes:</b> " + diasRestantes 
+    + "</p>";
+
+    html += "<p style='margin:0 0 14px 0;color:#334155;'>Saldo crítico configurado: <b>" + money(VEKTOR_ALERT_SALDO_CRITICO) + "</b></p>";
+
+  // RISCO
+  if (risco && risco.length) {
+    html += "<h3 style='margin:16px 0 6px 0;color:#b91c1c;'>🔴 Risco operacional (prioridade alta)</h3>";
+    html += "<p style='margin:0 0 8px 0;color:#334155;'><b>Interpretação:</b> Risco elevado de bloqueio antes do fim do ciclo.<br/><b>Ação recomendada:</b> Se a coluna <b>Ação</b> indicar aumento, priorizar ajuste de limite. Se indicar <b>Manter</b>, tratar como alerta operacional (monitorar consumo/saldo e evitar bloqueio).</p>";
+
+    html += tabelaAlertas_(risco, money, pct);
+  }
+
+  // MONITORAMENTO
+
+  if (monitoramento && monitoramento.length) {
+  html += "<h3 style='margin:16px 0 6px 0;color:#a16207;'>🟡 Monitoramento (não crítico)</h3>";
+  html += "<p style='margin:0 0 8px 0;color:#334155;'><b>Interpretação:</b> tendência de consumo próxima do esperado para o ciclo, porém ainda sem sinais críticos.<br/><b>Ação recomendada:</b> acompanhar e antecipar ajuste se necessário.</p>";
+  html += tabelaAlertas_(monitoramento, money, pct);
+}
+
+  // EFICIÊNCIA
+  if (eficiencia && eficiencia.length) {
+    html += "<h3 style='margin:16px 0 6px 0;color:#b45309;'>🟠 Eficiência (prioridade média)</h3>";
+    html += "<p style='margin:0 0 8px 0;color:#334155;'><b>Interpretação:</b> Limite acima do padrão esperado.<br/><b>Ação recomendada:</b> Avaliar redução para otimização de capital, sem impacto operacional.</p>";
+    html += tabelaAlertas_(eficiencia, money, pct);
+    html += "<p style='margin:8px 0 0 0;color:#64748b;'><i>Observação:</i> casos com %Projeção baixa devem ser confirmados como recorrentes em 2–3 ciclos antes de redução estrutural.</p>";
+  }
+
+  // ADMIN
+  if (admin && admin.length) {
+    html += "<h3 style='margin:16px 0 6px 0;color:#2563eb;'>🔵 Pendências administrativas</h3>";
+    html += "<p style='margin:0 0 8px 0;color:#334155;'><b>Interpretação:</b> cartão com consumo sem limite cadastrado/zerado.<br/><b>Ação recomendada:</b> definir limite na aba Info_limites.</p>";
+    html += tabelaAlertas_(admin, money, pct);
+  }
+
+  // Rodapé metodológico
+  html += "<hr style='margin:16px 0;border:none;border-top:1px solid #e2e8f0;'/>";
+  html += "<p style='margin:0;color:#475569;'><b>Metodologia (resumo):</b> Projeção baseada nos últimos 6 ciclos (06→05). Em sazonalidade (Nov/Dez), considera-se cenário conservador para evitar subestimação. Recomendações são heurísticas e devem ser validadas pelo time ADM.</p>";
+  html += "</div>";
+  return html;
+}
+
+function tabelaAlertas_(lista, moneyFn, pctFn) {
+  var html = "";
+  html += "<table cellpadding='0' cellspacing='0' style='border-collapse:collapse;width:100%;margin-top:6px;'>";
+  html += "<tr>";
+  html += th_("Loja") + th_("Time") + th_("Cartão") + th_("Limite") + th_("Utilizado") + th_("Saldo") + th_("Projeção") + th_("% Projeção") + th_("Ação") + th_("Motivo");
+  html += "</tr>";
+
+  lista.forEach(function(r){
+    html += "<tr>";
+    html += td_(r.loja || "N/D");
+    html += td_(r.time || "N/D");
+    html += td_(r.nomeCartao || "N/D");
+    html += td_(moneyFn(r.limite));
+    html += td_(moneyFn(r.utilizado));
+    html += td_(moneyFn(r.saldo));
+    html += td_(moneyFn(r.projecao));
+    html += td_(pctFn(r.pctProj));
+    html += td_((r.acao || "—"));
+    html += td_((r.motivo || "—"));
+    html += "</tr>";
+  });
+
+  html += "</table>";
+  return html;
+
+  function th_(t){
+    return "<th style='border:1px solid #0f172a;background:#0b2a57;color:#fff;padding:6px;text-align:left;font-size:12px;white-space:nowrap;'>" + esc_(t) + "</th>";
+  }
+  function td_(t){
+    return "<td style='border:1px solid #0f172a;padding:6px;font-size:12px;vertical-align:top;white-space:nowrap;'>" + esc_(t) + "</td>";
+  }
+  function esc_(x){
+    return String(x===null||x===undefined?"":x)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+  }
+}
+
+// -------------------------
+// Helpers
+// -------------------------
+function enriquecerRowAlerta_(r, extra) {
+  var out = Object.assign({}, r);
+  if (extra) Object.keys(extra).forEach(function(k){ out[k] = extra[k]; });
+
+  // delta de redução útil para ordenação
+  out.deltaReducao = extrairDeltaReducao_(out.acao || "");
+  return out;
+}
+
+function extrairDeltaReducao_(acaoStr) {
+  // Espera algo como: "Reduzir -R$ 500,00"
+  var s = (acaoStr || "").toString();
+  if (s.toLowerCase().indexOf("reduzir") !== 0) return 0;
+
+  // captura números após "-"
+  var m = s.match(/-\s*R\$\s*([\d\.\,]+)/i);
+  if (!m) return 0;
+
+  var num = m[1].replace(/\./g,"").replace(",",".");
+  var v = Number(num);
+  return isFinite(v) ? v : 0;
+}
+
+function getCicloKey06a05_() {
+  // Usa sua regra: se dia 01–05, ciclo começou dia 06 do mês anterior
+  var p = getPeriodoCicloClara_();
+  var ini = p.inicio;
+  var fim = p.fim;
+  return Utilities.formatDate(ini, "America/Sao_Paulo", "yyyy-MM-dd") + "_" +
+         Utilities.formatDate(fim, "America/Sao_Paulo", "yyyy-MM-dd");
+}
+
+function getAdminEmails_() {
+  // Reaproveita sua própria lista central via isAdminEmail
+  // Se você tiver a lista em outro lugar, adapte aqui.
+  // Estratégia: varrer lista conhecida — se você já tem array interno em isAdminEmail, replique.
+  var admins = [
+    "rodrigo.lisboa@gruposbf.com.br"
+    // adicione aqui os outros admins que já existem no isAdminEmail
+  ];
+
+  // limpa duplicados
+  var seen = {};
+  var out = [];
+  admins.forEach(function(e){
+    var k = (e||"").toLowerCase().trim();
+    if (!k || seen[k]) return;
+    seen[k] = true;
+    out.push(k);
+  });
+  return out;
 }
 
 function chaveCartaoClara_(raw) {
