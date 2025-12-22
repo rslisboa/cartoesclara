@@ -1379,7 +1379,7 @@ function vektorDetectarFuncaoOrigem() {
           // ========= EXPORTAÇÃO DE TABELA PARA CSV =========
 
   // Usado pelo botão "⬇ Exportar CSV" dentro das respostas com tabela.
-  // IMPORTANT: precisa estar dentro do document.addEventListener("DOMContentLoaded", ...)
+  // IMPORTANTE: precisa estar dentro do document.addEventListener("DOMContentLoaded", ...)
   // e exposto em window para o onclick funcionar.
   window.exportTableToCSV = function(btn, defaultFileName) {
     try {
@@ -1448,6 +1448,99 @@ function vektorDetectarFuncaoOrigem() {
     }
   };
 
+
+  function vektorFiltrarRelacaoSaldos(wrapId) {
+  try {
+    var wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+
+    var selLoja = document.getElementById("filtroRelacaoSaldosLoja");
+    var selAcao = document.getElementById("filtroRelacaoSaldosAcao");
+
+    var lojaVal = selLoja ? (selLoja.value || "") : "";
+    var acaoVal = selAcao ? (selAcao.value || "") : "";
+
+    var tbody = wrap.querySelector("tbody");
+    if (!tbody) return;
+
+    var trs = tbody.querySelectorAll("tr");
+    trs.forEach(function(tr){
+      var alias = tr.getAttribute("data-alias") || "";
+      var acao  = tr.getAttribute("data-acao")  || "";
+
+      var okLoja = !lojaVal || alias === lojaVal;
+      var okAcao = !acaoVal || acao === acaoVal;
+
+      tr.style.display = (okLoja && okAcao) ? "" : "none";
+    });
+  } catch (e) {
+    console.error("Erro ao filtrar relação de saldos:", e);
+  }
+}
+
+// 1) FUNÇÃO DE FILTRAR (obrigatória)
+window.vektorFiltrarRelacaoSaldos = function (wrapId) {
+  try {
+    var wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+
+    var selLoja = document.getElementById("filtroRelacaoSaldosLoja");
+    var selAcao = document.getElementById("filtroRelacaoSaldosAcao");
+
+    var lojaVal = selLoja ? (selLoja.value || "").trim() : "";
+    var acaoVal = selAcao ? (selAcao.value || "").trim() : ""; // "Aumentar" | "Manter" | "Reduzir"
+
+    // Normaliza a seleção de ação para comparação (base)
+    var acaoValNorm = "";
+    if (acaoVal) {
+      var a = acaoVal.toLowerCase();
+      if (a.indexOf("aumentar") === 0) acaoValNorm = "aumentar";
+      else if (a.indexOf("reduzir") === 0) acaoValNorm = "reduzir";
+      else if (a.indexOf("manter") === 0) acaoValNorm = "manter";
+      else acaoValNorm = a; // fallback
+    }
+
+    var tbody = wrap.querySelector("tbody");
+    if (!tbody) return;
+
+    var trs = tbody.querySelectorAll("tr");
+    trs.forEach(function (tr) {
+      var alias = (tr.getAttribute("data-alias") || "").trim();
+
+      // Pode vir "Aumentar (+R$...)" etc. Vamos pegar só a base.
+      var acaoRaw = (tr.getAttribute("data-acao") || "").trim();
+      var acaoNorm = "";
+      if (acaoRaw) {
+        var x = acaoRaw.toLowerCase();
+        if (x.indexOf("aumentar") === 0) acaoNorm = "aumentar";
+        else if (x.indexOf("reduzir") === 0) acaoNorm = "reduzir";
+        else if (x.indexOf("manter") === 0) acaoNorm = "manter";
+        else acaoNorm = x; // fallback
+      }
+
+      var okLoja = !lojaVal || alias === lojaVal;
+      var okAcao = !acaoValNorm || acaoNorm === acaoValNorm;
+
+      tr.style.display = (okLoja && okAcao) ? "" : "none";
+    });
+  } catch (e) {
+    console.error("Erro ao filtrar relação de saldos:", e);
+  }
+};
+
+// 2) FUNÇÃO DE LIMPAR (mantém a sua, só garantindo window.)
+window.vektorLimparFiltroRelacaoSaldos = function (wrapId) {
+  try {
+    var selLoja = document.getElementById("filtroRelacaoSaldosLoja");
+    var selAcao = document.getElementById("filtroRelacaoSaldosAcao");
+    if (selLoja) selLoja.value = "";
+    if (selAcao) selAcao.value = "";
+
+    window.vektorFiltrarRelacaoSaldos(wrapId);
+  } catch (e) {
+    console.error("Erro ao limpar filtro relação de saldos:", e);
+  }
+};
 
 window.vektorAplicarFiltrosItensComprados = function (wrapId) {
   const wrap = document.getElementById(wrapId);
@@ -9129,6 +9222,9 @@ function vektorRenderTabelaRelacaoSaldos(res, tipo) {
   const totals = res.totals || {};
   const h = (res.highlights || {});
 
+  // ID único por instância (evita conflito se o usuário pedir “saldo geral” 2x no chat)
+  const wrapId = "vektor-saldos-" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
+
   if (!rows.length) {
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>Sem dados para o período <b>" + (periodo.inicio || "") + "</b> a <b>" + (periodo.fim || "") + "</b>.</p>"
@@ -9141,118 +9237,189 @@ function vektorRenderTabelaRelacaoSaldos(res, tipo) {
     return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   }
 
-  // Insights (1 linha por item, sem espaçamento)
-  let insights = "";
-  insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Período:</b> " + (periodo.inicio || "") + " a " + (periodo.fim || "") + "</p>";
-    insights += "<div style='height:8px;'></div>";
+  // =======================
+// FILTROS (APENAS SALDO GERAL)
+// =======================
+var filtrosHtml = "";
+var wrapIdRelacaoSaldos = "relacaoSaldosWrap_" + (tipo || "geral"); // mantém como você já tinha
++ "_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
 
-        if (h.menorSaldo) {
-        const lojaTxt = h.menorSaldo.loja ? ("Loja " + h.menorSaldo.loja) : "Loja (N/D)";
-        insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Menor saldo:</b> "
-          + lojaTxt + " — " + money(h.menorSaldo.saldo) + "</p>";
-      }
-      insights += "<div style='height:8px;'></div>";
+if ((tipo || "").toLowerCase() === "geral") {
+  // pega lojas/aliases (BaseClara col H) a partir do retorno
+  var aliases = (rows || [])
+    .map(function(x){ return (x && x.nomeCartao) ? String(x.nomeCartao).trim() : ""; })
+    .filter(function(x){ return !!x; });
+
+  // únicos
+  var seen = {};
+  var aliasesUnicos = [];
+  aliases.forEach(function(a){
+    if (!seen[a]) { seen[a] = true; aliasesUnicos.push(a); }
+  });
+
+  // ordena (opcional, melhora uso)
+  aliasesUnicos.sort(function(a,b){ return a.localeCompare(b); });
+
+  var optionsLojas = ["<option value=''>Todas as lojas</option>"]
+    .concat(aliasesUnicos.map(function(a){
+      return "<option value='" + a.replace(/'/g,"&#39;") + "'>" + a + "</option>";
+    }))
+    .join("");
+
+  filtrosHtml =
+    "<span style='display:inline-flex;align-items:center;gap:8px;margin-left:14px;'>" +
+      "<label style='font-size:13px;color:#334155;white-space:nowrap;'><b>Lojas:</b></label>" +
+      "<select id='filtroRelacaoSaldosLoja' " +
+              "onchange=\"vektorFiltrarRelacaoSaldos('" + wrapIdRelacaoSaldos + "')\" " +
+              "style='font-size:12px;border:1px solid #CBD5E1;border-radius:6px;padding:4px 8px;background:#fff;'>" +
+        optionsLojas +
+      "</select>" +
+
+      "<label style='font-size:13px;color:#334155;white-space:nowrap;margin-left:8px;'><b>Ação:</b></label>" +
+      "<select id='filtroRelacaoSaldosAcao' " +
+              "onchange=\"vektorFiltrarRelacaoSaldos('" + wrapIdRelacaoSaldos + "')\" " +
+              "style='font-size:12px;border:1px solid #CBD5E1;border-radius:6px;padding:4px 8px;background:#fff;'>" +
+        "<option value=''>Todas</option>" +
+        "<option value='Aumentar'>Aumentar</option>" +
+        "<option value='Manter'>Manter</option>" +
+        "<option value='Reduzir'>Reduzir</option>" +
+      "</select>" +
+
+      "<button type='button' " +
+              "onclick=\"vektorLimparFiltroRelacaoSaldos('" + wrapIdRelacaoSaldos + "')\" " +
+              "style='margin-left:8px;background:#0F172A;color:#fff;border:none;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer;'>" +
+        "Limpar" +
+      "</button>" +
+    "</span>";
+}
+
+// Insights (1 linha por item, sem espaçamento)
+let insights = "";
+
+// Período + filtros na MESMA linha (somente geral terá filtros; time fica vazio)
+insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Período:</b> "
+  + (periodo.inicio || "") + " a " + (periodo.fim || "")
+  + (filtrosHtml || "")
+  + "</p>";
+insights += "<div style='height:8px;'></div>";
+
+if (h.menorSaldo) {
+  const lojaTxt = h.menorSaldo.loja ? ("Loja " + h.menorSaldo.loja) : "Loja (N/D)";
+  insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Menor saldo:</b> "
+    + lojaTxt + " — " + money(h.menorSaldo.saldo) + "</p>";
+}
+insights += "<div style='height:8px;'></div>";
+
+if (h.maiorSaldo) {
+  const lojaTxt = h.maiorSaldo.loja ? ("Loja " + h.maiorSaldo.loja) : "Loja (N/D)";
+  insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Maior saldo:</b> "
+    + lojaTxt + " — " + money(h.maiorSaldo.saldo) + "</p>";
+}
+insights += "<div style='height:8px;'></div>";
+
+insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'>"
+  + "<b>Projeção de gasto:</b> estimativa do valor que a loja tende a gastar até o fim do ciclo de faturamento (06→05), "
+  + "calculada pela média dos últimos 3 ciclos completos. "
+  + "Na ausência de histórico suficiente, utiliza 2 ciclos ou, em último caso, os últimos 30 dias."
+  + "</p>";
+insights += "<div style='height:8px;'></div>";
+
+// Cabeçalho dinâmico
+const showLoja = false;
+const showTime = (tipo === "geral"); // conforme você pediu: time/loja sem coluna Time
+
+let th = "";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Nome do cartão</th>";
+if (showTime) th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Time</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Tipo</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Titular</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Limite</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Valor Utilizado</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;position:sticky;top:0;z-index:3;'>ℹ️ Projeção Gasto</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;position:sticky;top:0;z-index:3;'>% da Projeção</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Ritmo de Consumo</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Limite Recomendado</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Ação</th>";
+th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Saldo</th>";
+
+// Linhas
+let trs = "";
+rows.forEach(function(r) {
+  var aliasCartao = (r.nomeCartao || "").toString();     // vem da BaseClara (Alias do Cartão)
+
+  var acaoLinhaRaw = (r.acao || "").toString(); // pode vir "Aumentar (+R$...)" etc.
+  var acaoBase = "";
+
+  var acaoUp = acaoLinhaRaw.trim().toLowerCase();
+  if (acaoUp.indexOf("aumentar") === 0) acaoBase = "Aumentar";
+  else if (acaoUp.indexOf("reduzir") === 0) acaoBase = "Reduzir";
+  else if (acaoUp.indexOf("manter") === 0) acaoBase = "Manter";
+  // se vier vazio ou outro texto, acaoBase fica "" (não filtra por ação)
+
+  trs += "<tr data-alias='" + aliasCartao.replace(/'/g, "&#39;") +
+        "' data-acao='" + acaoBase.replace(/'/g, "&#39;") + "'>";
 
 
-      if (h.maiorSaldo) {
-        const lojaTxt = h.maiorSaldo.loja ? ("Loja " + h.maiorSaldo.loja) : "Loja (N/D)";
-        insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'><b>Maior saldo:</b> "
-          + lojaTxt + " — " + money(h.maiorSaldo.saldo) + "</p>";
-      }
-      insights += "<div style='height:8px;'></div>";
+  trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.nomeCartao || "") + "</td>";
 
-      insights += "<p class='text-sm text-slate-700' style='margin:0; padding:0;'>"
-      + "<b>Projeção de gasto:</b> estimativa do valor que a loja tende a gastar até o fim do ciclo de faturamento (06→05), "
-      + "calculada pela média dos últimos 3 ciclos completos. "
-      + "Na ausência de histórico suficiente, utiliza 2 ciclos ou, em último caso, os últimos 30 dias."
-      + "</p>";
-    insights += "<div style='height:8px;'></div>";
+  if (showTime) {
+    trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.time || "") + "</td>";
+  }
 
+  trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.tipo || "") + "</td>";
+  trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.titular || "") + "</td>";
 
-  // Cabeçalho dinâmico
-  const showLoja = false;
-  const showTime = (tipo === "geral"); // conforme você pediu: time/loja sem coluna Time
+  trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.limite) + "</td>";
+  trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.utilizado) + "</td>";
 
-  let th = "";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Nome do cartão</th>";
-  if (showTime) th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Time</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Tipo</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Titular</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Limite</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Valor Utilizado</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;position:sticky;top:0;z-index:3;'>ℹ️ Projeção Gasto</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#FFF3B0;color:#000;position:sticky;top:0;z-index:3;'>% da Projeção</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Ritmo de Consumo</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Limite Recomendado</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Ação</th>";
-  th += "<th style='border:1px solid #000;padding:6px;background:#0b2a57;color:#fff;position:sticky;top:0;z-index:2;'>Saldo</th>";
+  // ℹ️ Projeção Gasto
+  trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.projecao) + "</td>";
 
-        // Linhas
-      let trs = "";
-      rows.forEach(function(r) {
-        trs += "<tr>";
+  // % da Projeção
+  var pctProj = (r.projecao && r.projecao > 0)
+    ? ((r.utilizado / r.projecao) * 100).toFixed(1) + "%"
+    : "—";
+  trs += "<td style='border:1px solid #000;padding:6px;'>" + pctProj + "</td>";
 
-        trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.nomeCartao || "") + "</td>";
+  // Ritmo de consumo (com ícone)
+  var ritmoTxt = r.ritmo || "—";
+  var ritmoIcon = "";
 
-        if (showTime) {
-          trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.time || "") + "</td>";
-        }
+  if (ritmoTxt === "Alto") {
+    ritmoIcon = "🚨 ";
+  } else if (ritmoTxt === "Médio") {
+    ritmoIcon = "⚠️ ";
+  } else if (ritmoTxt === "Baixo") {
+    ritmoIcon = "⬇️ ";
+  }
 
-        trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.tipo || "") + "</td>";
-        trs += "<td style='border:1px solid #000;padding:6px;'>" + (r.titular || "") + "</td>";
+  trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;'>" 
+    + ritmoIcon + ritmoTxt 
+    + "</td>";
 
-        trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.limite) + "</td>";
-        trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.utilizado) + "</td>";
+  trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;'>" + money(r.limiteRecomendado) + "</td>";
+  trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;font-weight:700;'>" + (r.acao || "") + "</td>";
+  trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.saldo) + "</td>";
 
-        // ℹ️ Projeção Gasto
-        trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.projecao) + "</td>";
+  trs += "</tr>";
+});
 
-        // % da Projeção
-        var pctProj = (r.projecao && r.projecao > 0)
-          ? ((r.utilizado / r.projecao) * 100).toFixed(1) + "%"
-          : "—";
-        trs += "<td style='border:1px solid #000;padding:6px;'>" + pctProj + "</td>";
+const table =
+  "<div id='" + wrapIdRelacaoSaldos + "' style='max-width:100%; overflow:auto; max-height:420px;'>" +
+    insights +
+    "<table style='min-width:1300px; width:100%; border-collapse:collapse;'>" +
+      "<thead><tr style='background:#0b2a5b;color:#fff;'>" + th + "</tr></thead>" +
+      "<tbody>" + trs + "</tbody>" +
+    "</table>" +
+    "<div style='text-align:right; margin-top:6px;'>" +
+      "<button type='button' onclick=\"exportTableToCSV(this, 'relacao_saldos')\" " +
+        "style='background:#005E27;color:#fff;border:none;padding:6px 12px;border-radius:4px;font-size:11px;cursor:pointer;'>" +
+        "⬇ Exportar CSV" +
+      "</button>" +
+    "</div>" +
+  "</div>";
 
-        // Ritmo de consumo (com ícone)
-          var ritmoTxt = r.ritmo || "—";
-          var ritmoIcon = "";
-
-          if (ritmoTxt === "Alto") {
-            ritmoIcon = "🚨 ";
-          } else if (ritmoTxt === "Médio") {
-            ritmoIcon = "⚠️ ";
-          } else if (ritmoTxt === "Baixo") {
-            ritmoIcon = "⬇️ ";
-          }
-
-          trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;'>" 
-            + ritmoIcon + ritmoTxt 
-            + "</td>";
-
-
-        trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;'>" + money(r.limiteRecomendado) + "</td>";
-        trs += "<td style='border:1px solid #000;padding:6px;white-space:nowrap;font-weight:700;'>" + (r.acao || "") + "</td>";
-        trs += "<td style='border:1px solid #000;padding:6px;'>" + money(r.saldo) + "</td>";
-
-        trs += "</tr>";
-      });
-
-  const table =
-    "<div style='max-width:100%; overflow:auto; max-height:420px;'>" +
-      insights +
-      "<table style='min-width:1300px; width:100%; border-collapse:collapse;'>" +
-        "<thead><tr style='background:#0b2a5b;color:#fff;'>" + th + "</tr></thead>" +
-        "<tbody>" + trs + "</tbody>" +
-      "</table>" +
-      "<div style='text-align:right; margin-top:6px;'>" +
-        "<button type='button' onclick=\"exportTableToCSV(this, 'relacao_saldos')\" " +
-          "style='background:#005E27;color:#fff;border:none;padding:6px 12px;border-radius:4px;font-size:11px;cursor:pointer;'>" +
-          "⬇ Exportar CSV" +
-        "</button>" +
-      "</div>" +
-    "</div>";
-
-  renderBotMessage("HTML:" + table);
+renderBotMessage("HTML:" + table);
 }
 
 // ========= Botões "Verificar pendências / justificativas" (tabelas de LOJAS) ========= //
