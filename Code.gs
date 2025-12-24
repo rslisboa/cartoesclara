@@ -1,3 +1,60 @@
+// =======================
+// CONFIGURAÇÕES GLOBAIS
+// =======================
+
+var BASE_CLARA_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI"; // ID real da planilha BaseClara
+var HIST_PEND_CLARA_RAW = "HIST_PEND_CLARA_RAW";
+
+function normalizarLojaNumero_(valor) {
+  var digits = String(valor || "").replace(/\D/g, "");
+  if (!digits) return null;
+  var n = Number(digits);
+  return isFinite(n) ? n : null; // ignora zeros à esquerda
+}
+
+/**
+ * BaseClara:
+ * - Coluna R = 18 = "Grupos" (Time)
+ * - Coluna V = 22 = "LojaNum"
+ */
+function construirMapaLojaParaTime_() {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName("BaseClara");
+  if (!sh) throw new Error("Aba BaseClara não encontrada.");
+
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return {};
+
+  // Lê R:V (18..22) => 5 colunas: [Grupos, S, T, U, LojaNum]
+  var values = sh.getRange(2, 18, lastRow - 1, 5).getValues();
+
+  var map = {};      // lojaNum(number) -> time(string)
+  var freq = {};     // para escolher o mais frequente por loja (caso exista mais de 1)
+
+  values.forEach(function (r) {
+    var time = String(r[0] || "").trim();   // R
+    var lojaNum = normalizarLojaNumero_(r[4]); // V
+    if (!lojaNum || !time) return;
+
+    var key = String(lojaNum);
+    if (!freq[key]) freq[key] = {};
+    freq[key][time] = (freq[key][time] || 0) + 1;
+  });
+
+  Object.keys(freq).forEach(function (k) {
+    var best = null;
+    var bestN = -1;
+    Object.keys(freq[k]).forEach(function (t) {
+      if (freq[k][t] > bestN) { bestN = freq[k][t]; best = t; }
+    });
+    map[Number(k)] = best;
+  });
+
+  return map;
+}
+
+var PROP_LAST_SNAPSHOT_SIG = "VEKTOR_HISTPEND_LAST_SIG";
+
 function LIMPAR_ANTI_SPAM() {
 var props = PropertiesService.getScriptProperties();
   var cicloKey = getCicloKey06a05_();
@@ -58,6 +115,8 @@ if (isAdminEmail(email)) {
     .setTitle('Grupo SBF | Vektor')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
+
+
 
 // ✅ ID da planilha de métricas do Vektor
 // (a planilha que você mandou)
@@ -2577,7 +2636,7 @@ if (typeof res.periodo === "string") {
 
   // Monta e-mail
   var assunto = risco.length
-    ? "❗[ALERTA CRÍTICO] Risco de estouro de limite – Vektor"
+    ? "⚠️[ALERTA CLARA | LIMITE] Risco de estouro"
     : "⚠️[ALERTA] Ajustes de limite recomendados – Vektor";
 
   var html = montarEmailAlertasLimites_(periodo, risco, monitoramento, eficiencia, admin);
@@ -2602,6 +2661,400 @@ if (typeof res.periodo === "string") {
     counts: { risco: risco.length, eficiencia: eficiencia.length, admin: admin.length },
     ciclo: cicloKey
   };
+}
+
+// ======================================
+// RELATÓRIO OFENSORAS - PENDÊNCIAS CLARA
+// ======================================
+function gerarRelatorioOfensorasPendencias_(diasJanela) {
+  diasJanela = Number(diasJanela) || 60;
+
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var hist = ss.getSheetByName(HIST_PEND_CLARA_RAW);
+  if (!hist) throw new Error("Aba " + HIST_PEND_CLARA_RAW + " não encontrada.");
+
+  var lr = hist.getLastRow();
+  if (lr < 2) return { ok: true, rows: [], msg: "Histórico vazio.", janelaDias: diasJanela };
+
+  // Colunas: A Data_snapshot, B Loja, C Data_transacao, D Valor, E Pendencia_etiqueta, F Pendencia_nf, G Pendencia_descricao, H Qtde Total
+  var data = hist.getRange(2, 1, lr - 1, 8).getValues();
+
+  // Mapa LojaNum -> Time (BaseClara!V -> BaseClara!R)
+  var mapaTime = construirMapaLojaParaTime_();
+
+  var hoje = new Date();
+  var inicio = new Date(hoje.getTime() - diasJanela * 24 * 60 * 60 * 1000);
+
+  // agregação por loja
+  var m = {}; // lojaKey -> stats
+  function getLojaKey(loja){ return String(loja || "").trim() || "(N/D)"; }
+
+  data.forEach(function(r){
+    var dtSnap = (r[0] instanceof Date) ? r[0] : new Date(r[0]);
+    if (!(dtSnap instanceof Date) || isNaN(dtSnap.getTime())) return;
+    if (dtSnap < inicio) return;
+
+    var lojaKey = getLojaKey(r[1]);
+    var lojaNum = normalizarLojaNumero_(lojaKey);
+
+    var dtTx = (r[2] instanceof Date) ? r[2] : new Date(r[2]);
+
+    var valor = Number(r[3]) || 0;
+    var pe = Number(r[4]) || 0;
+    var pn = Number(r[5]) || 0;
+    var pd = Number(r[6]) || 0;
+    var qt = Number(r[7]) || (pe + pn + pd);
+
+    if (!m[lojaKey]) {
+      m[lojaKey] = {
+        loja: lojaKey,
+        lojaNum: lojaNum,
+        time: "N/D",
+        qtde: 0,
+        valor: 0,
+        pendEtiqueta: 0,
+        pendNF: 0,
+        pendDesc: 0,
+        snaps: {},     // dias distintos de snapshot
+        diasTx: {},    // dias distintos de transação (pendência)
+        maxSnap: null  // último snapshot observado
+      };
+    }
+
+    // resolve time (se existir no mapa)
+    if (m[lojaKey].lojaNum && mapaTime[m[lojaKey].lojaNum]) {
+      m[lojaKey].time = mapaTime[m[lojaKey].lojaNum];
+    }
+
+    m[lojaKey].qtde += qt;
+    m[lojaKey].valor += valor;
+    m[lojaKey].pendEtiqueta += pe;
+    m[lojaKey].pendNF += pn;
+    m[lojaKey].pendDesc += pd;
+
+    // snapshot day key
+    var snapKey = Utilities.formatDate(dtSnap, "America/Sao_Paulo", "yyyy-MM-dd");
+    m[lojaKey].snaps[snapKey] = true;
+
+    // transação day key (se data válida)
+    if (dtTx instanceof Date && !isNaN(dtTx.getTime())) {
+      var txKey = Utilities.formatDate(dtTx, "America/Sao_Paulo", "yyyy-MM-dd");
+      m[lojaKey].diasTx[txKey] = true;
+    }
+
+    // max snapshot
+    if (!m[lojaKey].maxSnap || dtSnap > m[lojaKey].maxSnap) {
+      m[lojaKey].maxSnap = dtSnap;
+    }
+  });
+
+  var rows = Object.keys(m).map(function(k){
+    var s = m[k];
+
+    var diasPend = Object.keys(s.diasTx).length;
+    var qtdSnaps = Object.keys(s.snaps).length;
+
+    // aceleração recente (mantém sua lógica)
+    var r14 = calcularTrend14dias_(data, s.loja);
+
+    // score composto (ajuste se quiser outra ponderação)
+    var score = (
+      (s.qtde || 0) +
+      (s.pendEtiqueta || 0) * 2 +
+      (s.pendNF || 0) * 2 +
+      (s.pendDesc || 0) * 1 +
+      diasPend * 1
+    );
+
+    var classificacao = "Baixa";
+    if (score >= 200) classificacao = "Crítica";
+    else if (score >= 80) classificacao = "Alta";
+    else if (score >= 30) classificacao = "Média";
+
+    return {
+      loja: s.loja,
+      time: s.time || "N/D",
+
+      qtde: s.qtde,
+      valor: s.valor,
+      diasComPendencia: diasPend,
+      pendEtiqueta: s.pendEtiqueta,
+      pendNF: s.pendNF,
+      pendDesc: s.pendDesc,
+
+      qtdeSnapshots: qtdSnaps,
+
+      trend14: r14, // {ult14, ant14, delta}
+      score: score,
+      classificacao: classificacao
+    };
+  });
+
+  // ranking por qtde e por valor
+  rows.sort(function(a,b){
+    if (b.qtde !== a.qtde) return b.qtde - a.qtde;
+    return b.valor - a.valor;
+  });
+
+  return { ok: true, rows: rows, janelaDias: diasJanela };
+}
+
+function calcularTrend14dias_(histData, lojaKey) {
+  var hoje = new Date();
+  var d0 = new Date(hoje.getTime() - 14 * 24*60*60*1000);
+  var d1 = new Date(hoje.getTime() - 28 * 24*60*60*1000);
+
+  var ult14 = 0;
+  var ant14 = 0;
+
+  histData.forEach(function(r){
+    var dtSnap = r[0] instanceof Date ? r[0] : new Date(r[0]);
+    if (!(dtSnap instanceof Date) || isNaN(dtSnap.getTime())) return;
+
+    var loja = String(r[1] || "").trim() || "(N/D)";
+    if (loja !== lojaKey) return;
+
+    var qt = Number(r[7]) || 0;
+
+    if (dtSnap >= d0) ult14 += qt;
+    else if (dtSnap >= d1 && dtSnap < d0) ant14 += qt;
+  });
+
+  var deltaAbs = ult14 - ant14;
+
+  // Percentual: só faz sentido se ant14 > 0
+  // Se ant14 == 0 e ult14 > 0, é “novo” (sem base comparativa)
+  var deltaPct = null;
+  if (ant14 > 0) {
+    deltaPct = (deltaAbs / ant14) * 100; // ex.: +241.6 (%)
+  }
+
+  // ✅ Mantém "delta" por compatibilidade com o resto do código
+  return {
+    ult14: ult14,
+    ant14: ant14,
+    delta: deltaAbs,       // compatibilidade
+    deltaAbs: deltaAbs,    // novo (opção C)
+    deltaPct: deltaPct     // novo (opção C) -> número ou null
+  };
+}
+
+function montarEmailOfensorasPendencias_(rel) {
+  var rows = (rel && rel.rows) ? rel.rows.slice() : [];
+  var periodo = (rel && rel.periodo) ? rel.periodo : {};
+  var meta = (rel && rel.meta) ? rel.meta : {};
+
+  function esc(s){
+    return String(s || "").replace(/[&<>"']/g, function(m){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);
+    });
+  }
+  function fmtMoney(v){
+    try {
+      return (Number(v)||0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+    } catch(e) {
+      return "R$ " + (Math.round((Number(v)||0)*100)/100).toString().replace(".", ",");
+    }
+  }
+  function fmtNum(v){ return (Number(v)||0).toLocaleString("pt-BR"); }
+
+  // ========= TOP (por quantidade) =========
+  var top = rows.slice().sort(function(a,b){
+    if ((b.qtde||0) !== (a.qtde||0)) return (b.qtde||0) - (a.qtde||0);
+    return (b.valor||0) - (a.valor||0);
+  }).slice(0, 15);
+
+  // Set para impedir duplicidade nas futuras
+  var topSet = {};
+  top.forEach(function(r){ topSet[String(r.loja||"")] = true; });
+
+  // ========= FUTURAS (por aceleração 14d), EXCLUINDO TOP =========
+  var futuras = rows
+    .filter(function(r){
+      var loja = String(r.loja||"");
+      if (topSet[loja]) return false;               // ✅ nunca pode repetir
+      var d = Number(r.delta14)||0;
+      if (d <= 0) return false;                     // só aceleração positiva
+      // corte anti-ruído: evita “futuras” com volume muito baixo
+      if ((Number(r.qtde)||0) < 5) return false;
+      return true;
+    })
+    .sort(function(a,b){
+      if ((b.delta14||0) !== (a.delta14||0)) return (b.delta14||0) - (a.delta14||0);
+      return (b.score||0) - (a.score||0);
+    })
+    .slice(0, 10);
+
+  // ========= Texto analítico: “por quê” =========
+  function principalFalha_(r){
+    var e = Number(r.pendEtiqueta)||0;
+    var n = Number(r.pendNF)||0;
+    var d = Number(r.pendDesc)||0;
+    var total = e+n+d;
+    if (!total) return "sem detalhamento por tipo";
+
+    var arr = [
+      {k:"NF/Recibo", v:n},
+      {k:"Etiqueta", v:e},
+      {k:"Descrição", v:d}
+    ].sort(function(a,b){ return b.v-a.v; });
+
+    var pct = Math.round((arr[0].v/total)*100);
+    return arr[0].k + " (" + pct + "%)";
+  }
+
+  function linhaAnalitica_(r){
+    var snaps = (r.qtdeSnapshots == null ? "—" : fmtNum(r.qtdeSnapshots));
+    var score = (r.score == null ? "—" : Number(r.score).toFixed(1));
+    return "<li><b>" + esc(r.loja) + "</b> (" + esc(r.time||"N/D") + ", " + esc(r.classificacao||"—") + "): " +
+      "Qtde " + fmtNum(r.qtde) +
+      ", principal falha: <b>" + esc(principalFalha_(r)) + "</b>" +
+      ", #Snapshots " + esc(snaps) +
+      ", Δ14d " + fmtNum(r.delta14||0) +
+      ", Score " + esc(score) + ".</li>";
+  }
+
+  // ========= Tabela com as MESMAS colunas do chat =========
+  function tabela_(titulo, lista, headerBg) {
+    var th = "border:1px solid #cbd5e1;padding:6px;font-size:12px;white-space:nowrap;color:#fff;background:" + headerBg + ";";
+    var td = "border:1px solid #cbd5e1;padding:6px;font-size:12px;white-space:nowrap;";
+    var thMetric = "border:1px solid #cbd5e1;padding:6px;font-size:12px;white-space:nowrap;color:#0d0c0c;background:#e6e605;";
+
+    var html = "";
+    html += "<h3 style='margin:16px 0 8px 0'>" + esc(titulo) + "</h3>";
+    html += "<table style='border-collapse:collapse;width:100%'>";
+    html += "<tr>" +
+      "<th style='" + th + "text-align:left'>Loja</th>" +
+      "<th style='" + th + "text-align:left'>Time</th>" +
+      "<th style='" + th + "text-align:center'>Qtde</th>" +
+      "<th style='" + th + "text-align:right'>Valor (R$)</th>" +
+      "<th style='" + th + "text-align:center'>Dias c/ pendência</th>" +
+      "<th style='" + th + "text-align:center'>Etiqueta</th>" +
+      "<th style='" + th + "text-align:center'>NF/Recibo</th>" +
+      "<th style='" + th + "text-align:center'>Descrição</th>" +
+      "<th style='" + thMetric + "text-align:center'># Snapshots</th>" +
+      "<th style='" + thMetric + "text-align:center'>Variação - Δ 14d</th>" +
+      "<th style='" + thMetric + "text-align:center'>% Var Δ 14d</th>" +
+      "<th style='" + thMetric + "text-align:center'>Score</th>" +
+      "<th style='" + thMetric + "text-align:left'>Classificação</th>" +
+    "</tr>";
+
+          (lista || []).forEach(function(r){
+        var dAbs = Number(r.delta14 || 0);
+        var dPct = (r.delta14Pct != null ? Number(r.delta14Pct) : null);
+
+        var dAbsTxt = (dAbs > 0 ? "+" : "") + fmtNum(dAbs);
+        var dPctTxt = (dPct == null) ? (dAbs > 0 ? "novo" : "—") : ((dPct > 0 ? "+" : "") + dPct.toFixed(0) + "%");
+        var variacaoTxt = dAbsTxt + " (" + dPctTxt + ")";
+        var pctColTxt = dPctTxt;
+
+        html += "<tr>" +
+          "<td style='" + td + "'>" + esc(r.loja) + "</td>" +
+          "<td style='" + td + "'>" + esc(r.time || "N/D") + "</td>" +
+          "<td style='" + td + "text-align:center'>" + fmtNum(r.qtde) + "</td>" +
+          "<td style='" + td + "text-align:right'>" + fmtMoney(r.valor) + "</td>" +
+          "<td style='" + td + "text-align:center'>" + fmtNum(r.diasComPendencia) + "</td>" +
+          "<td style='" + td + "text-align:center'>" + fmtNum(r.pendEtiqueta) + "</td>" +
+          "<td style='" + td + "text-align:center'>" + fmtNum(r.pendNF) + "</td>" +
+          "<td style='" + td + "text-align:center'>" + fmtNum(r.pendDesc) + "</td>" +
+          "<td style='" + td + "text-align:center'>" + (r.qtdeSnapshots == null ? "—" : fmtNum(r.qtdeSnapshots)) + "</td>" +
+
+          // ✅ agora sim opção C aparece no email
+          "<td style='" + td + "text-align:center'>" + esc(variacaoTxt) + "</td>" +
+          "<td style='" + td + "text-align:center'>" + esc(pctColTxt) + "</td>" +
+          "<td style='" + td + "text-align:center'>" + (r.score == null ? "—" : Number(r.score).toFixed(1)) + "</td>" +
+          "<td style='" + td + "font-weight:700'>" + esc(r.classificacao || "—") + "</td>" +
+        "</tr>";
+      });
+
+
+    html += "</table>";
+    return html;
+  }
+
+  // ========= Montagem do email =========
+  var html = "";
+  html += "<div style='font-family:Arial,sans-serif;font-size:13px;color:#0f172a'>";
+  html += "<h2 style='margin:0 0 6px 0'>Lojas ofensoras (pendências de justificativas)</h2>";
+
+  html += "<p style='margin:0 0 10px 0'>";
+  if (periodo.inicio || periodo.fim) {
+    html += "<b>Período:</b> " + esc(periodo.inicio||"") + " a " + esc(periodo.fim||"") + " | ";
+  }
+  html += "<b>Janela:</b> últimos " + esc(meta.diasJanela || "") + " dias";
+  html += "</p>";
+
+  html += "<p style='margin:0 0 12px 0;color:#334155'>";
+  html += "Top ofensoras = maior volume de pendências. Futuras ofensoras = aceleração recente (Δ14d) ";
+  html += "com exclusão automática das lojas que já estão no Top (para evitar duplicidade).";
+  html += "</p>";
+
+  html += "<h3 style='margin:16px 0 8px 0'>Principais lojas ofensoras e por quê:</h3>";
+
+  html += "<p style='margin:0 0 10px 0;font-size:13px;color:#334155;line-height:1.35;'>" +
+  "<b>Como ler os indicadores:</b> " +
+  "<b>Qtde</b> = total de pendências no período; " +
+  "<b>Principal falha</b> = o tipo de pendência mais frequente na loja (Etiqueta, NF/Recibo ou Descrição) e o percentual indica a participação desse tipo no total de pendências da loja (ex.: <b>Descrição (81%)</b> significa que 81% das pendências são por falta/erro de descrição); " +
+  "<b>#Snapshots</b> = Em quantas coletas diferentes a loja apareceu com pendência (proxy de recorrência ao longo do período); " +
+  "<b>Δ14d</b> = variação do total de pendências nos últimos 14 dias versus os 14 dias anteriores; " +
+  "<b>Score</b> = índice composto usado para priorização (combina volume, tipo de falha e recorrência); " +
+  "<b>Classificação</b> = faixa do Score (Baixa/Média/Alta/Crítica)." +
+"</p>";
+
+  html += "<ul style='margin:0 0 12px 18px'>";
+  top.slice(0, 5).forEach(function(r){ html += linhaAnalitica_(r); });
+  html += "</ul>";
+
+  html += tabela_("Top ofensoras (por quantidade)", top, "#0b2a57");
+
+  html += "<h3 style='margin:16px 0 8px 0'>Prováveis futuras ofensoras (aceleração Δ 14d)</h3>";
+  if (!futuras.length) {
+    html += "<p style='margin:0'>Sem destaques de aceleração no período (ou todas já estão no Top).</p>";
+  } else {
+    html += tabela_("Futuras ofensoras (sem duplicidade)", futuras, "#8a6b00");
+  }
+
+  html += "<p style='margin:16px 0 0 0;color:#475569'>Base: Histórico consolidado de transações da Clara.</p>";
+  html += "</div>";
+  return html;
+}
+
+function enviarEmailOfensorasPendenciasClara(diasJanela) {
+  try {
+    // Segurança: só Admin (mesmo padrão do e-mail de limites)
+    var email = Session.getActiveUser().getEmail();
+    if (!isAdminEmail(email)) {
+      return { ok: false, error: "Acesso restrito: apenas Administrador pode disparar esse relatório." };
+    }
+
+    var rel = getLojasOfensorasParaChat(diasJanela || 60);
+    if (!rel || !rel.ok) return { ok: false, error: (rel && rel.error) ? rel.error : "Falha no relatório." };
+
+    var destinatarios = getAdminEmails_();
+    if (!destinatarios.length) return { ok: false, error: "Lista de admins vazia." };
+
+    var assunto = "📌 [ALERTA CLARA | JUSTIFICATIVAS] Lojas ofensoras (" +
+  ((rel && rel.meta && rel.meta.diasJanela) ? rel.meta.diasJanela : (diasJanela||60)) + "d)";
+
+    if (rel && rel.periodo && rel.periodo.inicio && rel.periodo.fim) {
+      assunto += " | " + rel.periodo.inicio + " a " + rel.periodo.fim;
+    }
+
+var html = montarEmailOfensorasPendencias_(rel);
+
+
+    MailApp.sendEmail({
+      to: destinatarios.join(","),
+      subject: assunto,
+      htmlBody: html,
+      name: "Vektor - Grupo SBF"
+    });
+
+    return { ok: true, sent: true, msg: "E-mail enviado para admins.", totalLojas: (rel.rows||[]).length };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
 }
 
 /**
@@ -2642,6 +3095,18 @@ function ENVIAR_EMAIL_LIMITE_CLARA() {
 
   // 4) marca assinatura como processada e dispara envio
   props.setProperty(keySig, sigAtual.sig);
+
+  // ✅ NOVO: snapshot só quando BaseClara mudou
+try {
+  var snap = REGISTRAR_SNAPSHOT();
+  if (snap && snap.ok) {
+    Logger.log("Snapshot pendências gravado. Linhas: " + (snap.gravados || 0));
+  } else {
+    Logger.log("Snapshot pendências falhou: " + (snap && snap.error ? snap.error : snap));
+  }
+} catch (e) {
+  Logger.log("Snapshot pendências - erro: " + (e && e.message ? e.message : e));
+}
 
   Logger.log("BaseClara mudou (sig anterior ≠ atual). Enviando alertas...");
   enviarAlertasLimitesClaraDiario();
@@ -2722,6 +3187,157 @@ function calcularAssinaturaBaseClara_() {
 
   } catch (e) {
     return { error: "Falha ao calcular assinatura BaseClara: " + (e && e.message ? e.message : e) };
+  }
+}
+
+// ================================
+// SNAPSHOT PENDÊNCIAS - HISTÓRICO
+// ================================
+var HIST_PEND_CLARA_RAW = "HIST_PEND_CLARA_RAW";
+var PROP_LAST_SNAPSHOT_SIG = "VEKTOR_HISTPEND_LAST_SIG";
+
+/**
+ * Faz snapshot das pendências atuais da BaseClara e grava em HIST_PEND_CLARA_RAW.
+ * Recomendado: chamar apenas quando BaseClara foi atualizada (pelo seu gatilho já existente).
+ */
+function REGISTRAR_SNAPSHOT() {
+  try {
+
+    // (1) Lê BaseClara (reaproveite sua forma atual de abrir a planilha BaseClara)
+    // Se você já tem BASE_CLARA_ID e nome da aba BaseClara em constantes, use-as.
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error("Aba BaseClara não encontrada.");
+
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 2) {
+      Logger.log(">>> BaseClara sem linhas (lastRow=" + lastRow + ")");
+      return { ok: true, msg: "BaseClara sem linhas." };
+    }
+
+
+    var values = sh.getRange(1, 1, lastRow, lastCol).getValues();
+    var header = values[0].map(function(h){ return String(h || "").trim(); });
+    var rows = values.slice(1);
+
+    Logger.log("Rows lidas da BaseClara: " + rows.length);
+    Logger.log("Headers BaseClara: " + JSON.stringify(header));
+
+
+    // (2) Anti-duplicação por assinatura (evita gravar o mesmo snapshot repetidamente)
+    // Reaproveita a mesma lógica: se você já tem uma função calcularAssinaturaBaseClara_(), use-a.
+    var sigObj = calcularAssinaturaBaseClara_(); // se sua função exigir args, ajuste
+    if (sigObj && sigObj.error) throw new Error(sigObj.error);
+
+    var props = PropertiesService.getScriptProperties();
+    var lastSig = props.getProperty(PROP_LAST_SNAPSHOT_SIG) || "";
+    //if (sigObj && sigObj.sig && sigObj.sig === lastSig) {
+      //return { ok: true, msg: "Snapshot ignorado (assinatura igual à última)." };
+    //}
+
+    // (3) Índices por nome de coluna (tolerante a variação)
+    function idxOf(possiveis) {
+      for (var i = 0; i < possiveis.length; i++) {
+        var p = possiveis[i];
+        var ix = header.indexOf(p);
+        if (ix >= 0) return ix;
+      }
+      return -1;
+    }
+
+    var idxDataTrans  = idxOf(["Data da Transação", "Data Transação", "Data"]);
+    var idxValorBRL   = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLojaNum    = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
+    var idxEtiquetas  = idxOf(["Etiquetas"]);
+    var idxRecibo     = idxOf(["Recibo"]);
+    var idxDescricao  = idxOf(["Descrição", "Descricao"]);
+
+    if (idxDataTrans < 0) throw new Error("Não encontrei a coluna 'Data da Transação' na BaseClara.");
+    if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna 'Valor em R$' na BaseClara.");
+    if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna 'LojaNum' na BaseClara.");
+    if (idxEtiquetas < 0) throw new Error("Não encontrei a coluna 'Etiquetas' na BaseClara.");
+    if (idxRecibo    < 0) throw new Error("Não encontrei a coluna 'Recibo' na BaseClara.");
+    if (idxDescricao < 0) throw new Error("Não encontrei a coluna 'Descrição' na BaseClara.");
+
+    // (4) Monta linhas pendentes
+    // Regra objetiva (do jeito que você descreveu):
+    // - Pendencia_etiqueta = 1 se Etiquetas vazia
+    // - Pendencia_nf       = 1 se Recibo vazio
+    // - Pendencia_descricao= 1 se Descrição vazia
+    // - Qtde Total = soma das 3
+    var snapshotDate = new Date();
+    var out = [];
+
+    function isVazio_(v) {
+  if (v === null || v === undefined) return true;
+  if (v === false) return true; // IMPORTANTÍSSIMO: checkbox/boolean
+  var s = String(v).trim().toLowerCase();
+
+  // placeholders comuns
+  if (!s) return true;
+  if (s === "-" || s === "—" || s === "n/a" || s === "na") return true;
+  if (s === "false" || s === "0") return true;
+  if (s === "não" || s === "nao") return true;
+  if (s.indexOf("sem recibo") >= 0) return true;
+  if (s.indexOf("sem etiqueta") >= 0) return true;
+
+  return false;
+}
+
+    for (var r = 0; r < rows.length; r++) {
+      var row = rows[r];
+
+      var dt = row[idxDataTrans];
+      var loja = String(row[idxLojaNum] || "").trim();
+      var valor = Number(row[idxValorBRL]) || 0;
+
+      var etiquetas = String(row[idxEtiquetas] || "").trim();
+      var recibo = String(row[idxRecibo] || "").trim();
+      var desc = String(row[idxDescricao] || "").trim();
+
+      var pendEtiqueta = isVazio_(etiquetas) ? 1 : 0;
+      var pendNF       = isVazio_(recibo)   ? 1 : 0;
+      var pendDesc     = isVazio_(desc)     ? 1 : 0;
+
+
+      var qtde = pendEtiqueta + pendNF + pendDesc;
+      if (qtde <= 0) continue; // só grava se houver pendência
+
+      // Guarda data transação como Date se vier string
+      var dt2 = (dt instanceof Date) ? dt : new Date(dt);
+
+      out.push([
+        snapshotDate,
+        loja,
+        dt2,
+        valor,
+        pendEtiqueta,
+        pendNF,
+        pendDesc,
+        qtde
+      ]);
+    }
+
+    // (5) Grava na HIST_PEND_CLARA_RAW
+    var hist = ss.getSheetByName(HIST_PEND_CLARA_RAW);
+    if (!hist) throw new Error("Aba " + HIST_PEND_CLARA_RAW + " não encontrada.");
+
+    if (out.length) {
+      hist.getRange(hist.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
+    }
+
+    // (6) Atualiza assinatura salva
+    if (sigObj && sigObj.sig) props.setProperty(PROP_LAST_SNAPSHOT_SIG, sigObj.sig);
+
+    Logger.log("Snapshot pendências - linhas geradas: " + out.length);
+
+    return { ok: true, gravados: out.length, msg: "Snapshot gravado com sucesso." };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
 }
 
@@ -2907,7 +3523,7 @@ function montarEmailAlertasLimites_(periodoStr, risco, monitoramento, eficiencia
 
     var html = "";
     html += "<div style='font-family:Arial,sans-serif;font-size:13px;color:#0f172a;'>";
-    html += "<h2 style='margin:0 0 8px 0;'>Vektor – Grupo SBF | Alertas de Limites (Clara)</h2>";
+    html += "<h2 style='margin:0 0 8px 0;'>Alertas de Limites (Clara)</h2>";
 
     // Dias restantes para o fim do ciclo (06→05)
     // Regra: se hoje é dia 06+ => fecha dia 05 do próximo mês
@@ -2944,7 +3560,7 @@ function montarEmailAlertasLimites_(periodoStr, risco, monitoramento, eficiencia
   // RISCO
   if (risco && risco.length) {
     html += "<h3 style='margin:16px 0 6px 0;color:#b91c1c;'>🔴 Risco operacional (prioridade alta)</h3>";
-    html += "<p style='margin:0 0 8px 0;color:#334155;'><b>Interpretação:</b> Risco elevado de bloqueio antes do fim do ciclo.<br/><b>Ação recomendada:</b> Se a coluna <b>Ação</b> indicar aumento, priorizar ajuste de limite. Se indicar <b>Manter</b>, tratar como alerta operacional (monitorar consumo/saldo e evitar bloqueio).</p>";
+    html += "<p style='margin:0 0 8px 0;color:#334155;'><b>Interpretação:</b> Risco elevado de impacto no uso do cartão.<br/><b>Ação recomendada:</b> Se a coluna <b>Ação</b> indicar aumento, priorizar ajuste de limite. Se indicar <b>Manter</b>, tratar como alerta operacional (monitorar consumo/saldo e evitar problemas na utilização).</p>";
 
     html += tabelaAlertas_(risco, money, pct);
   }
@@ -5867,4 +6483,97 @@ function registrarMetricaVektor(payload) {
   } catch (e) {
     console.error('Erro ao registrar métrica do Vektor: ' + e);
   }
+}
+
+function getLojasOfensorasParaChat(diasJanela) {
+  diasJanela = Number(diasJanela) || 60;
+
+  const rel = gerarRelatorioOfensorasPendencias_(diasJanela);
+  if (!rel || !rel.ok) {
+    return { ok: false, error: "Falha ao gerar relatório." };
+  }
+
+  // período
+  var hoje = new Date();
+  var inicio = new Date(hoje.getTime() - diasJanela * 24 * 60 * 60 * 1000);
+  var tz = "America/Sao_Paulo";
+
+  var periodo = {
+    inicio: Utilities.formatDate(inicio, tz, "dd/MM/yyyy"),
+    fim: Utilities.formatDate(hoje, tz, "dd/MM/yyyy")
+  };
+
+  return {
+    ok: true,
+    periodo: periodo,
+    meta: { diasJanela: diasJanela, totalLojas: (rel.rows || []).length },
+    rows: (rel.rows || []).map(r => {
+      const t14 = r.trend14 || {};
+
+      // ✅ delta absoluto (compatível com versões antigas)
+      const deltaAbs = (t14.deltaAbs != null) ? t14.deltaAbs : (t14.delta != null ? t14.delta : 0);
+
+      return {
+        loja: r.loja,
+        time: r.time || "N/D",
+
+        qtde: r.qtde,
+        valor: r.valor,
+        diasComPendencia: r.diasComPendencia,
+        pendEtiqueta: r.pendEtiqueta,
+        pendNF: r.pendNF,
+        pendDesc: r.pendDesc,
+
+        // ✅ não force 0: se não existe, deixa null para o front/email mostrar "—"
+        qtdeSnapshots: (r.qtdeSnapshots != null ? r.qtdeSnapshots : null),
+
+        ult14: t14.ult14 || 0,
+        ant14: t14.ant14 || 0,
+
+        // ✅ opção C
+        delta14: deltaAbs,
+        delta14Pct: (t14.deltaPct != null ? t14.deltaPct : null),
+
+        score: (r.score != null ? r.score : null),
+        classificacao: r.classificacao || "—"
+      };
+    })
+  };
+}
+
+function DISPARAR_EMAIL_OFENSORAS_SEMANA() {
+  var props = PropertiesService.getScriptProperties();
+
+  // assinatura atual da BaseClara
+  var sigAtual = calcularAssinaturaBaseClara_();
+  if (!sigAtual || sigAtual.error) {
+    Logger.log("Falha ao calcular assinatura BaseClara");
+    return;
+  }
+
+  var KEY_ULT_ENVIO = "VEKTOR_OFENSORAS_SIG_ULT_ENVIO";
+  var sigUltEnvio = props.getProperty(KEY_ULT_ENVIO) || "";
+
+  // Se BaseClara NÃO mudou desde o último envio semanal → não envia
+  if (sigAtual.sig === sigUltEnvio) {
+    Logger.log("BaseClara não mudou desde o último e-mail semanal. Não envia.");
+    return;
+  }
+
+  // Envia o e-mail (admins)
+  var res = enviarEmailOfensorasPendenciasClara(60);
+  if (!res || !res.ok) {
+    Logger.log("Falha ao enviar e-mail de ofensoras");
+    return;
+  }
+
+  // Marca assinatura como já enviada
+  props.setProperty(KEY_ULT_ENVIO, sigAtual.sig);
+
+  Logger.log("E-mail semanal de lojas ofensoras enviado com sucesso.");
+}
+
+function RESETAR_GATE_EMAIL_OFENSORAS_SEMANA() {
+  PropertiesService.getScriptProperties().deleteProperty("VEKTOR_OFENSORAS_SIG_ULT_ENVIO");
+  Logger.log("Gate resetado: VEKTOR_OFENSORAS_SIG_ULT_ENVIO removida. Próximo disparo enviará novamente.");
 }
