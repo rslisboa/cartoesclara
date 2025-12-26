@@ -970,6 +970,7 @@ const VEKTOR_INTENTS = [
   "Frequência de uso Clara para o time",
   "Frequência de uso Clara para a loja",
   "Perdi meu cartão Clara, o que fazer?",
+  "Comparar fatura atual vs anterior",
   "Cartão Clara bloqueado, como resolver?",
   "Como desbloquear o cartão Clara?",
   "Meu cartão não passou, o que pode ser?",
@@ -9748,6 +9749,251 @@ const optsClasses = ["<option value=''>Todas as classificações</option>"]
   renderBotMessage("HTML:" + table);
 }
 
+function renderTabelaComparativoFaturas(res) {
+  if (!res || !res.ok) {
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>" + (res && res.error ? res.error : "Falha ao consultar comparativo de faturas.") + "</p>");
+    return;
+  }
+
+  const rows = res.rows || [];
+  const periodo = res.periodo || {};
+  if (!rows.length) {
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Sem dados para comparar fatura atual vs anterior.</p>");
+    return;
+  }
+
+  const wrapId = "wrapComparativoFaturas_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+  const selLojaId = "filtroCompFatLoja_" + wrapId;
+  const selTimeId = "filtroCompFatTime_" + wrapId;
+
+  // opções
+  const lojas = Array.from(new Set(rows.map(r => (r.loja || "").toString().trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+  const times = Array.from(new Set(rows.map(r => (r.time || "N/D").toString().trim()).filter(Boolean))).sort((a,b)=>a.localeCompare(b));
+
+  const optsLojas = ["<option value=''>Todas as lojas</option>"]
+    .concat(lojas.map(l => "<option value='" + l.replace(/'/g,"&#39;") + "'>" + l + "</option>"))
+    .join("");
+
+  const optsTimes = ["<option value=''>Todos os times</option>"]
+    .concat(times.map(t => "<option value='" + t.replace(/'/g,"&#39;") + "'>" + t + "</option>"))
+    .join("");
+
+  // estilos
+  const TH_BASE = "padding:8px;position:sticky;top:0;z-index:5;white-space:nowrap;background:#4F46E5;color:#000;border:3px double #fff;";
+  const TD_BASE = "padding:8px;white-space:nowrap;border:1px solid #000;";
+
+  const TH_CALC =
+    "padding:8px;position:sticky;top:0;z-index:6;white-space:nowrap;" +
+    "background:#005E27;color:#fff;border:3px double #fff;";
+
+  function money(n){
+    const v = Number(n) || 0;
+    return v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+  }
+
+  // ===== SUMMARY (backend)
+  const s = res.summary || {};
+  const totalPrev0 = Number(s.totalPrev) || 0;
+  const totalCur0  = Number(s.totalCur) || 0;
+  const totalDelta0 = totalCur0 - totalPrev0;
+  const totalVar0 = (totalPrev0 > 0)
+    ? (((totalDelta0/totalPrev0*100) > 0 ? "+" : "") + (totalDelta0/totalPrev0*100).toFixed(1) + "%")
+    : (totalCur0 > 0 ? "Início no período" : "—");
+
+  // ===== INSIGHTS (topo)
+  const ant = periodo.anterior || {};
+  const atu = periodo.atual || {};
+
+  let insights = "";
+  insights += "<p class='text-sm text-slate-700' style='margin:0;'>" +
+    "<b>Período anterior:</b> " + (ant.inicio||"") + " a " + (ant.fim||"") +
+    " — <b>Valor comparado:</b> <span id='cmpPrevTotal_" + wrapId + "'>" + money(totalPrev0) + "</span>" +
+  "</p>";
+
+  insights += "<p class='text-sm text-slate-700' style='margin:0;'>" +
+    "<b>Período atual:</b> " + (atu.inicio||"") + " a " + (atu.fim||"") +
+    " — <b>Valor atual comparado:</b> <span id='cmpCurTotal_" + wrapId + "'>" + money(totalCur0) + "</span>" +
+  "</p> <br>";
+
+  const meta = res.meta || {};
+  const ultData = (meta.ultimaDataConsiderada || "").toString().trim();
+
+if (ultData) {
+  insights += "<p class='text-sm text-slate-700' style='margin:0;'>" +
+    "<b>Nota:</b> O comparativo considera as transações da fatura atual registradas até <b>" + ultData + "</b>." +
+  "</p>";
+}
+
+  insights += "<p class='text-sm text-slate-700' style='margin:0;'>" +
+    "<b>Variação total no período analisado:</b> " +
+    "<span id='cmpDelta_" + wrapId + "'><b>" + (totalDelta0 >= 0 ? "+" : "") + money(totalDelta0) + "</b></span> " +
+    "(<span id='cmpVarPct_" + wrapId + "'>" + totalVar0 + "</span>)" +
+  "</p>";
+
+  insights += "<div style='height:8px;'></div>";
+
+  insights += "<p class='text-sm text-slate-700' style='margin:0;'>" +
+    "A variação é calculada comparando o total do período da fatura atual vs o mesmo período da fatura anterior. " +
+    "Quando o período anterior é zero e houve gasto no atual, a variação aparece como <b>Início no período</b> (percentual indefinido)." +
+  "</p>";
+  insights += "<div style='height:10px;'></div>";
+
+  // ===== FILTROS
+  const filtrosHtml =
+    "<div style='display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px;'>" +
+
+      "<div style='display:flex; gap:8px; align-items:center; flex-wrap:nowrap;'>" +
+        "<label style='font-size:13px;color:#334155;white-space:nowrap;'><b>Loja:</b></label>" +
+        "<select id='" + selLojaId + "' onchange=\"window.vektorFiltrarComparativoFaturas('" + wrapId + "')\" " +
+          "style='font-size:12px;border:1px solid #CBD5E1;border-radius:10px;padding:6px 10px;background:#fff;min-width:220px;'>" +
+          optsLojas +
+        "</select>" +
+      "</div>" +
+
+      "<div style='display:flex; gap:8px; align-items:center; flex-wrap:nowrap;'>" +
+        "<label style='font-size:13px;color:#334155;white-space:nowrap;'><b>Time:</b></label>" +
+        "<select id='" + selTimeId + "' onchange=\"window.vektorFiltrarComparativoFaturas('" + wrapId + "')\" " +
+          "style='font-size:12px;border:1px solid #CBD5E1;border-radius:10px;padding:6px 10px;background:#fff;min-width:220px;'>" +
+          optsTimes +
+        "</select>" +
+      "</div>" +
+
+      "<button type='button' onclick=\"window.vektorLimparFiltrosComparativoFaturas('" + wrapId + "')\" " +
+        "style='background:#0F172A;color:#fff;border:none;padding:6px 12px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>" +
+        "Limpar" +
+      "</button>" +
+    "</div>";
+
+  // ===== LINHAS
+  let trs = "";
+  rows.forEach(function(r){
+    const loja = (r.loja || "").toString().trim();
+    const time = (r.time || "N/D").toString().trim();
+
+    const vPrev = Number(r.valorAnterior) || 0;
+    const vCur  = Number(r.valorAtual) || 0;
+    const dVal  = Number(r.deltaValor) || 0;
+    const varTxt= (r.variacaoPctTxt != null ? String(r.variacaoPctTxt) : "—");
+
+    const cat = (r.categoriaDriver || "—").toString();
+    const picoDia = (r.picoDia || "—").toString();
+    const picoV = Number(r.picoValor) || 0;
+    const fator = (r.fatorVariacao || "—").toString();
+
+    trs += "<tr data-loja='" + loja.replace(/'/g,"&#39;") + "' " +
+                "data-time='" + time.replace(/'/g,"&#39;") + "' " +
+                "data-prev='" + String(vPrev) + "' " +
+                "data-cur='" + String(vCur) + "'>" +
+      "<td style='" + TD_BASE + "'>" + loja + "</td>" +
+      "<td style='" + TD_BASE + "'>" + time + "</td>" +
+
+      "<td style='" + TD_BASE + "text-align:right;'>" + money(vPrev) + "</td>" +
+      "<td style='" + TD_BASE + "text-align:right;'>" + money(vCur) + "</td>" +
+      "<td style='" + TD_BASE + "text-align:right;'>" + (dVal >= 0 ? "+" : "") + money(dVal) + "</td>" +
+      "<td style='" + TD_BASE + "text-align:center;'>" + varTxt + "</td>" +
+
+      "<td style='" + TD_BASE + "'>" + cat + "</td>" +
+      "<td style='" + TD_BASE + "text-align:center;'>" + picoDia + "</td>" +
+      "<td style='" + TD_BASE + "text-align:right;'>" + money(picoV) + "</td>" +
+      "<td style='" + TD_BASE + "white-space:normal; min-width:420px;'>" + fator.replace(/</g,"&lt;").replace(/>/g,"&gt;") + "</td>" +
+    "</tr>";
+  });
+
+  const table =
+    "<div id='" + wrapId + "' style='max-width:100%; overflow:auto; max-height:520px; padding:10px; border:1px solid #e5e7eb; border-radius:14px; background:#fff;'>" +
+      insights +
+      filtrosHtml +
+      "<table style='min-width:1850px; width:100%; border-collapse:collapse;'>" +
+        "<thead><tr>" +
+          "<th style='" + TH_BASE + "'>Loja</th>" +
+          "<th style='" + TH_BASE + "'>Time</th>" +
+          "<th style='" + TH_CALC + "'>Valor Per. Anterior</th>" +
+          "<th style='" + TH_CALC + "'>Valor Per. Atual</th>" +
+          "<th style='" + TH_CALC + "'>Δ Valor (R$)</th>" +
+          "<th style='" + TH_CALC + "'>Variação (%)</th>" +
+          "<th style='" + TH_BASE + "'>Categoria driver</th>" +
+          "<th style='" + TH_BASE + "'>Pico (dia)</th>" +
+          "<th style='" + TH_BASE + "'>Valor pico</th>" +
+          "<th style='" + TH_BASE + "'>Fator Variação</th>" +
+        "</tr></thead>" +
+        "<tbody>" + trs + "</tbody>" +
+      "</table>" +
+      "<div style='text-align:right; margin-top:8px;'>" +
+        "<button type='button' onclick=\"exportTableToCSV(this, 'comparativo_faturas')\" " +
+          "style='background:#005E27;color:#fff;border:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>" +
+          "⬇ Exportar CSV" +
+        "</button>" +
+      "</div>" +
+    "</div>";
+
+  renderBotMessage("HTML:" + table);
+
+  // ===== 2ª mensagem: narrativa (usa summary do backend)
+  try {
+    const topCats = (s.topCats || []).slice(0,3);
+    const topLojas = (s.topLojas || []).slice(0,3);
+
+    const direcao = totalDelta0 > 0 ? "aumento" : (totalDelta0 < 0 ? "redução" : "estabilidade");
+    const verbo = totalDelta0 > 0 ? "subiu" : (totalDelta0 < 0 ? "caiu" : "se manteve");
+
+    let texto = "";
+    texto += "<p class='text-base text-slate-700' style='margin:0;'><b>Leitura do período:</b></p><br>";
+    texto += "<p class='text-sm text-slate-700' style='margin:0;'>" +
+      "No recorte analisado, a fatura <b>" + verbo + "</b> de <b>" + money(totalPrev0) + "</b> para <b>" + money(totalCur0) + "</b>, " +
+      "uma variação de <b>" + (totalDelta0 >= 0 ? "+" : "") + money(totalDelta0) + "</b> (" + totalVar0 + ")." +
+      "</p>";
+
+    const topDias = (s.topDias || []).slice(0,5);
+    if (topDias.length) {
+      const partesD = topDias.map(d => {
+        const delta = Number(d.delta) || 0;
+        return "<b>" + (d.dia || "—") + "</b>: " + (delta>=0?"+":"") + money(delta);
+      });
+
+      texto += "<p class='text-sm text-slate-700' style='margin:8px 0 0 0;'>" +
+        "Os dias que mais impactaram a variação (comparando o mesmo dia do ciclo anterior) foram: " +
+        partesD.join(", ") + "." +
+      "</p>";
+    }
+
+    if (topCats.length) {
+      const partes = topCats.map(c => {
+        const d = Number(c.delta) || 0;
+        return "<b>" + (c.categoria || "—") + "</b> (" + (d>=0?"+":"") + money(d) + ")";
+      });
+      texto += "<p class='text-sm text-slate-700' style='margin:8px 0 0 0;'>" +
+        "O " + direcao + " foi explicado principalmente por " + partes.join(", ") + "." +
+        "</p>";
+    }
+
+    if (topLojas.length) {
+      const partesL = topLojas.map(r => {
+        const d = Number(r.deltaValor) || 0;
+        return "Loja <b>" + (r.loja || "") + "</b> (" + (r.time || "N/D") + ") <b>" + (d>=0?"+":"") + money(d) + "</b>";
+      });
+      texto += "<p class='text-sm text-slate-700' style='margin:8px 0 0 0;'>" +
+        "As maiores contribuições vieram de: " + partesL.join("; ") + "." +
+        "</p>";
+    }
+
+    texto += "<p class='text-sm text-slate-700' style='margin:8px 0 0 0;'>" +
+      "Para detalhar por loja/time, aplique os filtros e leia o campo <b>Fator Variação</b>, que aponta a categoria driver, possível estabelecimento relevante e o dia de pico." +
+      "</p>";
+
+     // ===== Sazonalidade (se o backend mandou)
+      const sazTxt = (s.sazonalidadeTexto || "").toString().trim();
+      if (sazTxt) {
+        texto += "<p class='text-sm text-slate-700' style='margin:8px 0 0 0;'>" +
+          sazTxt.replace(/</g,"&lt;").replace(/>/g,"&gt;") +
+        "</p>";
+      }
+
+    renderBotMessage("HTML:" + texto);
+  } catch (e) {
+    console.error("Erro ao renderizar resumo comparativo:", e);
+  }
+}
+
 window.vektorFiltrarLojasOfensoras = function (wrapId) {
   try {
     var wrap = document.getElementById(wrapId);
@@ -9796,6 +10042,122 @@ window.vektorLimparFiltrosLojasOfensoras = function (wrapId) {
     window.vektorFiltrarLojasOfensoras(wrapId);
   } catch (e) {
     console.error("Erro ao limpar filtros lojas ofensoras:", e);
+  }
+};
+
+window.vektorFiltrarComparativoFaturas = function (wrapId) {
+  try {
+    var wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+
+    // money local (não depende do escopo da renderTabelaComparativoFaturas)
+    function moneyLocal_(n){
+      var v = Number(n) || 0;
+      return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+    var selLoja = wrap.querySelector("select[id^='filtroCompFatLoja_']");
+    var selTime = wrap.querySelector("select[id^='filtroCompFatTime_']");
+
+    var lojaVal = selLoja ? (selLoja.value || "").trim() : "";
+    var timeVal = selTime ? (selTime.value || "").trim() : "";
+
+    // 1) filtra linhas
+    var trs = wrap.querySelectorAll("tbody tr[data-loja][data-time]");
+    trs.forEach(function(tr){
+      var loja = (tr.getAttribute("data-loja") || "").trim();
+      var time = (tr.getAttribute("data-time") || "").trim();
+
+      var okLoja = !lojaVal || loja === lojaVal;
+      var okTime = !timeVal || time === timeVal;
+
+      tr.style.display = (okLoja && okTime) ? "" : "none";
+    });
+
+    // 2) calcula valores disponíveis nas linhas VISÍVEIS
+    var lojasVisiveis = new Set();
+    var timesVisiveis = new Set();
+
+    trs.forEach(function(tr){
+      if (tr.style.display === "none") return;
+      lojasVisiveis.add((tr.getAttribute("data-loja") || "").trim());
+      timesVisiveis.add((tr.getAttribute("data-time") || "").trim());
+    });
+
+    function atualizarSelect(selectEl, placeholder, valuesSet) {
+      if (!selectEl) return;
+      var atual = (selectEl.value || "").trim();
+
+      var values = Array.from(valuesSet).filter(Boolean).sort(function(a,b){ return a.localeCompare(b); });
+
+      var html = "<option value=''>" + placeholder + "</option>";
+      values.forEach(function(v){
+        var safe = v.replace(/'/g,"&#39;");
+        html += "<option value='" + safe + "'>" + v + "</option>";
+      });
+
+      selectEl.innerHTML = html;
+
+      // restaura seleção se ainda existir
+      var aindaExiste = values.indexOf(atual) >= 0;
+      selectEl.value = aindaExiste ? atual : "";
+    }
+
+    // 3) sincroniza dropdowns conforme resultado do filtro atual
+    atualizarSelect(selLoja, "Todas as lojas", lojasVisiveis);
+    atualizarSelect(selTime, "Todos os times", timesVisiveis);
+
+    // 4) Recalcula totais conforme linhas visíveis (depois dos dropdowns estabilizarem)
+    // (re-lê trs para garantir que está consistente)
+    trs = wrap.querySelectorAll("tbody tr[data-loja][data-time]");
+
+    var sumPrev = 0;
+    var sumCur  = 0;
+
+    trs.forEach(function(tr){
+      if (tr.style.display === "none") return;
+      sumPrev += Number(tr.getAttribute("data-prev")) || 0;
+      sumCur  += Number(tr.getAttribute("data-cur")) || 0;
+    });
+
+    var delta = sumCur - sumPrev;
+
+    var varTxt = (sumPrev > 0)
+      ? (((delta / sumPrev * 100) > 0 ? "+" : "") + (delta / sumPrev * 100).toFixed(1) + "%")
+      : (sumCur > 0 ? "Início no período" : "—");
+
+    // Atualiza os valores no topo
+    var elPrev  = document.getElementById("cmpPrevTotal_" + wrapId);
+    var elCur   = document.getElementById("cmpCurTotal_" + wrapId);
+    var elDelta = document.getElementById("cmpDelta_" + wrapId);
+    var elVar   = document.getElementById("cmpVarPct_" + wrapId);
+
+    if (elPrev)  elPrev.innerHTML  = moneyLocal_(sumPrev);
+    if (elCur)   elCur.innerHTML   = moneyLocal_(sumCur);
+    if (elDelta) elDelta.innerHTML = "<b>" + (delta >= 0 ? "+" : "") + moneyLocal_(delta) + "</b>";
+    if (elVar)   elVar.innerHTML   = varTxt;
+
+  } catch (e) {
+    console.error("Erro ao filtrar comparativo faturas:", e);
+  }
+};
+
+window.vektorLimparFiltrosComparativoFaturas = function (wrapId) {
+  try {
+    var wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+
+    var selLoja = wrap.querySelector("select[id^='filtroCompFatLoja_']");
+    var selTime = wrap.querySelector("select[id^='filtroCompFatTime_']");
+
+    if (selLoja) selLoja.value = "";
+    if (selTime) selTime.value = "";
+
+    // re-aplica para reconstituir dropdowns completos
+    window.vektorFiltrarComparativoFaturas(wrapId);
+
+  } catch (e) {
+    console.error("Erro ao limpar filtros comparativo faturas:", e);
   }
 };
 
@@ -13756,6 +14118,35 @@ if (/\b(no\s+geral|geral)\b/i.test(norm)) {
 }
 
 // =====================================================
+// ✅ COMPARATIVO FATURA ATUAL VS ANTERIOR (CHAT)
+// Comando: "comparar fatura" / "comparar fatura atual vs anterior"
+// =====================================================
+const isCmdCompararFatura = /^\s*compar(ar|ação|acao)\s+fatura\b/i.test(norm) ||
+                            /^\s*fatura\s+atual\s+vs\s+anterior\b/i.test(norm);
+
+if (isCmdCompararFatura) {
+  renderBotMessage("HTML:<p class='text-sm text-slate-700'>Efetuando cálculos para demonstrar comparação...</p>");
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      try {
+        renderTabelaComparativoFaturas(res);
+      } catch (e) {
+        console.error("Erro ao renderizar comparativo de faturas:", e);
+        renderBotMessage("HTML:<p class='text-sm text-red-700'><b>Erro ao renderizar tabela:</b> " + (e && e.message ? e.message : e) + "</p>");
+      }
+    })
+    .withFailureHandler(function(err){
+      console.error("Falha na consulta comparativo faturas:", err);
+      var msg = (err && err.message) ? err.message : JSON.stringify(err);
+      renderBotMessage("HTML:<p class='text-sm text-red-700'><b>Falha ao consultar comparativo de faturas:</b> " + msg + "</p>");
+    })
+    .getComparativoFaturasClaraParaChat();
+
+  return; // ⛔ importante
+}
+
+// =====================================================
 // ✅ LOJAS OFENSORAS (ADM) — histórico de pendências
 // Comando: "lojas ofensoras"
 // =====================================================
@@ -13926,7 +14317,7 @@ window.vektorMostrarTabelaDemissoesAdmin = function () {
           // Monta tabela
                 let html =
                   "<div class='text-sm'>" +
-                    "<p>Conforme consulta efetuada no sistema de informações do RH (Senior), segue abaixo tabela com as últimas demissões ocorridas.</p>" +
+                    "<p>Conforme consulta efetuada no sistema de informações do RH (Senior), segue abaixo tabela com as últimas demissões de <b>Gerente de loja</b> ocorridas:</p>" +
                     "<div class='mt-2 overflow-x-auto'>" +
                       "<table class='min-w-full text-xs border border-slate-200'>" +
                         "<thead class='bg-slate-100'>" +
