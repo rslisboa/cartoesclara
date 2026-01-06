@@ -7122,3 +7122,9 @@ function RESETAR_GATE_EMAIL_OFENSORAS_SEMANA() {
   PropertiesService.getScriptProperties().deleteProperty("VEKTOR_OFENSORAS_SIG_ULT_ENVIO");
   Logger.log("Gate resetado: VEKTOR_OFENSORAS_SIG_ULT_ENVIO removida. Próximo disparo enviará novamente.");
 }
+
+function LIMPAR_ALERTA_LIMITE() {
+  var props = PropertiesService.getScriptProperties();
+  props.deleteProperty("VEKTOR_HISTPEND_LAST_SIG");
+  Logger.log("Snapshot do alerta de LIMITE limpo com sucesso.");
+}
