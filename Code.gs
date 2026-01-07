@@ -2224,6 +2224,41 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
     // --- 4) Agregação ---
     var agg = {}; // key -> { cartaoKey, nomeCartao, loja, time, usado }
 
+    // --- 4.1) Mapa de vínculo (histórico completo): última loja/time por cartão ---
+var vinculoPorCartao = {}; // cartaoKey -> { loja, time, nomeCartao, dt }
+
+for (var h = 0; h < linhas.length; h++) {
+  var r0 = linhas[h];
+
+  var alias0 = (r0[idxAlias] || "").toString().trim();
+  if (!alias0) continue;
+
+  var dt0 = r0[idxData];
+  var data0 = (dt0 instanceof Date) ? dt0 : new Date(dt0);
+  if (!(data0 instanceof Date) || isNaN(data0.getTime())) continue;
+
+  // Loja (mesma lógica que você já usa)
+  var lojaRaw0 = (r0[idxLoja] || "").toString().trim();
+  var lojaDigits0 = lojaRaw0.replace(/\D/g, "");
+  var lojaKey0 = lojaDigits0 ? String(Number(lojaDigits0)).padStart(4, "0") : "";
+
+  // Time (Grupos)
+  var gruposRaw0 = (r0[idxGrupos] || "").toString().trim();
+
+  // Cartão (chave padronizada)
+  var cartaoKey0 = cartaoKeyCE_(alias0);
+  if (!cartaoKey0) continue;
+
+  // Regra do Rodrigo: sem vínculo => não registrar (fica oculto até ter 1ª transação com vínculo)
+  // Se você considera que "time vazio" OU "loja vazia" é "sem vínculo", mantenha assim:
+  if (!lojaKey0 || !gruposRaw0) continue;
+
+  var cur = vinculoPorCartao[cartaoKey0];
+  if (!cur || data0 > cur.dt) {
+    vinculoPorCartao[cartaoKey0] = { loja: lojaKey0, time: gruposRaw0, nomeCartao: alias0, dt: data0 };
+  }
+}
+
     // Filtro por time (somente quando tipoFiltro="time")
     var filtroTimeNorm = "";
     if (tipoFiltro === "time") {
@@ -2283,6 +2318,40 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
       agg[key].usado += v;
     }
 
+    // --- 4.2) Se não houve transação no ciclo, ainda assim queremos mostrar saldos (usado=0)
+// para cartões que já têm vínculo loja/time (histórico).
+Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
+  var v = vinculoPorCartao[cartaoKey];
+  if (!v) return;
+
+  // Se for filtro por time, respeita
+  if (tipoFiltro === "time") {
+    var filtroTimeNorm = normalizarTexto_(valorFiltro);
+    var vNorm = normalizarTexto_(v.time);
+    if (!filtroTimeNorm || !vNorm || vNorm.indexOf(filtroTimeNorm) === -1) return;
+  }
+
+  // mesma “chave” da sua agregação:
+  // - geral inclui time no key (para não colapsar times diferentes)
+  // - time (ou loja, se existir) usa key menor
+  var key;
+  if (tipoFiltro === "geral") {
+    key = cartaoKey + "||" + v.loja + "||" + normalizarTexto_(v.time);
+  } else {
+    key = cartaoKey + "||" + v.loja;
+  }
+
+  if (!agg[key]) {
+    agg[key] = {
+      cartaoKey: cartaoKey,
+      nomeCartao: v.nomeCartao || "",
+      loja: v.loja || "",
+      time: v.time || "",
+      usado: 0
+    };
+  }
+});
+
     // --- 5) Monta rows com limites + recomendação ---
     var rows = [];
 
@@ -2291,6 +2360,15 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
       var lim = limites[a.cartaoKey];
 
       var limite = lim ? (Number(lim.limite) || 0) : 0;
+
+      // ✅ NOVO: não exibir cartões sem limite (zerado/inativo)
+      if (limite <= 0) return;   // <-- ESSA LINHA
+
+      var tipo = lim ? (lim.tipo || "") : "";
+      var titular = lim ? (lim.titular || "") : "";
+
+      var saldo = limite - (a.usado || 0);
+
       var tipo = lim ? (lim.tipo || "") : "";
       var titular = lim ? (lim.titular || "") : "";
 
@@ -2562,6 +2640,213 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
 
   } catch (e) {
     return { ok: false, error: "Falha ao calcular relação de saldos: " + (e && e.message ? e.message : e) };
+  }
+}
+
+function getTabelaEstornosClara(tipoFiltro, valorFiltro) {
+  try {
+    var info = carregarLinhasBaseClara_();
+    if (!info) return { ok:false, error:"BaseClara não carregada (retorno vazio)." };
+    if (info.error) return { ok:false, error: info.error };
+
+    // seu loader retorna { header, linhas }
+    var headers = info.header || [];
+    var rowsAll = info.linhas || [];
+
+    if (!rowsAll || !rowsAll.length) {
+      return { ok:false, error:"BaseClara sem dados (linhas vazias)." };
+    }
+
+    // ====== ÍNDICES FIXOS (conforme sua regra)
+    // Coluna C = Transação (Estabelecimento) | Coluna D = Valor original
+    var IDX_ESTAB = 2;   // C (0-based)
+    var IDX_VALOR = 3;   // D (0-based)
+    var IDX_FATURA = 1;  // B (Extrato da conta) => Período da fatura
+
+
+    function idxByNames(possiveis) {
+      return encontrarIndiceColuna_(headers, possiveis);
+    }
+
+    // Esses podem variar de posição, então usamos fallback por nome
+    // (mas sem deixar quebrar o estabelecimento/valor original que agora é por índice)
+    var idxLojaNum = idxByNames(["LojaNum"]);
+    var idxAlias   = idxByNames(["Alias Do Cartão", "Alias do Cartão", "Alias"]);
+    var idxTime    = idxByNames(["Grupos"]);
+    var idxData    = idxByNames(["Data da Transação"]);
+    var idxTit     = idxByNames(["Titular"]);
+    var idxCat     = idxByNames(["Categoria da Compra"]);
+
+    // Fallback comum: se não achar Data por nome, tenta coluna A (index 0)
+    if (idxData < 0) idxData = 0;
+
+    var tipo = (tipoFiltro || "geral").toString().toLowerCase();
+    var vf = (valorFiltro || "").toString().trim();
+
+    function norm(s) { return normalizarTexto_(s || ""); }
+
+    var filtroTimeNorm = (tipo === "time") ? norm(vf) : "";
+
+    function parseMoneyBR(v) {
+      if (v === null || v === undefined || v === "") return 0;
+      if (typeof v === "number") return v;
+      var s = String(v).trim();
+      s = s.replace(/[R$\s]/g, "");
+      s = s.replace(/\./g, "").replace(",", ".");
+      var n = Number(s);
+      return isFinite(n) ? n : 0;
+    }
+
+    function toDateMaybe(v) {
+      if (!v) return null;
+      if (Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime())) return v;
+
+      var s = String(v).trim();
+
+      var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m1) return new Date(Number(m1[3]), Number(m1[2]) - 1, Number(m1[1]));
+
+      var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) return new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]));
+
+      var d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    function fmtDate(d) {
+      if (!d) return "";
+      if (Object.prototype.toString.call(d) === "[object Date]" && !isNaN(d.getTime())) {
+        var dd = ("0" + d.getDate()).slice(-2);
+        var mm = ("0" + (d.getMonth()+1)).slice(-2);
+        var yy = d.getFullYear();
+        return dd + "/" + mm + "/" + yy;
+      }
+      return String(d);
+    }
+
+    function parseLojaNumFromAlias(alias) {
+      var s = String(alias || "").trim();     // ex: CE0046
+      var m = s.match(/(\d{1,4})/);
+      if (!m) return "";
+      return String(Number(m[1]));           // "0046" -> "46"
+    }
+
+    function parseLojaNum(v, alias) {
+      var s = String(v || "").trim();
+      var digits = s.replace(/\D/g, "");
+      if (digits) return String(Number(digits));   // "0101" -> "101"
+      if (alias) return parseLojaNumFromAlias(alias);
+      return "";
+    }
+
+    var estornos = [];
+    var minD = null, maxD = null;
+
+    for (var i = 0; i < rowsAll.length; i++) {
+      var r = rowsAll[i];
+
+      // segurança de tamanho mínimo da linha
+      if (!r || r.length < 4) continue;
+
+      var valorO = parseMoneyBR(r[IDX_VALOR]);
+      if (!(valorO < 0)) continue; // estorno = negativo
+
+      var alias = (idxAlias >= 0 ? r[idxAlias] : "");
+      var loja = parseLojaNum(idxLojaNum >= 0 ? r[idxLojaNum] : "", alias);
+
+      var time = (idxTime >= 0 ? (r[idxTime] || "").toString().trim() : "");
+
+      if (tipo === "time") {
+        if (!filtroTimeNorm) continue;
+        if (norm(time) !== filtroTimeNorm) continue;
+      }
+
+      var dt = toDateMaybe(r[idxData]);
+      if (dt) {
+        if (!minD || dt.getTime() < minD.getTime()) minD = dt;
+        if (!maxD || dt.getTime() > maxD.getTime()) maxD = dt;
+      }
+
+      estornos.push({
+        loja: loja,
+        time: time,
+        dataTransacao: fmtDate(dt || r[idxData]),
+        periodoFatura: (r[IDX_FATURA] || "").toString(),
+        valorEstorno: valorO,
+        // ✅ estabelecimento fixo pela coluna C
+        estabelecimento: (r[IDX_ESTAB] || "").toString(),
+        titular: (idxTit >= 0 ? (r[idxTit] || "").toString() : ""),
+        categoria: (idxCat >= 0 ? (r[idxCat] || "").toString() : "")
+      });
+    }
+
+    // ordena por data desc
+    estornos.sort(function(a,b){
+      var da = toDateMaybe(a.dataTransacao);
+      var db = toDateMaybe(b.dataTransacao);
+      if (da && db) return db.getTime() - da.getTime();
+      return 0;
+    });
+
+    var periodo = {
+      inicio: minD ? fmtDate(minD) : "",
+      fim: maxD ? fmtDate(maxD) : ""
+    };
+
+    // highlights
+    var total = estornos.length;
+
+    var countPorLoja = {};
+    for (var j = 0; j < estornos.length; j++) {
+      var lj = estornos[j].loja || "";
+      countPorLoja[lj] = (countPorLoja[lj] || 0) + 1;
+    }
+
+    var topLoja = null;
+    Object.keys(countPorLoja).forEach(function(lj){
+      if (!topLoja || countPorLoja[lj] > topLoja.qtd) {
+        topLoja = { loja: lj, qtd: countPorLoja[lj] };
+      }
+    });
+
+    var lojaMaiorPct = null;
+    if (topLoja && total > 0) {
+      var pct = (topLoja.qtd / total) * 100;
+      lojaMaiorPct = {
+        loja: topLoja.loja,
+        qtd: topLoja.qtd,
+        pct: pct.toFixed(1).replace(".", ",") + "%"
+      };
+    }
+
+    var maiorEstorno = null;
+    for (var k = 0; k < estornos.length; k++) {
+      var e = estornos[k];
+      var mag = Math.abs(Number(e.valorEstorno) || 0);
+      if (!maiorEstorno || mag > Math.abs(Number(maiorEstorno.valor) || 0)) {
+        maiorEstorno = {
+          valor: e.valorEstorno,
+          data: e.dataTransacao,
+          loja: e.loja,
+          time: e.time
+        };
+      }
+    }
+
+    return {
+      ok: true,
+      tipoFiltro: tipoFiltro || "geral",
+      valorFiltro: valorFiltro || "",
+      periodo: periodo,
+      highlights: {
+        lojaMaiorPct: lojaMaiorPct,
+        maiorEstorno: maiorEstorno
+      },
+      rows: estornos
+    };
+
+  } catch (e) {
+    return { ok:false, error:"Erro em getTabelaEstornosClara: " + e };
   }
 }
 
@@ -3339,6 +3624,101 @@ function REGISTRAR_SNAPSHOT() {
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
+}
+
+/**
+ * Remove do HIST_PEND_CLARA_RAW todas as linhas cujo Data_snapshot seja a data alvo.
+ * A comparação é por "yyyy-MM-dd" no timezone America/Sao_Paulo (ignora hora).
+ *
+ * @param {Date} dataAlvo
+ * @return {object} { ok:true, removidos:n } ou { ok:false, error:"..." }
+ */
+function REMOVER_SNAPSHOT_POR_DATA_(dataAlvo) {
+  try {
+    if (!(dataAlvo instanceof Date) || isNaN(dataAlvo.getTime())) {
+      throw new Error("Data alvo inválida.");
+    }
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var hist = ss.getSheetByName(HIST_PEND_CLARA_RAW);
+    if (!hist) throw new Error("Aba " + HIST_PEND_CLARA_RAW + " não encontrada.");
+
+    var lr = hist.getLastRow();
+    if (lr < 2) return { ok: true, removidos: 0, msg: "Histórico vazio." };
+
+    // No seu projeto o histórico tem 8 colunas (A:H)
+    var numCols = 8;
+
+    var tz = "America/Sao_Paulo";
+    var alvoKey = Utilities.formatDate(dataAlvo, tz, "yyyy-MM-dd");
+
+    var data = hist.getRange(2, 1, lr - 1, numCols).getValues();
+
+    var mantidos = [];
+    var removidos = 0;
+
+    for (var i = 0; i < data.length; i++) {
+      var r = data[i];
+      var dtSnap = (r[0] instanceof Date) ? r[0] : new Date(r[0]);
+
+      // Se não conseguir ler data, mantém (não assume que é do dia alvo)
+      if (!(dtSnap instanceof Date) || isNaN(dtSnap.getTime())) {
+        mantidos.push(r);
+        continue;
+      }
+
+      var k = Utilities.formatDate(dtSnap, tz, "yyyy-MM-dd");
+      if (k === alvoKey) {
+        removidos++;
+      } else {
+        mantidos.push(r);
+      }
+    }
+
+    // Reescreve abaixo do cabeçalho (não mexe na linha 1)
+    if (lr > 2) {
+      hist.getRange(2, 1, lr - 1, numCols).clearContent();
+    }
+    if (mantidos.length) {
+      hist.getRange(2, 1, mantidos.length, numCols).setValues(mantidos);
+    }
+
+    return { ok: true, removidos: removidos, msg: "Snapshot(s) removidos do dia " + alvoKey };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Apaga os snaps de ONTEM do histórico e regrava rodando REGISTRAR_SNAPSHOT() novamente.
+ * Use isso depois que você corrigiu a BaseClara (coluna Loja preenchida).
+ */
+function REPROCESSAR_SNAPSHOT_ONTEM() {
+  var tz = "America/Sao_Paulo";
+  var agora = new Date();
+
+  // "ontem" no seu timezone (zerando horário para evitar bordas)
+  var ontem = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - 1);
+
+  // 1) remove do histórico
+  var r1 = REMOVER_SNAPSHOT_POR_DATA_(ontem);
+  if (!r1.ok) throw new Error("Falha ao remover snapshot de ontem: " + r1.error);
+
+  // 2) limpa assinatura (trava de anti-duplicação do snapshot)
+  // Property usada pelo REGISTRAR_SNAPSHOT: VEKTOR_HISTPEND_LAST_SIG
+  var props = PropertiesService.getScriptProperties();
+  props.deleteProperty(PROP_LAST_SNAPSHOT_SIG);
+
+  // 3) regrava snapshot (agora com loja correta)
+  var r2 = REGISTRAR_SNAPSHOT();
+  if (!r2 || !r2.ok) throw new Error("Falha ao regravar snapshot: " + (r2 && r2.error ? r2.error : r2));
+
+  return {
+    ok: true,
+    removidosOntem: r1.removidos || 0,
+    gravadosAgora: r2.gravados || 0,
+    msg: "OK: removi ontem e regravei o snapshot."
+  };
 }
 
 // -------------------------
