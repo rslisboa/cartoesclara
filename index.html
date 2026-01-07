@@ -981,6 +981,8 @@ const VEKTOR_INTENTS = [
   "Itens comprados no geral",
   "Relação de saldos geral",
   "Relação de saldos do time",
+  "Tabela de estornos",
+  "Tabela de estornos do time",
   "Como usar bem o limite do cartão Clara?",
   "Quero gráficos das transações",
   "O que o Vektor pode fazer?",
@@ -9545,6 +9547,289 @@ const table =
 renderBotMessage("HTML:" + table);
 }
 
+function vektorRenderTabelaEstornos(res, tipo) {
+  if (!res || !res.ok) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>" +
+        (res && res.error ? res.error : "Erro ao buscar estornos.") +
+      "</p>"
+    );
+    return;
+  }
+
+  const rows = res.rows || [];
+  const periodo = res.periodo || {};
+  const h = res.highlights || {};
+
+  const wrapId = "vektor-estornos-" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
+
+  if (!rows.length) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Sem estornos no período <b>" +
+        (periodo.inicio || "") +
+      "</b> a <b>" +
+        (periodo.fim || "") +
+      "</b>.</p>"
+    );
+    return;
+  }
+
+  function money(n) {
+    const v = Number(n) || 0;
+    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  function esc(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  const dataset = rows.map(r => ({
+    loja: (r.loja || "").toString(),
+    time: (r.time || "").toString(),
+    data: (r.dataTransacao || "").toString(),
+    periodoFatura: (r.periodoFatura || "").toString(),
+    valor: r.valorEstorno,
+    estabelecimento: (r.estabelecimento || "").toString(),
+    titular: (r.titular || "").toString(),
+    categoria: (r.categoria || "").toString(),
+  }));
+
+  // dataset global por wrapId (pra filtros funcionarem sem nova chamada no GAS)
+  window.__VEKTOR_ESTORNOS = window.__VEKTOR_ESTORNOS || {};
+  window.__VEKTOR_ESTORNOS[wrapId] = dataset;
+
+  function uniq(arr) {
+    const s = {};
+    const out = [];
+    arr.forEach(x => {
+      const k = (x || "").trim();
+      if (!k) return;
+      if (!s[k]) { s[k] = true; out.push(k); }
+    });
+    out.sort((a,b)=>a.localeCompare(b));
+    return out;
+  }
+
+  const timesUnicos = uniq(dataset.map(x => x.time));
+  const lojasUnicas = uniq(dataset.map(x => x.loja));
+
+  const showTimeFilter = (String(tipo || "").toLowerCase() !== "time");
+
+  const txt =
+  "<div style='margin:0;padding:0;white-space:normal;line-height:18px;'>" +
+    "<div class='text-sm text-slate-700' style='margin:0;padding:0;line-height:18px;'>" +
+      "<b>Tabela de estornos:</b> Use como auditoria operacional sobre os estornos ocorridos e também para validação de justificativas/comprovantes." +
+    "</div>" +
+
+        "<div style='height:6px;'></div>" +  // ✅ 1 linha
+
+    "<div class='text-sm text-slate-700' style='margin:6px 0 0 0;padding:0;line-height:18px;'>" +
+      "<b>Período de análise:</b> " + esc(periodo.inicio || "—") + " a " + esc(periodo.fim || "—") +
+    "</div>" +
+
+    "<div style='height:6px;'></div>" +  // ✅ 1 linha
+
+    "<div class='text-sm text-slate-700' style='margin:6px 0 0 0;padding:0;line-height:18px;white-space:nowrap;'>" +
+      "<b>Total de estornos:</b> " + dataset.length +
+      "&nbsp;|&nbsp;<b>Loja maior %:</b> " + (h.lojaMaiorPct ? (esc(h.lojaMaiorPct.loja) + " (" + esc(h.lojaMaiorPct.pct || "0%") + ")") : "—") +
+      "&nbsp;|&nbsp;<b>Maior estorno:</b> " + (h.maiorEstorno ? (esc(money(h.maiorEstorno.valor)) + " em " + esc(h.maiorEstorno.data || "—")) : "—") +
+    "</div>" +
+  "</div>";
+
+  const filtrosHtml = `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0 6px 0;padding:0;line-height:18px;">
+      ${showTimeFilter ? `
+        <span style="display:inline-flex;align-items:center;gap:8px;">
+          <label style="font-size:13px;color:#334155;white-space:nowrap;"><b>Time:</b></label>
+          <select id="${wrapId}-time"
+                  onchange="window.vektorAplicarFiltrosEstornos('${wrapId}', ${showTimeFilter ? "true" : "false"})"
+                  style="font-size:12px;border:1px solid #CBD5E1;border-radius:8px;padding:4px 8px;background:#fff;height:32px;">
+            <option value="">Todos os times</option>
+            ${timesUnicos.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}
+          </select>
+        </span>
+      ` : ""}
+
+      <span style="display:inline-flex;align-items:center;gap:8px;">
+        <label style="font-size:13px;color:#334155;white-space:nowrap;"><b>Loja:</b></label>
+        <select id="${wrapId}-loja"
+                onchange="window.vektorAplicarFiltrosEstornos('${wrapId}', ${showTimeFilter ? "true" : "false"})"
+                style="font-size:12px;border:1px solid #CBD5E1;border-radius:8px;padding:4px 8px;background:#fff;height:32px;">
+          <option value="">Todas as lojas</option>
+          ${lojasUnicas.map(l => `<option value="${esc(l)}">${esc(l)}</option>`).join("")}
+        </select>
+      </span>
+      <button type="button"
+        onclick="window.vektorLimparFiltrosEstornos('${wrapId}', ${showTimeFilter ? "true" : "false"})"
+        style="
+          height:32px;
+          min-width:110px;
+          padding:0;
+          border:1px solid #CBD5E1;
+          border-radius:8px;
+          background:#fff;
+          font-size:12px;
+          font-weight:600;
+          cursor:pointer;
+          display:inline-flex;
+          align-items:center;
+          justify-content:center;
+          line-height:1;
+          box-sizing:border-box;
+        ">
+        Limpar filtros
+      </button>
+    </div>
+  `;
+
+  const thead = `
+  <thead>
+    <tr>
+      ${["Loja","Time","Data da Transação","Período da fatura","Valor Estorno","Estabelecimento","Titular","Categoria"].map(t => `
+        <th
+          style="
+            white-space:nowrap;
+            position:sticky;
+            top:0;
+            z-index:3;
+            background:#FFEB3B;  /* ✅ amarelo verdadeiro */
+            color:#000;
+            border:1px solid rgba(0,0,0,.25);
+            padding:8px 12px;
+            text-align:left;
+            font-size:13px;
+            font-weight:700;
+          "
+        >${t}</th>
+      `).join("")}
+    </tr>
+  </thead>
+`;
+
+  function rowHtml(r) {
+    const b = "border:1px solid rgba(0,0,0,.20);";
+    return `
+      <tr>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.loja)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.time)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.data)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.periodoFatura)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(money(r.valor))}</td>
+        <td style="${b}padding:8px 12px;font-size:13px;">${esc(r.estabelecimento)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.titular)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.categoria)}</td>
+      </tr>
+    `;
+  }
+
+  const html = `
+    <div id="${wrapId}" style="width:100%;">
+      ${txt}
+      ${filtrosHtml}
+
+      <div style="width:100%; max-height:420px; overflow:auto; position:relative; border:1px solid rgba(0,0,0,.15); border-radius:10px; background:#fff;">
+        <table style="width:100%; border-collapse:collapse;">
+          ${thead}
+          <tbody id="${wrapId}-tbody">
+            ${dataset.map(rowHtml).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+        <button type="button"
+          onclick="exportTableToCSV(this, 'estornos_clara')"
+          style="height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;line-height:1;background:#005E27;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
+          ⬇ Exportar CSV
+        </button>
+      </div>
+    </div>
+  `;
+
+  renderBotMessage("HTML:" + html);
+}
+
+window.vektorAplicarFiltrosEstornos = function(wrapId, hasTime) {
+  const data = (window.__VEKTOR_ESTORNOS && window.__VEKTOR_ESTORNOS[wrapId]) ? window.__VEKTOR_ESTORNOS[wrapId] : [];
+
+  const timeSel = document.getElementById(wrapId + "-time");
+  const lojaSel = document.getElementById(wrapId + "-loja");
+
+  const time = (hasTime && timeSel) ? (timeSel.value || "") : "";
+  const loja = lojaSel ? (lojaSel.value || "") : "";
+
+  // quando muda TIME, recalcula lista de lojas possíveis
+  if (hasTime && timeSel && lojaSel) {
+    const lojasPossiveis = {};
+    data.forEach(r => {
+      if (time && r.time !== time) return;
+      if (r.loja) lojasPossiveis[r.loja] = true;
+    });
+
+    const lojaAtual = lojaSel.value || "";
+    const opts = ["<option value=''>Todas as lojas</option>"]
+      .concat(Object.keys(lojasPossiveis).sort().map(l => `<option value="${String(l).replace(/"/g,"&quot;")}">${l}</option>`));
+    lojaSel.innerHTML = opts.join("");
+
+    if (lojaAtual && !lojasPossiveis[lojaAtual]) lojaSel.value = "";
+    else lojaSel.value = lojaAtual;
+  }
+
+  const lojaFinal = lojaSel ? (lojaSel.value || "") : "";
+
+  const filtrado = data.filter(r => {
+    if (hasTime && time && r.time !== time) return false;
+    if (lojaFinal && r.loja !== lojaFinal) return false;
+    return true;
+  });
+
+  // render tbody
+  const tbody = document.getElementById(wrapId + "-tbody");
+  if (!tbody) return;
+
+  function esc(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function money(n) {
+    const v = Number(n) || 0;
+    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  tbody.innerHTML = filtrado.map(r => {
+    const b = "border:1px solid rgba(0,0,0,.20);";
+    return `
+      <tr>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.loja)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.time)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.data)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.periodoFatura)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(money(r.valor))}</td>
+        <td style="${b}padding:8px 12px;font-size:13px;">${esc(r.estabelecimento)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.titular)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.categoria)}</td>
+      </tr>
+    `;
+  }).join("");
+};
+
+window.vektorLimparFiltrosEstornos = function(wrapId, hasTime) {
+  const timeSel = document.getElementById(wrapId + "-time");
+  const lojaSel = document.getElementById(wrapId + "-loja");
+
+  if (hasTime && timeSel) timeSel.value = "";
+  if (lojaSel) lojaSel.value = "";
+
+  window.vektorAplicarFiltrosEstornos(wrapId, hasTime);
+};
+
 function renderTabelaLojasOfensoras(res) {
   if (!res || !res.ok) {
     renderBotMessage("HTML:<p class='text-sm text-slate-700'>" + (res && res.error ? res.error : "Falha ao consultar lojas ofensoras.") + "</p>");
@@ -14144,6 +14429,55 @@ if (isCmdCompararFatura) {
     .getComparativoFaturasClaraParaChat();
 
   return; // ⛔ importante
+}
+
+// =====================================================
+// ✅ TABELA DE ESTORNOS (ADM)
+// Comandos:
+// - "tabela de estornos"
+// - "tabela de estornos do time X"
+// =====================================================
+const isCmdTabelaEstornos = /^\s*tabela\s+de\s+estornos\b/i.test(norm);
+
+if (isCmdTabelaEstornos) {
+
+  // 🔒 Apenas Administrador
+  if (typeof USER_ROLE_REPLACED !== "undefined" && USER_ROLE_REPLACED !== "Administrador") {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil <b>Administrador</b>.</p>"
+    );
+    return;
+  }
+
+  const m = norm.match(/tabela\s+de\s+estornos\s+do\s+time\s+(.+)$/i);
+
+  let tipoFiltro = "geral";
+  let valorFiltro = "";
+
+  if (m && m[1]) {
+    tipoFiltro = "time";
+    valorFiltro = (texto || "").split(/tabela\s+de\s+estornos\s+do\s+time/i)[1] || "";
+    valorFiltro = valorFiltro.trim();
+  }
+
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-500'>Buscando estornos…</p>"
+  );
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      vektorRenderTabelaEstornos(res, tipoFiltro);
+    })
+    .withFailureHandler(function(err){
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Erro ao buscar estornos: " +
+        (err && err.message ? err.message : err) +
+        "</p>"
+      );
+    })
+    .getTabelaEstornosClara(tipoFiltro, valorFiltro);
+
+  return; // ⛔ impede cair em outros comandos
 }
 
 // =====================================================
