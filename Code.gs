@@ -1889,7 +1889,7 @@ function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, 
     "impressao", "imprimir", "grafica", "plotagem", "encadernacao",
     "banner", "placa", "adesivo", "folder", "panfleto",
     "comunicacao", "comunicacao loja", "sinalizacao", "placas", "cartaz", "cartazes",
-    "papel couche", "couche", "laminacao", "recorte", "vinil",
+    "papel couche", "couche", "laminacao", "recorte", "vinil", "bobina",
 
     // Água / consumo básico
     "agua", "agua potavel", "potavel", "agua mineral", "galao", "garrafa",
@@ -3397,6 +3397,400 @@ try {
   enviarAlertasLimitesClaraDiario();
 }
 
+// ==============================
+// USO IRREGULAR (CONSERVADOR) - BASECLARA
+// ==============================
+
+function getPossivelUsoIrregularParaChat(modo) {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (!isAdminEmail(email)) {
+      return { ok: false, restrito: true, error: "Acesso restrito: apenas Administrador." };
+    }
+
+    modo = (modo || "7d").toString().toLowerCase().trim(); // default 7 dias
+
+    var rel = detectarUsoIrregularBaseClara_({ modo: modo });
+    return rel;
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Porteiro (igual ao limite): só roda se BaseClara mudou.
+ * Coloque o gatilho nesta função.
+ */
+function ENVIAR_EMAIL_USO_IRREGULAR_CLARA() {
+  var props = PropertiesService.getScriptProperties();
+
+  // 1) assinatura da BaseClara (reaproveita o mesmo método do limite)
+  var sigAtual = calcularAssinaturaBaseClara_();
+  if (!sigAtual || sigAtual.error) {
+    Logger.log("Falha ao calcular assinatura BaseClara: " + (sigAtual && sigAtual.error ? sigAtual.error : sigAtual));
+    return;
+  }
+
+  var keySig = "VEKTOR_SIG_BASECLARA_IRREGULAR";
+  var sigAnterior = props.getProperty(keySig) || "";
+
+  if (sigAtual.sig === sigAnterior) {
+    Logger.log("BaseClara não mudou desde a última verificação (uso irregular). Não envia.");
+    return;
+  }
+
+  // 2) processa e envia
+  var rel = detectarUsoIrregularBaseClara_();
+  if (!rel || !rel.ok) {
+    Logger.log("Relatório uso irregular falhou: " + (rel && rel.error ? rel.error : rel));
+    return;
+  }
+
+  // 3) anti-spam por ciclo (igual seus padrões)
+  var cicloKey = getCicloKey06a05_(); // já existe no seu arquivo :contentReference[oaicite:3]{index=3}
+  var sentKey = "VEKTOR_IRREGULAR_SENT_" + cicloKey;
+
+  // Se não tem alertas, atualiza assinatura e sai
+  if (!rel.rows || rel.rows.length === 0) {
+    props.setProperty(keySig, sigAtual.sig);
+    props.deleteProperty(sentKey);
+    Logger.log("Sem casos de uso irregular no ciclo. OK.");
+    return;
+  }
+
+  // Se já enviou neste ciclo, não manda de novo
+  if (props.getProperty(sentKey) === "1") {
+    props.setProperty(keySig, sigAtual.sig);
+    Logger.log("Uso irregular já enviado neste ciclo. Não reenvia.");
+    return;
+  }
+
+  var envio = enviarEmailUsoIrregularClara_(rel);
+  if (envio && envio.ok) {
+    props.setProperty(sentKey, "1");
+    props.setProperty(keySig, sigAtual.sig);
+  }
+}
+
+function enviarEmailUsoIrregularClara_(rel) {
+  try {
+    // Segurança: apenas Admin pode disparar manualmente também
+    var email = Session.getActiveUser().getEmail();
+    if (email && !isAdminEmail(email)) {
+      return { ok: false, error: "Acesso restrito: apenas Administrador." };
+    }
+
+    var destinatarios = getAdminEmails_(); // já existe no seu arquivo :contentReference[oaicite:4]{index=4}
+    if (!destinatarios || !destinatarios.length) {
+      return { ok: false, error: "Lista de admins vazia." };
+    }
+
+    var assunto = "📌 [ALERTA CLARA | POSSÍVEL USO IRREGULAR] " +
+      (rel.meta && rel.meta.periodo ? ("| " + rel.meta.periodo) : "");
+
+    // Tabela HTML (resumo)
+    var html = montarEmailUsoIrregular_(rel);
+
+    MailApp.sendEmail({
+      to: destinatarios.join(","),
+      subject: assunto,
+      htmlBody: html,
+      name: "Vektor - Grupo SBF"
+    });
+
+    return { ok: true, sent: true, total: (rel.rows || []).length };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function montarEmailUsoIrregular_(rel) {
+  function esc_(x){
+    return String(x===null||x===undefined?"":x)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+  }
+  function th_(t){
+    return "<th style='background:#B91C1C;color:#fff;border:1px solid #0f172a;padding:6px;font-size:12px;white-space:nowrap;'>" + esc_(t) + "</th>";
+  }
+  function td_(t){
+    return "<td style='border:1px solid #0f172a;padding:6px;font-size:12px;white-space:nowrap;vertical-align:top;'>" + esc_(t) + "</td>";
+  }
+
+  var rows = rel.rows || [];
+  var top = rows.slice(0, 60); // evita e-mail gigante
+
+  var html = "";
+  html += "<p>Identificamos <b>padrões atípicos</b> que requerem validação (modelo conservador; 2+ critérios).</p>";
+  html += "<p style='font-size:12px;color:#475569;'>" +
+          "Critérios podem incluir fracionamento, pendência + valor alto, recorrência anormal por estabelecimento/cartão." +
+          "</p>";
+
+  html += "<table style='border-collapse:collapse;width:100%;font-family:Arial,sans-serif;'>";
+  html += "<thead><tr>";
+  ["Loja","Time","Data","Cartão","Estabelecimento","Qtd (dia)","Soma (dia)","Valor (R$)","Pendências","Score","Regras"].forEach(function(h){
+    html += th_(h);
+  });
+  html += "</tr></thead><tbody>";
+
+  top.forEach(function(r){
+    html += "<tr>";
+    html += td_(r.loja);
+    html += td_(r.time);
+    html += td_(r.data);
+    html += td_(r.cartao);
+    html += td_(r.estabelecimento);
+    html += td_(r.qtdDia);
+    html += td_(r.somaDia);
+    html += td_(r.valor);
+    html += td_(r.pendenciasTxt);
+    html += td_(r.score);
+    html += td_(r.regrasTxt);
+    html += "</tr>";
+  });
+
+  html += "</tbody></table>";
+  html += "<br/><p><b>Vektor - Contas a Receber</b></p>";
+  return html;
+}
+
+function TESTE_ENVIAR_EMAIL_USO_IRREGULAR_CLARA() {
+  // 🔒 Mantém restrição: só Admin testa
+  var email = Session.getActiveUser().getEmail();
+  if (email && !isAdminEmail(email)) throw new Error("Acesso restrito: apenas Administrador.");
+
+  // Monta um relatório fake para validar layout e conteúdo do e-mail
+  var relFake = {
+    ok: true,
+    meta: { periodo: "TESTE (layout)" },
+    rows: [
+      {
+        loja: "0123",
+        time: "TESTE",
+        data: "2026-01-08",
+        cartao: "1234",
+        estabelecimento: "POSTO EXEMPLO LTDA",
+        qtdDia: 4,
+        somaDia: "R$ 1.980,00",
+        valor: "R$ 650,00",
+        pendenciasTxt: "Sim (2)",
+        score: 60,
+        regrasTxt: "Fracionamento (>=3 no dia) + Pendência + valor alto"
+      }
+    ]
+  };
+
+  // Envia para os admins (mesma lista do fluxo real)
+  var envio = enviarEmailUsoIrregularClara_(relFake);
+  if (!envio || !envio.ok) throw new Error("Falha no envio de teste: " + (envio && envio.error ? envio.error : envio));
+}
+
+function detectarUsoIrregularBaseClara_(opts) {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName("BaseClara");
+  if (!sh) return { ok: false, error: "Aba BaseClara não encontrada." };
+
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return { ok: true, rows: [], meta: { periodo: "" } };
+
+  var values = sh.getRange(2, 1, lastRow - 1, 23).getValues(); // A..W = 23 cols
+
+  // Índices zero-based (A..W)
+  var IDX_DATA   = 0;   // A
+  var IDX_TRANS  = 2;   // C (estabelecimento)
+  var IDX_VALOR  = 5;   // F (R$)
+  var IDX_CARTAO = 6;   // G (4 dígitos)
+  var IDX_AUT    = 12;  // M (cód. autorização)
+  var IDX_RECIBO = 14;  // O
+  var IDX_TITULAR = 16;
+  var IDX_GRUPO  = 17;  // R
+  var IDX_ETIQ   = 19;  // T
+  var IDX_DESC   = 20;  // U
+  var IDX_LOJA   = 21;  // V
+
+  // ------------------------------
+  // ✅ Janela de análise por "modo"
+  // ------------------------------
+  opts = opts || {};
+  var modo = String(opts.modo || "ciclo").toLowerCase().trim(); // default: ciclo (compatível)
+
+  var tz = "America/Sao_Paulo";
+  var ini = null;
+  var fim = null;
+  var periodoLabel = "";
+
+  if (modo === "7d") {
+    // últimos 7 dias (inclui hoje)
+    var hoje = new Date();
+    var hoje0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+    ini = new Date(hoje0.getFullYear(), hoje0.getMonth(), hoje0.getDate() - 6);
+    fim = hoje0;
+    periodoLabel = Utilities.formatDate(ini, tz, "dd/MM/yyyy") + " a " + Utilities.formatDate(fim, tz, "dd/MM/yyyy");
+  } else if (modo === "full") {
+    // base toda
+    ini = null;
+    fim = null;
+    periodoLabel = "Base toda (investigação)";
+  } else {
+    // ciclo 06–05 (padrão atual)
+    var pc = getPeriodoCicloClara_();
+    ini = pc.inicio;
+    fim = pc.fim;
+    periodoLabel = Utilities.formatDate(ini, tz, "dd/MM/yyyy") + " a " + Utilities.formatDate(fim, tz, "dd/MM/yyyy");
+  }
+
+  function norm_(s){
+    return normalizarTexto_ ? normalizarTexto_(s) : String(s||"").toLowerCase();
+  }
+  function money_(n){
+    var v = Number(n) || 0;
+    return v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+  }
+  function isPendencia_(row){
+    // conservador: pendência se vazio OU “sim”
+    function p(v){
+      var s = String(v||"").trim().toUpperCase();
+      return (!s || s === "SIM");
+    }
+    return p(row[IDX_RECIBO]) || p(row[IDX_ETIQ]) || p(row[IDX_DESC]);
+  }
+  function pendTxt_(row){
+    var p = [];
+    function chk(v, nome){
+      var s = String(v||"").trim().toUpperCase();
+      if (!s || s === "SIM") p.push(nome);
+    }
+    chk(row[IDX_RECIBO], "Recibo");
+    chk(row[IDX_ETIQ],   "Etiqueta");
+    chk(row[IDX_DESC],   "Descrição");
+    return p.join(", ");
+  }
+
+  // ========== 1) Indexação por (data|cartão|estab) para fracionamento ==========
+  var gruposDia = {}; // key -> { loja,time, dataKey, cartao, estab, qtd, soma, maxValor, pendCount }
+
+  // ========== 2) Stats auxiliares ==========
+  var valoresJanela = [];     // percentil 95 dentro da janela (7d/ciclo/full)
+  var byCartaoEstab = {};     // cartao||estab -> count + pend
+
+  for (var i=0;i<values.length;i++){
+    var r = values[i];
+    if (!r) continue;
+
+    var d = parseDateClara_(r[IDX_DATA]);
+    if (!d || isNaN(d.getTime())) continue;
+
+    // aplica janela se existir
+    if (ini && d < ini) continue;
+    if (fim && d > fim) continue;
+
+    var lojaDigits = String(r[IDX_LOJA]||"").replace(/\D/g,"");
+    if (!lojaDigits) continue;
+    var loja = ("0000"+lojaDigits).slice(-4);
+
+    var time = String(r[IDX_GRUPO]||"").trim();
+    var cartao = String(r[IDX_CARTAO]||"").trim();
+    var estab = String(r[IDX_TRANS]||"").trim();
+
+    var v = parseNumberSafe_(r[IDX_VALOR]);
+    if (!isFinite(v) || v <= 0) continue;
+
+    valoresJanela.push(v);
+
+    // chave dia (dd/MM/yyyy) + cartao + estab
+    var dataKey = Utilities.formatDate(d, tz, "dd/MM/yyyy");
+    var kDia = dataKey + "||" + cartao + "||" + norm_(estab);
+
+    if (!gruposDia[kDia]) {
+      gruposDia[kDia] = {
+        loja: loja, time: time, dataKey: dataKey, cartao: cartao, estab: estab,
+        qtd: 0, soma: 0, maxValor: 0, pendCount: 0
+      };
+    }
+
+    gruposDia[kDia].qtd++;
+    gruposDia[kDia].soma += v;
+    if (v > gruposDia[kDia].maxValor) gruposDia[kDia].maxValor = v;
+    if (isPendencia_(r)) gruposDia[kDia].pendCount++;
+
+    var kCE = cartao + "||" + norm_(estab);
+    if (!byCartaoEstab[kCE]) byCartaoEstab[kCE] = { count: 0, pend: 0 };
+    byCartaoEstab[kCE].count++;
+    if (isPendencia_(r)) byCartaoEstab[kCE].pend++;
+  }
+
+  // percentil 95 (conservador) dentro da janela escolhida
+  valoresJanela.sort(function(a,b){return a-b;});
+  var p95 = valoresJanela.length ? valoresJanela[Math.floor(valoresJanela.length*0.95)] : 999999;
+
+  // ========== 3) Gerar alertas com regra 2+ critérios ==========
+  var rows = [];
+
+  Object.keys(gruposDia).forEach(function(k){
+    var g = gruposDia[k];
+
+    var regras = [];
+    var score = 0;
+
+    // Critério A: fracionamento
+    if (g.qtd >= 3 && g.soma >= 800) {
+      regras.push("Fracionamento (>=3 no dia)");
+      score += 40;
+    }
+
+    // Critério B: pendência + valor alto (p95 da janela ou >=1500)
+    if (g.pendCount > 0 && (g.maxValor >= 1500 || g.maxValor >= p95)) {
+      regras.push("Pendência + valor alto");
+      score += 25;
+    }
+
+    // Critério C: recorrência por cartão+estab na janela (ciclo/7d/full)
+    var ce = byCartaoEstab[g.cartao + "||" + norm_(g.estab)];
+    if (ce && ce.count >= 8 && ce.pend >= 2) {
+      regras.push("Recorrência cartão/estab");
+      score += 15;
+    }
+
+    // Conservador: exige 2 critérios
+    if (regras.length < 2) return;
+
+    // Threshold final
+    if (score < 50) return;
+
+    rows.push({
+      loja: g.loja,
+      time: g.time,
+      data: g.dataKey,
+      cartao: g.cartao,
+      estabelecimento: g.estab,
+      qtdDia: g.qtd,
+      somaDia: money_(g.soma),
+      valor: money_(g.maxValor),
+      pendenciasTxt: (g.pendCount > 0 ? "Sim (" + g.pendCount + ")" : "Não"),
+      score: score,
+      regrasTxt: regras.join(" + ")
+    });
+  });
+
+  // ordenação por score e soma
+  rows.sort(function(a,b){
+    if (b.score !== a.score) return b.score - a.score;
+    // fallback simples (não perfeito, mas mantém compatível com seu retorno atual)
+    return (String(b.somaDia).length - String(a.somaDia).length);
+  });
+
+  return {
+    ok: true,
+    rows: rows,
+    meta: {
+      periodo: periodoLabel,
+      p95: p95,
+      modo: modo
+    }
+  };
+}
 
 /**
  * Calcula uma assinatura leve da BaseClara, suficiente para detectar atualização real da aba.
