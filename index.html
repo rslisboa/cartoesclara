@@ -553,6 +553,62 @@
 
 <script>
 
+  // ===============================
+// MODO MANUTENÇÃO (MANUAL)
+// ===============================
+// ATIVE/DESATIVE (false ou true)
+const VEKTOR_MANUTENCAO_ATIVA = false; // <--------------------- ALTERAR PARA MANUTENÇÃO SEMPRE AQUI//
+
+// Mensagem manual (edite data/hora aqui)
+const VEKTOR_MSG_MANUTENCAO_HTML = `
+  <div class="bot-bubble px-4 py-3 max-w-[80%] text-slate-700">
+    <p class="font-semibold text-slate-800 text-base">
+      Em manutenção preventiva, previsão de término às <b>22:30</b> do dia <b>10/01/2026</b>.
+    </p>
+  </div>
+`;
+
+function vektorAplicarManutencao_() {
+  // 1) substitui conteúdo do chat
+  const chat = document.getElementById("chatWindow");
+  if (chat) {
+    chat.innerHTML = `
+      <div class="flex items-start gap-3">
+        <img src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png"
+             alt="Vektor"
+             class="h-16 w-auto object-contain flex-shrink-0" />
+        ${VEKTOR_MSG_MANUTENCAO_HTML}
+      </div>
+    `;
+  }
+
+  // 2) bloqueia input e envio
+  const input = document.getElementById("userInput");
+  if (input) {
+    input.value = "";
+    input.disabled = true;
+    input.placeholder = "Indisponível (manutenção).";
+  }
+
+  const btn = document.getElementById("sendBtn");
+  if (btn) btn.disabled = true;
+
+  // 3) trava submit do form
+  const form = document.getElementById("chatForm");
+  if (form) {
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      return false;
+    }, { capture: true });
+  }
+}
+
+// ✅ aplica manutenção SOMENTE quando estiver true
+if (VEKTOR_MANUTENCAO_ATIVA) {
+  vektorAplicarManutencao_();
+  setTimeout(vektorAplicarManutencao_, 100); // garante que ninguém reescreva depois
+}
+
     // Estado global para o upload do Termo de Responsabilidade
   window.vektorTermoPending = null;         // guarda o arquivo em memória até receber o nome
   window.vektorTermoAguardandoNome = false; // indica se o próximo texto é o nome completo
@@ -626,6 +682,8 @@ function vektorRegistrarMetrica(
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+
+  if (VEKTOR_MANUTENCAO_ATIVA) return;
 
     let grupoNome = "";
     let grupo = "";
@@ -918,7 +976,7 @@ const VEKTOR_INTENTS = [
   "Gerente mudou de loja",
   "Troca de gerente entre lojas",
   "Servicenow",
-  "Como abrir chamado no servicenow?",
+  "Como abrir chamado no servicenow?",  
   "Lojas com mais pendências",
   "Pendências do time",
   "Pendências da loja",
@@ -987,6 +1045,7 @@ const VEKTOR_INTENTS = [
   "Quero gráficos das transações",
   "O que o Vektor pode fazer?",
   "Como anexar nota fiscal na Clara?",
+  "Possível uso irregular",
   "Como justificar compras na Clara?"
 ];
 
@@ -9145,64 +9204,111 @@ function vektorRenderTabelaListaItensComprados(res) {
           Observação: a classificação é heurística baseada em descrição livre; use como triagem e valide comprovantes/etiquetas.
         </div>
       `;
-
           // Tabela
-          let thead = `
-            <thead>
-              <tr style="background:#00FFFF;color:#0F172A;">
-                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Data</th>
-                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Valor (R$)</th>
-                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Lojas</th>
-                <th class="px-3 py-2 text-left text-sm font-semibold">Item Comprado</th>
-                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Conformidade</th>
-                <th class="px-3 py-2 text-left text-sm font-semibold">Motivo</th>
-                <th class="px-3 py-2 text-left text-sm font-semibold" style="white-space:nowrap;">Reincidência</th>
-              </tr>
-            </thead>
-          `;
+            let thead = `
+  <thead>
+    <tr>
+      <th class="px-3 text-left text-sm font-semibold"
+          style="white-space:nowrap;position:sticky;top:0;z-index:5;
+                 background:#00FFFF;color:#0F172A;
+                 height:44px;line-height:44px;vertical-align:middle;">
+        Data
+      </th>
+
+      <th class="px-3 text-left text-sm font-semibold"
+          style="white-space:nowrap;position:sticky;top:0;z-index:5;
+                 background:#00FFFF;color:#0F172A;
+                 height:44px;line-height:44px;vertical-align:middle;">
+        Valor (R$)
+      </th>
+
+      <th class="px-3 text-left text-sm font-semibold"
+          style="white-space:nowrap;position:sticky;top:0;z-index:5;
+                 background:#00FFFF;color:#0F172A;
+                 height:44px;line-height:44px;vertical-align:middle;">
+        Lojas
+      </th>
+
+      <th class="px-3 text-left text-sm font-semibold"
+          style="white-space:nowrap;position:sticky;top:0;z-index:5;
+                 background:#00FFFF;color:#0F172A;
+                 height:44px;line-height:44px;vertical-align:middle;">
+        Item Comprado
+      </th>
+
+      <th class="px-3 text-left text-sm font-semibold"
+          style="white-space:nowrap;position:sticky;top:0;z-index:5;
+                 background:#00FFFF;color:#0F172A;
+                 height:44px;line-height:44px;vertical-align:middle;">
+        Conformidade
+      </th>
+
+      <th class="px-3 text-left text-sm font-semibold"
+          style="white-space:nowrap;position:sticky;top:0;z-index:5;
+                 background:#00FFFF;color:#0F172A;
+                 height:44px;line-height:44px;vertical-align:middle;">
+        Motivo
+      </th>
+
+      <th class="px-3 text-left text-sm font-semibold"
+          style="white-space:nowrap;position:sticky;top:0;z-index:5;
+                 background:#00FFFF;color:#0F172A;
+                 height:44px;line-height:44px;vertical-align:middle;">
+        Reincidência
+      </th>
+    </tr>
+  </thead>
+`;
 
   let tbody = rows.map(r => {
-    const v = (Number(r.valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const status = r.status || "";
-    const badge =
-      status === "ALERTA" ? "<span class='px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700'>ALERTA</span>" :
-      status === "OK"     ? "<span class='px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700'>OK</span>" :
-                            "<span class='px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-700'>REVISAR</span>";
+  const v = (Number(r.valor) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const statusKey = (r.status || r.conformidade || "").toString().trim().toUpperCase() || "REVISAR";
-    const reincTxt = (r.reincidencia || "").toString().trim();
-    const reincFlag = reincTxt ? "1" : "0";
+  const statusKey = (r.status || r.conformidade || "").toString().trim().toUpperCase() || "REVISAR";
+  const reincTxt = (r.reincidencia || "").toString().trim();
+  const reincFlag = reincTxt ? "1" : "0";
 
-    return `
-              <tr class="border-t border-slate-200"
-              data-status="${(r.conformidade || r.status || '').toString().trim().toUpperCase()}"
-              data-reinc="${(r.reincidencia || '').toString().trim() ? '1' : '0'}"
-              data-time="${((r.time || '').toString().trim()).replace(/"/g,'&quot;')}"
-              data-loja="${((r.loja || '').toString().trim()).replace(/"/g,'&quot;')}">
-              <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">${r.data || ""}</td>
-              <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">R$ ${v}</td>
-              <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">${(r.loja || "").replace(/</g,"&lt;")}</td>
+   const badge =
+    statusKey === "ALERTA" ? "<span class='px-2 py-1 rounded text-xs font-semibold bg-red-100 text-red-700'>ALERTA</span>" :
+    statusKey === "OK"     ? "<span class='px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700'>OK</span>" :
+                             "<span class='px-2 py-1 rounded text-xs font-semibold bg-yellow-100 text-yellow-700'>REVISAR</span>";
 
-              <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400">
-                <div style="white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.35;">
-                  ${(r.item || "").replace(/</g,"&lt;")}
-                </div>
-              </td>
+  return `
+    <tr class="border-t border-slate-200"
+        data-status="${statusKey}"
+        data-reinc="${reincFlag}"
+        data-time="${((r.time || '').toString().trim()).replace(/"/g,'&quot;')}"
+        data-loja="${((r.loja || '').toString().trim()).replace(/"/g,'&quot;')}">
 
-              <td class="px-3 py-2 text-sm border-r border-slate-400">${badge}</td>
+      <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400" style="white-space:nowrap;">
+        ${r.data || ""}
+      </td>
 
-              <td class="px-3 py-2 text-sm text-slate-700 border-r border-slate-400">
-                <div style="white-space:normal; word-break:break-word; overflow-wrap:anywhere; line-height:1.35;">
-                  ${(r.motivo || "").replace(/</g,"&lt;")}
-                </div>
-              </td>
+      <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400" style="white-space:nowrap;">
+        R$ ${v}
+      </td>
 
-              <td class="px-3 py-2 text-sm text-slate-700">
-                ${(r.reincidencia || "").replace(/</g,"&lt;")}
-              </td>
-            </tr>
-        `;
-        }).join("");
+      <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400" style="white-space:nowrap;">
+        ${(r.loja || "").replace(/</g,"&lt;")}
+      </td>
+
+      <td class="px-3 py-2 text-sm text-slate-800 border-r border-slate-400" style="white-space:nowrap;">
+        ${(r.item || "").replace(/</g,"&lt;")}
+      </td>
+
+      <td class="px-3 py-2 text-sm border-r border-slate-400" style="white-space:nowrap;">
+        ${badge}
+      </td>
+
+      <td class="px-3 py-2 text-sm text-slate-700 border-r border-slate-400" style="white-space:nowrap;">
+        ${(r.motivo || "").replace(/</g,"&lt;")}
+      </td>
+
+      <td class="px-3 py-2 text-sm text-slate-700" style="white-space:nowrap;">
+        ${reincTxt.replace(/</g,"&lt;")}
+      </td>
+    </tr>
+  `;
+}).join("");
 
         const tableWrapId = "itensWrap_" + Date.now();
 
@@ -9312,12 +9418,15 @@ function vektorRenderTabelaListaItensComprados(res) {
     ${filtrosHtml}
 
     <!-- Tabela -->
-    <div class="mt-1" style="max-width:100%; min-width:0; overflow-x:auto;">
-      <table class="min-w-full border border-slate-200 rounded-lg">
+        <div class="mt-1"
+        style="max-width:100%; min-width:0; max-height:420px; overflow:auto; position:relative;">
+      <table class="border border-slate-200 rounded-lg"
+       style="border-collapse:separate; border-spacing:0; table-layout:auto; width:max-content;">
         ${thead}
         <tbody>${tbody}</tbody>
       </table>
     </div>
+
 
     <!-- Botão CSV -->
     <div class="mt-1" style="width:100%; display:flex; justify-content:flex-end;">
@@ -9752,6 +9861,266 @@ function vektorRenderTabelaEstornos(res, tipo) {
 
   renderBotMessage("HTML:" + html);
 }
+
+function vektorRenderTabelaUsoIrregular(res) {
+  if (!res || !res.ok) {
+    if (res && res.restrito) {
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Esse comando é restrito a Administradores.</p>");
+      return;
+    }
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Não consegui montar o relatório de uso irregular.</p>");
+    return;
+  }
+
+  const dataset = Array.isArray(res.rows) ? res.rows : [];
+  if (!dataset.length) {
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Nenhum caso atingiu o gatilho conservador (2+ critérios) no ciclo atual.</p>");
+    return;
+  }
+
+  const wrapId = "vektor-uso-irregular-" + Date.now();
+  window.__VEKTOR_USO_IRREGULAR = window.__VEKTOR_USO_IRREGULAR || {};
+  window.__VEKTOR_USO_IRREGULAR[wrapId] = dataset;
+
+  const times = Array.from(new Set(dataset.map(r => (r.time || "").trim()).filter(Boolean))).sort();
+  const lojas = Array.from(new Set(dataset.map(r => (r.loja || "").trim()).filter(Boolean))).sort();
+
+  const filtrosHtml = `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin:0;padding:0;line-height:1;">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label style="font-size:12px;color:#334155;font-weight:700;">Time</label>
+        <select id="${wrapId}-time" onchange="window.vektorAplicarFiltrosUsoIrregular('${wrapId}')" style="height:34px;border:1px solid rgba(0,0,0,.2);border-radius:8px;padding:0 10px;font-size:12px;min-width:220px;">
+          <option value="">Todos</option>
+          ${times.map(t => `<option value="${t}">${t}</option>`).join("")}
+        </select>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <label style="font-size:12px;color:#334155;font-weight:700;">Loja</label>
+        <select id="${wrapId}-loja" onchange="window.vektorAplicarFiltrosUsoIrregular('${wrapId}')" style="height:34px;border:1px solid rgba(0,0,0,.2);border-radius:8px;padding:0 10px;font-size:12px;min-width:140px;">
+          <option value="">Todas</option>
+          ${lojas.map(l => `<option value="${l}">${l}</option>`).join("")}
+        </select>
+      </div>
+
+      <button type="button"
+        onclick="window.vektorLimparFiltrosUsoIrregular('${wrapId}')"
+        style="height:34px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;line-height:1;background:#0f172a;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">
+        Limpar
+      </button>
+    </div>
+  `;
+
+  const thead = `
+    <thead>
+      <tr>
+        ${["Loja","Time","Data","Cartão","Estabelecimento","Qtd (dia)","Soma (dia)","Maior valor","Pendências","Score","Regras"]
+          .map(t => `<th style="
+            position:sticky;top:0;z-index:2;
+            background:#B91C1C;color:#ffffff;
+            border:1px solid #000;
+            text-align:left;font-size:13px;font-weight:800;
+            padding:8px 12px;white-space:nowrap;
+          ">${t}</th>`).join("")}
+      </tr>
+    </thead>
+  `;
+
+  function esc(x){
+    return String(x===null||x===undefined?"":x)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+  }
+
+  function rowHtml(r) {
+    const b = "border:1px solid rgba(0,0,0,0.65);";
+    return `
+      <tr data-loja="${esc(r.loja)}" data-time="${esc(r.time)}">
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.loja)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.time)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.data)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.cartao)}</td>
+        <td style="${b}padding:8px 12px;font-size:13px;">${esc(r.estabelecimento)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.qtdDia)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.somaDia)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.valor)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;">${esc(r.pendenciasTxt)}</td>
+        <td style="${b}white-space:nowrap;padding:8px 12px;font-size:13px;font-weight:800;">${esc(r.score)}</td>
+        <td style="${b}padding:8px 12px;font-size:13px;">${esc(r.regrasTxt)}</td>
+      </tr>
+    `;
+  }
+
+      const html = `
+      <div id="${wrapId}" style="width:100%; margin:0; padding:0;">
+
+        <div style="margin:0; padding:0; display:flex; flex-direction:column; gap:0;">
+        
+        <!-- Linha 1: texto -->
+        <div class="text-sm text-slate-700"
+            style="margin:0;padding:0;line-height:1.2;white-space:nowrap;">
+          <b>Possível uso irregular</b> (modelo conservador: 2+ critérios). Período:
+          <b>${esc((res.meta && res.meta.periodo) || "")}</b>.
+          <br><br> 
+
+        <!-- Linha 3: filtros -->
+        ${filtrosHtml} <br>
+
+
+    <div style="width:100%; max-height:420px; overflow:auto; position:relative; border:1px solid rgba(0,0,0,0.2); border-radius:10px; background:#fff; margin-top:4px;">
+      <table style="width:100%; border-collapse:collapse;">
+        ${thead}
+        <tbody id="${wrapId}-tbody">
+          ${dataset.map(rowHtml).join("")}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:4px; display:flex; justify-content:flex-end;">
+      <button type="button"
+        onclick="exportTableToCSV(this, 'uso_irregular_clara')"
+        style="height:32px;padding:0 12px;display:inline-flex;align-items:center;gap:6px;line-height:1;background:#005E27;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
+        ⬇ Exportar CSV
+      </button>
+    </div>
+  </div>
+`;
+
+  renderBotMessage("HTML:" + html);
+
+try {
+  var rows = dataset || [];
+  var periodoTxt = (res && res.meta && res.meta.periodo) ? res.meta.periodo : "";
+
+  // loja principal = maior score; desempate por maior valor (string dinheiro não é ideal, mas serve)
+  var top = rows.slice().sort(function(a,b){
+    if ((b.score||0) !== (a.score||0)) return (b.score||0) - (a.score||0);
+    return String(b.valor||"").localeCompare(String(a.valor||""));
+  })[0];
+
+  var lojasUnicas = Array.from(new Set(rows.map(r => (r.loja||"").trim()).filter(Boolean)));
+  var totalCasos = rows.length;
+
+  var texto =
+    "<div class='text-sm text-slate-700' style='margin-top:4px;'>" +
+      "<p style='margin:0;'><b>Leitura do cenário:</b> encontrei <b>" + totalCasos + "</b> caso(s) em <b>" + lojasUnicas.length + "</b> loja(s)" +
+      (periodoTxt ? " no período <b>" + periodoTxt + "</b>" : "") + ".</p>" +
+      (top ? (
+        "<p style='margin:4px 0 0 0;'>" +
+          "A principal prioridade de verificação é a loja <b>" + (top.loja||"") + "</b>" +
+          " (titular: <b>" + (top.titular||"—") + "</b>), porque teve o maior <b>score (" + (top.score||0) + ")</b> e combinou regras: " +
+          "<b>" + (top.regrasTxt||"") + "</b>." +
+        "</p>"
+      ) : "") +
+      "<p style='margin:4px 0 0 0;'>" +
+        "<b>Como interpretar o score:</b> ele é uma soma ponderada de sinais conservadores; " +
+        "quanto maior, mais critérios simultâneos apareceram (ex.: fracionamento + pendência + valor alto). " +
+        "Use como <b>triagem</b> e confirme em comprovantes/etiquetas/descrição." +
+      "</p>" +
+    "</div>";
+
+  renderBotMessage("HTML:" + texto);
+} catch(e) {
+  console.warn("Falha ao gerar explicação do cenário:", e);
+}
+
+}
+
+window.vektorAplicarFiltrosUsoIrregular = function(wrapId) {
+  try {
+    var data = (window.__VEKTOR_USO_IRREGULAR && window.__VEKTOR_USO_IRREGULAR[wrapId]) ? window.__VEKTOR_USO_IRREGULAR[wrapId] : [];
+    var selTime = document.getElementById(wrapId + "-time");
+    var selLoja = document.getElementById(wrapId + "-loja");
+
+    var timeVal = selTime ? (selTime.value || "").trim() : "";
+    var lojaVal = selLoja ? (selLoja.value || "").trim() : "";
+
+    // 1) FILTRA LINHAS (AND)
+    var tbody = document.getElementById(wrapId + "-tbody");
+    if (tbody) {
+      var trs = tbody.querySelectorAll("tr[data-loja][data-time]");
+      trs.forEach(function(tr){
+        var t = (tr.getAttribute("data-time") || "").trim();
+        var l = (tr.getAttribute("data-loja") || "").trim();
+
+        var okT = !timeVal || t === timeVal;
+        var okL = !lojaVal || l === lojaVal;
+
+        tr.style.display = (okT && okL) ? "" : "none";
+      });
+    }
+
+    // 2) RECONSTRÓI AS OPÇÕES DO OUTRO SELECT
+    // - lojas válidas dependem do time selecionado
+    // - times válidos dependem da loja selecionada
+    var lojasValidas = {};
+    var timesValidos = {};
+
+    data.forEach(function(r){
+      var t = (r.time || "").trim();
+      var l = (r.loja || "").trim();
+
+      // aplica “o outro filtro” para gerar opções dependentes
+      if (!timeVal || t === timeVal) lojasValidas[l] = true;
+      if (!lojaVal || l === lojaVal) timesValidos[t] = true;
+    });
+
+    function rebuildSelect(selectEl, placeholder, mapValidos, currentVal) {
+      if (!selectEl) return;
+      var arr = Object.keys(mapValidos).filter(Boolean).sort(function(a,b){ return a.localeCompare(b); });
+
+      var html = "<option value=''>" + placeholder + "</option>";
+      arr.forEach(function(v){
+        var sel = (currentVal && v === currentVal) ? " selected" : "";
+        html += "<option value=\"" + v.replace(/"/g,'&quot;') + "\"" + sel + ">" + v + "</option>";
+      });
+      selectEl.innerHTML = html;
+
+      // se o valor atual não existe mais, limpa
+      if (currentVal && arr.indexOf(currentVal) === -1) {
+        selectEl.value = "";
+      }
+    }
+
+    rebuildSelect(selLoja, "Todas", lojasValidas, lojaVal);
+    rebuildSelect(selTime, "Todos", timesValidos, timeVal);
+
+  } catch (e) {
+    console.error("Erro em vektorAplicarFiltrosUsoIrregular:", e);
+  }
+};
+
+window.vektorLimparFiltrosUsoIrregular = function(wrapId) {
+  var selTime = document.getElementById(wrapId + "-time");
+  var selLoja = document.getElementById(wrapId + "-loja");
+  if (selTime) selTime.value = "";
+  if (selLoja) selLoja.value = "";
+  window.vektorAplicarFiltrosUsoIrregular(wrapId);
+};
+
+window.vektorExecutarUsoIrregular = function (modo) {
+  try {
+    renderBotMessage(
+  "HTML:<p class='text-sm text-slate-600'>Processando analise (" + String(modo || "") + ")...</p>"
+);
+
+    google.script.run
+      .withSuccessHandler(function(res){
+        try {
+          vektorRenderTabelaUsoIrregular(res); // mantém sua renderização atual
+        } catch (e) {
+          console.error("Erro ao renderizar uso irregular:", e);
+          renderBotMessage("HTML:<p class='text-sm text-red-700'><b>Erro ao renderizar tabela:</b> " + (e && e.message ? e.message : e) + "</p>");
+        }
+      })
+      .withFailureHandler(function(err){
+        renderBotMessage("HTML:<p class='text-sm text-red-700'>Falha ao consultar BaseClara: " + (err && err.message ? err.message : err) + "</p>");
+      })
+      .getPossivelUsoIrregularParaChat(modo);  // <- AGORA com parâmetro
+  } catch (e) {
+    console.error(e);
+  }
+};
 
 window.vektorAplicarFiltrosEstornos = function(wrapId, hasTime) {
   const data = (window.__VEKTOR_ESTORNOS && window.__VEKTOR_ESTORNOS[wrapId]) ? window.__VEKTOR_ESTORNOS[wrapId] : [];
@@ -14478,6 +14847,57 @@ if (isCmdTabelaEstornos) {
     .getTabelaEstornosClara(tipoFiltro, valorFiltro);
 
   return; // ⛔ impede cair em outros comandos
+}
+
+// =====================================================
+// ✅ POSSÍVEL USO IRREGULAR (ADM)
+// Comando: "possível uso irregular"
+// =====================================================
+const isCmdUsoIrregular = /^\s*poss(i|í)vel\s+uso\s+irregular\b/i.test(norm);
+
+if (isCmdUsoIrregular) {
+
+  // 🔒 Apenas Administrador (mesmo padrão do estornos)
+  if (typeof USER_ROLE_REPLACED !== "undefined" && USER_ROLE_REPLACED !== "Administrador") {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil <b>Administrador</b>.</p>"
+    );
+    return;
+  }
+
+  renderBotMessage(
+  "HTML:" +
+  "<div class='text-sm text-slate-700'>" +
+    "<p style='margin:0 0 6px 0; font-weight:700;'>Possível uso irregular — selecione o escopo da análise:</p>" +
+    "<div style='display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;'>" +
+
+      "<button type='button' " +
+        "onclick=\"window.vektorExecutarUsoIrregular('7d')\" " +
+        "style='background:#0F172A;color:#fff;border:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>" +
+        "Padrão (7 dias)" +
+      "</button>" +
+
+      "<button type='button' " +
+        "onclick=\"window.vektorExecutarUsoIrregular('ciclo')\" " +
+        "style='background:#334155;color:#fff;border:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>" +
+        "Ciclo 06–05" +
+      "</button>" +
+
+      "<button type='button' " +
+        "onclick=\"window.vektorExecutarUsoIrregular('full')\" " +
+        "style='background:#B91C1C;color:#fff;border:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>" +
+        "Base toda (investigação)" +
+      "</button>" +
+
+    "</div>" +
+    "<p style='margin:8px 0 0 0; font-size:12px; color:#64748B;'>" +
+      "Dica: a opção <b>Base toda</b> pode ser mais lenta e tende a gerar mais volume (use para investigação pontual)." +
+    "</p>" +
+  "</div>"
+);
+
+return;
+
 }
 
 // =====================================================
