@@ -376,6 +376,31 @@
     📊 Relatório Clara (Looker Studio)
   </button> -->
 
+  <button
+  type="button"
+  onclick="openStatusVektorModal()"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+>
+  🟢 Estado Operacional
+</button>
+
+  <button
+  type="button"
+  onclick="window.open(POLITICA_CARTOES_CLARA_LINK,'_blank')"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+>
+  📘 Regras e Políticas
+</button>
+
+<button
+  type="button"
+  onclick="openAjudaVektorModal()"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+>
+  ❓ Como usar o Vektor
+</button>
+
+
   <!-- Botão: Feedback -->
   <button
     type="button"
@@ -502,6 +527,130 @@
   </div>
 </div>
 
+<div id="statusVektorModal"
+     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
+  <div class="bg-white p-5 rounded-xl shadow-lg max-w-[520px] w-[95%] text-sm text-slate-700">
+    <h2 class="text-base font-semibold text-slate-800 mb-3">
+      Status
+    </h2>
+
+    <ul class="space-y-2">
+      <li><b>Última atualização da Base de Transações:</b> <span id="status-baseclara">—</span></li>
+      <li><b>Última execução dos jobs:</b> <span id="status-jobs">—</span></li>
+      <li><b>Status dos alertas:</b> <span id="status-alertas">—</span></li>
+      <li><b>Status Geral:</b> <span id="status-manutencao">—</span></li>
+    </ul>
+
+    <button
+      onclick="closeStatusVektorModal()"
+      class="mt-4 w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-semibold">
+      Fechar
+    </button>
+  </div>
+</div>
+
+<!-- Modal do Como Usar o Vektor -->
+<div id="ajudaVektorModal"
+     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
+  <div class="bg-white p-5 rounded-xl shadow-lg max-w-[720px] w-[95%]">
+    <h2 class="text-base font-semibold text-slate-800 mb-2">
+      ❓ Como usar o Vektor
+    </h2>
+    <p class="text-xs text-slate-500 mb-3">
+      Guia rápido dos principais procedimentos e exemplos de uso.
+    </p>
+
+    <!-- Conteúdo com scroll (para não estourar a tela) -->
+    <div class="text-sm text-slate-700 space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+
+      <p>
+        O Vektor é um assistente operacional da Clara: consulta bases, aplica regras padronizadas e orienta ações para reduzir pendências.
+      </p>
+
+      <div>
+        <p class="font-semibold text-slate-800">Principais procedimentos:</p>
+        <ul style="margin-left:14px; line-height:1.55; margin-top:6px;">
+          <li>
+            <b>1) Pendências e regularização</b><br/>
+            • Consultar pendências por loja/time e exibir tabela detalhada.<br/>
+            <i>Exemplos:</i> “pendências da loja 0297”, “lojas com mais pendências”, “pendências do time Furacão Sul”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>2) Relatório Gerencial</b><br/>
+            • Relatório Looker Studio com as principais métricas de uso do cartão.<br/>
+            <i>Exemplos:</i> “Abrir relatório gerencial da Clara”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>3) Faturas e ciclo (06→05)</b><br/>
+            • Consulta valores e explica o ciclo vigente.<br/>
+            <i>Exemplos:</i> “valor da fatura atual”, “valor das últimas 3 faturas”, “qual é o ciclo da fatura?”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>4) Rankings e análises gerenciais</b><br/>
+            • Rankings por loja/time/categoria/estabelecimento e comparativos por período.<br/>
+            <i>Exemplos:</i> “ranking de lojas com maior valor”, “categorias com maior valor”, “estabelecimentos mais usados”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>5) Estornos</b><br/>
+            • Exibe tabelas de estornos quando disponível no seu perfil.<br/>
+            <i>Exemplos:</i> “tabela de estornos”, “tabela de estornos do time”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>6) Possível uso irregular</b><br/>
+            • Apoia investigação e leitura objetiva do que disparou o alerta.<br/>
+            <i>Exemplo:</i> “possível uso irregular”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>7) Cartão (bloqueio, perda, suporte e direcionamento)</b><br/>
+            • Orienta o procedimento e encaminha para o canal correto (ex.: ServiceNow).<br/>
+            <i>Exemplos:</i> “perdi meu cartão”, “cartão bloqueado, como resolver?”, “servicenow”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>8) Listagem de Itens Comprados</b><br/>
+            • Relatórios com análises dos itens adquirido pela lojas (levando em consideração o campo descrição das transações).<br/>
+            <i>Exemplos:</i> “Itens comprados no geral”, “Itens comprados para o time xxxxxxxx”, “Itens comprados para a loja xxxx”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>9) Limite dos cartões</b><br/>
+            • Demonstra o saldo dos cartões, probabilidade de uso, possibilidade de aumento ou redução de limite.<br/>
+            <i>Exemplos:</i> “Relação de saldos geral”, “Relação de saldos do time xxxxxxxx”.
+          </li>
+
+          <li style="margin-top:10px;">
+            <b>10) Termo de responsabilidade</b><br/>
+            • Anexar o termo pelo botão de clipe e concluir com nome completo.<br/>
+            <i>Exemplo:</i> “termo de responsabilidade Clara”.
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="font-semibold text-slate-800">⚠️ Regras importantes ⚠️</p>
+        <ul style="margin-left:14px; line-height:1.55; margin-top:6px;">
+          <li><b>Padronização:</b> respostas seguem política/processo (não “opinião do Vektor”).</li>
+          <li><b>Perfil de acesso:</b> algumas visões são restritas (ex.: Administrador).</li>
+          <li><b>Boas práticas:</b> informe loja (4 dígitos) e/ou time; inclua período quando fizer sentido; sempre use as orientações de texto que aparecem no chat pra completar sua dúvida,solicitação etc.</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <button type="button"
+            onclick="closeAjudaVektorModal()"
+            class="mt-4 w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-semibold">
+      Fechar
+    </button>
+  </div>
+</div>
+
 <!-- AUTOCOMPLETE BOX -->
 <div id="vektor-autocomplete-box"></div>
 
@@ -620,6 +769,49 @@ function closeVektorModal() {
   if (modal) {
     modal.style.display = "none";
   }
+}
+
+function openAjudaVektorModal() {
+  var modal = document.getElementById("ajudaVektorModal");
+  if (modal) {
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+}
+
+function closeAjudaVektorModal() {
+  var modal = document.getElementById("ajudaVektorModal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+}
+
+document.addEventListener("click", function (e) {
+  var modal = document.getElementById("ajudaVektorModal");
+  if (!modal || modal.classList.contains("hidden")) return;
+
+  // clicou no fundo escuro (overlay) -> fecha
+  if (e.target === modal) closeAjudaVektorModal();
+});
+
+function openStatusVektorModal() {
+  document.getElementById("statusVektorModal").style.display = "flex";
+
+  // dados reais (não fake)
+  document.getElementById("status-manutencao").textContent =
+    VEKTOR_MANUTENCAO_ATIVA ? "Em manutenção" : "Em operação";
+
+  document.getElementById("status-alertas").textContent = "Ativos";
+
+  google.script.run.withSuccessHandler(function (data) {
+    document.getElementById("status-baseclara").textContent = data.baseClara;
+    document.getElementById("status-jobs").textContent = data.jobs;
+  }).vektorStatusSistema();
+}
+
+function closeStatusVektorModal() {
+  document.getElementById("statusVektorModal").style.display = "none";
 }
 
 let __vektorJaSugeriuLooker = false;
@@ -981,10 +1173,8 @@ const VEKTOR_INTENTS = [
   "Pendências do time",
   "Pendências da loja",
   "Time com mais pendências",
-  "Ver justificativas completas de uma loja",
   "Vídeo de justificativas",
   "Como justificar uma transação",
-  "Ver justificativas completas de um time",
   "Loja com maior valor de transações neste mês",
   "Loja com mais transações neste mês",
   "Treinamento Clara",
@@ -997,7 +1187,6 @@ const VEKTOR_INTENTS = [
   "Valor das últimas 3 faturas",
   "Valor das últimas 6 faturas",
   "Valor de todas as faturas",
-  "Ver extrato da conta da Clara",
   "Qual é o ciclo da fatura da Clara?",
   "Qual etiqueta usar para compra de",
   "Listagem de etiquetas cadastradas na Clara",
