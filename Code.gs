@@ -7999,3 +7999,18 @@ function LIMPAR_ALERTA_LIMITE() {
   props.deleteProperty("VEKTOR_HISTPEND_LAST_SIG");
   Logger.log("Snapshot do alerta de LIMITE limpo com sucesso.");
 }
+
+function vektorStatusSistema() {
+  const file = DriveApp.getFileById(BASE_CLARA_ID);
+
+  const ultimaAtualizacao = file.getLastUpdated();
+
+  return {
+    baseClara: Utilities.formatDate(
+      ultimaAtualizacao,
+      Session.getScriptTimeZone(),
+      "dd/MM/yyyy HH:mm"
+    ),
+    jobs: "Executados com sucesso"
+  };
+}
