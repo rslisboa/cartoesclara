@@ -2643,6 +2643,103 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
   }
 }
 
+/**
+ * Retorna transações da loja (Alias do Cartão / nomeCartao) no período aberto do ciclo:
+ * início = dia 06 do ciclo atual
+ * fim = hoje (fim do dia)
+ *
+ * Colunas solicitadas (BaseClara):
+ * A (0)  = Data da Transação
+ * F (5)  = Valor em R$
+ * H (7)  = Alias do Cartão (Loja no seu contexto)
+ * U (20) = Descrição (Item comprado)
+ */
+function getTransacoesLojaPeriodoAberto(aliasLoja) {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    // (opcional) se quiser restringir só ADM:
+    // if (!isAdminEmail(email)) return { ok:false, error:"Acesso restrito." };
+
+    aliasLoja = (aliasLoja || "").toString().trim();
+    if (!aliasLoja) return { ok: true, rows: [], meta: { inicio:"", fim:"" } };
+
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return { ok: false, error: info.error };
+
+    var linhas = info.linhas || [];
+    if (!linhas.length) return { ok: true, rows: [], meta: { inicio:"", fim:"" } };
+
+    // Período aberto do ciclo (06 -> hoje)
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var pc = getPeriodoCicloClara_(); // você já usa isso no projeto
+    var ini = pc && pc.inicio ? new Date(pc.inicio) : null;
+    if (!ini || isNaN(ini.getTime())) return { ok:false, error:"Não consegui determinar o início do ciclo (06)." };
+
+    ini.setHours(0,0,0,0);
+
+    var hoje = new Date();
+    var fim = new Date(hoje);
+    fim.setHours(23,59,59,999);
+
+    // Índices fixos
+    var IDX_DATA  = 0;   // A
+    var IDX_VALOR = 5;   // F
+    var IDX_ALIAS = 7;   // H
+    var IDX_ITEM  = 20;  // U
+
+    function fmtBR(d) {
+      return Utilities.formatDate(d, tz, "dd/MM/yyyy");
+    }
+
+    var out = [];
+    for (var i = 0; i < linhas.length; i++) {
+      var r = linhas[i];
+      if (!r) continue;
+
+      var alias = (r[IDX_ALIAS] || "").toString().trim();
+      if (alias !== aliasLoja) continue;
+
+      var d = parseDateClara_(r[IDX_DATA]);
+      if (!d || isNaN(d.getTime())) continue;
+
+      if (d < ini || d > fim) continue;
+
+      var v = Number(r[IDX_VALOR]) || 0;
+
+      out.push({
+        data: fmtBR(d),
+        valor: v,
+        loja: alias,                 // coluna H (Alias)
+        item: (r[IDX_ITEM] || "").toString()
+      });
+    }
+
+    // ordena por data desc (opcional)
+    out.sort(function(a,b){
+      // como data vem dd/MM/yyyy, ordena por Date real:
+      function toDt(x){
+        var p = (x||"").split("/");
+        if (p.length !== 3) return new Date(0);
+        return new Date(Number(p[2]), Number(p[1])-1, Number(p[0]));
+      }
+      return toDt(b.data) - toDt(a.data);
+    });
+
+    return {
+      ok: true,
+      rows: out,
+      meta: {
+        alias: aliasLoja,
+        inicio: fmtBR(ini),
+        fim: fmtBR(hoje) // “até a data atual” como você pediu
+      }
+    };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 function getTabelaEstornosClara(tipoFiltro, valorFiltro) {
   try {
     var info = carregarLinhasBaseClara_();
