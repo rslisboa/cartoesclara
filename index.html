@@ -559,13 +559,20 @@
     </h2>
 
     <ul class="space-y-2">
-      <li><b>Última atualização da Base de Transações:</b> <span id="status-baseclara">—</span></li>
+    <!-- Sempre visível -->
+    <li><b>Última atualização da Base de Transações:</b> <span id="status-baseclara">—</span></li>
+    <li><b>Status Geral:</b> <span id="status-geral">—</span></li>
+
+    <? if ((userRole || "") === "Administrador") { ?>
+      <!-- Somente Admin -->
       <li><b>Última execução dos jobs:</b> <span id="status-jobs">—</span></li>
       <li><b>Serviços Google (Apps Script / E-mail):</b> <span id="status-google">—</span></li>
       <li><b>BigQuery:</b> <span id="status-bigquery">—</span></li>
       <li><b>Status dos alertas:</b> <span id="status-alertas">—</span></li>
-      <li><b>Status Geral:</b> <span id="status-manutencao">—</span></li>
-    </ul>
+      <li><b>Manutenção:</b> <span id="status-manutencao">—</span></li>
+    <? } ?>
+  </ul>
+
 
     <button
       onclick="closeStatusVektorModal()"
@@ -919,72 +926,6 @@ function closeAlertasRecentesModal() {
   }
 }
 
-// ===============================
-// MODAL: ESTADO OPERACIONAL
-// ===============================
-function openStatusVektorModal() {
-  const modal = document.getElementById("statusVektorModal");
-  if (modal) {
-    modal.style.display = "flex";
-    modal.classList.remove("hidden");
-  }
-
-  // placeholders imediatos (evita parecer “travado”)
-  const set = (id, txt) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = (txt == null ? "—" : String(txt));
-  };
-
-  set("status-baseclara", "Carregando...");
-  set("status-jobs", "Carregando...");
-  set("status-google", "Carregando...");
-  set("status-bigquery", "Carregando...");
-  set("status-alertas", "Carregando...");
-  set("status-manutencao", "Carregando...");
-  // Se você tiver uma variação com "status-geral" em outro HTML, mantém também:
-  set("status-geral", "Carregando...");
-
-  // Proteção
-  if (typeof google === "undefined" || !google.script || !google.script.run) {
-    set("status-manutencao", "google.script.run indisponível (abra via WebApp).");
-    return;
-  }
-
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (!res || !res.ok) {
-        const msg = (res && res.error) ? res.error : "Falha ao obter status.";
-        set("status-manutencao", msg);
-        set("status-geral", msg);
-        return;
-      }
-
-      set("status-baseclara", res.baseclara || "—");
-      set("status-jobs", res.jobs || "—");
-      set("status-alertas", res.alertas || "—");
-
-      // Serviços Google / E-mail (quota + status)
-      set("status-google", res.google || "—");
-
-      // BigQuery healthcheck
-      set("status-bigquery", res.bigquery || "—");
-
-      // Status geral / manutenção
-      set("status-manutencao", res.geral || "—");
-      set("status-geral", res.geral || "—");
-    })
-    .withFailureHandler(function (err) {
-      const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
-      const set = (id, txt) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = txt;
-      };
-      set("status-manutencao", "Erro ao buscar status: " + msg);
-      set("status-geral", "Erro ao buscar status: " + msg);
-    })
-    .getStatusOperacionalVektor(); // <- esta função vai ser criada no Code.gs
-}
-
 function closeStatusVektorModal() {
   const modal = document.getElementById("statusVektorModal");
   if (modal) {
@@ -1161,32 +1102,62 @@ document.addEventListener("click", function (e) {
 });
 
 function openStatusVektorModal() {
-  document.getElementById("statusVektorModal").style.display = "flex";
+  const modal = document.getElementById("statusVektorModal");
+  if (modal) modal.style.display = "flex";
 
-  // dados reais (não fake)
-  document.getElementById("status-manutencao").textContent =
-    VEKTOR_MANUTENCAO_ATIVA ? "Em manutenção" : "Em operação";
+  // Helper seguro: só escreve se o elemento existir
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (value == null || value === "") ? "—" : String(value);
+  };
 
-  document.getElementById("status-alertas").textContent = "Ativos";
+  // Status Geral (sempre visível)
+  setText("status-geral", "Em operação");
 
-  google.script.run.withSuccessHandler(function (data) {
-  document.getElementById("status-baseclara").textContent = data.baseClara || "—";
-  document.getElementById("status-jobs").textContent = data.jobs || "—";
-  // Serviços Google (Apps Script / E-mail)
-const googleStatus =
-  data && (data.google ?? data.googleStatus ?? data.servicosGoogle);
+  // Manutenção (somente admin, se existir no DOM)
+  if (typeof VEKTOR_MANUTENCAO_ATIVA !== "undefined") {
+    setText("status-manutencao", VEKTOR_MANUTENCAO_ATIVA ? "Em manutenção" : "Em operação");
+  } else {
+    // se a constante não existir, não quebra
+    setText("status-manutencao", "Em operação");
+  }
 
-document.getElementById("status-google").textContent =
-  googleStatus ? googleStatus : "Indisponível";
+  // Alertas (somente admin, se existir no DOM)
+  setText("status-alertas", "Ativos");
 
-// BigQuery
-const bigQueryStatus =
-  data && (data.bigquery ?? data.bigQuery ?? data.bigQueryStatus);
+  // Proteção: se abriu fora do WebApp
+  if (typeof google === "undefined" || !google.script || !google.script.run) {
+    setText("status-geral", "google.script.run indisponível (abra via WebApp).");
+    return;
+  }
 
-document.getElementById("status-bigquery").textContent =
-  bigQueryStatus ? bigQueryStatus : "Indisponível";
+  google.script.run
+    .withSuccessHandler(function (data) {
+      // Base (sempre visível)
+      setText("status-baseclara", data && (data.baseClara || data.baseclara));
 
-}).vektorStatusSistema();
+      // Status Geral (sempre visível)
+      const geral = data && (data.geral || data.statusGeral);
+      setText("status-geral", geral || "Em operação");
+
+      // A partir daqui: campos admin-only (só preenche se existirem)
+      setText("status-jobs", data && data.jobs);
+      setText("status-alertas", data && data.alertas);
+
+      // Serviços Google (Apps Script / E-mail)
+      const googleStatus = data && (data.google ?? data.googleStatus ?? data.servicosGoogle);
+      setText("status-google", googleStatus || "Indisponível");
+
+      // BigQuery
+      const bigQueryStatus = data && (data.bigquery ?? data.bigQuery ?? data.bigQueryStatus);
+      setText("status-bigquery", bigQueryStatus || "Indisponível");
+
+    })
+    .withFailureHandler(function (err) {
+      const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+      setText("status-geral", "Erro ao buscar status: " + msg);
+    })
+    .vektorStatusSistema();
 }
 
 function closeStatusVektorModal() {
