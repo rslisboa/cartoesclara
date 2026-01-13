@@ -333,13 +333,12 @@
      style="display:none; font-size:16px; text-shadow: 0 1px 2px rgba(0,0,0,0.15);  line-height:1.3;">
 </div>
 
-
 </div>
  
- <div class="h-screen flex px-4 py-6 gap-4 items-stretch">
+ <div class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
    
-   <aside class="hidden md:flex w-72 shrink-0 flex-none flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 space-y-4 h-full">
+   <aside class="hidden md:flex w-72 shrink-0 flex-none flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 self-stretch min-h-0">
 
   <!-- Bloco Vektor + título -->
   <div class="w-full flex flex-col items-center mb-4">
@@ -357,6 +356,9 @@
   <div class="w-full text-center mb-1">
     <p class="text-base font-semibold text-black">Menu</p>
   </div>
+
+  <!-- Conteúdo rolável do menu (botões) -->
+<div class="flex-1 min-h-0 overflow-y-auto space-y-4 pb-3">
 
   <!-- Botão: assistir apresentação -->
   <button
@@ -400,6 +402,18 @@
   ❓ Como usar o Vektor
 </button>
 
+<? if ((userRole || "") === "Administrador") { ?>
+
+  <!-- Botão: Alertas Recentes (somente Admin) -->
+  <button
+    type="button"
+    onclick="openAlertasRecentesModal()"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  >
+    🔔 Alertas Recentes
+  </button>
+
+<? } ?>
 
   <!-- Botão: Feedback -->
   <button
@@ -409,11 +423,21 @@
   >
     📝 Feedback
   </button>
+
+  </div> <!-- fim do conteúdo rolável -->
+
+  <!-- Rodapé do menu: Versão do Vektor -->
+<div class="mt-4 px-3 py-3 text-center border-t border-slate-200">
+  <div class="text-[11px] text-slate-500 leading-tight">
+    Vektor v1.6.0<br>
+    <span class="text-slate-400">Build 12/01/2026</span>
+  </div>
+</div>
   
 </aside>
  
    <!-- COLUNA DIREITA: CHAT -->
-   <div class="flex-1 min-w-0">
+   <div class="flex-1 min-w-0 min-h-0">
      <div class="chat-wrapper">
 
     <!-- HEADER -->
@@ -537,6 +561,8 @@
     <ul class="space-y-2">
       <li><b>Última atualização da Base de Transações:</b> <span id="status-baseclara">—</span></li>
       <li><b>Última execução dos jobs:</b> <span id="status-jobs">—</span></li>
+      <li><b>Serviços Google (Apps Script / E-mail):</b> <span id="status-google">—</span></li>
+      <li><b>BigQuery:</b> <span id="status-bigquery">—</span></li>
       <li><b>Status dos alertas:</b> <span id="status-alertas">—</span></li>
       <li><b>Status Geral:</b> <span id="status-manutencao">—</span></li>
     </ul>
@@ -650,6 +676,111 @@
     </button>
   </div>
 </div>
+
+<? if ((userRole || "") === "Administrador") { ?>
+
+<!-- Modal: Alertas Recentes -->
+<div id="alertasRecentesModal"
+     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl w-[95%] max-w-[980px] overflow-hidden border border-slate-200">
+    
+    <!-- Header -->
+    <div class="px-5 py-4 bg-[#005E27] text-white flex items-center justify-between">
+      <div>
+        <div class="text-base font-extrabold">🔔 Alertas Recentes</div>
+        <div class="text-xs opacity-90">Rastreabilidade de alertas enviados (limite, pendências, possíveis irregularidades)</div>
+      </div>
+      <button type="button"
+              onclick="closeAlertasRecentesModal()"
+              class="bg-white/15 hover:bg-white/25 transition rounded-lg px-3 py-2 text-sm font-semibold">
+        Fechar
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="p-5">
+      <!-- Filtros -->
+      <div class="flex flex-col md:flex-row md:items-end gap-3">
+        <div class="flex-1">
+          <label class="text-xs font-semibold text-slate-600">Janela (dias)</label>
+          <select id="alertasRecentesDias"
+                  class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="7">Últimos 7 dias</option>
+            <option value="14" selected>Últimos 14 dias</option>
+            <option value="30">Últimos 30 dias</option>
+          </select>
+        </div>
+
+        <div class="flex-1">
+          <label class="text-xs font-semibold text-slate-600">Tipo</label>
+          <select id="alertasRecentesTipo"
+                  class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+            <option value="" selected>Todos</option>
+            <option value="LIMITE">Limite</option>
+            <option value="PENDENCIAS">Pendências</option>
+            <option value="USO_IRREGULAR">Possível irregularidade</option>
+          </select>
+        </div>
+
+        <div class="flex gap-2">
+          <button type="button"
+                  onclick="carregarAlertasRecentes()"
+                  class="rounded-lg bg-black text-white text-sm font-semibold px-4 py-2 hover:bg-slate-900 transition">
+            Atualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+        <div class="rounded-xl border border-slate-200 p-4">
+          <div class="text-xs font-semibold text-slate-500">Total de alertas</div>
+          <div id="kpiAlertasTotal" class="text-2xl font-extrabold text-slate-900 mt-1">—</div>
+        </div>
+        <div class="rounded-xl border border-slate-200 p-4">
+          <div class="text-xs font-semibold text-slate-500">Último envio</div>
+          <div id="kpiAlertasUltimo" class="text-sm font-semibold text-slate-900 mt-2">—</div>
+        </div>
+        <div class="rounded-xl border border-slate-200 p-4">
+          <div class="text-xs font-semibold text-slate-500">Observação</div>
+          <div class="text-sm text-slate-700 mt-2">
+            Este painel mostra apenas alertas que foram <b>efetivamente enviados</b> por e-mail.
+          </div>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div class="mt-4">
+        <div id="alertasRecentesLoading" class="hidden text-sm text-slate-700">
+          Carregando alertas...
+        </div>
+
+        <div id="alertasRecentesEmpty" class="hidden text-sm text-slate-700 rounded-xl border border-slate-200 p-4">
+          Nenhum alerta encontrado na janela selecionada.
+        </div>
+
+        <div class="mt-2 overflow-x-auto">
+          <table class="min-w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="text-left px-3 py-2 border-b">Data/Hora</th>
+                <th class="text-left px-3 py-2 border-b">Tipo</th>
+                <th class="text-left px-3 py-2 border-b">Loja</th>
+                <th class="text-left px-3 py-2 border-b">Time</th>
+                <th class="text-left px-3 py-2 border-b">Detalhe</th>
+                <th class="text-left px-3 py-2 border-b">Origem</th>
+              </tr>
+            </thead>
+            <tbody id="alertasRecentesTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<? } ?>
 
 <!-- AUTOCOMPLETE BOX -->
 <div id="vektor-autocomplete-box"></div>
@@ -771,6 +902,166 @@ function closeVektorModal() {
   }
 }
 
+function openAlertasRecentesModal() {
+  const modal = document.getElementById("alertasRecentesModal");
+  if (modal) {
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+  carregarAlertasRecentes();
+}
+
+function closeAlertasRecentesModal() {
+  const modal = document.getElementById("alertasRecentesModal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+}
+
+function carregarAlertasRecentes() {
+  const loading = document.getElementById("alertasRecentesLoading");
+  const empty = document.getElementById("alertasRecentesEmpty");
+  const tbody = document.getElementById("alertasRecentesTbody");
+
+  const kpiTotal = document.getElementById("kpiAlertasTotal");
+  const kpiUltimo = document.getElementById("kpiAlertasUltimo");
+
+  const diasEl = document.getElementById("alertasRecentesDias");
+  const tipoEl = document.getElementById("alertasRecentesTipo");
+
+  const dias = Number(diasEl ? diasEl.value : 14) || 14;
+  const tipo = (tipoEl ? tipoEl.value : "").trim();
+
+  // Reset UI
+  if (loading) loading.classList.remove("hidden");
+  if (empty) empty.classList.add("hidden");
+  if (tbody) tbody.innerHTML = "";
+  if (kpiTotal) kpiTotal.textContent = "—";
+  if (kpiUltimo) kpiUltimo.textContent = "—";
+
+  // Proteção: google.script.run precisa existir
+  if (typeof google === "undefined" || !google.script || !google.script.run) {
+    if (loading) loading.classList.add("hidden");
+    if (empty) {
+      empty.classList.remove("hidden");
+      empty.textContent = "google.script.run não disponível. Abra pela URL do WebApp do Apps Script.";
+    }
+    return;
+  }
+
+  // Proteção: DOM precisa existir
+  if (!tbody) {
+    if (loading) loading.classList.add("hidden");
+    console.error("alertasRecentesTbody não encontrado no DOM.");
+    return;
+  }
+
+      const fmtTs = (ts) => {
+      try {
+        if (!ts) return "";
+
+        // 1) Se já veio como Date (às vezes o Apps Script manda assim)
+        if (ts instanceof Date) return ts.toLocaleString("pt-BR");
+
+        const s = String(ts).trim();
+
+        // 2) Se veio em formato BR: "dd/MM/yyyy HH:mm:ss" (ou sem segundos)
+        const mBR = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+        if (mBR) {
+          const dd = Number(mBR[1]);
+          const mm = Number(mBR[2]);
+          const yyyy = Number(mBR[3]);
+          const HH = Number(mBR[4] || 0);
+          const MI = Number(mBR[5] || 0);
+          const SS = Number(mBR[6] || 0);
+
+          const d = new Date(yyyy, mm - 1, dd, HH, MI, SS);
+          return d.toLocaleString("pt-BR");
+        }
+
+        // 3) ISO (ex.: 2026-01-12T22:19:21.000Z) ou "yyyy-MM-dd HH:mm:ss"
+        const d2 = new Date(s.replace(" ", "T"));
+        return isNaN(d2.getTime()) ? s : d2.toLocaleString("pt-BR");
+      } catch (e) {
+        return String(ts || "");
+      }
+    };
+
+  const badge = (t) => {
+    const x = String(t || "").toUpperCase();
+    if (x === "LIMITE") return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800'>Limite</span>";
+    if (x === "PENDENCIAS") return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800'>Pendências</span>";
+    if (x === "USO_IRREGULAR") return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800'>Possível irregularidade</span>";
+    return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800'>" + (t || "Outro") + "</span>";
+  };
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      try {
+        if (loading) loading.classList.add("hidden");
+
+        // Debug: te mostra no console o que voltou do backend
+        console.log("[AlertasRecentes] res:", res);
+
+        if (!res || !res.ok) {
+          if (empty) {
+            empty.classList.remove("hidden");
+            empty.textContent =
+          "Falha ao carregar alertas. " +
+          (res && res.error ? res.error : "Sem mensagem de erro.") +
+          " | payload=" + JSON.stringify(res);
+          }
+          return;
+        }
+
+        let rows = Array.isArray(res.rows) ? res.rows : [];
+        if (tipo) rows = rows.filter(r => String(r.tipo || "").toUpperCase() === tipo.toUpperCase());
+
+        if (!rows.length) {
+          if (empty) empty.classList.remove("hidden");
+          if (kpiTotal) kpiTotal.textContent = "0";
+          if (kpiUltimo) kpiUltimo.textContent = "—";
+          return;
+        }
+
+        if (kpiTotal) kpiTotal.textContent = String(rows.length);
+        if (kpiUltimo) kpiUltimo.textContent = fmtTs(rows[0].timestamp || "—");
+
+        rows.forEach(r => {
+          const tr = document.createElement("tr");
+          tr.className = "hover:bg-slate-50";
+          tr.innerHTML = `
+            <td class="px-3 py-2 border-b text-xs text-slate-700 whitespace-nowrap">${fmtTs(r.timestamp || "")}</td>
+            <td class="px-3 py-2 border-b">${badge(r.tipo)}</td>
+            <td class="px-3 py-2 border-b text-slate-700 whitespace-nowrap">${(r.loja && String(r.loja).trim()) ? r.loja : "Consolidado"}</td>
+            <td class="px-3 py-2 border-b text-slate-700 whitespace-nowrap">${(r.time && String(r.time).trim()) ? r.time : "Consolidado"}</td>
+            <td class="px-3 py-2 border-b text-slate-700">${r.detalhe || ""}</td>
+            <td class="px-3 py-2 border-b text-xs text-slate-500 whitespace-nowrap">${r.origem || ""}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        // Se der erro aqui, antes ficava “mudo”. Agora você vai ver.
+        if (loading) loading.classList.add("hidden");
+        if (empty) {
+          empty.classList.remove("hidden");
+          empty.textContent = "Erro ao renderizar alertas: " + (e && e.message ? e.message : e);
+        }
+        console.error("Erro ao renderizar Alertas Recentes:", e);
+      }
+    })
+    .withFailureHandler(function (err) {
+      if (loading) loading.classList.add("hidden");
+      if (empty) {
+        empty.classList.remove("hidden");
+        empty.textContent = "Erro ao carregar alertas: " + (err && err.message ? err.message : err);
+      }
+      console.error("[AlertasRecentes] failure:", err);
+    })
+    .getAlertasRecentes(dias, 200);
+}
+
 function openAjudaVektorModal() {
   var modal = document.getElementById("ajudaVektorModal");
   if (modal) {
@@ -805,9 +1096,11 @@ function openStatusVektorModal() {
   document.getElementById("status-alertas").textContent = "Ativos";
 
   google.script.run.withSuccessHandler(function (data) {
-    document.getElementById("status-baseclara").textContent = data.baseClara;
-    document.getElementById("status-jobs").textContent = data.jobs;
-  }).vektorStatusSistema();
+  document.getElementById("status-baseclara").textContent = data.baseClara || "—";
+  document.getElementById("status-jobs").textContent = data.jobs || "—";
+  document.getElementById("status-google").textContent = data.google || "—";
+  document.getElementById("status-bigquery").textContent = data.bigquery || "—";
+}).vektorStatusSistema();
 }
 
 function closeStatusVektorModal() {
