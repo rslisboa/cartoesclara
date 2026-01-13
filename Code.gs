@@ -8302,50 +8302,81 @@ function LIMPAR_ALERTA_LIMITE() {
 }
 
 function vektorStatusSistema() {
-  const file = DriveApp.getFileById(BASE_CLARA_ID);
+  const email = Session.getActiveUser().getEmail() || "";
+  const isAdmin = isAdminEmail(email);
 
+  const file = DriveApp.getFileById(BASE_CLARA_ID);
   const ultimaAtualizacao = file.getLastUpdated();
 
-   // ===== Serviços Google (Apps Script / E-mail) =====
-  var googleTxt = "OK";
-  try {
-    var quota = MailApp.getRemainingDailyQuota();
-    googleTxt = "OK | Quota e-mail restante hoje: " + quota;
-  } catch (eMail) {
-    googleTxt = "Falha MailApp/quota: " + ((eMail && eMail.message) ? eMail.message : String(eMail));
-  }
+  // Sempre retorna Base e Status Geral
+  const baseClaraTxt = Utilities.formatDate(
+    ultimaAtualizacao,
+    Session.getScriptTimeZone(),
+    "dd/MM/yyyy HH:mm"
+  );
 
-  // ===== BigQuery (healthcheck simples) =====
-  var bqTxt = "OK";
-  try {
-    var req = { query: "SELECT 1 AS ok", useLegacySql: false };
-    var r = BigQuery.Jobs.query(req, PROJECT_ID);
-    bqTxt = (r && r.jobComplete === true) ? "OK" : "Indisponível (job não completou)";
-  } catch (eBQ) {
-    bqTxt = "Falha BigQuery: " + ((eBQ && eBQ.message) ? eBQ.message : String(eBQ));
+  // Não-admin: retorna só o necessário (segurança)
+  if (!isAdmin) {
+    return {
+      baseClara: baseClaraTxt,
+      geral: "Em operação"
+    };
   }
+  // Serviços Google (Apps Script / E-mail): quota diária restante
+let googleTxt = "OK";
+try {
+  const quota = MailApp.getRemainingDailyQuota();
+  googleTxt = "OK | Quota e-mail restante hoje: " + quota;
+} catch (e) {
+  // Se falhar, devolve a falha (pra você enxergar no modal em vez de mascarar)
+  googleTxt = "Falha ao ler quota de e-mail: " + (e && e.message ? e.message : String(e));
+}
 
+  // ===== BigQuery: healthcheck real (Job + métricas) =====
+let bqTxt = "Indisponível";
+try {
+  const t0 = Date.now();
+
+  const req = {
+    query: "SELECT 1 AS ok",
+    useLegacySql: false,
+    timeoutMs: 10000 // evita travar o modal
+  };
+
+  const r = BigQuery.Jobs.query(req, PROJECT_ID);
+
+  const ms = Date.now() - t0;
+  const jobId = r && r.jobReference ? r.jobReference.jobId : "";
+  const loc = r && r.jobReference ? r.jobReference.location : "";
+  const complete = r && r.jobComplete === true;
+
+  // totalBytesProcessed costuma vir como string
+  const bytes = r && r.statistics ? r.statistics.totalBytesProcessed : "";
+  const cacheHit = r && r.statistics ? r.statistics.cacheHit : "";
+
+  if (!complete) {
+    bqTxt = `Instável | job não completou | ${ms}ms` + (jobId ? ` | jobId ${jobId}` : "");
+  } else {
+    bqTxt =
+      `OK | ${ms}ms` +
+      (bytes ? ` | bytes ${bytes}` : "") +
+      (cacheHit !== "" ? ` | cacheHit ${cacheHit}` : "") +
+      (loc ? ` | ${loc}` : "") +
+      (jobId ? ` | jobId ${jobId}` : "");
+  }
+} catch (eBQ) {
+  bqTxt = "Falha BigQuery: " + (eBQ && eBQ.message ? eBQ.message : String(eBQ));
+}
+
+  // Admin: retorna completo
   return {
-    baseClara: Utilities.formatDate(
-      ultimaAtualizacao,
-      Session.getScriptTimeZone(),
-      "dd/MM/yyyy HH:mm"
-    ),
+    baseClara: baseClaraTxt,
     jobs: "Executados com sucesso",
 
-    // ✅ NOVOS CAMPOS para o modal
+    // ajuste conforme o que você já implementou
     google: googleTxt,
     bigquery: bqTxt,
-
-    // ✅ mantém o que seu modal já exibe hoje (se estiver hardcoded no front)
     alertas: "Ativos",
     geral: "Em operação"
   };
-
-}
-
-function TESTE_LER_ALERTAS_RECENTES() {
-  const res = getAlertasRecentes(30, 50);
-  Logger.log(JSON.stringify(res, null, 2));
-  return res;
 }
