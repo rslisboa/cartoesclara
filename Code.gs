@@ -264,6 +264,127 @@ function getAlertasRecentes(dias, limit) {
 }
 
 /**
+ * Retorna informações do "Estado Operacional" para o modal do HTML.
+ * Inclui:
+ * - BaseClara: referência simples (última linha/data, quando possível)
+ * - Jobs: se houver propriedade registrada (fallback N/D)
+ * - Serviços Google: quota de e-mail + status de execução
+ * - BigQuery: healthcheck simples (SELECT 1)
+ * - Alertas: última linha do log (se existir)
+ */
+function getStatusOperacionalVektor() {
+  try {
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+    // -------------------------
+    // 1) BaseClara (sinal simples)
+    // -------------------------
+    var baseClaraTxt = "—";
+    try {
+      var ssBase = SpreadsheetApp.openById(BASE_CLARA_ID);
+      var shBase = ssBase.getSheetByName("BaseClara");
+      if (shBase) {
+        var lr = shBase.getLastRow();
+        if (lr >= 2) {
+          // tenta capturar uma data “de referência” na última linha (coluna A)
+          var vA = shBase.getRange(lr, 1).getValue();
+          if (vA instanceof Date) {
+            baseClaraTxt = "Linha " + lr + " | " + Utilities.formatDate(vA, tz, "dd/MM/yyyy HH:mm");
+          } else {
+            baseClaraTxt = "Linha " + lr + " | " + Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm");
+          }
+        } else {
+          baseClaraTxt = "BaseClara sem dados suficientes.";
+        }
+      } else {
+        baseClaraTxt = "Aba BaseClara não encontrada.";
+      }
+    } catch (eBase) {
+      baseClaraTxt = "Falha ao ler BaseClara: " + (eBase && eBase.message ? eBase.message : String(eBase));
+    }
+
+    // -------------------------
+    // 2) Jobs (se você tiver alguma property de controle)
+    // -------------------------
+    var jobsTxt = "—";
+    try {
+      var props = PropertiesService.getScriptProperties();
+      // se você já grava algo como VEKTOR_LAST_JOBS_RUN, vai aparecer; senão, N/D
+      var lastJobs = props.getProperty("VEKTOR_LAST_JOBS_RUN") || "";
+      jobsTxt = lastJobs ? lastJobs : "N/D (não registrado)";
+    } catch (eJobs) {
+      jobsTxt = "Falha ao ler status de jobs.";
+    }
+
+    // -------------------------
+    // 3) Serviços Google / E-mail (quota)
+    // -------------------------
+    var googleTxt = "—";
+    try {
+      var quota = MailApp.getRemainingDailyQuota(); // pode lançar exceção se serviço estiver com problema
+      googleTxt = "OK | Quota e-mail restante hoje: " + quota;
+    } catch (eMail) {
+      googleTxt = "Falha no MailApp/quota: " + (eMail && eMail.message ? eMail.message : String(eMail));
+    }
+
+    // -------------------------
+    // 4) BigQuery (healthcheck SELECT 1)
+    // -------------------------
+    var bqTxt = "—";
+    try {
+      var req = { query: "SELECT 1 AS ok", useLegacySql: false };
+      var r = BigQuery.Jobs.query(req, PROJECT_ID);
+      bqTxt = (r && r.jobComplete === true) ? "OK" : "Indisponível (job não completou)";
+    } catch (eBQ) {
+      bqTxt = "Falha BigQuery: " + (eBQ && eBQ.message ? eBQ.message : String(eBQ));
+    }
+
+    // -------------------------
+    // 5) Alertas (último envio registrado)
+    // -------------------------
+    var alertasTxt = "—";
+    try {
+      var sh = getOrCreateAlertasLogSheet_(); // você já tem essa função no projeto
+      var lastRow = sh.getLastRow();
+      if (lastRow >= 2) {
+        var ts = sh.getRange(lastRow, 1).getValue(); // timestamp
+        var tipo = sh.getRange(lastRow, 2).getValue(); // tipo
+        var tsFmt = (ts instanceof Date) ? Utilities.formatDate(ts, tz, "dd/MM/yyyy HH:mm:ss") : String(ts || "");
+        alertasTxt = "Último: " + tsFmt + " | " + String(tipo || "");
+      } else {
+        alertasTxt = "Sem registros recentes.";
+      }
+    } catch (eAl) {
+      alertasTxt = "Falha ao ler log de alertas.";
+    }
+
+    // -------------------------
+    // 6) Status geral (regra simples)
+    // -------------------------
+    var geralTxt = "Operando";
+    var temFalhaGoogle = String(googleTxt).toLowerCase().indexOf("falha") !== -1;
+    var temFalhaBQ = String(bqTxt).toLowerCase().indexOf("falha") !== -1 || String(bqTxt).toLowerCase().indexOf("indispon") !== -1;
+
+    if (temFalhaGoogle && temFalhaBQ) geralTxt = "Instável (Google + BigQuery)";
+    else if (temFalhaGoogle) geralTxt = "Instável (Serviços Google/E-mail)";
+    else if (temFalhaBQ) geralTxt = "Instável (BigQuery)";
+
+    return {
+      ok: true,
+      baseclara: baseClaraTxt,
+      jobs: jobsTxt,
+      google: googleTxt,
+      bigquery: bqTxt,
+      alertas: alertasTxt,
+      geral: geralTxt
+    };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
  * Busca demissões de gerentes (Senior/RH via BigQuery) a partir de uma data (inclusive).
  * Retorna colunas: matricula, des_email_corporativo, des_titulo_cargo,
  * nom_apelido_filial, nom_afastamento, dat_afastamento (dd/MM/yyyy)
@@ -8185,14 +8306,42 @@ function vektorStatusSistema() {
 
   const ultimaAtualizacao = file.getLastUpdated();
 
+   // ===== Serviços Google (Apps Script / E-mail) =====
+  var googleTxt = "OK";
+  try {
+    var quota = MailApp.getRemainingDailyQuota();
+    googleTxt = "OK | Quota e-mail restante hoje: " + quota;
+  } catch (eMail) {
+    googleTxt = "Falha MailApp/quota: " + ((eMail && eMail.message) ? eMail.message : String(eMail));
+  }
+
+  // ===== BigQuery (healthcheck simples) =====
+  var bqTxt = "OK";
+  try {
+    var req = { query: "SELECT 1 AS ok", useLegacySql: false };
+    var r = BigQuery.Jobs.query(req, PROJECT_ID);
+    bqTxt = (r && r.jobComplete === true) ? "OK" : "Indisponível (job não completou)";
+  } catch (eBQ) {
+    bqTxt = "Falha BigQuery: " + ((eBQ && eBQ.message) ? eBQ.message : String(eBQ));
+  }
+
   return {
     baseClara: Utilities.formatDate(
       ultimaAtualizacao,
       Session.getScriptTimeZone(),
       "dd/MM/yyyy HH:mm"
     ),
-    jobs: "Executados com sucesso"
+    jobs: "Executados com sucesso",
+
+    // ✅ NOVOS CAMPOS para o modal
+    google: googleTxt,
+    bigquery: bqTxt,
+
+    // ✅ mantém o que seu modal já exibe hoje (se estiver hardcoded no front)
+    alertas: "Ativos",
+    geral: "Em operação"
   };
+
 }
 
 function TESTE_LER_ALERTAS_RECENTES() {
