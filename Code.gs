@@ -116,8 +116,6 @@ if (isAdminEmail(email)) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-
-
 // ✅ ID da planilha de métricas do Vektor
 // (a planilha que você mandou)
 const VEKTOR_METRICAS_SHEET_ID = '18yAuYoAR33JOagqapxgwHh86F1WeD0mZcj9AIJym07k';
@@ -129,10 +127,141 @@ const VEKTOR_METRICAS_TAB_NAME = 'Vektor_Metricas';
 // (ID da pasta que você mandou no link)
 const VEKTOR_PASTA_TERMOS_ID = '1Qj1oXoBxKnkGUA9hKoaF6Ak_9m7bb4wD';
 
+// =======================
+// LOG DE ALERTAS ENVIADOS
+// =======================
+const VEKTOR_ALERTAS_LOG_TAB = "Vektor_Alertas_Log"; 
+
 
 // 🌐 BigQuery – validação de loja
 const PROJECT_ID = 'cnto-data-lake';
 const BQ_TABLE_LOJAS = '`cnto-data-lake.refined.cnt_ref_gld_dim_estrutura_loja`';
+
+function getOrCreateAlertasLogSheet_() {
+  var ss = SpreadsheetApp.openById(VEKTOR_METRICAS_SHEET_ID);
+  var sh = ss.getSheetByName(VEKTOR_ALERTAS_LOG_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(VEKTOR_ALERTAS_LOG_TAB);
+    sh.appendRow(["timestamp", "tipo", "loja", "time", "detalhe", "destinatarios", "origem"]);
+    sh.getRange(1, 1, 1, 7).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+/**
+ * Registra um alerta enviado (linha simples, rastreável).
+ * tipo: "LIMITE", "PENDENCIAS", "USO_IRREGULAR", "OFENSORAS", etc.
+ */
+function registrarAlertaEnviado_(tipo, loja, time, detalhe, destinatarios, origem) {
+  try {
+    var sh = getOrCreateAlertasLogSheet_();
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var ts = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss");
+
+    sh.appendRow([
+      ts,
+      String(tipo || "").trim(),
+      String(loja || "").trim(),
+      String(time || "").trim(),
+      String(detalhe || "").trim(),
+      String(destinatarios || "").trim(),
+      String(origem || "").trim()
+    ]);
+  } catch (e) {
+    Logger.log("Falha ao registrar alerta enviado: " + (e && e.message ? e.message : e));
+  }
+}
+
+/**
+ * Retorna alertas recentes para o modal.
+ * dias: janela (ex 14)
+ * limit: limite de linhas (ex 200)
+ */
+function getAlertasRecentes(dias, limit) {
+
+    var email = Session.getActiveUser().getEmail() || "";
+  if (!isAdminEmail(email)) {
+    return { ok: false, error: "Acesso restrito: apenas Administrador." };
+  }
+
+  try {
+    dias = Number(dias) || 14;
+    limit = Number(limit) || 200;
+
+    var sh = getOrCreateAlertasLogSheet_();
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return { ok: true, rows: [] };
+
+    var values = sh.getRange(2, 1, lastRow - 1, 7).getValues(); // sem cabeçalho
+    // values: [ts,tipo,loja,time,detalhe,destinatarios,origem]
+
+    // filtra por janela
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var agora = new Date();
+    var ini = new Date(agora);
+    ini.setDate(agora.getDate() - (dias - 1));
+    ini.setHours(0, 0, 0, 0);
+
+    function parseTs_(s) {
+  // Se vier como Date (Sheets converte), usa direto
+  if (s instanceof Date) return s;
+
+  // Espera "yyyy-MM-dd HH:mm:ss"
+  if (!s) return null;
+
+  var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/);
+  if (m) {
+    return new Date(
+      Number(m[1]),
+      Number(m[2]) - 1,
+      Number(m[3]),
+      Number(m[4]),
+      Number(m[5]),
+      Number(m[6])
+    );
+  }
+
+  // Fallback: tenta parse nativo (caso venha em outro formato)
+  var d2 = new Date(String(s));
+  return isNaN(d2.getTime()) ? null : d2;
+}
+
+    var out = [];
+    for (var i = values.length - 1; i >= 0; i--) { // mais recentes primeiro
+      var r = values[i];
+      var d = parseTs_(r[0]);
+      if (!d) continue;
+      if (d < ini) break; // como está em ordem cronológica, pode parar
+
+      var tsTxt = "";
+        try {
+          tsTxt = Utilities.formatDate(d, tz, "dd/MM/yyyy HH:mm:ss");
+        } catch (e) {
+          tsTxt = String(r[0] || "");
+        }
+
+        out.push({
+          timestamp: tsTxt,                 // ✅ string serializável no WebApp
+          tipo: String(r[1] || ""),
+          loja: String(r[2] || ""),
+          time: String(r[3] || ""),
+          detalhe: String(r[4] || ""),
+          destinatarios: String(r[5] || ""),
+          origem: String(r[6] || "")
+        });
+
+
+      if (out.length >= limit) break;
+    }
+
+    return { ok: true, rows: out, meta: { dias: dias, limit: limit } };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+
+}
 
 /**
  * Busca demissões de gerentes (Senior/RH via BigQuery) a partir de uma data (inclusive).
@@ -605,6 +734,15 @@ function enviarPendenciasPorEmail(lojaCodigo, emailDestino) {
       htmlBody: corpoHtml,
       name: "Vektor Grupo SBF"
     });
+
+    registrarAlertaEnviado_(
+  "PENDENCIAS_LOJA",
+  lojaNumero,
+  "",
+  "Pendências enviadas por e-mail (data cobrança " + dataFormatada + "). Itens=" + ((dados.rows || []).length),
+  emailDestino,
+  "enviarPendenciasPorEmail"
+);
 
     return {
       ok: true,
@@ -3034,6 +3172,17 @@ if (typeof res.periodo === "string") {
     name: "Vektor – Grupo SBF"
   });
 
+  // Após MailApp.sendEmail(...)
+  registrarAlertaEnviado_(
+  "LIMITE",
+  "",
+  "",
+  "Envio consolidado de alertas de limite. Risco=" + (risco.length) +
+    ", Monitoramento=" + (monitoramento.length) + ", Eficiência=" + (eficiencia.length) + ", Admin=" + (admin.length),
+  destinatarios.join(","),
+  "enviarAlertasLimitesClaraDiario"
+);
+
   // Registra enviados no ciclo para anti-spam
   registrarEnviadosCiclo_(cicloKey, filtrados._enviadosKeys);
 
@@ -3432,6 +3581,15 @@ var html = montarEmailOfensorasPendencias_(rel);
       name: "Vektor - Grupo SBF"
     });
 
+    registrarAlertaEnviado_(
+  "PENDENCIAS",
+  "",
+  "",
+  "Envio do relatório de lojas ofensoras (janela " + ((diasJanela || 60)) + "d). Total lojas=" + ((rel.rows || []).length),
+  destinatarios.join(","),
+  "enviarEmailOfensorasPendenciasClara"
+);
+
     return { ok: true, sent: true, msg: "E-mail enviado para admins.", totalLojas: (rel.rows||[]).length };
 
   } catch (e) {
@@ -3595,6 +3753,16 @@ function enviarEmailUsoIrregularClara_(rel) {
       htmlBody: html,
       name: "Vektor - Grupo SBF"
     });
+
+    registrarAlertaEnviado_(
+  "USO_IRREGULAR",
+  "", // não é alerta por loja única (é consolidado)
+  "",
+  "Possível uso irregular (modelo conservador). Casos=" + ((rel.rows || []).length) +
+    (rel.meta && rel.meta.periodo ? (" | " + rel.meta.periodo) : ""),
+  destinatarios.join(","),
+  "enviarEmailUsoIrregularClara_"
+);
 
     return { ok: true, sent: true, total: (rel.rows || []).length };
 
@@ -7996,8 +8164,20 @@ function RESETAR_GATE_EMAIL_OFENSORAS_SEMANA() {
 
 function LIMPAR_ALERTA_LIMITE() {
   var props = PropertiesService.getScriptProperties();
+
+  // 1) Gate do envio de limite (porteiro ENVIAR_EMAIL_LIMITE_CLARA)
+  props.deleteProperty("VEKTOR_SIG_BASECLARA_PROCESSADA");
+
+  // 2) Anti-spam do ciclo (se existir no seu fluxo)
+  try {
+    var cicloKey = getCicloKey06a05_();
+    props.deleteProperty("VEKTOR_ALERTS_SENT_" + cicloKey);
+  } catch (e) {}
+
+  // 3) Mantém sua limpeza antiga (se ainda for usada em outra parte)
   props.deleteProperty("VEKTOR_HISTPEND_LAST_SIG");
-  Logger.log("Snapshot do alerta de LIMITE limpo com sucesso.");
+
+  Logger.log("Gate do alerta de LIMITE limpo com sucesso.");
 }
 
 function vektorStatusSistema() {
@@ -8013,4 +8193,10 @@ function vektorStatusSistema() {
     ),
     jobs: "Executados com sucesso"
   };
+}
+
+function TESTE_LER_ALERTAS_RECENTES() {
+  const res = getAlertasRecentes(30, 50);
+  Logger.log(JSON.stringify(res, null, 2));
+  return res;
 }
