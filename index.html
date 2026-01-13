@@ -919,6 +919,80 @@ function closeAlertasRecentesModal() {
   }
 }
 
+// ===============================
+// MODAL: ESTADO OPERACIONAL
+// ===============================
+function openStatusVektorModal() {
+  const modal = document.getElementById("statusVektorModal");
+  if (modal) {
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+
+  // placeholders imediatos (evita parecer “travado”)
+  const set = (id, txt) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = (txt == null ? "—" : String(txt));
+  };
+
+  set("status-baseclara", "Carregando...");
+  set("status-jobs", "Carregando...");
+  set("status-google", "Carregando...");
+  set("status-bigquery", "Carregando...");
+  set("status-alertas", "Carregando...");
+  set("status-manutencao", "Carregando...");
+  // Se você tiver uma variação com "status-geral" em outro HTML, mantém também:
+  set("status-geral", "Carregando...");
+
+  // Proteção
+  if (typeof google === "undefined" || !google.script || !google.script.run) {
+    set("status-manutencao", "google.script.run indisponível (abra via WebApp).");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.ok) {
+        const msg = (res && res.error) ? res.error : "Falha ao obter status.";
+        set("status-manutencao", msg);
+        set("status-geral", msg);
+        return;
+      }
+
+      set("status-baseclara", res.baseclara || "—");
+      set("status-jobs", res.jobs || "—");
+      set("status-alertas", res.alertas || "—");
+
+      // Serviços Google / E-mail (quota + status)
+      set("status-google", res.google || "—");
+
+      // BigQuery healthcheck
+      set("status-bigquery", res.bigquery || "—");
+
+      // Status geral / manutenção
+      set("status-manutencao", res.geral || "—");
+      set("status-geral", res.geral || "—");
+    })
+    .withFailureHandler(function (err) {
+      const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+      const set = (id, txt) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = txt;
+      };
+      set("status-manutencao", "Erro ao buscar status: " + msg);
+      set("status-geral", "Erro ao buscar status: " + msg);
+    })
+    .getStatusOperacionalVektor(); // <- esta função vai ser criada no Code.gs
+}
+
+function closeStatusVektorModal() {
+  const modal = document.getElementById("statusVektorModal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+}
+
 function carregarAlertasRecentes() {
   const loading = document.getElementById("alertasRecentesLoading");
   const empty = document.getElementById("alertasRecentesEmpty");
@@ -1098,8 +1172,20 @@ function openStatusVektorModal() {
   google.script.run.withSuccessHandler(function (data) {
   document.getElementById("status-baseclara").textContent = data.baseClara || "—";
   document.getElementById("status-jobs").textContent = data.jobs || "—";
-  document.getElementById("status-google").textContent = data.google || "—";
-  document.getElementById("status-bigquery").textContent = data.bigquery || "—";
+  // Serviços Google (Apps Script / E-mail)
+const googleStatus =
+  data && (data.google ?? data.googleStatus ?? data.servicosGoogle);
+
+document.getElementById("status-google").textContent =
+  googleStatus ? googleStatus : "Indisponível";
+
+// BigQuery
+const bigQueryStatus =
+  data && (data.bigquery ?? data.bigQuery ?? data.bigQueryStatus);
+
+document.getElementById("status-bigquery").textContent =
+  bigQueryStatus ? bigQueryStatus : "Indisponível";
+
 }).vektorStatusSistema();
 }
 
