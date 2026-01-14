@@ -852,7 +852,6 @@
       <li><b>Última execução dos jobs:</b> <span id="status-jobs">—</span></li>
       <li><b>Serviços Google (Apps Script / E-mail):</b> <span id="status-google">—</span></li>
       <li><b>BigQuery:</b> <span id="status-bigquery">—</span></li>
-      <li><b>Status dos alertas:</b> <span id="status-alertas">—</span></li>
       <li><b>Manutenção:</b> <span id="status-manutencao">—</span></li>
     <? } ?>
   </ul>
@@ -1050,21 +1049,21 @@
           Nenhum alerta encontrado na janela selecionada.
         </div>
 
-        <div class="mt-2 overflow-x-auto">
-          <table class="min-w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
-            <thead class="bg-slate-100">
-              <tr>
-                <th class="text-left px-3 py-2 border-b">Data/Hora</th>
-                <th class="text-left px-3 py-2 border-b">Tipo</th>
-                <th class="text-left px-3 py-2 border-b">Loja</th>
-                <th class="text-left px-3 py-2 border-b">Time</th>
-                <th class="text-left px-3 py-2 border-b">Detalhe</th>
-                <th class="text-left px-3 py-2 border-b">Origem</th>
-              </tr>
-            </thead>
-            <tbody id="alertasRecentesTbody"></tbody>
-          </table>
-        </div>
+        <div class="mt-2 overflow-x-auto overflow-y-auto max-h-[45vh] rounded-xl border border-slate-200">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="sticky top-0 z-10 bg-slate-100 text-left px-3 py-2 border-b">Data/Hora</th>
+              <th class="sticky top-0 z-10 bg-slate-100 text-left px-3 py-2 border-b">Tipo</th>
+              <th class="sticky top-0 z-10 bg-slate-100 text-left px-3 py-2 border-b">Loja</th>
+              <th class="sticky top-0 z-10 bg-slate-100 text-left px-3 py-2 border-b">Time</th>
+              <th class="sticky top-0 z-10 bg-slate-100 text-left px-3 py-2 border-b">Detalhe</th>
+              <th class="sticky top-0 z-10 bg-slate-100 text-left px-3 py-2 border-b">Origem</th>
+            </tr>
+          </thead>
+          <tbody id="alertasRecentesTbody"></tbody>
+        </table>
+      </div>
       </div>
     </div>
 
@@ -1379,9 +1378,6 @@ function openStatusVektorModal() {
     setText("status-manutencao", "Em operação");
   }
 
-  // Alertas (somente admin, se existir no DOM)
-  setText("status-alertas", "Ativos");
-
   // Proteção: se abriu fora do WebApp
   if (typeof google === "undefined" || !google.script || !google.script.run) {
     setText("status-geral", "google.script.run indisponível (abra via WebApp).");
@@ -1399,7 +1395,6 @@ function openStatusVektorModal() {
 
       // A partir daqui: campos admin-only (só preenche se existirem)
       setText("status-jobs", data && data.jobs);
-      setText("status-alertas", data && data.alertas);
 
       // Serviços Google (Apps Script / E-mail)
       const googleStatus = data && (data.google ?? data.googleStatus ?? data.servicosGoogle);
@@ -16298,7 +16293,7 @@ window.vektorMostrarTabelaDemissoesAdmin = function () {
           if (!rows.length) {
             renderBotMessage(
               "HTML:<div class='text-sm text-slate-700'>" +
-                "<p><b>Conforme consulta efetuada no sistema de informações do RH (Senior)</b>, não há demissões de gerentes registradas desde <b>01/12/2025</b>.</p>" +
+                "<p><b>Conforme consulta efetuada no sistema de informações do RH (Senior) através da tabela de informações no BigQuery</b>, não há demissões de gerentes registradas desde <b>01/12/2025</b>.</p>" +
               "</div>"
             );
             return;
@@ -16307,7 +16302,7 @@ window.vektorMostrarTabelaDemissoesAdmin = function () {
           // Monta tabela
                 let html =
                   "<div class='text-sm'>" +
-                    "<p>Conforme consulta efetuada no sistema de informações do RH (Senior), segue abaixo tabela com as últimas demissões de <b>Gerente de loja</b> ocorridas:</p>" +
+                    "<p>Conforme consulta efetuada no sistema de informações do RH (Senior) através da tabela de informações no BigQuery, segue abaixo tabela com as últimas demissões de <b>Gerente de loja</b> ocorridas:</p>" +
                     "<div class='mt-2 overflow-x-auto'>" +
                       "<table class='min-w-full text-xs border border-slate-200'>" +
                         "<thead class='bg-slate-100'>" +
