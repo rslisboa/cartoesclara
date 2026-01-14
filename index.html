@@ -31,6 +31,9 @@
         flex-direction:column;
         height:100%;
         min-height:0;
+        position: relative;
+        overflow: hidden;
+
     }
 
     /* HEADER */
@@ -87,7 +90,7 @@
         flex: 1;
         display:flex;
         flex-direction:column;
-        overflow-y:auto;
+        overflow-y:hidden;
         padding:1rem 1.25rem;
         background-color:#fff;
         min-height:0;
@@ -149,6 +152,7 @@
         gap:.75rem;
         padding:.75rem 1rem;
         box-shadow:0 10px 15px -3px rgba(0,0,0,.08);
+        position: relative;
     }
     .input-shell textarea {
         flex:1 1 auto;
@@ -253,11 +257,18 @@
 
 /* === VEKTOR AUTOCOMPLETE === */
 #vektor-autocomplete-box {
-  margin-top: 4px;
+  position: absolute;
+  left: 0;
+  right: 0;
+
+  /* aparece acima do input, sem empurrar layout */
+  bottom: calc(100% + 8px);
+
+  margin-top: 0;
   background: #ffffff;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.14);
   z-index: 9999;
   display: none;
   font-size: 13px;
@@ -413,6 +424,14 @@
     🔔 Alertas Recentes
   </button>
 
+  <!-- Botão: Radar de Irregularidade (somente Admin) -->
+  <button
+    type="button"
+    onclick="window.vektorOpenRadar('7d')"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  >
+    📈 Radar de Irregularidade
+  </button>
 <? } ?>
 
   <!-- Botão: Feedback -->
@@ -450,25 +469,143 @@
   </div>
 </header>
 
-    <!-- BODY -->
-    <main class="chat-body">
-        <div id="chatWindow" class="chat-window">
+<!-- BODY -->
+<div id="chatView" style="height:100%; display:flex; flex-direction:column; min-height:0;">
+  <main class="chat-body">
+    <div id="chatWindow" class="chat-window">
 
-                        <!-- Mensagem inicial do bot -->
-                <div class="flex items-start gap-3">
-                    <img
-                        src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png"
-                        alt="Assistente Clara (robô)"
-                        class="h-16 w-auto object-contain flex-shrink-0"
-                    />
-                    <div class="bot-bubble px-4 py-3 max-w-[80%] text-slate-700">
-                        <p class="font-semibold text-slate-800 text-base">
-                            Olá! 👋 Eu sou o Vektor, atleta do <b>Grupo SBF</b> especializado na Clara.
-                        </p>
-                    </div>
-                </div>
-                </div>     <!-- fecha #chatWindow -->
-              </main>      <!-- fecha .chat-body -->
+      <!-- Mensagem inicial do bot -->
+      <div class="flex items-start gap-3">
+        <img
+          src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png"
+          alt="Assistente Clara (robô)"
+          class="h-16 w-auto object-contain flex-shrink-0"
+        />
+        <div class="bot-bubble px-4 py-3 max-w-[80%] text-slate-700">
+          <p class="font-semibold text-slate-800 text-base">
+            Olá! 👋 Eu sou o Vektor, atleta do <b>Grupo SBF</b> especializado na Clara.
+          </p>
+        </div>
+      </div>
+
+    </div> <!-- fecha #chatWindow -->
+  </main> <!-- fecha .chat-body -->
+
+<!-- FOOTER / INPUT (AGORA DENTRO DO chatView) -->
+  <footer class="chat-footer">
+    <form id="chatForm" class="w-full">
+      <div class="input-shell">
+        <textarea id="userInput" placeholder="Digite aqui."></textarea>
+
+        <!-- AUTOCOMPLETE VEKTOR -->
+        <div id="vektor-autocomplete-box"></div>
+
+        <!-- Botão de anexo do Termo -->
+        <button
+          type="button"
+          id="attachBtn"
+          title="Anexar"
+          class="ml-1 px-2 py-2 rounded-md border border-slate-300 text-sm flex items-center justify-center bg-transparent"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg"
+            fill="none" viewBox="0 0 24 24" stroke-width="2"
+            stroke="#0f172a" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M21 12.79V9a6 6 0 10-12 0v7a4 4 0 008 0v-6a2 2 0 00-4 0v5"/>
+          </svg>
+        </button>
+
+        <!-- Botão Enviar -->
+        <button type="submit" id="sendBtn">Enviar</button>
+
+        <!-- Input de arquivo escondido (Termo) -->
+        <input
+          type="file"
+          id="fileTermo"
+          accept=".pdf,.jpg,.jpeg,.png,.heic,.HEIC"
+          class="hidden"
+        />
+      </div>
+    </form>
+  </footer>
+</div> <!-- fecha #chatView -->
+
+<!-- VIEW: RADAR (sobrepõe SOMENTE a área do chat) -->
+<div id="radarView" class="hidden" style="position:absolute; inset:0; z-index:20;">
+
+    <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+      <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+
+      <!-- Header do Radar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button type="button"
+              onclick="window.vektorShowChatView()"
+              style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:800; font-size:12px;">
+              ← Voltar ao chat
+            </button>
+
+          <div>
+            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Radar de Irregularidade</div>
+            <div style="color:rgba(226,232,240,0.9); font-size:12px; margin-top:2px;">
+              Correlação entre métricas + ranking de proximidade por loja
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+         <button id="radarBtn7d" type="button" onclick="window.vektorOpenRadar('7d')"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+            7 dias
+          </button>
+
+          <button id="radarBtnCiclo" type="button" onclick="window.vektorOpenRadar('ciclo')"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+            Ciclo
+          </button>
+
+          <button id="radarBtnFull" type="button" onclick="window.vektorOpenRadar('full')"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+            Base toda
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div style="flex:1; overflow:auto; background:#070b14; padding:14px 16px;">
+        <div id="radarLoading" style="display:none; color:rgba(226,232,240,0.9); font-size:13px; font-weight:700;">
+          Carregando dados do Radar...
+        </div>
+
+        <div id="radarContent" style="display:grid; grid-template-columns: 1.2fr 0.8fr; gap:12px;">
+          <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:10px;">
+              <div style="color:#fff; font-weight:900; font-size:13px;">Correlação (Pearson)</div>
+              <div style="color:rgba(226,232,240,0.75); font-size:11px;">-1 · 0 · +1</div>
+            </div>
+            <div id="radarHeatmap" style="margin-top:10px;"></div>
+            <div style="margin-top:10px; height:10px; border-radius:999px;
+              background:linear-gradient(90deg, rgba(59,130,246,0.95), rgba(148,163,184,0.35), rgba(239,68,68,0.95));
+              border:1px solid rgba(148,163,184,0.18);">
+            </div>
+          </div>
+
+          <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+            <div style="color:#fff; font-weight:900; font-size:13px;">Lojas mais próximas</div>
+            <div style="color:rgba(226,232,240,0.7); font-size:11px; margin-top:2px;">
+              Score composto (MAX_SCORE + CASOS + PEND_RATE)
+            </div>
+            <div id="radarRanking" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+ </div> <!-- fecha #radarView -->
 
 <!-- Modal de apresentação do Vektor -->
 
@@ -788,49 +925,6 @@
 </div>
 
 <? } ?>
-
-<!-- AUTOCOMPLETE BOX -->
-<div id="vektor-autocomplete-box"></div>
-
-<!-- FOOTER / INPUT -->
-
-<footer class="chat-footer">
-    <form id="chatForm" class="w-full">
-        <div class="input-shell">
-            
-            <textarea id="userInput" placeholder="Digite aqui..."></textarea>
-
-            <!-- AUTOCOMPLETE VEKTOR -->
-            <div id="vektor-autocomplete-box"></div>
-
-            <!-- Botão de anexo do Termo -->
-            <button
-                type="button"
-                id="attachBtn"
-                title="Anexar"
-                class="ml-1 px-2 py-2 rounded-md border border-slate-300 text-sm flex items-center justify-center bg-transparent"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" 
-                    fill="none" viewBox="0 0 24 24" stroke-width="2" 
-                    stroke="#0f172a" class="w-6 h-6">
-                    <path stroke-linecap="round" stroke-linejoin="round" 
-                          d="M21 12.79V9a6 6 0 10-12 0v7a4 4 0 008 0v-6a2 2 0 00-4 0v5"/>
-                </svg>
-            </button>
-
-            <!-- Botão Enviar -->
-            <button type="submit" id="sendBtn">Enviar</button>
-
-            <!-- Input de arquivo escondido (Termo) -->
-            <input
-                type="file"
-                id="fileTermo"
-                accept=".pdf,.jpg,.jpeg,.png,.heic,.HEIC"
-                class="hidden"
-            />
-        </div>
-    </form>
-</footer>
 
 </div> <!-- fecha .chat-wrapper -->
 </div>   <!-- fecha coluna direita -->
@@ -1158,6 +1252,220 @@ function openStatusVektorModal() {
       setText("status-geral", "Erro ao buscar status: " + msg);
     })
     .vektorStatusSistema();
+}
+
+// ===============================
+// VIEW CONTROL (Chat <-> Radar)
+// ===============================
+window.vektorShowChatView = function () {
+  const chatView = document.getElementById("chatView");
+  const radarView = document.getElementById("radarView");
+  if (radarView) radarView.classList.add("hidden");
+  if (chatView) chatView.classList.remove("hidden");
+
+  // garante layout flex do chatView
+  if (chatView) chatView.style.display = "flex";
+
+  // devolve foco
+  const input = document.getElementById("userInput");
+  if (input && !input.disabled) setTimeout(() => input.focus(), 50);
+};
+
+function vektorShowRadarView_() {
+  const chatView = document.getElementById("chatView");
+  const radarView = document.getElementById("radarView");
+  if (chatView) chatView.classList.add("hidden");
+  if (radarView) radarView.classList.remove("hidden");
+}
+
+// ===============================
+// RADAR (tela cheia)
+// ===============================
+window.vektorOpenRadar = function (modo) {
+  vektorShowRadarView_();
+
+  setRadarActiveBtn_(modo);
+
+  const loading = document.getElementById("radarLoading");
+  const heat = document.getElementById("radarHeatmap");
+  const rank = document.getElementById("radarRanking");
+  if (loading) loading.style.display = "block";
+  if (heat) heat.innerHTML = "";
+  if (rank) rank.innerHTML = "";
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (loading) loading.style.display = "none";
+
+      if (!res || !res.ok) {
+        const msg = (res && res.restrito) ? "Acesso restrito: apenas Administrador." : "Falha ao carregar dados do Radar.";
+        if (heat) heat.innerHTML = `<div style="color:rgba(226,232,240,0.85); font-weight:700; font-size:13px;">${msg}</div>`;
+        return;
+      }
+
+      const lojas = Array.isArray(res.lojas) ? res.lojas : [];
+      if (!lojas.length) {
+        if (heat) heat.innerHTML = `<div style="color:rgba(226,232,240,0.85); font-weight:700; font-size:13px;">Sem dados suficientes no período.</div>`;
+        return;
+      }
+
+      renderRadarHeatmap_(lojas);
+      renderRadarRanking_(lojas);
+    })
+    .withFailureHandler(function (err) {
+      if (loading) loading.style.display = "none";
+      const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+      if (heat) heat.innerHTML = `<div style="color:rgba(248,113,113,0.95); font-weight:800; font-size:13px;">Falha: ${msg}</div>`;
+    })
+    .getRadarIrregularidadeParaChat(modo);
+};
+
+function setRadarActiveBtn_(modo) {
+  const map = {
+    "7d": "radarBtn7d",
+    "ciclo": "radarBtnCiclo",
+    "full": "radarBtnFull"
+  };
+
+  // reseta todos
+  ["radarBtn7d", "radarBtnCiclo", "radarBtnFull"].forEach(id => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.style.background = "rgba(255,255,255,0.06)";
+    b.style.color = "#ffffff";
+  });
+
+  // aplica ativo
+  const activeId = map[String(modo || "7d").toLowerCase()] || "radarBtn7d";
+  const a = document.getElementById(activeId);
+  if (a) {
+    a.style.background = "#16a34a";   // verde
+    a.style.color = "#04110a";        // texto escuro
+  }
+}
+
+function renderRadarHeatmap_(lojas) {
+  const heat = document.getElementById("radarHeatmap");
+  if (!heat) return;
+
+  const metrics = [
+    { key: "casos", label: "CASOS" },
+    { key: "avgScore", label: "AVG" },
+    { key: "maxScore", label: "MAX" },
+    { key: "pendRate", label: "PEND" },
+    { key: "avgQtdDia", label: "QTD/D" },
+    { key: "maxValor", label: "VALOR" }
+  ];
+
+  const series = {};
+  metrics.forEach(m => { series[m.key] = lojas.map(x => Number(x[m.key] || 0)); });
+
+  const corr = (a, b) => {
+    const n = Math.min(a.length, b.length);
+    if (n < 3) return 0;
+    let sa = 0, sb = 0;
+    for (let i = 0; i < n; i++) { sa += a[i]; sb += b[i]; }
+    const ma = sa / n, mb = sb / n;
+
+    let num = 0, da = 0, db = 0;
+    for (let i = 0; i < n; i++) {
+      const xa = a[i] - ma;
+      const xb = b[i] - mb;
+      num += xa * xb;
+      da += xa * xa;
+      db += xb * xb;
+    }
+    const den = Math.sqrt(da * db);
+    return den ? (num / den) : 0;
+  };
+
+  // Cores fortes e “realistas”: azul forte <-> cinza escuro <-> vermelho forte
+  const colorFor = (v) => {
+    v = Math.max(-1, Math.min(1, v));
+    if (v >= 0) {
+      const t = v;
+      return `rgba(239,68,68,${0.22 + 0.78 * t})`; // vermelho forte
+    } else {
+      const t = Math.abs(v);
+      return `rgba(59,130,246,${0.22 + 0.78 * t})`; // azul forte
+    }
+  };
+
+  // Grid compacto, sem “buracos” grandes
+  const n = metrics.length;
+  let html = `
+    <div style="display:grid; grid-template-columns: 70px repeat(${n}, 56px); gap:2px; align-items:center;">
+      <div></div>
+      ${metrics.map(m => `<div style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:900; text-align:center;">${m.label}</div>`).join("")}
+  `;
+
+  for (let i = 0; i < n; i++) {
+    html += `<div style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:900; padding-left:2px;">${metrics[i].label}</div>`;
+    for (let j = 0; j < n; j++) {
+      if (j <= i) {
+        // triangular (meia matriz), mas sem espaçamento absurdo
+        html += `<div style="width:56px; height:44px; background:rgba(2,6,23,0.35); border:1px solid rgba(148,163,184,0.10); border-radius:8px;"></div>`;
+      } else {
+        const v = corr(series[metrics[i].key], series[metrics[j].key]);
+        const txt = (Math.round(v * 100) / 100).toFixed(2);
+        html += `
+          <div style="width:56px; height:44px; border-radius:8px; background:${colorFor(v)};
+                      border:1px solid rgba(15,23,42,0.25); display:flex; align-items:center; justify-content:center;">
+            <div style="font-size:12px; font-weight:1000; color:rgba(255,255,255,0.95);
+            text-shadow:0 2px 6px rgba(0,0,0,0.85);">${txt}</div>
+          </div>`;
+      }
+    }
+  }
+
+  html += `</div>`;
+  heat.innerHTML = html;
+}
+
+function renderRadarRanking_(lojas) {
+  const rank = document.getElementById("radarRanking");
+  if (!rank) return;
+
+  const norm01 = (arr, v) => {
+    const min = Math.min(...arr);
+    const max = Math.max(...arr);
+    if (!isFinite(min) || !isFinite(max) || max === min) return 0;
+    return (v - min) / (max - min);
+  };
+
+  const arrMax = lojas.map(x => Number(x.maxScore || 0));
+  const arrCasos = lojas.map(x => Number(x.casos || 0));
+  const arrPend = lojas.map(x => Number(x.pendRate || 0));
+
+  const ranked = lojas.map(l => {
+    const s1 = norm01(arrMax, Number(l.maxScore || 0));
+    const s2 = norm01(arrCasos, Number(l.casos || 0));
+    const s3 = norm01(arrPend, Number(l.pendRate || 0));
+    const risco = (0.55*s1 + 0.30*s2 + 0.15*s3);
+    return { ...l, risco: Number((risco * 100).toFixed(1)) };
+  }).sort((a,b) => b.risco - a.risco);
+
+  rank.innerHTML = ranked.slice(0, 18).map((r, idx) => {
+    const w = Math.max(2, Math.min(100, r.risco));
+    return `
+      <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(148,163,184,0.18); border-radius:12px; padding:10px;">
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:baseline;">
+          <div style="color:#fff; font-weight:950; font-size:12px;">
+            ${idx+1}. Loja ${r.loja} <span style="color:rgba(226,232,240,0.7); font-weight:800;">(${r.time || "N/D"})</span>
+          </div>
+          <div style="color:#fff; font-weight:1000; font-size:12px;">${r.risco}</div>
+        </div>
+
+        <div style="margin-top:8px; height:10px; border-radius:999px; background:rgba(148,163,184,0.18); overflow:hidden;">
+          <div style="height:10px; width:${w}%; background:linear-gradient(90deg, rgba(239,68,68,0.85), rgba(234,179,8,0.75));"></div>
+        </div>
+
+        <div style="margin-top:8px; color:rgba(226,232,240,0.85); font-size:11px;">
+          casos: <b>${r.casos}</b> · maxScore: <b>${r.maxScore}</b> · pend: <b>${(Number(r.pendRate||0)*100).toFixed(1)}%</b>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 function closeStatusVektorModal() {
@@ -1800,16 +2108,13 @@ vektorBox.addEventListener("mousedown", (e)=>{
 
     /* ========= FUNÇÕES DE UI ========= */
     function scrollToBottom() {
-        requestAnimationFrame(() => {
-            const body = document.querySelector(".chat-body");
-            if (body) {
-                body.scrollTop = body.scrollHeight;
-                setTimeout(() => {
-                    body.scrollTop = body.scrollHeight;
-                }, 150);
-            }
-        });
-    }
+  requestAnimationFrame(() => {
+    const w = document.getElementById("chatWindow");
+    if (!w) return;
+    w.scrollTop = w.scrollHeight;
+    setTimeout(() => { w.scrollTop = w.scrollHeight; }, 150);
+  });
+}
 
     function renderUserMessage(text) {
         const wrapper = document.createElement("div");
