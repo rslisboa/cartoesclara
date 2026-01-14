@@ -571,6 +571,15 @@
                   background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
             Base toda
           </button>
+
+          <button
+            type="button"
+            onclick="openRadarAnaliseModal()"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+            Como acontece a análise?
+          </button>
+
         </div>
       </div>
 
@@ -606,6 +615,97 @@
     </div>
   </main>
  </div> <!-- fecha #radarView -->
+
+ <!-- Modal: Como acontece a análise? (Radar) -->
+<div id="radarAnaliseModal"
+     class="fixed inset-0 bg-black/60 z-[60] hidden items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl w-[95%] max-w-[860px] overflow-hidden border border-slate-200">
+    <!-- Header -->
+    <div class="px-5 py-4 bg-[#0b1220] text-white flex items-center justify-between">
+      <div>
+        <div class="text-base font-extrabold">Como acontece a análise?</div>
+        <div class="text-xs opacity-90">Leitura objetiva do heatmap (correlação) e do ranking de risco</div>
+      </div>
+      <button type="button"
+              onclick="closeRadarAnaliseModal()"
+              class="bg-white/15 hover:bg-white/25 transition rounded-lg px-3 py-2 text-sm font-semibold">
+        Fechar
+      </button>
+    </div>
+
+    <!-- Body -->
+    <div class="p-5 text-sm text-slate-700 space-y-4 max-h-[70vh] overflow-y-auto">
+      <div class="rounded-xl border border-slate-200 p-4">
+        <div class="font-semibold text-slate-900">1) Correlação (Pearson)</div>
+        <div class="mt-2 text-sm">
+          O heatmap mede <b>relação entre métricas</b> (não aponta loja individual).
+          <br/>
+          <b>+1</b> = sobem juntas · <b>0</b> = sem relação · <b>-1</b> = uma sobe e a outra tende a descer.
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="rounded-xl border border-slate-200 p-4">
+          <div class="font-semibold text-slate-900">Interpretação (positiva)</div>
+          <div class="mt-2 overflow-x-auto">
+            <table class="min-w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
+              <thead class="bg-slate-100">
+                <tr>
+                  <th class="text-left px-3 py-2 border-b">Valor</th>
+                  <th class="text-left px-3 py-2 border-b">Interpretação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td class="px-3 py-2 border-b">0.00 – 0.19</td><td class="px-3 py-2 border-b">Irrelevante</td></tr>
+                <tr><td class="px-3 py-2 border-b">0.20 – 0.39</td><td class="px-3 py-2 border-b">Fraca</td></tr>
+                <tr><td class="px-3 py-2 border-b">0.40 – 0.59</td><td class="px-3 py-2 border-b">Moderada</td></tr>
+                <tr><td class="px-3 py-2 border-b">0.60 – 0.79</td><td class="px-3 py-2 border-b">Forte</td></tr>
+                <tr><td class="px-3 py-2">0.80 – 1.00</td><td class="px-3 py-2">Muito forte</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-4">
+          <div class="font-semibold text-slate-900">Interpretação (negativa)</div>
+          <div class="mt-2 text-sm">
+            A escala negativa tem a mesma “força”, mas no sentido inverso:
+            <br/>
+            <b>-1</b> = quando uma métrica sobe, a outra tende a descer.
+          </div>
+          <div class="mt-3 overflow-x-auto">
+            <table class="min-w-full text-sm border border-slate-200 rounded-xl overflow-hidden">
+              <thead class="bg-slate-100">
+                <tr>
+                  <th class="text-left px-3 py-2 border-b">Valor</th>
+                  <th class="text-left px-3 py-2 border-b">Interpretação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td class="px-3 py-2 border-b">-0.00 – -0.19</td><td class="px-3 py-2 border-b">Irrelevante</td></tr>
+                <tr><td class="px-3 py-2 border-b">-0.20 – -0.39</td><td class="px-3 py-2 border-b">Fraca (inversa)</td></tr>
+                <tr><td class="px-3 py-2 border-b">-0.40 – -0.59</td><td class="px-3 py-2 border-b">Moderada (inversa)</td></tr>
+                <tr><td class="px-3 py-2 border-b">-0.60 – -0.79</td><td class="px-3 py-2 border-b">Forte (inversa)</td></tr>
+                <tr><td class="px-3 py-2">-0.80 – -1.00</td><td class="px-3 py-2">Muito forte (inversa)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 p-4">
+        <div class="font-semibold text-slate-900">2) Ranking “Lojas mais próximas”</div>
+        <div class="mt-2 text-sm">
+          O número do ranking (ex.: <b>55</b>) é um <b>índice relativo de prioridade</b> (0–100), calculado por score composto:
+          <br/>
+          <b>55% MAX_SCORE + 30% CASOS + 15% PEND_RATE</b> (com normalização 0–1 por período).
+          <br/>
+          Quanto maior, maior a prioridade de análise — <b>não</b> é prova de fraude.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Modal de apresentação do Vektor -->
 
@@ -1014,6 +1114,22 @@ function openAlertasRecentesModal() {
 
 function closeAlertasRecentesModal() {
   const modal = document.getElementById("alertasRecentesModal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+}
+
+function openRadarAnaliseModal() {
+  const modal = document.getElementById("radarAnaliseModal");
+  if (modal) {
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+}
+
+function closeRadarAnaliseModal() {
+  const modal = document.getElementById("radarAnaliseModal");
   if (modal) {
     modal.style.display = "none";
     modal.classList.add("hidden");
@@ -1442,7 +1558,9 @@ function renderRadarRanking_(lojas) {
     const s2 = norm01(arrCasos, Number(l.casos || 0));
     const s3 = norm01(arrPend, Number(l.pendRate || 0));
     const risco = (0.55*s1 + 0.30*s2 + 0.15*s3);
-    return { ...l, risco: Number((risco * 100).toFixed(1)) };
+
+    return { ...l, risco: Number((risco * 100).toFixed(1)), _s1: s1, _s2: s2, _s3: s3 };
+
   }).sort((a,b) => b.risco - a.risco);
 
   rank.innerHTML = ranked.slice(0, 18).map((r, idx) => {
@@ -1453,7 +1571,22 @@ function renderRadarRanking_(lojas) {
           <div style="color:#fff; font-weight:950; font-size:12px;">
             ${idx+1}. Loja ${r.loja} <span style="color:rgba(226,232,240,0.7); font-weight:800;">(${r.time || "N/D"})</span>
           </div>
-          <div style="color:#fff; font-weight:1000; font-size:12px;">${r.risco}</div>
+          <div style="color:#fff; font-weight:1000; font-size:12px; display:flex; align-items:center; gap:6px;">
+          ${r.risco}
+          <span class="vektor-btn-wrapper" style="display:inline-flex; align-items:center;">
+            <span style="font-size:12px; font-weight:900; color:#93c5fd; cursor:help;">ⓘ</span>
+            <span class="vektor-tooltip-base"
+                  style="white-space:normal; max-width:280px; line-height:1.35;
+                        background:rgba(15,23,42,0.95); border:1px solid rgba(148,163,184,0.25);">
+              <b>Score composto (0–100)</b><br/>
+              risco = (0.55·MAX + 0.30·CASOS + 0.15·PEND)·100<br/><br/>
+              <b>Normalizados (0–1):</b><br/>
+              MAX: ${(r._s1).toFixed(2)} · CASOS: ${(r._s2).toFixed(2)} · PEND: ${(r._s3).toFixed(2)}<br/><br/>
+              <b>Valores:</b><br/>
+              maxScore=${r.maxScore} · casos=${r.casos} · pendRate=${(Number(r.pendRate||0)*100).toFixed(1)}%
+            </span>
+          </span>
+        </div>
         </div>
 
         <div style="margin-top:8px; height:10px; border-radius:999px; background:rgba(148,163,184,0.18); overflow:hidden;">
