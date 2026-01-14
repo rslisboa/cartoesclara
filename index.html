@@ -600,8 +600,22 @@
               background:linear-gradient(90deg, rgba(59,130,246,0.95), rgba(148,163,184,0.35), rgba(239,68,68,0.95));
               border:1px solid rgba(148,163,184,0.18);">
             </div>
+           <!-- INSIGHTS dinâmicos (explicação "tipo IA") -->
+            <div id="radarInsights"
+                style="margin-top:12px; padding:12px; border-radius:12px;
+                border:1px solid rgba(148,163,184,0.18);
+                background:rgba(255,255,255,0.03);
+                color:rgba(226,232,240,0.9);
+                font-size:12px; line-height:1.5;
+                max-height:180px; overflow:auto;">
+              <div style="font-weight:900; color:#fff; margin-bottom:6px;">
+                Leitura automática do Radar
+              </div>
+              <div style="opacity:0.85;">
+                Carregando interpretação…
+              </div>
+            </div>
           </div>
-
           <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
             <div style="color:#fff; font-weight:900; font-size:13px;">Lojas mais próximas</div>
             <div style="color:rgba(226,232,240,0.7); font-size:11px; margin-top:2px;">
@@ -1427,6 +1441,8 @@ window.vektorOpenRadar = function (modo) {
 
       renderRadarHeatmap_(lojas);
       renderRadarRanking_(lojas);
+      renderRadarInsights_(lojas);
+
     })
     .withFailureHandler(function (err) {
       if (loading) loading.style.display = "none";
@@ -1536,6 +1552,100 @@ function renderRadarHeatmap_(lojas) {
 
   html += `</div>`;
   heat.innerHTML = html;
+}
+
+function radarCorr_(a, b) {
+  const n = Math.min(a.length, b.length);
+  if (n < 3) return 0;
+
+  let sa = 0, sb = 0;
+  for (let i = 0; i < n; i++) { sa += a[i]; sb += b[i]; }
+  const ma = sa / n, mb = sb / n;
+
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < n; i++) {
+    const xa = a[i] - ma;
+    const xb = b[i] - mb;
+    num += xa * xb;
+    da += xa * xa;
+    db += xb * xb;
+  }
+  const den = Math.sqrt(da * db);
+  return den ? (num / den) : 0;
+}
+
+function radarStrengthLabel_(vAbs) {
+  if (vAbs < 0.20) return "irrelevante";
+  if (vAbs < 0.40) return "fraca";
+  if (vAbs < 0.60) return "moderada";
+  if (vAbs < 0.80) return "forte";
+  return "muito forte";
+}
+
+function renderRadarInsights_(lojas) {
+  const el = document.getElementById("radarInsights");
+  if (!el) return;
+
+  const nLojas = Array.isArray(lojas) ? lojas.length : 0;
+  if (nLojas < 3) {
+    el.innerHTML =
+      "<div style='font-weight:900;color:#fff;margin-bottom:6px;'>Leitura automática do Radar</div>" +
+      "<div style='opacity:0.85;'>Amostra pequena (" + nLojas + " lojas). A correlação pode ficar instável; use como sinal.</div>";
+    return;
+  }
+
+  const metrics = [
+    { key: "casos", label: "CASOS" },
+    { key: "avgScore", label: "AVG" },
+    { key: "maxScore", label: "MAX" },
+    { key: "pendRate", label: "PEND" },
+    { key: "avgQtdDia", label: "QTD/D" },
+    { key: "maxValor", label: "VALOR" }
+  ];
+
+  const series = {};
+  metrics.forEach(m => { series[m.key] = lojas.map(x => Number(x[m.key] || 0)); });
+
+  let bestPos = { v: -999, a: null, b: null };
+  let bestNeg = { v:  999, a: null, b: null };
+  let absSum = 0, absCount = 0;
+
+  for (let i = 0; i < metrics.length; i++) {
+    for (let j = i + 1; j < metrics.length; j++) {
+      const a = metrics[i], b = metrics[j];
+      const v = radarCorr_(series[a.key], series[b.key]);
+      const av = Math.abs(v);
+      absSum += av; absCount++;
+      if (v > bestPos.v) bestPos = { v, a, b };
+      if (v < bestNeg.v) bestNeg = { v, a, b };
+    }
+  }
+
+  const avgAbs = absCount ? (absSum / absCount) : 0;
+  const trend =
+    (avgAbs < 0.20) ? "As métricas estão pouco acopladas entre si (correlações em geral fracas)." :
+    (avgAbs < 0.40) ? "Há sinais de relação entre métricas, mas ainda majoritariamente fracos/moderados." :
+    "As métricas estão bem conectadas (correlações moderadas/fortes dominantes).";
+
+  const fmt = (v) => (Math.round(v * 100) / 100).toFixed(2);
+
+  const posAbs = Math.abs(bestPos.v);
+  const negAbs = Math.abs(bestNeg.v);
+
+  el.innerHTML =
+    "<div style='font-weight:900;color:#fff;margin-bottom:6px;'>Leitura automática do Radar</div>" +
+    "<div style='opacity:0.9;'>" + trend + "</div>" +
+    "<div style='margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;'>" +
+      "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(239,68,68,0.10);'>" +
+        "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais alinhadas (positivo)</div>" +
+        "<div style='opacity:0.9;'><b>" + bestPos.a.label + "</b> × <b>" + bestPos.b.label + "</b> = <b>" + fmt(bestPos.v) + "</b> (" + radarStrengthLabel_(posAbs) + ")</div>" +
+      "</div>" +
+      "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(59,130,246,0.12);'>" +
+        "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais inversas (negativo)</div>" +
+        "<div style='opacity:0.9;'><b>" + bestNeg.a.label + "</b> × <b>" + bestNeg.b.label + "</b> = <b>" + fmt(bestNeg.v) + "</b> (" + radarStrengthLabel_(negAbs) + ")</div>" +
+      "</div>" +
+    "</div>" +
+    "<div style='margin-top:10px;font-size:11px;opacity:0.85;'>Nota: correlação indica associação (não causalidade).</div>";
 }
 
 function renderRadarRanking_(lojas) {
