@@ -3794,6 +3794,115 @@ function getPossivelUsoIrregularParaChat(modo) {
   }
 }
 
+function getRadarIrregularidadeParaChat(modo) {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (!isAdminEmail(email)) {
+      return { ok: false, restrito: true, error: "Acesso restrito: apenas Administrador." };
+    }
+
+    modo = (modo || "7d").toString().toLowerCase().trim();
+
+    // Reaproveita exatamente a mesma base do fluxo atual
+    var rel = detectarUsoIrregularBaseClara_({ modo: modo });
+    if (!rel || !rel.ok) return rel;
+
+    var rows = Array.isArray(rel.rows) ? rel.rows : [];
+    var mapa = {}; // loja -> agg
+
+    function toNumberMoney_(s) {
+      // "R$ 1.980,00" -> 1980.00
+      if (s == null) return 0;
+      var t = String(s).replace(/[^\d,.-]/g, "");
+      // troca separador milhar/ponto
+      // casos comuns: "1.980,00" -> remove "." e troca "," por "."
+      t = t.replace(/\./g, "").replace(",", ".");
+      var n = Number(t);
+      return isNaN(n) ? 0 : n;
+    }
+
+    function pendCount_(txt) {
+      // "Sim (2)" -> 2; "Não" -> 0
+      var s = String(txt || "").toLowerCase();
+      var m = s.match(/\((\d+)\)/);
+      if (m) return Number(m[1]) || 0;
+      return s.indexOf("sim") >= 0 ? 1 : 0;
+    }
+
+    rows.forEach(function (r) {
+      var loja = String(r.loja || "").trim();
+      if (!loja) return;
+
+      if (!mapa[loja]) {
+        mapa[loja] = {
+          loja: loja,
+          time: String(r.time || "").trim(),
+          casos: 0,
+          scoreSum: 0,
+          scoreMax: 0,
+          qtdDiaSum: 0,
+          valorMax: 0,
+          pendEventos: 0,
+          pendCountSum: 0
+        };
+      }
+
+      var a = mapa[loja];
+
+      var score = Number(r.score) || 0;
+      var qtdDia = Number(r.qtdDia) || 0;
+      var valor = toNumberMoney_(r.valor); // no seu retorno, "valor" já vem como money_()
+      var pendCount = pendCount_(r.pendenciasTxt);
+
+      a.casos += 1;
+      a.scoreSum += score;
+      if (score > a.scoreMax) a.scoreMax = score;
+
+      a.qtdDiaSum += qtdDia;
+      if (valor > a.valorMax) a.valorMax = valor;
+
+      if (pendCount > 0) a.pendEventos += 1;
+      a.pendCountSum += pendCount;
+
+      // mantém último time não vazio
+      if (!a.time && r.time) a.time = String(r.time || "").trim();
+    });
+
+    var lojas = Object.keys(mapa).map(function (k) {
+      var a = mapa[k];
+      var avgScore = a.casos ? (a.scoreSum / a.casos) : 0;
+      var avgQtdDia = a.casos ? (a.qtdDiaSum / a.casos) : 0;
+      var pendRate = a.casos ? (a.pendEventos / a.casos) : 0;
+
+      return {
+        loja: a.loja,
+        time: a.time || "N/D",
+        casos: a.casos,
+        avgScore: Number(avgScore.toFixed(2)),
+        maxScore: a.scoreMax,
+        avgQtdDia: Number(avgQtdDia.toFixed(2)),
+        maxValor: Number(a.valorMax.toFixed(2)),
+        pendRate: Number(pendRate.toFixed(3)),
+        pendCountSum: a.pendCountSum
+      };
+    });
+
+    // ordena por “proximidade” simples (maxScore e casos)
+    lojas.sort(function (x, y) {
+      if (y.maxScore !== x.maxScore) return y.maxScore - x.maxScore;
+      return y.casos - x.casos;
+    });
+
+    return {
+      ok: true,
+      meta: rel.meta || {},
+      lojas: lojas
+    };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 /**
  * Porteiro (igual ao limite): só roda se BaseClara mudou.
  * Coloque o gatilho nesta função.
