@@ -1204,6 +1204,15 @@ function carregarAlertasRecentes() {
   const dias = Number(diasEl ? diasEl.value : 14) || 14;
   const tipo = (tipoEl ? tipoEl.value : "").trim();
 
+    // Normaliza tipos do log (ex.: PENDENCIAS_LOJA -> PENDENCIAS)
+  const normTipo = (t) => {
+  const x = String(t || "").toUpperCase().trim();
+    if (x.startsWith("PENDENCIAS")) return "PENDENCIAS";
+    if (x.startsWith("LIMITE")) return "LIMITE";
+    if (x.startsWith("USO_IRREGULAR")) return "USO_IRREGULAR";
+    return x; // fallback
+  };
+
   // Reset UI
   if (loading) loading.classList.remove("hidden");
   if (empty) empty.classList.add("hidden");
@@ -1262,8 +1271,8 @@ function carregarAlertasRecentes() {
   const badge = (t) => {
     const x = String(t || "").toUpperCase();
     if (x === "LIMITE") return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800'>Limite</span>";
-    if (x === "PENDENCIAS") return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800'>Pendências</span>";
-    if (x === "USO_IRREGULAR") return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800'>Possível irregularidade</span>";
+    if (x.startsWith("PENDENCIAS")) return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800'>Pendências</span>";
+    if (x.startsWith("USO_IRREGULAR")) return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800'>Possível irregularidade</span>";
     return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800'>" + (t || "Outro") + "</span>";
   };
 
@@ -1287,7 +1296,10 @@ function carregarAlertasRecentes() {
         }
 
         let rows = Array.isArray(res.rows) ? res.rows : [];
-        if (tipo) rows = rows.filter(r => String(r.tipo || "").toUpperCase() === tipo.toUpperCase());
+        if (tipo) {
+        const tipoFiltro = String(tipo || "").toUpperCase().trim();
+        rows = rows.filter(r => normTipo(r.tipo) === tipoFiltro);
+      }
 
         if (!rows.length) {
           if (empty) empty.classList.remove("hidden");
