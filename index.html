@@ -2176,6 +2176,9 @@ const VEKTOR_INTENTS = [
   "O que o Vektor pode fazer?",
   "Como anexar nota fiscal na Clara?",
   "Possível uso irregular",
+  "Emissão de 1ª via",
+  "Emissão de 2ª via",
+  "Novo cartão Clara",
   "Como justificar compras na Clara?"
 ];
 
@@ -5604,39 +5607,31 @@ Depois que a loja recebeu o cartão Clara e fez o treinamento, o processo de san
 }
 
     function respNovoCartaoPrimeiraVia() {
-        return `HTML:<div class="text-sm text-slate-700">
-<p><b>Primeira via de cartão Clara (novo cartão)</b></p>
-<p class="mt-1">
-Para solicitar a <b>primeira via</b> do cartão Clara, siga estes passos:
-</p>
-<ol class="list-decimal ml-5 mt-1">
-  <li>Preencha o formulário: <a href="https://docs.google.com/forms/d/1vGAsFHuDQ6y5ydJMuE7W9ThJFjsLma_1I6yw92OLHh4/viewform"
-       target="_blank" rel="noopener noreferrer"><b>Formulário de Solicitação de Cartão Clara</b></a>.
-  
-  <li class="mt-1">Depois de preencher o formulário, envie um e-mail para o Financeiro informando que já preencheu, para que o cartão seja emitido: <b>contasareceber@gruposbf.com.br</b>
-<p class="mt-2">
-O prazo de entrega do cartão é de até <b>7 dias úteis</b>, conforme a política interna.
-</p>
+  return `HTML:<div class="text-sm text-slate-700">
+<p>Primeira via de cartão Clara (novo gerente)</p>
+<p class="mt-1">A emissão da primeira via do cartão Clara deve ser realizada exclusivamente por meio de chamado no ServiceNow, no caminho:<br><b>Contas a Receber - Cartão Clara - Emissão de 1ª Via de Cartão Clara – Novo Gerente</b></p>
+<p class="mt-1">No chamado, é obrigatório o preenchimento das seguintes informações:</p>
+<ul class="list-disc ml-5 mt-1">
+<li>Nome do gerente;</li>
+<li>E-mail do gerente;</li>
+<li>Endereço completo da loja com CEP;</li>
+<li>Termo de Responsabilidade assinado.</li>
+</ul>
+<p class="mt-1">O prazo de entrega do cartão é de até <b>7 dias úteis</b>.</p>
 </div>`;
-    }
+}
 
 function respNovoCartaoSegundaVia() {
-  return `HTML:
-<div class="text-sm text-slate-700">
-
-  <b>Segunda via de cartão Clara (cartão já existia)
-
-  <p style="margin-top:6px;">
-    A solicitação de <b>segunda via</b> (perda, roubo, dano ou troca de portador) deve seguir o fluxo previsto na Política de Uso dos Cartões Clara:
-
-  <p style="margin-top:6px; margin-bottom:4px;">
-    • Bloquear imediatamente o cartão antigo na plataforma / app da Clara através da funcionalidade de <b>"Congelar"</b>;<br>
-    • Registrar o motivo (perda, roubo, quebra, etc.) conforme orientações internas;<br>
-    • Enviar email para o time de Contas a Receber solicitando a emissão de segunda via do cartão Clara.
-
-  <p style="margin-top:6px;">
-    Sempre siga as orientações detalhadas na <b>Política de Uso dos Cartões Clara</b> para casos de reemissão/segunda via.
-
+  return `HTML:<div class="text-sm text-slate-700">
+<p>Segunda via de cartão Clara</p>
+<p class="mt-1">A solicitação da segunda via do cartão Clara deve ser feita por meio de chamado no ServiceNow, no caminho:<br><b>Contas a Receber - Cartão Clara - Emissão de 2ª Via de Cartão Clara</b></p>
+<p class="mt-1">No chamado, é necessário informar:</p>
+<ul class="list-disc ml-5 mt-1">
+<li>Motivo da emissão da 2ª via;</li>
+<li>Endereço completo da loja com CEP.</li>
+</ul>
+<p class="mt-1">O cartão anterior será <b>automaticamente cancelado</b>.</p>
+<p class="mt-1">O prazo para entrega é de até <b>7 dias úteis</b>.</p>
 </div>`;
 }
 
