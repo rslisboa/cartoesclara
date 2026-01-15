@@ -210,6 +210,33 @@
   display: inline-block;
 }
 
+/* ===== Radar Tooltip (tabela com scroll, sem afetar tooltips globais) ===== */
+.vektor-btn-wrapper.vektor-radar-tip:hover .vektor-tooltip-base,
+.vektor-tooltip-base.vektor-radar-tip:hover {
+  opacity: 1;
+  pointer-events: auto; /* permite rolar/interagir */
+}
+
+/* Tooltip "grande" apenas quando tiver a classe vektor-radar-tip */
+.vektor-tooltip-base.vektor-radar-tip {
+  white-space: normal;
+  width: min(1100px, 92vw);
+  max-height: 360px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(15,23,42,0.97);
+  border: 1px solid rgba(148,163,184,0.25);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.45);
+}
+
+/* Container interno rolável: scroll só no conteúdo da tabela */
+.vektor-tooltip-base.vektor-radar-tip .vektor-radar-tip-scroll {
+  overflow: auto;
+  max-height: 320px;
+  max-width: 100%;
+  padding-right: 6px;
+}
+
 .vektor-tooltip-base {
   position: absolute;
   bottom: 110%;           /* aparece logo acima do botão */
@@ -1480,7 +1507,7 @@ window.vektorOpenRadar = function (modo) {
       }
 
       renderRadarHeatmap_(lojas);
-      renderRadarRanking_(lojas);
+      renderRadarRanking_(lojas, res.detalhesPorLoja || {});
       renderRadarInsights_(lojas);
 
     })
