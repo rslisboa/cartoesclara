@@ -509,9 +509,9 @@
           class="h-16 w-auto object-contain flex-shrink-0"
         />
         <div class="bot-bubble px-4 py-3 max-w-[80%] text-slate-700">
-          <p class="font-semibold text-slate-800 text-base">
-            Olá! 👋 Eu sou o Vektor, atleta do <b>Grupo SBF</b> especializado na Clara.
+          <p id="vektorGreeting" class="text-slate-800 text-base">
           </p>
+          
         </div>
       </div>
 
@@ -926,7 +926,7 @@
           </li>
 
           <li style="margin-top:10px;">
-            <b>3) Faturas e comparativos (06→05)</b><br/>
+            <b>3) Faturas e comparativos</b><br/>
             • Consulta valores, extrai informações e compara com fatura anterior.<br/>
             <i>Exemplos:</i> “valor da fatura atual”, “valor das últimas 3 faturas”, "Comparar fatura atual vs anterior", “qual é o ciclo da fatura?”.
           </li>
@@ -979,8 +979,8 @@
         <p class="font-semibold text-slate-800">⚠️ Regras importantes ⚠️</p>
         <ul style="margin-left:14px; line-height:1.55; margin-top:6px;">
           <li><b>Padronização:</b> respostas seguem política/processo (não “opinião do Vektor”).</li>
-          <li><b>Perfil de acesso:</b> algumas visões são restritas (ex.: Administrador).</li>
-          <li><b>Boas práticas:</b> informe loja (4 dígitos) e/ou time; inclua período quando fizer sentido; sempre use as orientações de texto que aparecem no chat pra completar sua dúvida,solicitação etc.</li>
+          <li><b>Perfil de acesso:</b> algumas visões são restritas ao perfil de Administrador.</li>
+          <li><b>Boas práticas:</b> informe a loja e time para consultas especificas; inclua período quando fizer sentido (nesse mes, nessa semana, semana passada, mes passado, nesse trtimestre, periodo de datas etc); sempre use as orientações de texto que aparecem no chat pra completar sua dúvida ou solicitação.</li>
         </ul>
       </div>
 
@@ -2058,6 +2058,37 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 })();
 
+// SAUDAÇÃO MSG INICIAL //
+  function getSaudacaoPorHorario_() {
+    const hora = new Date().getHours();
+
+    if (hora >= 5 && hora < 12) return "bom dia";
+    if (hora >= 12 && hora < 18) return "boa tarde";
+    return "boa noite";
+  }
+
+  function renderSaudacaoVektor_() {
+  const el = document.getElementById("vektorGreeting");
+  if (!el) return;
+
+  const saudacao = getSaudacaoPorHorario_();
+
+  const nome = (typeof FIRST_NAME !== "undefined" && FIRST_NAME)
+    ? FIRST_NAME
+    : (typeof displayName !== "undefined" ? displayName : "");
+
+  const prefixo = nome
+    ? `Olá ${nome}, ${saudacao}!`
+    : `Olá, ${saudacao}!`;
+
+  el.innerHTML =
+    `${prefixo} Eu sou o <b>Vektor</b>, <b>Agente de Governança Financeira do Cartão Clara</b>.`;
+}
+
+  // Executa assim que o DOM estiver pronto
+  document.addEventListener("DOMContentLoaded", renderSaudacaoVektor_);
+
+  renderSaudacaoVektor_();
     
 // 🔹 Mensagem inicial: exemplos do que o Vektor faz
 renderBotMessage(
