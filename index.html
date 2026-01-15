@@ -225,7 +225,7 @@
   padding: 10px;
   border-radius: 10px;
   background: rgba(15,23,42,0.97);
-  border: 1px solid rgba(148,163,184,0.25);
+  border: 2px solid rgba(226,232,240,0.9);
   box-shadow: 0 10px 25px rgba(0,0,0,0.45);
 }
 
@@ -1739,9 +1739,24 @@ function renderRadarInsights_(lojas) {
   "</div>";
 }
 
-function renderRadarRanking_(lojas) {
+function renderRadarRanking_(lojas, detalhesPorLoja) {
   const rank = document.getElementById("radarRanking");
   if (!rank) return;
+
+  lojas = Array.isArray(lojas) ? lojas : [];
+  detalhesPorLoja = (detalhesPorLoja && typeof detalhesPorLoja === "object") ? detalhesPorLoja : {};
+
+  const esc = (s) => String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
+  if (!lojas.length) {
+    rank.innerHTML = `<div style="opacity:0.85; color:rgba(226,232,240,0.85); font-size:12px;">Sem dados suficientes no período.</div>`;
+    return;
+  }
 
   const norm01 = (arr, v) => {
     const min = Math.min(...arr);
@@ -1754,48 +1769,104 @@ function renderRadarRanking_(lojas) {
   const arrCasos = lojas.map(x => Number(x.casos || 0));
   const arrPend = lojas.map(x => Number(x.pendRate || 0));
 
+  // tooltip: tabela (1 linha)
+  const buildTooltipTable = (row) => {
+    if (!row) {
+      return "<div style='font-size:12px;opacity:0.9;'>Sem detalhe transacional disponível para esta loja no período.</div>";
+    }
+
+    const th = "padding:6px 8px;font-size:11px;text-align:left;border-bottom:1px solid rgba(226,232,240,0.12);white-space:nowrap;";
+    const td = "padding:6px 8px;font-size:11px;border-bottom:1px solid rgba(226,232,240,0.08);white-space:nowrap;";
+
+    // IMPORTANTE: container rolável é SÓ aqui (classe do Passo 1)
+    return (
+      "<div style='font-size:12px;font-weight:900;margin-bottom:6px;'>Detalhe (mesma linha do Possível uso irregular)</div>" +
+      "<div class='vektor-radar-tip-scroll'>" +
+        "<table style='border-collapse:collapse; width:max-content; min-width:980px;'>" +
+          "<thead>" +
+            "<tr style='background:rgba(255,255,255,0.06);'>" +
+              "<th style='" + th + "'>Loja</th>" +
+              "<th style='" + th + "'>Time</th>" +
+              "<th style='" + th + "'>Data</th>" +
+              "<th style='" + th + "'>Cartão</th>" +
+              "<th style='" + th + "'>Estabelecimento</th>" +
+              "<th style='" + th + "'>Qtd (dia)</th>" +
+              "<th style='" + th + "'>Soma suma (dia)</th>".replace("S", "So") + // evita autocorreção estranha ao colar (mantém "Soma")
+              "<th style='" + th + "'>Maior valor</th>" +
+              "<th style='" + th + "'>Pendências</th>" +
+              "<th style='" + th + "'>Score</th>" +
+              "<th style='" + th + "'>Regras</th>" +
+            "</tr>" +
+          "</thead>" +
+          "<tbody>" +
+            "<tr>" +
+              "<td style='" + td + "'>" + esc(row.loja) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.time) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.data) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.cartao) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.estabelecimento) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.qtdDia) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.somaDia) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.valor) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.pendenciasTxt) + "</td>" +
+              "<td style='" + td + "'>" + esc(row.score) + "</td>" +
+              "<td style='" + td + "; white-space:normal; min-width:240px;'>" + esc(row.regrasTxt) + "</td>" +
+            "</tr>" +
+          "</tbody>" +
+        "</table>" +
+      "</div>"
+    );
+  };
+
   const ranked = lojas.map(l => {
     const s1 = norm01(arrMax, Number(l.maxScore || 0));
     const s2 = norm01(arrCasos, Number(l.casos || 0));
     const s3 = norm01(arrPend, Number(l.pendRate || 0));
     const risco = (0.55*s1 + 0.30*s2 + 0.15*s3);
-
     return { ...l, risco: Number((risco * 100).toFixed(1)), _s1: s1, _s2: s2, _s3: s3 };
-
   }).sort((a,b) => b.risco - a.risco);
 
   rank.innerHTML = ranked.slice(0, 18).map((r, idx) => {
     const w = Math.max(2, Math.min(100, r.risco));
+    const detalhe = detalhesPorLoja[String(r.loja)] || null;
+
     return `
       <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(148,163,184,0.18); border-radius:12px; padding:10px;">
         <div style="display:flex; justify-content:space-between; gap:10px; align-items:baseline;">
           <div style="color:#fff; font-weight:950; font-size:12px;">
-            ${idx+1}. Loja ${r.loja} <span style="color:rgba(226,232,240,0.7); font-weight:800;">(${r.time || "N/D"})</span>
+            ${idx+1}. Loja ${esc(r.loja)} <span style="color:rgba(226,232,240,0.7); font-weight:800;">(${esc(r.time || "N/D")})</span>
           </div>
+
           <div style="color:#fff; font-weight:1000; font-size:12px; display:flex; align-items:center; gap:6px;">
-          ${r.risco}
-          <span class="vektor-btn-wrapper" style="display:inline-flex; align-items:center;">
-            <span style="font-size:12px; font-weight:900; color:#93c5fd; cursor:help;">ⓘ</span>
-            <span class="vektor-tooltip-base"
-                  style="white-space:normal; max-width:280px; line-height:1.35;
-                        background:rgba(15,23,42,0.95); border:1px solid rgba(148,163,184,0.25);">
-              <b>Score composto (0–100)</b><br/>
-              risco = (0.55·MAX + 0.30·CASOS + 0.15·PEND)·100<br/><br/>
-              <b>Normalizados (0–1):</b><br/>
-              MAX: ${(r._s1).toFixed(2)} · CASOS: ${(r._s2).toFixed(2)} · PEND: ${(r._s3).toFixed(2)}<br/><br/>
-              <b>Valores:</b><br/>
-              maxScore=${r.maxScore} · casos=${r.casos} · pendRate=${(Number(r.pendRate||0)*100).toFixed(1)}%
+            ${esc(r.risco)}
+
+            <span class="vektor-btn-wrapper" style="display:inline-flex; align-items:center;">
+              <span style="font-size:12px; font-weight:900; color:#93c5fd; cursor:help;">ⓘ</span>
+              <span class="vektor-tooltip-base" style="white-space:normal; max-width:280px; line-height:1.35; background:rgba(15,23,42,0.95); border:1px solid rgba(148,163,184,0.25);">
+                <b>Score composto (0–100)</b><br/>
+                risco = (0.55·MAX + 0.30·CASOS + 0.15·PEND)·100<br/><br/>
+                <b>Normalizados (0–1):</b><br/>
+                MAX: ${(r._s1).toFixed(2)} · CASOS: ${(r._s2).toFixed(2)} · PEND: ${(r._s3).toFixed(2)}<br/><br/>
+                <b>Valores:</b><br/>
+                maxScore=${esc(r.maxScore)} · casos=${esc(r.casos)} · pendRate=${(Number(r.pendRate||0)*100).toFixed(1)}%
+              </span>
             </span>
-          </span>
-        </div>
+          </div>
         </div>
 
-        <div style="margin-top:8px; height:10px; border-radius:999px; background:rgba(148,163,184,0.18); overflow:hidden;">
-          <div style="height:10px; width:${w}%; background:linear-gradient(90deg, rgba(239,68,68,0.85), rgba(234,179,8,0.75));"></div>
-        </div>
+        <!-- Tooltip NA BARRA (tabela rolável, não some ao rolar) -->
+        <span class="vektor-btn-wrapper vektor-radar-tip" style="display:block; margin-top:8px;">
+          <div style="height:10px; border-radius:999px; background:rgba(148,163,184,0.18); overflow:hidden;">
+            <div style="height:10px; width:${w}%; background:linear-gradient(90deg, rgba(239,68,68,0.85), rgba(234,179,8,0.75));"></div>
+          </div>
+
+          <span class="vektor-tooltip-base vektor-radar-tip">
+            ${buildTooltipTable(detalhe)}
+          </span>
+        </span>
 
         <div style="margin-top:8px; color:rgba(226,232,240,0.85); font-size:11px;">
-          casos: <b>${r.casos}</b> · maxScore: <b>${r.maxScore}</b> · pend: <b>${(Number(r.pendRate||0)*100).toFixed(1)}%</b>
+          casos: <b>${esc(r.casos)}</b> · maxScore: <b>${esc(r.maxScore)}</b> · pend: <b>${(Number(r.pendRate||0)*100).toFixed(1)}%</b>
         </div>
       </div>
     `;
