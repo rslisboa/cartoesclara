@@ -1673,19 +1673,43 @@ function renderRadarInsights_(lojas) {
   const negAbs = Math.abs(bestNeg.v);
 
   el.innerHTML =
-    "<div style='font-weight:900;color:#fff;margin-bottom:6px;'>Leitura automática do Radar</div>" +
-    "<div style='opacity:0.9;'>" + trend + "</div>" +
-    "<div style='margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;'>" +
-      "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(239,68,68,0.10);'>" +
-        "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais alinhadas (positivo)</div>" +
-        "<div style='opacity:0.9;'><b>" + bestPos.a.label + "</b> × <b>" + bestPos.b.label + "</b> = <b>" + fmt(bestPos.v) + "</b> (" + radarStrengthLabel_(posAbs) + ")</div>" +
-      "</div>" +
-      "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(59,130,246,0.12);'>" +
-        "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais inversas (negativo)</div>" +
-        "<div style='opacity:0.9;'><b>" + bestNeg.a.label + "</b> × <b>" + bestNeg.b.label + "</b> = <b>" + fmt(bestNeg.v) + "</b> (" + radarStrengthLabel_(negAbs) + ")</div>" +
+  "<div style='font-weight:900;color:#fff;margin-bottom:6px;'>Leitura automática do Radar</div>" +
+
+  "<div style='opacity:0.9; line-height:1.45; margin-bottom:6px;'>" +
+    "O Radar cruza indicadores do período (frequência, valores, concentração diária e pendências) para encontrar <b>padrões</b> entre as lojas. " +
+    "O objetivo aqui é <b>priorizar investigação</b>, não concluir irregularidade automaticamente." +
+  "</div>" +
+
+  "<div style='opacity:0.9; line-height:1.45; margin-bottom:6px;'>" +
+    "<b>Como ler:</b> relações <b>positivas</b> indicam métricas que tendem a subir juntas; relações <b>negativas</b> indicam que uma tende a subir quando a outra cai. " +
+    "Quanto mais forte o sinal, mais consistente ele apareceu no período." +
+  "</div>" +
+
+  "<div style='opacity:0.9;'>" + trend + "</div>" +
+
+  "<div style='margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;'>" +
+
+    "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(239,68,68,0.10);'>" +
+      "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais alinhadas (positivo)</div>" +
+      "<div style='opacity:0.9; line-height:1.35;'><b>" + bestPos.a.label + "</b> × <b>" + bestPos.b.label + "</b> = <b>" + fmt(bestPos.v) + "</b> (" + radarStrengthLabel_(posAbs) + ")</div>" +
+      "<div style='margin-top:6px; font-size:11px; opacity:0.85; line-height:1.35;'>" +
+        "Interpretação prática: quando uma dessas métricas aumenta, a outra tende a aumentar também no mesmo período." +
       "</div>" +
     "</div>" +
-    "<div style='margin-top:10px;font-size:11px;opacity:0.85;'>Nota: correlação indica associação (não causalidade).</div>";
+
+    "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(59,130,246,0.12);'>" +
+      "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais inversas (negativo)</div>" +
+      "<div style='opacity:0.9; line-height:1.35;'><b>" + bestNeg.a.label + "</b> × <b>" + bestNeg.b.label + "</b> = <b>" + fmt(bestNeg.v) + "</b> (" + radarStrengthLabel_(negAbs) + ")</div>" +
+      "<div style='margin-top:6px; font-size:11px; opacity:0.85; line-height:1.35;'>" +
+        "Interpretação prática: quando uma dessas métricas aumenta, a outra tende a reduzir no mesmo período." +
+      "</div>" +
+    "</div>" +
+
+  "</div>" +
+
+  "<div style='margin-top:10px;font-size:11px;opacity:0.85; line-height:1.35;'>" +
+    "<b>Nota:</b> correlação indica associação (não causalidade). Use este quadro para escolher a loja no ranking e validar no detalhe (transações e regras) quando necessário." +
+  "</div>";
 }
 
 function renderRadarRanking_(lojas) {
