@@ -2381,6 +2381,7 @@ const VEKTOR_INTENTS = [
   "Tabela de estornos",
   "Tabela de estornos do time",
   "Como usar bem o limite do cartão Clara?",
+  "Gastos por etiquetas",
   "Quero gráficos das transações",
   "O que o Vektor pode fazer?",
   "Como anexar nota fiscal na Clara?",
@@ -15791,6 +15792,23 @@ function listarEtiquetasClara() {
         if (!isNaN(v)) somaValores += v;
       });
 
+      // min/max para formatação condicional da coluna "Valor total"
+        var minValor = Infinity;
+        var maxValor = -Infinity;
+
+        itens.forEach(function (it) {
+          var v = Number(it.valorTotal || 0);
+          if (isFinite(v)) {
+            if (v < minValor) minValor = v;
+            if (v > maxValor) maxValor = v;
+          }
+        });
+
+        // fallback (evita divisão por zero / Infinity)
+        if (!isFinite(minValor)) minValor = 0;
+        if (!isFinite(maxValor)) maxValor = 0;
+
+
  // Monta a tabela HTML
       var html = "<div class='text-sm text-slate-700 mt-2'>" +
                  "<p class='mb-2'>Resumo de uso das etiquetas na Clara:</p>" +
@@ -15814,6 +15832,22 @@ function listarEtiquetasClara() {
         var perc = formatPct(it.percentual || 0);
         var val = formatBRL(it.valorTotal || 0);
 
+        var vNum = Number(it.valorTotal || 0);
+
+        // intensidade 0..1
+        var t = 0;
+        if (maxValor > minValor) {
+          t = (vNum - minValor) / (maxValor - minValor);
+          if (t < 0) t = 0;
+          if (t > 1) t = 1;
+        }
+
+        // alfa mais forte p/ valores maiores (ajuste fino sem estourar)
+        var alpha = 0.12 + (0.55 * t);
+
+        // cor base (verde institucional). Mantém leitura com texto escuro.
+        var bgVal = "background: rgba(0,94,39," + alpha.toFixed(3) + ");";
+
         etiqueta = etiqueta
           .toString()
           .replace(/&/g, "&amp;")
@@ -15823,7 +15857,7 @@ function listarEtiquetasClara() {
         html += "<tr>" +
                 "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;'>" + etiqueta + "</td>" +
                 "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;'>" + perc + "</td>" +
-                "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;'>" + val + "</td>" +
+                "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;" + bgVal + "'>" + val + "</td>" +
                 "</tr>";
       });
 
