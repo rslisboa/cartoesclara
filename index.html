@@ -15813,26 +15813,26 @@ async function ensurePanelBubble_() {
     html +=   "<p style='margin:0;margin-top:6px;font-size:12px;opacity:0.9'>Dica: clique em uma etiqueta para abrir as transações detalhadas (respeitando os filtros).</p>";
 
     // filtros
-    html += "<div style='margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end'>";
-    html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:160px'>" +
-              "<label style='font-size:11px;opacity:0.85'>Mês</label>" +
-              `<select data-etq="mes" id="vektor-etq-mes" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
-              opt(meses, st.mes, "Todos") + "</select></div>";
-    html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:220px'>" +
-              "<label style='font-size:11px;opacity:0.85'>Time</label>" +
-              `<select data-etq="time" id="vektor-etq-time" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
-              opt(times, st.time, "Todos") + "</select></div>";
-    html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:140px'>" +
-              "<label style='font-size:11px;opacity:0.85'>Loja</label>" +
-              `<select data-etq="loja" id="vektor-etq-loja" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
-              opt(lojas, st.loja, "Todas") + "</select></div>";
-    html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:260px;flex:1'>" +
-              "<label style='font-size:11px;opacity:0.85'>Etiqueta</label>" +
-              `<select data-etq="etiqueta" id="vektor-etq-etiqueta" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
-              opt(etiquetas, st.etiqueta, "Todas") + "</select></div>";
-    html +=   "<button type='button' id='vektor-etq-limpar' data-etq-action='limpar' " +
-              "style='background:#0f172a;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Limpar</button>";
-    html += "</div>";
+html += "<div style='margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end'>";
+html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:160px'>" +
+          "<label style='font-size:11px;opacity:0.85'>Mês</label>" +
+          `<select data-etq="mes" id="vektor-etq-mes" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
+          opt(meses, st.mes, "Todos") + "</select></div>";
+html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:220px'>" +
+          "<label style='font-size:11px;opacity:0.85'>Time</label>" +
+          `<select data-etq="time" id="vektor-etq-time" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
+          opt(times, st.time, "Todos") + "</select></div>";
+html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:140px'>" +
+          "<label style='font-size:11px;opacity:0.85'>Loja</label>" +
+          `<select data-etq="loja" id="vektor-etq-loja" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
+          opt(lojas, st.loja, "Todas") + "</select></div>";
+html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:260px;flex:1'>" +
+          "<label style='font-size:11px;opacity:0.85'>Etiqueta</label>" +
+          `<select data-etq="etiqueta" id="vektor-etq-etiqueta" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
+          opt(etiquetas, st.etiqueta, "Todas") + "</select></div>";
+html +=   "<button type='button' id='vektor-etq-limpar' data-etq-action='limpar' " +
+          "style='background:#0f172a;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Limpar</button>";
+html += "</div>";
 
     // tabela principal (thead sticky)
     html += "<div style='margin-top:10px'>";
@@ -15983,108 +15983,104 @@ async function ensurePanelBubble_() {
 
   // 2) bind único (delegação) — não duplica e não perde listeners
   function bindOnce_() {
-    if (window.__vektorEtiquetasBound) return;
-    window.__vektorEtiquetasBound = true;
+  if (window.__vektorEtiquetasBound) return;
+  window.__vektorEtiquetasBound = true;
 
-    document.addEventListener("change", function(e) {
-      const sel = e.target && e.target.matches && e.target.matches("#vektor-etq-mes, #vektor-etq-time, #vektor-etq-loja, #vektor-etq-etiqueta");
-      if (!sel) return;
+  document.addEventListener("change", function(e) {
+    const el = e.target;
+    if (!el || !el.matches) return;
 
-      const st = window.__vektorEtiquetasState || {};
-      st.mes = (document.getElementById("vektor-etq-mes") || {}).value || "";
-      st.time = (document.getElementById("vektor-etq-time") || {}).value || "";
-      st.loja = (document.getElementById("vektor-etq-loja") || {}).value || "";
-      st.etiqueta = (document.getElementById("vektor-etq-etiqueta") || {}).value || "";
-      window.__vektorEtiquetasState = st;
+    if (!el.matches("#vektor-etq-mes, #vektor-etq-time, #vektor-etq-loja, #vektor-etq-etiqueta")) return;
 
+    const st = window.__vektorEtiquetasState || {};
+    st.mes = (document.getElementById("vektor-etq-mes") || {}).value || "";
+    st.time = (document.getElementById("vektor-etq-time") || {}).value || "";
+    st.loja = (document.getElementById("vektor-etq-loja") || {}).value || "";
+    st.etiqueta = (document.getElementById("vektor-etq-etiqueta") || {}).value || "";
+    window.__vektorEtiquetasState = st;
+
+    clearDetalhe_();
+    loadResumo_();
+  });
+
+  document.addEventListener("click", function(e) {
+    const btnLimpar = e.target && e.target.closest && e.target.closest("[data-etq-action='limpar']");
+    if (btnLimpar) {
+      window.__vektorEtiquetasState = { mes:"", time:"", loja:"", etiqueta:"" };
       clearDetalhe_();
       loadResumo_();
-    });
+      return;
+    }
 
-    document.addEventListener("click", function(e) {
-      const btnLimpar = e.target && e.target.closest && e.target.closest("[data-etq-action='limpar']");
-      if (btnLimpar) {
-        window.__vektorEtiquetasState = { mes:"", time:"", loja:"", etiqueta:"" };
-        clearDetalhe_();
-        loadResumo_();
-        return;
-      }
+    const tr = e.target && e.target.closest && e.target.closest(".vektor-etq-row");
+    if (!tr) return;
 
-      const tr = e.target && e.target.closest && e.target.closest(".vektor-etq-row");
+    const etiquetaSel = tr.getAttribute("data-etiqueta") || "";
+    const st = window.__vektorEtiquetasState || {};
+    const payload = { mes: st.mes || "", time: st.time || "", loja: st.loja || "", etiqueta: etiquetaSel };
 
-      if (tr) {
-  const etiquetaSel = tr.getAttribute("data-etiqueta") || "";
-  const st = window.__vektorEtiquetasState || {};
-  const payload = { mes: st.mes || "", time: st.time || "", loja: st.loja || "", etiqueta: etiquetaSel };
+    const wrapId = "vektor-etq-detailwrap-" + Date.now();
 
-  // 1) Abre uma bolha SEPARADA para o detalhe (com placeholder)
-  const wrapId = "vektor-etq-detailwrap-" + Date.now();
-  renderBotMessage(
-    "HTML:<div class='text-sm text-slate-700' id='" + wrapId + "' style='margin:0'>" +
-      "<p style='margin:0'><b>Carregando transações da etiqueta</b> " + escHtml_(etiquetaSel) + "…</p>" +
-      "<div style='margin-top:8px' id='" + wrapId + "-content'></div>" +
-    "</div>"
-  );
+    renderBotMessage(
+      "HTML:<div class='text-sm text-slate-700' id='" + wrapId + "' style='margin:0'>" +
+        "<div style='margin-top:0' id='" + wrapId + "-content'>" +
+          "<p style='margin:0'><b>Carregando transações da etiqueta</b> " + escHtml_(etiquetaSel) + "…</p>" +
+        "</div>" +
+      "</div>"
+    );
 
-  google.script.run
-    .withSuccessHandler(function(resp) {
-      const rows = resp && resp.ok && Array.isArray(resp.rows) ? resp.rows : [];
+    google.script.run
+      .withSuccessHandler(function(resp) {
+        const rows = resp && resp.ok && Array.isArray(resp.rows) ? resp.rows : [];
+        const contentEl = document.getElementById(wrapId + "-content");
+        if (!contentEl) return;
 
-      const contentEl = document.getElementById(wrapId + "-content");
-      if (!contentEl) return;
+        if (!rows.length) {
+          contentEl.innerHTML = "<p style='margin:0'>Sem transações para os filtros atuais.</p>";
+          return;
+        }
 
-      if (!rows.length) {
-        contentEl.innerHTML = "<p style='margin:0'>Sem transações para os filtros atuais.</p>";
-        return;
-      }
+        contentEl.innerHTML = buildDetalheHtml_(etiquetaSel, rows);
 
-      // 2) Monta a tabela e injeta na MESMA bolha do detalhe
-      contentEl.innerHTML = buildDetalheHtml_(etiquetaSel, rows);
+        const btnEmail = document.querySelector("#" + wrapId + " #btn-email-etq");
+        if (btnEmail) {
+          btnEmail.addEventListener("click", function() {
+            btnEmail.disabled = true;
+            btnEmail.textContent = "Enviando…";
 
-      // 3) Botão de e-mail: status na própria bolha (sem renderBotMessage)
-      const btnEmail = document.querySelector("#" + wrapId + " #btn-email-etq");
-      if (btnEmail) {
-        btnEmail.addEventListener("click", function() {
-          btnEmail.disabled = true;
-          btnEmail.textContent = "Enviando…";
+            google.script.run
+              .withSuccessHandler(function(rEmail) {
+                btnEmail.disabled = false;
+                btnEmail.textContent = "Enviar por e-mail";
 
-          google.script.run
-            .withSuccessHandler(function(rEmail) {
-              btnEmail.disabled = false;
-              btnEmail.textContent = "Enviar por e-mail";
-
-              const statusEl = document.querySelector("#" + wrapId + " #vektor-etq-email-status");
-              if (statusEl) {
-                statusEl.innerHTML =
-                  (rEmail && rEmail.ok)
-                    ? "<span style='color:#16a34a;font-weight:800;'>E-mail enviado:</span> <b>Base de Gastos por Etiquetas</b>."
-                    : "<span style='color:#dc2626;font-weight:800;'>Falha ao enviar o e-mail.</span>";
-              }
-            })
-            .enviarEmailGastosPorEtiquetasClara(payload);
-        }, { once: true });
-      }
-    })
-    .withFailureHandler(function(err) {
-      const contentEl = document.getElementById(wrapId + "-content");
-      if (!contentEl) return;
-      const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
-      contentEl.innerHTML = "<p style='margin:0;color:#b91c1c'><b>Falha:</b> " + escHtml_(msg) + "</p>";
-    })
-    .getTransacoesPorEtiquetaClara(payload);
-
-  return;
+                const statusEl = document.querySelector("#" + wrapId + " #vektor-etq-email-status");
+                if (statusEl) {
+                  statusEl.innerHTML =
+                    (rEmail && rEmail.ok)
+                      ? "<span style='color:#16a34a;font-weight:800;'>E-mail enviado:</span> <b>Base de Gastos por Etiquetas</b>."
+                      : "<span style='color:#dc2626;font-weight:800;'>Falha ao enviar o e-mail.</span>";
+                }
+              })
+              .enviarEmailGastosPorEtiquetasClara(payload);
+          }, { once: true });
+        }
+      })
+      .withFailureHandler(function(err) {
+        const contentEl = document.getElementById(wrapId + "-content");
+        if (!contentEl) return;
+        const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+        contentEl.innerHTML = "<p style='margin:0;color:#b91c1c'><b>Falha:</b> " + escHtml_(msg) + "</p>";
+      })
+      .getTransacoesPorEtiquetaClara(payload);
+  });
 }
-      
-    });
-  }
 
   // Mensagem (bolha) separada — aparece só uma vez por sessão do painel
 if (!window.__vektorEtiquetasIntroShown) {
   window.__vektorEtiquetasIntroShown = true;
   await renderBotMessage(
     "HTML:<p class='text-sm text-slate-700' style='margin:0'>" +
-      "Vou montar o painel de <b>Gastos por etiquetas</b> com filtros e detalhamento." +
+      "Vou montar o painel de <b>Gastos por etiquetas</b> com filtros e detalhamento, pode demorar um pouco, então aguarde..." +
     "</p>"
   );
 }
