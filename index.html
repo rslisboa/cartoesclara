@@ -15742,6 +15742,97 @@ function detectarMaioresTransacoesIndividuais(msgOriginal, norm) {
   };
 }
 
+function bindPeriodoEtiquetasOnce_() {
+  if (window.__vektorEtiquetasPeriodoBound) return;
+  window.__vektorEtiquetasPeriodoBound = true;
+
+  document.addEventListener("click", async function(e) {
+    const btn = e.target && e.target.closest && e.target.closest("#vektor-etq-per-aplicar");
+    if (!btn) return;
+
+    const iniEl = document.getElementById("vektor-etq-per-ini");
+    const fimEl = document.getElementById("vektor-etq-per-fim");
+    const ini = iniEl ? String(iniEl.value || "").trim() : "";
+    const fim = fimEl ? String(fimEl.value || "").trim() : "";
+
+    if (!ini || !fim) {
+      renderBotMessage("HTML:<p class='text-sm text-red-700' style='margin:0'><b>Preencha</b> data inicial e final.</p>");
+      return;
+    }
+    if (ini > fim) {
+      renderBotMessage("HTML:<p class='text-sm text-red-700' style='margin:0'><b>Período inválido:</b> a data inicial não pode ser maior que a final.</p>");
+      return;
+    }
+
+    const st = window.__vektorEtiquetasState || {};
+    st.periodoIni = ini;
+    st.periodoFim = fim;
+
+    // zera filtros do painel (mantém coerência)
+    st.mes = "";
+    st.time = "";
+    st.loja = "";
+    st.etiqueta = "";
+
+    window.__vektorEtiquetasState = st;
+
+    // força a msg única do próprio listarGastos... reaparecer quando mudar o período
+    window.__vektorEtiquetasIntroShown = false;
+
+    // importante: fecha a “sessão” do calendário para permitir reabrir depois
+    window.__vektorEtiquetasPeriodoOpen = false;
+
+    window.__vektorEtiquetasIntroShown = false;
+
+    await listarGastosPorEtiquetasClara();
+
+  });
+}
+
+function abrirPeriodoGastosEtiquetas_() {
+  bindPeriodoEtiquetasOnce_();
+  // evita abrir 2 vezes
+  if (window.__vektorEtiquetasPeriodoOpen) return;
+  window.__vektorEtiquetasPeriodoOpen = true;
+
+  // default: últimos 30 dias
+  const hoje = new Date();
+  const fim = hoje.toISOString().slice(0, 10);
+
+  const iniDt = new Date(hoje.getTime());
+  iniDt.setDate(iniDt.getDate() - 30);
+  const ini = iniDt.toISOString().slice(0, 10);
+
+  // se já existe período salvo, pré-preenche
+  const st = window.__vektorEtiquetasState || {};
+  const vIni = st.periodoIni || ini;
+  const vFim = st.periodoFim || fim;
+
+  renderBotMessage(
+    "HTML:" +
+    "<div class='text-sm text-slate-700' style='margin:0'>" +
+      "<p style='margin:0'><b>Selecione o período</b> para montar <b>Gastos por etiquetas</b>:</p>" +
+      "<div style='display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px'>" +
+        "<div style='display:flex;flex-direction:column;gap:4px'>" +
+          "<label style='font-size:11px;opacity:0.85'>Data inicial</label>" +
+          "<input type='date' id='vektor-etq-per-ini' value='" + vIni + "' " +
+          "style='border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px' />" +
+        "</div>" +
+        "<div style='display:flex;flex-direction:column;gap:4px'>" +
+          "<label style='font-size:11px;opacity:0.85'>Data final</label>" +
+          "<input type='date' id='vektor-etq-per-fim' value='" + vFim + "' " +
+          "style='border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px' />" +
+        "</div>" +
+        "<button type='button' id='vektor-etq-per-aplicar' " +
+          "style='background:#005E27;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer'>" +
+          "Aplicar período" +
+        "</button>" +
+      "</div>" +
+      "<p style='margin:0;margin-top:8px;font-size:12px;opacity:0.9'>Dica: escolha um período menor para carregar mais rápido.</p>" +
+    "</div>"
+  );
+}
+
 // Lista as etiquetas disponíveis na BaseClara (coluna T) e mostra no chat
 
 async function listarGastosPorEtiquetasClara() {
@@ -15751,6 +15842,15 @@ async function listarGastosPorEtiquetasClara() {
   // id único do painel (1 instância)
   const panelId = window.__vektorEtiquetasPanelId || ("vektor-etq-panel-" + Date.now());
   window.__vektorEtiquetasPanelId = panelId;
+
+  const st0 = window.__vektorEtiquetasState || {};
+
+if (!st0.periodoIni || !st0.periodoFim) {
+  // primeira entrada: pede o período no chat
+  window.__vektorEtiquetasPeriodoOpen = false;
+  abrirPeriodoGastosEtiquetas_();  // renderiza o mini-calendário em nova bolha
+  return;
+}
 
   function escHtml_(s) {
     return String(s ?? "")
@@ -15832,7 +15932,44 @@ html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:260p
           opt(etiquetas, st.etiqueta, "Todas") + "</select></div>";
 html +=   "<button type='button' id='vektor-etq-limpar' data-etq-action='limpar' " +
           "style='background:#0f172a;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Limpar</button>";
+html +=   "<button type='button' data-etq-action='periodo' " +
+          "style='background:#334155;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Alterar período</button>";
 html += "</div>";
+
+// Modal de período (popup) — fica sempre no DOM, mas escondido
+const stPer = window.__vektorEtiquetasState || {};
+const vIni = stPer.periodoIni || "";
+const vFim = stPer.periodoFim || "";
+
+html +=
+  "<div id='vektor-etq-periodo-modal' style='display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:rgba(0,0,0,0.55)'>" +
+    "<div style='background:#fff;border-radius:14px;width:min(520px,92vw);padding:16px;border:1px solid #e2e8f0;box-shadow:0 25px 60px rgba(0,0,0,0.35)'>" +
+      "<div style='display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px'>" +
+        "<div style='font-weight:900;color:#0f172a'>Alterar período</div>" +
+        "<button type='button' data-etq-action='periodo-fechar' style='background:transparent;border:0;font-size:18px;cursor:pointer;line-height:1'>×</button>" +
+      "</div>" +
+
+      "<div style='display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end'>" +
+        "<div style='display:flex;flex-direction:column;gap:4px;min-width:200px;flex:1'>" +
+          "<label style='font-size:11px;opacity:0.85'>Data inicial</label>" +
+          "<input type='date' id='vektor-etq-per-ini-modal' value='" + escHtml_(vIni) + "' " +
+          "style='border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:12px' />" +
+        "</div>" +
+        "<div style='display:flex;flex-direction:column;gap:4px;min-width:200px;flex:1'>" +
+          "<label style='font-size:11px;opacity:0.85'>Data final</label>" +
+          "<input type='date' id='vektor-etq-per-fim-modal' value='" + escHtml_(vFim) + "' " +
+          "style='border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:12px' />" +
+        "</div>" +
+      "</div>" +
+
+      "<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap'>" +
+        "<button type='button' data-etq-action='periodo-cancelar' style='background:#e2e8f0;color:#0f172a;border:none;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer'>Cancelar</button>" +
+        "<button type='button' data-etq-action='periodo-aplicar' style='background:#005E27;color:#fff;border:none;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer'>Aplicar</button>" +
+      "</div>" +
+
+      "<div id='vektor-etq-periodo-erro' style='margin-top:10px;font-size:12px;color:#b91c1c;display:none'></div>" +
+    "</div>" +
+  "</div>";
 
     // tabela principal (thead sticky)
     html += "<div style='margin-top:10px'>";
@@ -15840,7 +15977,7 @@ html += "</div>";
     html +=     "<table id='tabela-etiquetas-clara' style='border-collapse:collapse;width:100%; font-size:12px; border:2px solid #000;'>";
     html +=       "<thead><tr>";
     const th = "background:#003366;color:#ffffff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;white-space:nowrap;";
-    html +=         "<th style='"+th+"position:sticky;top:0;z-index:10;text-align:left;'>Etiqueta</th>";
+    html +=         "<th style='"+th+"position:sticky;top:0;z-index:10;text-align:left;'>Etiqueta / Tag</th>";
     html +=         "<th style='"+th+"position:sticky;top:0;z-index:10;text-align:right;'>% de uso (valor)</th>";
     html +=         "<th style='"+th+"position:sticky;top:0;z-index:10;text-align:right;'>Valor total</th>";
     html +=       "</tr></thead><tbody>";
@@ -16005,8 +16142,78 @@ html += "</div>";
 
   document.addEventListener("click", function(e) {
     const btnLimpar = e.target && e.target.closest && e.target.closest("[data-etq-action='limpar']");
+    const btnPeriodo = e.target && e.target.closest && e.target.closest("[data-etq-action='periodo']");
+
+    if (btnPeriodo) {
+  const modal = document.getElementById("vektor-etq-periodo-modal");
+  if (!modal) return;
+
+  // pré-preenche com o state atual
+  const st = window.__vektorEtiquetasState || {};
+  const iniEl = document.getElementById("vektor-etq-per-ini-modal");
+  const fimEl = document.getElementById("vektor-etq-per-fim-modal");
+  if (iniEl) iniEl.value = st.periodoIni || "";
+  if (fimEl) fimEl.value = st.periodoFim || "";
+
+  const err = document.getElementById("vektor-etq-periodo-erro");
+  if (err) { err.style.display = "none"; err.textContent = ""; }
+
+  modal.style.display = "flex";
+  return;
+}
+
+const btnFecharPeriodo = e.target && e.target.closest && e.target.closest("[data-etq-action='periodo-fechar'],[data-etq-action='periodo-cancelar']");
+if (btnFecharPeriodo) {
+  const modal = document.getElementById("vektor-etq-periodo-modal");
+  if (modal) modal.style.display = "none";
+  return;
+}
+
+const btnAplicarPeriodo = e.target && e.target.closest && e.target.closest("[data-etq-action='periodo-aplicar']");
+if (btnAplicarPeriodo) {
+  const iniEl = document.getElementById("vektor-etq-per-ini-modal");
+  const fimEl = document.getElementById("vektor-etq-per-fim-modal");
+  const ini = iniEl ? String(iniEl.value || "").trim() : "";
+  const fim = fimEl ? String(fimEl.value || "").trim() : "";
+
+  const err = document.getElementById("vektor-etq-periodo-erro");
+  function showErr(msg){
+    if (!err) return;
+    err.style.display = "block";
+    err.textContent = msg;
+  }
+
+  if (!ini || !fim) { showErr("Preencha data inicial e final."); return; }
+  if (ini > fim) { showErr("Período inválido: a data inicial não pode ser maior que a final."); return; }
+
+  // Atualiza state e zera filtros do painel
+  const st = window.__vektorEtiquetasState || {};
+  st.periodoIni = ini;
+  st.periodoFim = fim;
+
+  st.mes = "";
+  st.time = "";
+  st.loja = "";
+  st.etiqueta = "";
+  window.__vektorEtiquetasState = st;
+
+  // Fecha modal
+  const modal = document.getElementById("vektor-etq-periodo-modal");
+  if (modal) modal.style.display = "none";
+
+  // IMPORTANTE: não chamar listarGastosPorEtiquetasClara() (isso gera mensagem e re-fluxo).
+  clearDetalhe_();
+  loadResumo_();
+  return;
+}
+
     if (btnLimpar) {
-      window.__vektorEtiquetasState = { mes:"", time:"", loja:"", etiqueta:"" };
+      const st = window.__vektorEtiquetasState || {};
+        window.__vektorEtiquetasState = { 
+          mes:"", time:"", loja:"", etiqueta:"",
+          periodoIni: st.periodoIni || "",
+          periodoFim: st.periodoFim || ""
+        };
       clearDetalhe_();
       loadResumo_();
       return;
@@ -16017,7 +16224,12 @@ html += "</div>";
 
     const etiquetaSel = tr.getAttribute("data-etiqueta") || "";
     const st = window.__vektorEtiquetasState || {};
-    const payload = { mes: st.mes || "", time: st.time || "", loja: st.loja || "", etiqueta: etiquetaSel };
+    const payload = { 
+          mes: st.mes || "", time: st.time || "", loja: st.loja || "",
+          etiqueta: etiquetaSel,
+          periodoIni: st.periodoIni || "",
+          periodoFim: st.periodoFim || ""
+        };
 
     const wrapId = "vektor-etq-detailwrap-" + Date.now();
 
@@ -16080,7 +16292,7 @@ if (!window.__vektorEtiquetasIntroShown) {
   window.__vektorEtiquetasIntroShown = true;
   await renderBotMessage(
     "HTML:<p class='text-sm text-slate-700' style='margin:0'>" +
-      "Vou montar o painel de <b>Gastos por etiquetas</b> com filtros e detalhamento, pode demorar um pouco, então aguarde..." +
+      "Vou montar o painel de <b>Gastos por etiquetas</b> com filtros e detalhamento." +
     "</p>"
   );
 }
@@ -16088,6 +16300,10 @@ if (!window.__vektorEtiquetasIntroShown) {
   // execução
   await ensurePanelBubble_();
   bindOnce_();
+  const elBoot = document.getElementById(panelId);
+  if (elBoot) {
+    elBoot.innerHTML = "<p style='margin:0;opacity:0.9'>Carregando dados do período selecionado...</p>";
+  }
   await loadResumo_();
 }
 
@@ -16628,7 +16844,7 @@ if (isCmdLojasOfensoras) {
 
     // Se a intenção for listar etiquetas, chama a função específica e para aqui
     if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
-        listarGastosPorEtiquetasClara();
+        abrirPeriodoGastosEtiquetas_();
         return;
     }
 
