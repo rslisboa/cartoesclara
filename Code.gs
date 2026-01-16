@@ -3808,6 +3808,42 @@ function getRadarIrregularidadeParaChat(modo) {
     if (!rel || !rel.ok) return rel;
 
     var rows = Array.isArray(rel.rows) ? rel.rows : [];
+
+    // ✅ Detalhe por loja: 1 linha “mais crítica” por loja (para tooltip no ranking)
+var detalhesPorLoja = {};
+function toNumberMoney_(v) {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return v;
+  var s = String(v);
+  s = s.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  var n = Number(s);
+  return isFinite(n) ? n : 0;
+}
+
+rows.forEach(function (r) {
+  var loja = String(r.loja || "").trim();
+  if (!loja) return;
+
+  var cur = detalhesPorLoja[loja];
+  if (!cur) { detalhesPorLoja[loja] = r; return; }
+
+  var sA = Number(r.score) || 0;
+  var sB = Number(cur.score) || 0;
+  if (sA !== sB) { if (sA > sB) detalhesPorLoja[loja] = r; return; }
+
+  var vA = toNumberMoney_(r.valor);
+  var vB = toNumberMoney_(cur.valor);
+  if (vA !== vB) { if (vA > vB) detalhesPorLoja[loja] = r; return; }
+
+  var sdA = toNumberMoney_(r.somaDia);
+  var sdB = toNumberMoney_(cur.somaDia);
+  if (sdA !== sdB) { if (sdA > sdB) detalhesPorLoja[loja] = r; return; }
+
+  var qA = Number(r.qtdDia) || 0;
+  var qB = Number(cur.qtdDia) || 0;
+  if (qA > qB) detalhesPorLoja[loja] = r;
+});
+
     var mapa = {}; // loja -> agg
 
     function toNumberMoney_(s) {
@@ -3896,7 +3932,8 @@ function getRadarIrregularidadeParaChat(modo) {
     return {
       ok: true,
       meta: rel.meta || {},
-      lojas: lojas
+      lojas: lojas,
+      detalhesPorLoja: detalhesPorLoja
     };
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
@@ -7312,6 +7349,338 @@ function getListaEtiquetasClara() {
 
   } catch (e) {
     return [];
+  }
+}
+
+// =====================================================
+// GASTOS POR ETIQUETAS (BaseClara) - por indices fixos
+// =====================================================
+
+// Indices fixos conforme solicitado (A=0, C=2, D=3, H=7, R=17, T=19, U=20)
+var _ETQ_IDX_DATA_  = 0;   // A
+var _ETQ_IDX_ESTAB_ = 2;   // C
+var _ETQ_IDX_VALOR_ = 3;   // D
+var _ETQ_IDX_LOJA_  = 7;   // H
+var _ETQ_IDX_TIME_  = 17;  // R
+var _ETQ_IDX_TAGS_  = 19;  // T
+var _ETQ_IDX_DESC_  = 20;  // U
+
+function _parseDataToDate_(v) {
+  if (!v) return null;
+  if (Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime())) return v;
+
+  var s = String(v).trim();
+  if (!s) return null;
+
+  // dd/MM/yyyy
+  var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (m1) return new Date(Number(m1[3]), Number(m1[2]) - 1, Number(m1[1]));
+
+  // yyyy-MM-dd
+  var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m2) return new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]));
+
+  var d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function _fmtMes_(dt, tz) {
+  try {
+    return Utilities.formatDate(dt, tz, "MM/yyyy");
+  } catch (e) {
+    return "";
+  }
+}
+
+function _toNumberValor_(v) {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return isFinite(v) ? v : 0;
+  var s = String(v).trim();
+  if (!s) return 0;
+  // remove separador milhar e troca vírgula por ponto
+  s = s.replace(/\./g, "").replace(",", ".");
+  var n = parseFloat(s);
+  return isFinite(n) ? n : 0;
+}
+
+function _splitTags_(cell) {
+  var txt = (cell === null || cell === undefined) ? "" : String(cell);
+  txt = txt.trim();
+  if (!txt) return [];
+  return txt.split("|").map(function (x) { return String(x || "").trim(); }).filter(Boolean);
+}
+
+function _rowHasTag_(row, tag) {
+  if (!tag) return true;
+  var tags = _splitTags_(row[_ETQ_IDX_TAGS_]);
+  for (var i = 0; i < tags.length; i++) {
+    if (tags[i] === tag) return true;
+  }
+  return false;
+}
+
+function _keysSorted_(obj) {
+  return Object.keys(obj || {}).sort(function (a, b) { return a.localeCompare(b, "pt-BR"); });
+}
+
+/**
+ * Retorna:
+ * - itens: [{ etiqueta, valorTotal, percentual }]
+ * - somaValores: soma total de valores (coluna D) das transações filtradas (base)
+ * - totalGeral: soma dos valores alocados por etiqueta (atenção: pode "duplicar" se houver múltiplas etiquetas por transação)
+ * - filtros dependentes: meses/times/lojas/etiquetas
+ */
+function getGastosPorEtiquetasClara(filtro) {
+  try {
+    filtro = filtro && typeof filtro === "object" ? filtro : {};
+    var fMes = String(filtro.mes || "").trim();       // "MM/yyyy"
+    var fTime = String(filtro.time || "").trim();
+    var fLoja = String(filtro.loja || "").trim();
+    var fTag = String(filtro.etiqueta || "").trim();
+
+    // Reaproveita seu loader existente
+    var info = carregarLinhasBaseClara_();
+    if (info && info.error) return { ok: false, error: info.error };
+
+    var linhas = (info && info.linhas) ? info.linhas : [];
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+    // sets dependentes
+    var setMes = {}, setTime = {}, setLoja = {}, setTag = {};
+
+    // agregação
+    var mapa = {};       // etiqueta -> valorTotal
+    var somaValores = 0; // soma base (coluna D) das transações filtradas (sem duplicar por etiqueta)
+    var totalGeral = 0;  // soma alocada por etiqueta (pode duplicar quando multi-etiqueta)
+
+    for (var i = 0; i < linhas.length; i++) {
+      var row = linhas[i];
+      if (!row) continue;
+
+      var dt = _parseDataToDate_(row[_ETQ_IDX_DATA_]);
+      if (!dt) continue;
+
+      var mes = _fmtMes_(dt, tz);
+      if (!mes) continue;
+
+      var time = String(row[_ETQ_IDX_TIME_] || "").trim();
+      var loja = String(row[_ETQ_IDX_LOJA_] || "").trim();
+      loja = loja ? loja.replace(/\D/g, "") : "";
+      if (loja) loja = ("0000" + loja).slice(-4);
+
+      var tags = _splitTags_(row[_ETQ_IDX_TAGS_]);
+      var temTagSelecionada = _rowHasTag_(row, fTag);
+
+      // -------------------------
+      // Filtros dependentes:
+      // cada conjunto ignora o próprio filtro e respeita os demais
+      // -------------------------
+
+      // meses disponíveis (respeita time/loja/etiqueta)
+      if ((!fTime || time === fTime) && (!fLoja || loja === fLoja) && temTagSelecionada) {
+        setMes[mes] = true;
+      }
+
+      // times disponíveis (respeita mes/loja/etiqueta)
+      if ((!fMes || mes === fMes) && (!fLoja || loja === fLoja) && temTagSelecionada) {
+        if (time) setTime[time] = true;
+      }
+
+      // lojas disponíveis (respeita mes/time/etiqueta)
+      if ((!fMes || mes === fMes) && (!fTime || time === fTime) && temTagSelecionada) {
+        if (loja) setLoja[loja] = true;
+      }
+
+      // etiquetas disponíveis (respeita mes/time/loja; ignora filtro etiqueta)
+      if ((!fMes || mes === fMes) && (!fTime || time === fTime) && (!fLoja || loja === fLoja)) {
+        for (var t = 0; t < tags.length; t++) setTag[tags[t]] = true;
+      }
+
+      // -------------------------
+      // Aplicação dos filtros para o resumo (respeita TODOS)
+      // -------------------------
+      if (fMes && mes !== fMes) continue;
+      if (fTime && time !== fTime) continue;
+      if (fLoja && loja !== fLoja) continue;
+      if (fTag && !temTagSelecionada) continue;
+
+      var valorNum = _toNumberValor_(row[_ETQ_IDX_VALOR_]);
+      if (!isFinite(valorNum)) valorNum = 0;
+
+      somaValores += valorNum;
+
+      // aloca por etiqueta (se não filtrou etiqueta, soma para todas as tags da transação)
+      for (var k = 0; k < tags.length; k++) {
+        var et = tags[k];
+        if (fTag && et !== fTag) continue;
+
+        if (!mapa[et]) mapa[et] = 0;
+        mapa[et] += valorNum;
+        totalGeral += valorNum;
+      }
+    }
+
+    var itens = [];
+    Object.keys(mapa).forEach(function (et) {
+      itens.push({ etiqueta: et, valorTotal: Number(mapa[et] || 0) });
+    });
+    itens.sort(function (a, b) { return (b.valorTotal || 0) - (a.valorTotal || 0); });
+
+    itens.forEach(function (it) {
+      var p = totalGeral > 0 ? (it.valorTotal / totalGeral) * 100 : 0;
+      it.percentual = p;
+    });
+
+    return {
+      ok: true,
+      itens: itens,
+      somaValores: somaValores,
+      totalGeral: totalGeral,
+      filtros: {
+        meses: _keysSorted_(setMes),
+        times: _keysSorted_(setTime),
+        lojas: _keysSorted_(setLoja),
+        etiquetas: _keysSorted_(setTag)
+      }
+    };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Tabela detalhada por etiqueta (respeita filtros).
+ * Retorna colunas conforme solicitado:
+ * Loja(H), Time(R), Data(A), Estabelecimento(C), Valor(D), Etiqueta(T), Descrição(U)
+ */
+function getTransacoesPorEtiquetaClara(payload) {
+  try {
+    payload = payload && typeof payload === "object" ? payload : {};
+    var fMes = String(payload.mes || "").trim();
+    var fTime = String(payload.time || "").trim();
+    var fLoja = String(payload.loja || "").trim();
+    var tagSel = String(payload.etiqueta || "").trim();
+    if (!tagSel) return { ok: true, rows: [] };
+
+    var info = carregarLinhasBaseClara_();
+    if (info && info.error) return { ok: false, error: info.error };
+
+    var linhas = (info && info.linhas) ? info.linhas : [];
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+    var out = [];
+    for (var i = 0; i < linhas.length; i++) {
+      var row = linhas[i];
+      if (!row) continue;
+
+      var dt = _parseDataToDate_(row[_ETQ_IDX_DATA_]);
+      if (!dt) continue;
+
+      var mes = _fmtMes_(dt, tz);
+      if (fMes && mes !== fMes) continue;
+
+      var time = String(row[_ETQ_IDX_TIME_] || "").trim();
+      if (fTime && time !== fTime) continue;
+
+      var loja = String(row[_ETQ_IDX_LOJA_] || "").trim();
+      loja = loja ? loja.replace(/\D/g, "") : "";
+      if (loja) loja = ("0000" + loja).slice(-4);
+      if (fLoja && loja !== fLoja) continue;
+
+      if (!_rowHasTag_(row, tagSel)) continue;
+
+      var estab = String(row[_ETQ_IDX_ESTAB_] || "").trim();
+      var valorNum = _toNumberValor_(row[_ETQ_IDX_VALOR_]);
+      var etiquetaCell = String(row[_ETQ_IDX_TAGS_] || "").trim();
+      var desc = String(row[_ETQ_IDX_DESC_] || "").trim();
+
+      out.push({
+        loja: loja,
+        time: time,
+        data: Utilities.formatDate(dt, tz, "dd/MM/yyyy"),
+        estabelecimento: estab,
+        valor: valorNum,
+        etiqueta: etiquetaCell,
+        descricao: desc
+      });
+
+      if (out.length >= 1500) break;
+    }
+
+    return { ok: true, etiqueta: tagSel, rows: out };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Envia a tabela detalhada por e-mail
+ * Assunto: Base de Gastos por Etiquetas
+ * Remetente: Vektor - Grupo SBF
+ */
+function enviarEmailGastosPorEtiquetasClara(payload) {
+  try {
+    var emailDestino = Session.getActiveUser().getEmail();
+    if (!emailDestino) return { ok: false, error: "Usuário sem e-mail ativo." };
+
+    var det = getTransacoesPorEtiquetaClara(payload);
+    if (!det || !det.ok) return { ok: false, error: det && det.error ? det.error : "Falha ao montar base." };
+
+    var rows = det.rows || [];
+    if (!rows.length) return { ok: false, error: "Sem transações para enviar com os filtros atuais." };
+
+    function esc_(x) {
+      return String(x === null || x === undefined ? "" : x)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+
+    var assunto = "Base de Gastos por Etiquetas";
+
+    var cab = "<p style='margin:0'>Segue a base detalhada de <b>Gastos por Etiquetas</b>.</p>";
+    cab += "<p style='margin:0;margin-top:6px;font-size:12px;color:#475569'>Etiqueta selecionada: <b>" + esc_(det.etiqueta || "") + "</b></p>";
+
+    var th = "background:#003366;color:#fff;border:1px solid #0f172a;padding:6px;white-space:nowrap;text-align:left;";
+    var td = "border:1px solid #0f172a;padding:6px;vertical-align:top;";
+
+    var t = "";
+    t += "<div style='margin-top:10px'>";
+    t += "<table style='border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:12px;'>";
+    t += "<thead><tr>";
+    t += "<th style='" + th + "'>Loja</th>";
+    t += "<th style='" + th + "'>Time</th>";
+    t += "<th style='" + th + "'>Data</th>";
+    t += "<th style='" + th + "text-align:left;'>Estabelecimento</th>";
+    t += "<th style='" + th + "text-align:right;'>Valor</th>";
+    t += "<th style='" + th + "'>Etiqueta inserida</th>";
+    t += "<th style='" + th + "'>Item comprado (descrição)</th>";
+    t += "</tr></thead><tbody>";
+
+    rows.slice(0, 1500).forEach(function (r) {
+      t += "<tr>";
+      t += "<td style='" + td + "white-space:nowrap;'>" + esc_(r.loja) + "</td>";
+      t += "<td style='" + td + "white-space:nowrap;'>" + esc_(r.time) + "</td>";
+      t += "<td style='" + td + "white-space:nowrap;'>" + esc_(r.data) + "</td>";
+      t += "<td style='" + td + "'>" + esc_(r.estabelecimento) + "</td>";
+      t += "<td style='" + td + "white-space:nowrap;text-align:right;'>" +
+           esc_(Number(r.valor || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })) + "</td>";
+      t += "<td style='" + td + "'>" + esc_(r.etiqueta) + "</td>";
+      t += "<td style='" + td + "'>" + esc_(r.descricao) + "</td>";
+      t += "</tr>";
+    });
+
+    t += "</tbody></table></div>";
+
+    MailApp.sendEmail({
+      to: emailDestino,
+      subject: assunto,
+      htmlBody: cab + t,
+      name: "Vektor - Grupo SBF"
+    });
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
 }
 
