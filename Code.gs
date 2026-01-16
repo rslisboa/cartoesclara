@@ -787,10 +787,29 @@ function enviarPendenciasPorEmail(lojaCodigo, emailDestino) {
       return { ok: false, error: "E-mail não informado." };
     }
 
-    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailDestino)) {
-      return { ok: false, error: "E-mail inválido." };
-    }
+    var emailUsuario = Session.getActiveUser().getEmail();
+if (!emailUsuario) {
+  return { ok: false, error: "Usuário sem e-mail ativo." };
+}
+
+var emailDestino = String(
+  (payload && payload.emailDestino) ? payload.emailDestino : emailUsuario
+).trim();
+
+// 🔒 trava domínio
+var emailRegex = /^[^\s@]+@((gruposbf|centauro)\.com\.br)$/i;
+if (!emailRegex.test(emailDestino)) {
+  return {
+    ok: false,
+    error: "Informe um e-mail válido dos domínios @gruposbf.com.br ou @centauro.com.br."
+  };
+}
+
+// CC somente se o destinatário for diferente do usuário
+var ccEmail = "";
+if (emailUsuario.toLowerCase() !== emailDestino.toLowerCase()) {
+  ccEmail = emailUsuario;
+}
 
     var dados = _obterPendenciasLoja(lojaCodigo);
     if (!dados.ok) {
@@ -7670,11 +7689,28 @@ function getTransacoesPorEtiquetaClara(payload) {
  */
 function enviarEmailGastosPorEtiquetasClara(payload) {
   try {
-    var emailDestino = Session.getActiveUser().getEmail();
-    if (!emailDestino) return { ok: false, error: "Usuário sem e-mail ativo." };
+    payload = payload && typeof payload === "object" ? payload : {};
+
+    var emailUsuario = Session.getActiveUser().getEmail();
+    if (!emailUsuario) return { ok: false, error: "Usuário sem e-mail ativo." };
+
+    // destinatário vindo do front (modal). fallback: se não vier, manda para o próprio usuário
+    var emailDestino = String(payload.emailDestino ? payload.emailDestino : emailUsuario).trim();
+
+    // 🔒 trava domínio: apenas @gruposbf.com.br ou @centauro.com.br
+    var emailRegex = /^[^\s@]+@((gruposbf|centauro)\.com\.br)$/i;
+    if (!emailRegex.test(emailDestino)) {
+      return { ok: false, error: "E-mail inválido. Use apenas @gruposbf.com.br ou @centauro.com.br." };
+    }
+
+    // CC: por padrão o usuário logado, exceto quando ele é o próprio destinatário
+    var ccEmail = "";
+    if (emailDestino.toLowerCase() !== emailUsuario.toLowerCase()) {
+      ccEmail = emailUsuario;
+    }
 
     var det = getTransacoesPorEtiquetaClara(payload);
-    if (!det || !det.ok) return { ok: false, error: det && det.error ? det.error : "Falha ao montar base." };
+    if (!det || !det.ok) return { ok: false, error: (det && det.error) ? det.error : "Falha ao montar base." };
 
     var rows = det.rows || [];
     if (!rows.length) return { ok: false, error: "Sem transações para enviar com os filtros atuais." };
@@ -7721,14 +7757,17 @@ function enviarEmailGastosPorEtiquetasClara(payload) {
 
     t += "</tbody></table></div>";
 
-    MailApp.sendEmail({
+    var mailObj = {
       to: emailDestino,
       subject: assunto,
       htmlBody: cab + t,
       name: "Vektor - Grupo SBF"
-    });
+    };
+    if (ccEmail) mailObj.cc = ccEmail;
 
-    return { ok: true };
+    MailApp.sendEmail(mailObj);
+
+    return { ok: true, to: emailDestino, cc: ccEmail || "" };
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
