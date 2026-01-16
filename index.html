@@ -1752,44 +1752,48 @@ function renderRadarInsights_(lojas) {
   const posAbs = Math.abs(bestPos.v);
   const negAbs = Math.abs(bestNeg.v);
 
-  el.innerHTML =
-  "<div style='font-weight:900;color:#fff;margin-bottom:6px;'>Leitura automática do Radar</div>" +
+    el.innerHTML =
+    "<div style='font-weight:900;color:#fff;margin-bottom:6px;'>Leitura automática do Radar</div>" +
 
-  "<div style='opacity:0.9; line-height:1.45; margin-bottom:6px;'>" +
-    "O Radar cruza indicadores do período (frequência, valores, concentração diária e pendências) para encontrar <b>padrões</b> entre as lojas. " +
-    "O objetivo aqui é <b>priorizar investigação</b>, não concluir irregularidade automaticamente." +
-  "</div>" +
-
-  "<div style='opacity:0.9; line-height:1.45; margin-bottom:6px;'>" +
-    "<b>Como ler:</b> relações <b>positivas</b> indicam métricas que tendem a subir juntas; relações <b>negativas</b> indicam que uma tende a subir quando a outra cai. " +
-    "Quanto mais forte o sinal, mais consistente ele apareceu no período." +
-  "</div>" +
-
-  "<div style='opacity:0.9;'>" + trend + "</div>" +
-
-  "<div style='margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;'>" +
-
-    "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(239,68,68,0.10);'>" +
-      "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais alinhadas (positivo)</div>" +
-      "<div style='opacity:0.9; line-height:1.35;'><b>" + bestPos.a.label + "</b> × <b>" + bestPos.b.label + "</b> = <b>" + fmt(bestPos.v) + "</b> (" + radarStrengthLabel_(posAbs) + ")</div>" +
-      "<div style='margin-top:6px; font-size:11px; opacity:0.85; line-height:1.35;'>" +
-        "Interpretação prática: quando uma dessas métricas aumenta, a outra tende a aumentar também no mesmo período." +
-      "</div>" +
+    "<div style='opacity:0.9; line-height:1.45; margin-bottom:6px;'>" +
+      "Este quadro mostra <b>como as métricas se comportaram juntas</b> no período. " +
+      "Use como <b>triagem operacional</b>: ele sugere onde vale olhar primeiro — não conclui irregularidade." +
     "</div>" +
 
-    "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(59,130,246,0.12);'>" +
-      "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais inversas (negativo)</div>" +
-      "<div style='opacity:0.9; line-height:1.35;'><b>" + bestNeg.a.label + "</b> × <b>" + bestNeg.b.label + "</b> = <b>" + fmt(bestNeg.v) + "</b> (" + radarStrengthLabel_(negAbs) + ")</div>" +
-      "<div style='margin-top:6px; font-size:11px; opacity:0.85; line-height:1.35;'>" +
-        "Interpretação prática: quando uma dessas métricas aumenta, a outra tende a reduzir no mesmo período." +
-      "</div>" +
+    "<div style='opacity:0.9; line-height:1.45; margin-bottom:6px;'>" +
+      "<b>Como ler:</b> <b>positivo</b> = tendem a subir juntas · <b>negativo</b> = quando uma sobe, a outra tende a cair. " +
+      "Quanto mais forte a correlação, mais consistente o padrão no período." +
     "</div>" +
 
-  "</div>" +
+    "<div style='opacity:0.9;'>" + trend + "</div>" +
 
-  "<div style='margin-top:10px;font-size:11px;opacity:0.85; line-height:1.35;'>" +
-    "<b>Nota:</b> correlação indica associação (não causalidade). Use este quadro para escolher a loja no ranking e validar no detalhe (transações e regras) quando necessário." +
-  "</div>";
+    "<div style='margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:10px;'>" +
+
+      "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(239,68,68,0.10);'>" +
+        "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais alinhadas (positivo)</div>" +
+        "<div style='opacity:0.9; line-height:1.35;'><b>" + bestPos.a.label + "</b> × <b>" + bestPos.b.label + "</b> = <b>" + fmt(bestPos.v) + "</b> (" + radarStrengthLabel_(posAbs) + ")</div>" +
+        "<div style='margin-top:6px; font-size:11px; opacity:0.85; line-height:1.35;'>" +
+          "Lojas onde <b>" + bestPos.a.label + "</b> sobe tendem a vir com <b>" + bestPos.b.label + "</b> mais alto no período. " +
+          "Priorize estas lojas no ranking à direita e valide no detalhe se necessário." +
+        "</div>" +
+      "</div>" +
+
+      "<div style='padding:10px;border-radius:10px;border:1px solid rgba(148,163,184,0.18);background:rgba(59,130,246,0.12);'>" +
+        "<div style='font-weight:900;color:#fff;margin-bottom:4px;'>Mais inversas (negativo)</div>" +
+        "<div style='opacity:0.9; line-height:1.35;'><b>" + bestNeg.a.label + "</b> × <b>" + bestNeg.b.label + "</b> = <b>" + fmt(bestNeg.v) + "</b> (" + radarStrengthLabel_(negAbs) + ")</div>" +
+        "<div style='margin-top:6px; font-size:11px; opacity:0.85; line-height:1.35;'>" +
+          "Quando <b>" + bestNeg.a.label + "</b> aumenta, <b>" + bestNeg.b.label + "</b> tende a cair no período. " +
+          "Use isso para entender <b>o que está puxando o risco</b> (volume, valor, pendência, frequência)." +
+        "</div>" +
+      "</div>" +
+
+    "</div>" +
+
+    "<div style='margin-top:10px;font-size:11px;opacity:0.85; line-height:1.35;'>" +
+      "<b>Nota:</b> correlação indica associação (não causalidade). " +
+      "Ação recomendada: selecione a loja em <b>Lojas mais próximas</b> e, se precisar confirmar, use o chat <b>“Possível uso irregular”</b> para ver transações e regras." +
+    "</div>";
+
 }
 
 function renderRadarRanking_(lojas, detalhesPorLoja) {
@@ -2311,12 +2315,13 @@ const VEKTOR_INTENTS = [
   "Consultar pendências de uma loja",
   "Gerente está de férias",
   "Gerente foi demitido",
+  "Sangria",
   "Gerente foi desligado",
   "Gerente mudou de loja",
   "Troca de gerente entre lojas",
   "Servicenow",
   "Como abrir chamado no servicenow?",  
-  "Lojas com mais pendências",
+  "Lojas com mais pendências do time",
   "Pendências do time",
   "Pendências da loja",
   "Time com mais pendências",
