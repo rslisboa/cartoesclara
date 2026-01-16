@@ -15767,15 +15767,15 @@ async function listarGastosPorEtiquetasClara() {
   }
 
   // 1) garante a bolha UMA vez
-  async function ensurePanelBubble_() {
-    if (document.getElementById(panelId)) return;
-    await renderBotMessage(
-      "HTML:<div class='text-sm text-slate-700' style='margin:0'>" +
-      "<p style='margin:0'>Vou montar o painel de <b>Gastos por etiquetas</b> com filtros e detalhamento.</p>" +
-      "<div id='" + panelId + "' style='margin-top:8px'></div>" +
-      "</div>"
-    );
-  }
+// 1) garante a bolha UMA vez (somente o container do painel)
+async function ensurePanelBubble_() {
+  if (document.getElementById(panelId)) return;
+  await renderBotMessage(
+    "HTML:<div class='text-sm text-slate-700' style='margin:0'>" +
+      "<div id='" + panelId + "'></div>" +
+    "</div>"
+  );
+}
 
   function buildPainelHtml_(res) {
     const st = window.__vektorEtiquetasState || { mes:"", time:"", loja:"", etiqueta:"" };
@@ -15916,7 +15916,10 @@ async function listarGastosPorEtiquetasClara() {
     h += "<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap'>";
     h += "<button type='button' onclick=\"exportTableToCSV(this, 'base_gastos_por_etiquetas')\" style='background:#005E27;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Exportar CSV</button>";
     h += "<button type='button' id='btn-email-etq' data-etq-action='email' style='background:#0f172a;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Enviar por e-mail</button>";
-    h += "</div></div>";
+
+    h += "</div>";
+    h += "<div id='vektor-etq-email-status' style='margin-top:8px;font-size:12px;opacity:0.9;'></div>";
+    h += "</div>";
     return h;
   }
 
@@ -16008,53 +16011,83 @@ async function listarGastosPorEtiquetasClara() {
       }
 
       const tr = e.target && e.target.closest && e.target.closest(".vektor-etq-row");
+
       if (tr) {
-        const etiquetaSel = tr.getAttribute("data-etiqueta") || "";
-        const st = window.__vektorEtiquetasState || {};
-        const payload = { mes: st.mes || "", time: st.time || "", loja: st.loja || "", etiqueta: etiquetaSel };
+  const etiquetaSel = tr.getAttribute("data-etiqueta") || "";
+  const st = window.__vektorEtiquetasState || {};
+  const payload = { mes: st.mes || "", time: st.time || "", loja: st.loja || "", etiqueta: etiquetaSel };
 
-        const det = document.querySelector("#" + panelId + " #vektor-etq-detalhe");
-        if (det) det.innerHTML = ""; // não escreve "carregando" dentro do painel
+  // 1) Abre uma bolha SEPARADA para o detalhe (com placeholder)
+  const wrapId = "vektor-etq-detailwrap-" + Date.now();
+  renderBotMessage(
+    "HTML:<div class='text-sm text-slate-700' id='" + wrapId + "' style='margin:0'>" +
+      "<p style='margin:0'><b>Carregando transações da etiqueta</b> " + escHtml_(etiquetaSel) + "…</p>" +
+      "<div style='margin-top:8px' id='" + wrapId + "-content'></div>" +
+    "</div>"
+  );
 
-        renderBotMessage(
-          "HTML:<div class='vektor-loading' style='margin:0'>" +
-            "<div class='vektor-spinner'></div>" +
-            "<span>Carregando transações da etiqueta <b>" + escHtml_(etiquetaSel) + "</b>…</span>" +
-          "</div>"
-        );
+  google.script.run
+    .withSuccessHandler(function(resp) {
+      const rows = resp && resp.ok && Array.isArray(resp.rows) ? resp.rows : [];
 
-        google.script.run
-          .withSuccessHandler(function(resp) {
-            const rows = resp && resp.ok && Array.isArray(resp.rows) ? resp.rows : [];
-            if (!rows.length) {
-              if (det) det.innerHTML = "<p style='margin:0'>Sem transações para os filtros atuais.</p>";
-              return;
-            }
-            if (det) det.innerHTML = buildDetalheHtml_(etiquetaSel, rows);
+      const contentEl = document.getElementById(wrapId + "-content");
+      if (!contentEl) return;
 
-            const btnEmail = document.querySelector("#" + panelId + " #btn-email-etq");
-            if (btnEmail) {
-              btnEmail.addEventListener("click", function() {
-                btnEmail.disabled = true;
-                btnEmail.textContent = "Enviando...";
-                google.script.run
-                  .withSuccessHandler(function(rEmail) {
-                    btnEmail.disabled = false;
-                    btnEmail.textContent = "Enviar por e-mail";
-                    renderBotMessage("HTML:<p class='text-sm text-slate-700' style='margin:0'>" +
-                      ((rEmail && rEmail.ok) ? "E-mail enviado: <b>Base de Gastos por Etiquetas</b>." : "Não consegui enviar o e-mail.") +
-                      "</p>");
-                  })
-                  .enviarEmailGastosPorEtiquetasClara(payload);
-              }, { once: true });
-            }
-          })
-          .getTransacoesPorEtiquetaClara(payload);
-
+      if (!rows.length) {
+        contentEl.innerHTML = "<p style='margin:0'>Sem transações para os filtros atuais.</p>";
         return;
       }
+
+      // 2) Monta a tabela e injeta na MESMA bolha do detalhe
+      contentEl.innerHTML = buildDetalheHtml_(etiquetaSel, rows);
+
+      // 3) Botão de e-mail: status na própria bolha (sem renderBotMessage)
+      const btnEmail = document.querySelector("#" + wrapId + " #btn-email-etq");
+      if (btnEmail) {
+        btnEmail.addEventListener("click", function() {
+          btnEmail.disabled = true;
+          btnEmail.textContent = "Enviando…";
+
+          google.script.run
+            .withSuccessHandler(function(rEmail) {
+              btnEmail.disabled = false;
+              btnEmail.textContent = "Enviar por e-mail";
+
+              const statusEl = document.querySelector("#" + wrapId + " #vektor-etq-email-status");
+              if (statusEl) {
+                statusEl.innerHTML =
+                  (rEmail && rEmail.ok)
+                    ? "<span style='color:#16a34a;font-weight:800;'>E-mail enviado:</span> <b>Base de Gastos por Etiquetas</b>."
+                    : "<span style='color:#dc2626;font-weight:800;'>Falha ao enviar o e-mail.</span>";
+              }
+            })
+            .enviarEmailGastosPorEtiquetasClara(payload);
+        }, { once: true });
+      }
+    })
+    .withFailureHandler(function(err) {
+      const contentEl = document.getElementById(wrapId + "-content");
+      if (!contentEl) return;
+      const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+      contentEl.innerHTML = "<p style='margin:0;color:#b91c1c'><b>Falha:</b> " + escHtml_(msg) + "</p>";
+    })
+    .getTransacoesPorEtiquetaClara(payload);
+
+  return;
+}
+      
     });
   }
+
+  // Mensagem (bolha) separada — aparece só uma vez por sessão do painel
+if (!window.__vektorEtiquetasIntroShown) {
+  window.__vektorEtiquetasIntroShown = true;
+  await renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700' style='margin:0'>" +
+      "Vou montar o painel de <b>Gastos por etiquetas</b> com filtros e detalhamento." +
+    "</p>"
+  );
+}
 
   // execução
   await ensurePanelBubble_();
