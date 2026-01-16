@@ -15744,151 +15744,327 @@ function detectarMaioresTransacoesIndividuais(msgOriginal, norm) {
 
 // Lista as etiquetas disponíveis na BaseClara (coluna T) e mostra no chat
 
-function listarEtiquetasClara() {
-  // Mensagem inicial do bot
-  renderBotMessage(
-    "HTML:<p class='text-sm text-slate-700'>" +
-    "Vou buscar a lista de etiquetas e o resumo de uso e já te mostro aqui. ⏳" +
-    "</p>"
-  );
+async function listarGastosPorEtiquetasClara() {
+  // estado global (filtros)
+  window.__vektorEtiquetasState = window.__vektorEtiquetasState || { mes:"", time:"", loja:"", etiqueta:"" };
 
-  google.script.run
-    .withSuccessHandler(function(resumo) {
-      if (!resumo || !Array.isArray(resumo.itens) || !resumo.itens.length) {
-        renderBotMessage(
-          "HTML:<p class='text-sm text-slate-700'>" +
-          "Não encontrei dados suficientes para montar o resumo de etiquetas (coluna T e valor). " +
-          "Verifique se a BaseClara tem a coluna de <b>Etiquetas</b> e a coluna de <b>Valor</b> preenchidas." +
-          "</p>"
-        );
+  // id único do painel (1 instância)
+  const panelId = window.__vektorEtiquetasPanelId || ("vektor-etq-panel-" + Date.now());
+  window.__vektorEtiquetasPanelId = panelId;
+
+  function escHtml_(s) {
+    return String(s ?? "")
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+  function formatBRL(n) {
+    n = Number(n || 0); if (!isFinite(n)) n = 0;
+    return n.toLocaleString("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2});
+  }
+  function formatPct(p) {
+    p = Number(p || 0); if (!isFinite(p)) p = 0;
+    return p.toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1}) + " %";
+  }
+
+  // 1) garante a bolha UMA vez
+  async function ensurePanelBubble_() {
+    if (document.getElementById(panelId)) return;
+    await renderBotMessage(
+      "HTML:<div class='text-sm text-slate-700' style='margin:0'>" +
+      "<p style='margin:0'>Vou montar o painel de <b>Gastos por etiquetas</b> com filtros e detalhamento.</p>" +
+      "<div id='" + panelId + "' style='margin-top:8px'></div>" +
+      "</div>"
+    );
+  }
+
+  function buildPainelHtml_(res) {
+    const st = window.__vektorEtiquetasState || { mes:"", time:"", loja:"", etiqueta:"" };
+    const filtros = res && res.filtros ? res.filtros : {};
+    const meses = Array.isArray(filtros.meses) ? filtros.meses : [];
+    const times = Array.isArray(filtros.times) ? filtros.times : [];
+    const lojas = Array.isArray(filtros.lojas) ? filtros.lojas : [];
+    const etiquetas = Array.isArray(filtros.etiquetas) ? filtros.etiquetas : [];
+
+    const itens = Array.isArray(res.itens) ? res.itens : [];
+    const somaValores = Number(res.somaValores || 0);
+
+    // heat column (valor)
+    let minValor = Infinity, maxValor = -Infinity;
+    itens.forEach(it => {
+      const v = Number(it.valorTotal || 0);
+      if (isFinite(v)) { if (v < minValor) minValor = v; if (v > maxValor) maxValor = v; }
+    });
+    if (!isFinite(minValor)) minValor = 0;
+    if (!isFinite(maxValor)) maxValor = 0;
+
+    const opt = (arr, selected, placeholder) => {
+      let out = `<option value="">${escHtml_(placeholder)}</option>`;
+      arr.forEach(v => {
+        const vv = String(v ?? "");
+        const sel = (vv === String(selected ?? "")) ? " selected" : "";
+        out += `<option value="${escHtml_(vv)}"${sel}>${escHtml_(vv)}</option>`;
+      });
+      return out;
+    };
+
+    let html = "";
+    html += "<div id='vektor-etiquetas-panel'>";
+    html +=   "<p style='margin:0'><b>Gastos por etiquetas</b></p>";
+    html +=   "<p style='margin:0;margin-top:6px;font-size:12px;opacity:0.9'>Dica: clique em uma etiqueta para abrir as transações detalhadas (respeitando os filtros).</p>";
+
+    // filtros
+    html += "<div style='margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end'>";
+    html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:160px'>" +
+              "<label style='font-size:11px;opacity:0.85'>Mês</label>" +
+              `<select data-etq="mes" id="vektor-etq-mes" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
+              opt(meses, st.mes, "Todos") + "</select></div>";
+    html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:220px'>" +
+              "<label style='font-size:11px;opacity:0.85'>Time</label>" +
+              `<select data-etq="time" id="vektor-etq-time" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
+              opt(times, st.time, "Todos") + "</select></div>";
+    html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:140px'>" +
+              "<label style='font-size:11px;opacity:0.85'>Loja</label>" +
+              `<select data-etq="loja" id="vektor-etq-loja" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
+              opt(lojas, st.loja, "Todas") + "</select></div>";
+    html +=   "<div style='display:flex;flex-direction:column;gap:4px;min-width:260px;flex:1'>" +
+              "<label style='font-size:11px;opacity:0.85'>Etiqueta</label>" +
+              `<select data-etq="etiqueta" id="vektor-etq-etiqueta" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 8px;font-size:12px">` +
+              opt(etiquetas, st.etiqueta, "Todas") + "</select></div>";
+    html +=   "<button type='button' id='vektor-etq-limpar' data-etq-action='limpar' " +
+              "style='background:#0f172a;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Limpar</button>";
+    html += "</div>";
+
+    // tabela principal (thead sticky)
+    html += "<div style='margin-top:10px'>";
+    html +=   "<div style='overflow:auto; max-height:45vh; border:1px solid #cbd5e1; border-radius:10px;'>";
+    html +=     "<table id='tabela-etiquetas-clara' style='border-collapse:collapse;width:100%; font-size:12px; border:2px solid #000;'>";
+    html +=       "<thead><tr>";
+    const th = "background:#003366;color:#ffffff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;white-space:nowrap;";
+    html +=         "<th style='"+th+"position:sticky;top:0;z-index:10;text-align:left;'>Etiqueta</th>";
+    html +=         "<th style='"+th+"position:sticky;top:0;z-index:10;text-align:right;'>% de uso (valor)</th>";
+    html +=         "<th style='"+th+"position:sticky;top:0;z-index:10;text-align:right;'>Valor total</th>";
+    html +=       "</tr></thead><tbody>";
+
+    itens.forEach(it => {
+      const etiqueta = String(it.etiqueta || "");
+      const perc = formatPct(it.percentual || 0);
+      const vNum = Number(it.valorTotal || 0);
+      const val = formatBRL(vNum);
+
+      let t = 0;
+      if (maxValor > minValor) {
+        t = (vNum - minValor) / (maxValor - minValor);
+        if (t < 0) t = 0; if (t > 1) t = 1;
+      }
+      const alpha = 0.12 + (0.55 * t);
+      const bgVal = `background: rgba(0,94,39,${alpha.toFixed(3)});`;
+
+      html += "<tr class='vektor-etq-row' data-etiqueta=\"" + escHtml_(etiqueta) + "\" " +
+              "title='Clique para abrir as transações desta etiqueta (respeitando os filtros).' style='cursor:pointer;'>" +
+              "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;'>" + escHtml_(etiqueta) + "</td>" +
+              "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;'>" + escHtml_(perc) + "</td>" +
+              "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;" + bgVal + "'>" + escHtml_(val) + "</td>" +
+              "</tr>";
+    });
+
+    html += "</tbody><tfoot><tr>" +
+            "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;font-weight:bold;'>TOTAL</td>" +
+            "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;text-align:right;font-weight:bold;'>100,0 %</td>" +
+            "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;text-align:right;font-weight:bold;'>" + escHtml_(formatBRL(somaValores)) + "</td>" +
+            "</tr></tfoot></table></div>";
+
+    html += "<div style='text-align:right; margin-top:8px;'>" +
+            "<button type='button' onclick=\"exportTableToCSV(this, 'gastos_por_etiquetas')\" " +
+            "style='background:#005E27;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Exportar CSV</button></div>";
+
+    html += "<div id='vektor-etq-detalhe' style='margin-top:12px;'></div>";
+    html += "</div></div></div>";
+
+    return html;
+  }
+
+  function buildDetalheHtml_(etiquetaSel, rows) {
+    let h = "";
+    h += "<div class='text-sm text-slate-700'>";
+    h += "<p style='margin:0'><b>Transações da etiqueta:</b> " + escHtml_(etiquetaSel) + "</p>";
+    h += "<div style='margin-top:10px;overflow:auto;max-height:45vh;border:1px solid #cbd5e1;border-radius:10px;'>";
+    h += "<table id='tabela-etiquetas-detalhe' style='border-collapse:collapse;width:100%;font-size:12px;border:2px solid #000;'><thead><tr>";
+    const th2 = "background:#003366;color:#fff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;white-space:nowrap;position:sticky;top:0;z-index:10;";
+    h += "<th style='"+th2+"text-align:left;'>Loja</th>";
+    h += "<th style='"+th2+"text-align:left;'>Time</th>";
+    h += "<th style='"+th2+"text-align:left;'>Data</th>";
+    h += "<th style='"+th2+"text-align:left;'>Estabelecimento</th>";
+    h += "<th style='"+th2+"text-align:right;'>Valor</th>";
+    h += "<th style='"+th2+"text-align:left;'>Etiqueta inserida</th>";
+    h += "<th style='"+th2+"text-align:left;'>Item comprado (descrição)</th>";
+    h += "</tr></thead><tbody>";
+
+    const td = "border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;vertical-align:top;";
+    rows.forEach(r => {
+      h += "<tr>";
+      h += "<td style='"+td+"white-space:nowrap;'>" + escHtml_(r.loja || "") + "</td>";
+      h += "<td style='"+td+"white-space:nowrap;'>" + escHtml_(r.time || "") + "</td>";
+      h += "<td style='"+td+"white-space:nowrap;'>" + escHtml_(r.data || "") + "</td>";
+      h += "<td style='"+td+"min-width:260px;'>" + escHtml_(r.estabelecimento || "") + "</td>";
+      h += "<td style='"+td+"text-align:right;white-space:nowrap;'>" + escHtml_(formatBRL(r.valor || 0)) + "</td>";
+      h += "<td style='"+td+"min-width:240px;'>" + escHtml_(r.etiqueta || "") + "</td>";
+      h += "<td style='"+td+"min-width:360px;'>" + escHtml_(r.descricao || "") + "</td>";
+      h += "</tr>";
+    });
+
+    h += "</tbody></table></div>";
+    h += "<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:8px;flex-wrap:wrap'>";
+    h += "<button type='button' onclick=\"exportTableToCSV(this, 'base_gastos_por_etiquetas')\" style='background:#005E27;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Exportar CSV</button>";
+    h += "<button type='button' id='btn-email-etq' data-etq-action='email' style='background:#0f172a;color:#fff;border:none;padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer'>Enviar por e-mail</button>";
+    h += "</div></div>";
+    return h;
+  }
+
+  async function loadResumo_() {
+  const st = window.__vektorEtiquetasState || {};
+
+  // ✅ Debounce simples (evita martelar o backend em mudanças rápidas)
+  window.__vektorEtiquetasDebounceId = window.__vektorEtiquetasDebounceId || null;
+  if (window.__vektorEtiquetasDebounceId) clearTimeout(window.__vektorEtiquetasDebounceId);
+
+  // ✅ Controle de requisição (evita resposta velha sobrescrever a nova)
+  window.__vektorEtiquetasReqSeq = (window.__vektorEtiquetasReqSeq || 0) + 1;
+  const reqId = window.__vektorEtiquetasReqSeq;
+
+  const el = document.getElementById(panelId);
+  if (el) {
+    // feedback imediato (UI responde na hora)
+    el.style.opacity = "0.85";
+    el.style.pointerEvents = "none";
+  }
+
+  window.__vektorEtiquetasDebounceId = setTimeout(() => {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        // ignora respostas antigas
+        if (reqId !== window.__vektorEtiquetasReqSeq) return;
+
+        const el2 = document.getElementById(panelId);
+        if (!el2) return;
+
+        if (!res || !res.ok) {
+          el2.innerHTML = "<p style='margin:0;color:#b91c1c'><b>Falha ao carregar.</b></p>";
+          el2.style.opacity = "1";
+          el2.style.pointerEvents = "auto";
+          return;
+        }
+
+        el2.innerHTML = buildPainelHtml_(res);
+        el2.style.opacity = "1";
+        el2.style.pointerEvents = "auto";
+      })
+      .withFailureHandler(function(err) {
+        if (reqId !== window.__vektorEtiquetasReqSeq) return;
+
+        const el2 = document.getElementById(panelId);
+        if (!el2) return;
+
+        const msg = (err && err.message) ? err.message : String(err || "Erro");
+        el2.innerHTML = "<p style='margin:0;color:#b91c1c'><b>Falha:</b> " + escHtml_(msg) + "</p>";
+        el2.style.opacity = "1";
+        el2.style.pointerEvents = "auto";
+      })
+      .getGastosPorEtiquetasClara(st);
+  }, 180); // 180ms = rápido, mas já evita “spam” de chamadas
+}
+
+  function clearDetalhe_() {
+    const det = document.querySelector("#" + panelId + " #vektor-etq-detalhe");
+    if (det) det.innerHTML = "";
+  }
+
+  // 2) bind único (delegação) — não duplica e não perde listeners
+  function bindOnce_() {
+    if (window.__vektorEtiquetasBound) return;
+    window.__vektorEtiquetasBound = true;
+
+    document.addEventListener("change", function(e) {
+      const sel = e.target && e.target.matches && e.target.matches("#vektor-etq-mes, #vektor-etq-time, #vektor-etq-loja, #vektor-etq-etiqueta");
+      if (!sel) return;
+
+      const st = window.__vektorEtiquetasState || {};
+      st.mes = (document.getElementById("vektor-etq-mes") || {}).value || "";
+      st.time = (document.getElementById("vektor-etq-time") || {}).value || "";
+      st.loja = (document.getElementById("vektor-etq-loja") || {}).value || "";
+      st.etiqueta = (document.getElementById("vektor-etq-etiqueta") || {}).value || "";
+      window.__vektorEtiquetasState = st;
+
+      clearDetalhe_();
+      loadResumo_();
+    });
+
+    document.addEventListener("click", function(e) {
+      const btnLimpar = e.target && e.target.closest && e.target.closest("[data-etq-action='limpar']");
+      if (btnLimpar) {
+        window.__vektorEtiquetasState = { mes:"", time:"", loja:"", etiqueta:"" };
+        clearDetalhe_();
+        loadResumo_();
         return;
       }
 
-      var itens = resumo.itens;
-      var totalGeral = resumo.totalGeral || 0;
+      const tr = e.target && e.target.closest && e.target.closest(".vektor-etq-row");
+      if (tr) {
+        const etiquetaSel = tr.getAttribute("data-etiqueta") || "";
+        const st = window.__vektorEtiquetasState || {};
+        const payload = { mes: st.mes || "", time: st.time || "", loja: st.loja || "", etiqueta: etiquetaSel };
 
-      // formatações
-      function formatBRL(n) {
-        if (!n || isNaN(n)) n = 0;
-        return n.toLocaleString("pt-BR", {
-          style: "currency",
-          currency: "BRL",
-          minimumFractionDigits: 2
-        });
+        const det = document.querySelector("#" + panelId + " #vektor-etq-detalhe");
+        if (det) det.innerHTML = ""; // não escreve "carregando" dentro do painel
+
+        renderBotMessage(
+          "HTML:<div class='vektor-loading' style='margin:0'>" +
+            "<div class='vektor-spinner'></div>" +
+            "<span>Carregando transações da etiqueta <b>" + escHtml_(etiquetaSel) + "</b>…</span>" +
+          "</div>"
+        );
+
+        google.script.run
+          .withSuccessHandler(function(resp) {
+            const rows = resp && resp.ok && Array.isArray(resp.rows) ? resp.rows : [];
+            if (!rows.length) {
+              if (det) det.innerHTML = "<p style='margin:0'>Sem transações para os filtros atuais.</p>";
+              return;
+            }
+            if (det) det.innerHTML = buildDetalheHtml_(etiquetaSel, rows);
+
+            const btnEmail = document.querySelector("#" + panelId + " #btn-email-etq");
+            if (btnEmail) {
+              btnEmail.addEventListener("click", function() {
+                btnEmail.disabled = true;
+                btnEmail.textContent = "Enviando...";
+                google.script.run
+                  .withSuccessHandler(function(rEmail) {
+                    btnEmail.disabled = false;
+                    btnEmail.textContent = "Enviar por e-mail";
+                    renderBotMessage("HTML:<p class='text-sm text-slate-700' style='margin:0'>" +
+                      ((rEmail && rEmail.ok) ? "E-mail enviado: <b>Base de Gastos por Etiquetas</b>." : "Não consegui enviar o e-mail.") +
+                      "</p>");
+                  })
+                  .enviarEmailGastosPorEtiquetasClara(payload);
+              }, { once: true });
+            }
+          })
+          .getTransacoesPorEtiquetaClara(payload);
+
+        return;
       }
+    });
+  }
 
-      function formatPct(p) {
-        if (!p || isNaN(p)) p = 0;
-        return p.toLocaleString("pt-BR", {
-          minimumFractionDigits: 1,
-          maximumFractionDigits: 1
-        }) + " %";
-      }
+  // execução
+  await ensurePanelBubble_();
+  bindOnce_();
+  await loadResumo_();
+}
 
-      // soma novamente por segurança (caso venha alguma inconsistência)
-      var somaValores = 0;
-      itens.forEach(function (it) {
-        var v = (it.valorTotal || 0);
-        if (!isNaN(v)) somaValores += v;
-      });
-
-      // min/max para formatação condicional da coluna "Valor total"
-        var minValor = Infinity;
-        var maxValor = -Infinity;
-
-        itens.forEach(function (it) {
-          var v = Number(it.valorTotal || 0);
-          if (isFinite(v)) {
-            if (v < minValor) minValor = v;
-            if (v > maxValor) maxValor = v;
-          }
-        });
-
-        // fallback (evita divisão por zero / Infinity)
-        if (!isFinite(minValor)) minValor = 0;
-        if (!isFinite(maxValor)) maxValor = 0;
-
-
- // Monta a tabela HTML
-      var html = "<div class='text-sm text-slate-700 mt-2'>" +
-                 "<p class='mb-2'>Resumo de uso das etiquetas na Clara:</p>" +
-                 "<div class='overflow-x-auto'>" +
-                 "<table id='tabela-etiquetas-clara' style='border-collapse:collapse;width:100%; font-size:12px; border:2px solid #000;'>";  // borda externa preta
-
-      // Cabeçalho
-      html += "<thead>" +
-              "<tr>" +
-              "<th style='background:#003366;color:#ffffff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;text-align:left;'>Etiqueta</th>" +
-              "<th style='background:#003366;color:#ffffff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;text-align:right;'>% de uso (valor)</th>" +
-              "<th style='background:#003366;color:#ffffff;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;text-align:right;'>Valor total</th>" +
-              "</tr>" +
-              "</thead>";
-
-      // Corpo
-      html += "<tbody>";
-
-      itens.forEach(function (it) {
-        var etiqueta = it.etiqueta || "";
-        var perc = formatPct(it.percentual || 0);
-        var val = formatBRL(it.valorTotal || 0);
-
-        var vNum = Number(it.valorTotal || 0);
-
-        // intensidade 0..1
-        var t = 0;
-        if (maxValor > minValor) {
-          t = (vNum - minValor) / (maxValor - minValor);
-          if (t < 0) t = 0;
-          if (t > 1) t = 1;
-        }
-
-        // alfa mais forte p/ valores maiores (ajuste fino sem estourar)
-        var alpha = 0.12 + (0.55 * t);
-
-        // cor base (verde institucional). Mantém leitura com texto escuro.
-        var bgVal = "background: rgba(0,94,39," + alpha.toFixed(3) + ");";
-
-        etiqueta = etiqueta
-          .toString()
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;");
-
-        html += "<tr>" +
-                "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;'>" + etiqueta + "</td>" +
-                "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;'>" + perc + "</td>" +
-                "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;" + bgVal + "'>" + val + "</td>" +
-                "</tr>";
-      });
-
-      html += "</tbody>";
-
-      // Rodapé (TOTAL)
-      html += "<tfoot>" +
-              "<tr>" +
-              "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;font-weight:bold;'>TOTAL</td>" +
-              "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;text-align:right;font-weight:bold;'>100,0 %</td>" +
-              "<td style='border-top:3px double #000;border:1px solid #000;padding:6px 8px;text-align:right;font-weight:bold;'>" + formatBRL(somaValores) + "</td>" +
-              "</tr>" +
-              "</tfoot>";
-
-      html += "</table>";
-
-      // Botão CSV no final, canto inferior direito
-      html += "<div style='text-align:right; margin-top:8px;'>" +
-              "<button type='button' " +
-                "onclick=\"exportTableToCSV(this, 'etiquetas_clara')\" " +
-                "style='background:#005E27;color:#fff;border:none;padding:6px 12px;" +
-                       "border-radius:4px;font-size:11px;cursor:pointer;'>" +
-                "⬇ Exportar CSV" +
-              "</button>" +
-              "</div>";
-
-      html += "</div></div>";
-
-      renderBotMessage("HTML:" + html);
-    })
-    .getResumoEtiquetasClara(); // <-- nova função no Code.gs
+// Backward-compat: evita quebra caso algum trecho ainda chame o nome antigo
+function listarEtiquetasClara() {
+  return listarGastosPorEtiquetasClara();
 }
 
     /* ========= ENVIO (ENTER / BOTÃO) ========= */
@@ -16423,7 +16599,7 @@ if (isCmdLojasOfensoras) {
 
     // Se a intenção for listar etiquetas, chama a função específica e para aqui
     if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
-        listarEtiquetasClara();
+        listarGastosPorEtiquetasClara();
         return;
     }
 
