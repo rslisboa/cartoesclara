@@ -15908,7 +15908,17 @@ async function ensurePanelBubble_() {
     };
 
     let html = "";
-    html += "<div id='vektor-etiquetas-panel'>";
+    html += "<div id='vektor-etiquetas-panel' style='position:relative'>";
+    // overlay de carregamento (fica oculto; o JS liga/desliga)
+    html += "<div id='vektor-etq-loading-overlay' " +
+        "style='display:none;position:absolute;inset:0;z-index:50;" +
+               "background:rgba(255,255,255,0.78);backdrop-filter:blur(1px);" +
+               "align-items:center;justify-content:center'>" +
+          "<div style='background:#0f172a;color:#fff;padding:10px 14px;border-radius:10px;" +
+                      "font-size:13px;font-weight:800;box-shadow:0 10px 30px rgba(0,0,0,0.25)'>" +
+            "Carregando informações ⌛" +
+          "</div>" +
+        "</div>";
     html +=   "<p style='margin:0'><b>Gastos por etiquetas</b></p>";
     html +=   "<p style='margin:0;margin-top:6px;font-size:12px;opacity:0.9'>Dica: clique em uma etiqueta para abrir as transações detalhadas (respeitando os filtros).</p>";
 
@@ -16078,6 +16088,10 @@ html +=
     el.style.pointerEvents = "none";
   }
 
+  // mostra overlay no centro do painel enquanto carrega
+  const ov = document.querySelector("#" + panelId + " #vektor-etq-loading-overlay");
+  if (ov) ov.style.display = "flex";
+
   window.__vektorEtiquetasDebounceId = setTimeout(() => {
     google.script.run
       .withSuccessHandler(function(res) {
@@ -16091,6 +16105,8 @@ html +=
           el2.innerHTML = "<p style='margin:0;color:#b91c1c'><b>Falha ao carregar.</b></p>";
           el2.style.opacity = "1";
           el2.style.pointerEvents = "auto";
+          const ov2 = document.querySelector("#" + panelId + " #vektor-etq-loading-overlay");
+            if (ov2) ov2.style.display = "none";
           return;
         }
 
@@ -16108,6 +16124,8 @@ html +=
         el2.innerHTML = "<p style='margin:0;color:#b91c1c'><b>Falha:</b> " + escHtml_(msg) + "</p>";
         el2.style.opacity = "1";
         el2.style.pointerEvents = "auto";
+        const ov2 = document.querySelector("#" + panelId + " #vektor-etq-loading-overlay");
+          if (ov2) ov2.style.display = "none";
       })
       .getGastosPorEtiquetasClara(st);
   }, 180); // 180ms = rápido, mas já evita “spam” de chamadas
