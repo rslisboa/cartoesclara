@@ -217,6 +217,8 @@
   pointer-events: auto; /* permite rolar/interagir */
 }
 
+
+
 /* Tooltip "grande" apenas quando tiver a classe vektor-radar-tip */
 .vektor-tooltip-base.vektor-radar-tip {
   white-space: normal;
@@ -256,6 +258,53 @@
 
 .vektor-btn-wrapper:hover .vektor-tooltip-base {
   opacity: 1;
+}
+
+/* ===== Radar: barra de legenda (animada) ===== */
+.radar-legend-bar {
+  margin-top: 10px;
+  height: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,0.18);
+  background: linear-gradient(
+    90deg,
+    rgba(59,130,246,0.95),
+    rgba(148,163,184,0.35),
+    rgba(239,68,68,0.95)
+  );
+  position: relative;
+  overflow: hidden;
+}
+
+/* brilho suave passando por cima */
+.radar-legend-bar::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  left: -35%;
+  width: 35%;
+  height: 180%;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0.25),
+    rgba(255,255,255,0)
+  );
+  transform: skewX(-18deg);
+  pointer-events: none;
+}
+
+/* anima SOMENTE quando o Radar estiver aberto */
+#radarView.is-open .radar-legend-bar::after {
+  animation: radarSheen 2.8s ease-in-out infinite;
+}
+
+@keyframes radarSheen {
+  0%   { left: -35%; opacity: 0.0; }
+  15%  { opacity: 0.55; }
+  50%  { left: 105%; opacity: 0.35; }
+  85%  { opacity: 0.0; }
+  100% { left: 105%; opacity: 0.0; }
 }
 
 /* ===== Spinner de carregamento para pendências/justificativas ===== */
@@ -623,10 +672,7 @@
               <div style="color:rgba(226,232,240,0.75); font-size:11px;">-1 · 0 · +1</div>
             </div>
             <div id="radarHeatmap" style="margin-top:10px;"></div>
-            <div style="margin-top:10px; height:10px; border-radius:999px;
-              background:linear-gradient(90deg, rgba(59,130,246,0.95), rgba(148,163,184,0.35), rgba(239,68,68,0.95));
-              border:1px solid rgba(148,163,184,0.18);">
-            </div>
+            <div class="radar-legend-bar"></div>
            <!-- INSIGHTS dinâmicos (explicação "tipo IA") -->
             <div id="radarInsights"
                 style="margin-top:12px; padding:12px; border-radius:12px;
@@ -1460,6 +1506,8 @@ window.vektorShowChatView = function () {
   if (radarView) radarView.classList.add("hidden");
   if (chatView) chatView.classList.remove("hidden");
 
+  if (radarView) radarView.classList.remove("is-open");
+
   // garante layout flex do chatView
   if (chatView) chatView.style.display = "flex";
 
@@ -1480,6 +1528,11 @@ function vektorShowRadarView_() {
 // ===============================
 window.vektorOpenRadar = function (modo) {
   vektorShowRadarView_();
+
+  vektorShowRadarView_();
+
+const radarView = document.getElementById("radarView");
+if (radarView) radarView.classList.add("is-open");
 
   setRadarActiveBtn_(modo);
 
