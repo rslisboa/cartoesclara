@@ -7454,6 +7454,20 @@ function getGastosPorEtiquetasClara(filtro) {
     var fLoja = String(filtro.loja || "").trim();
     var fTag = String(filtro.etiqueta || "").trim();
 
+    var fIni = String(filtro.periodoIni || "").trim(); // "YYYY-MM-DD"
+    var fFim = String(filtro.periodoFim || "").trim(); // "YYYY-MM-DD"
+
+    function _parseISODate_(s) {
+      if (!s) return null;
+      var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return null;
+      return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+    }
+
+    var dtIni = _parseISODate_(fIni);
+    var dtFim = _parseISODate_(fFim);
+    if (dtFim) dtFim = new Date(dtFim.getFullYear(), dtFim.getMonth(), dtFim.getDate(), 23, 59, 59, 999);
+
     // Reaproveita seu loader existente
     var info = carregarLinhasBaseClara_();
     if (info && info.error) return { ok: false, error: info.error };
@@ -7478,6 +7492,9 @@ function getGastosPorEtiquetasClara(filtro) {
 
       var mes = _fmtMes_(dt, tz);
       if (!mes) continue;
+
+      if (dtIni && dt < dtIni) continue;
+      if (dtFim && dt > dtFim) continue;
 
       var time = String(row[_ETQ_IDX_TIME_] || "").trim();
       var loja = String(row[_ETQ_IDX_LOJA_] || "").trim();
@@ -7576,6 +7593,20 @@ function getTransacoesPorEtiquetaClara(payload) {
     var fTime = String(payload.time || "").trim();
     var fLoja = String(payload.loja || "").trim();
     var tagSel = String(payload.etiqueta || "").trim();
+    var fIni = String(payload.periodoIni || "").trim();
+    var fFim = String(payload.periodoFim || "").trim();
+
+      function _parseISODate_(s) {
+        if (!s) return null;
+        var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!m) return null;
+        return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+      }
+
+      var dtIni = _parseISODate_(fIni);
+      var dtFim = _parseISODate_(fFim);
+      if (dtFim) dtFim = new Date(dtFim.getFullYear(), dtFim.getMonth(), dtFim.getDate(), 23, 59, 59, 999);
+
     if (!tagSel) return { ok: true, rows: [] };
 
     var info = carregarLinhasBaseClara_();
@@ -7591,6 +7622,9 @@ function getTransacoesPorEtiquetaClara(payload) {
 
       var dt = _parseDataToDate_(row[_ETQ_IDX_DATA_]);
       if (!dt) continue;
+
+      if (dtIni && dt < dtIni) continue;
+      if (dtFim && dt > dtFim) continue;
 
       var mes = _fmtMes_(dt, tz);
       if (fMes && mes !== fMes) continue;
