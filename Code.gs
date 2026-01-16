@@ -7423,6 +7423,22 @@ function _keysSorted_(obj) {
   return Object.keys(obj || {}).sort(function (a, b) { return a.localeCompare(b, "pt-BR"); });
 }
 
+function _keysSortedMes_(obj) {
+  function parseMes_(s) {
+    // aceita "MM/yyyy" e tenta tolerar "M/yyyy"
+    var m = String(s || "").match(/^(\d{1,2})\/(\d{4})$/);
+    if (!m) return { y: 0, mo: 0 };
+    return { mo: Number(m[1]) || 0, y: Number(m[2]) || 0 };
+  }
+
+  return Object.keys(obj || {}).sort(function(a, b) {
+    var pa = parseMes_(a);
+    var pb = parseMes_(b);
+    if (pa.y !== pb.y) return pa.y - pb.y;
+    return pa.mo - pb.mo;
+  });
+}
+
 /**
  * Retorna:
  * - itens: [{ etiqueta, valorTotal, percentual }]
@@ -7537,7 +7553,7 @@ function getGastosPorEtiquetasClara(filtro) {
       somaValores: somaValores,
       totalGeral: totalGeral,
       filtros: {
-        meses: _keysSorted_(setMes),
+        meses: _keysSortedMes_(setMes),
         times: _keysSorted_(setTime),
         lojas: _keysSorted_(setLoja),
         etiquetas: _keysSorted_(setTag)
