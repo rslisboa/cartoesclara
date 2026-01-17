@@ -441,7 +441,24 @@
 
   <!-- conteúdo do modal (CENTRALIZADO DE VERDADE) -->
   <div class="absolute inset-0 flex items-center justify-center">
-    <div class="w-[95%] max-w-[520px] rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+  <!-- Camada decorativa (logos), atrás do card -->
+  <div class="absolute inset-0 pointer-events-none">
+    <!-- Logo esquerda -->
+    <img
+      src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b4a49fd8563aa5311a25d23c977061710da8042b/LOGO%20-%20VERDE%2001.png"
+      alt=""
+      class="absolute left-10 top-1/2 -translate-y-1/2 w-[320px] opacity-45 blur-[1.5px] hidden md:block"
+    />
+
+    <img
+      src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b4a49fd8563aa5311a25d23c977061710da8042b/LOGO%20-%20VERDE%2001.png"
+      alt=""
+      class="absolute right-10 top-1/2 -translate-y-1/2 w-[320px] opacity-45 blur-[1.5px] hidden md:block"
+    />
+  </div>
+
+  <!-- Card do login (fica acima das logos) -->
+  <div class="relative w-[95%] max-w-[520px] rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
 
       <!-- Header -->
       <div class="px-6 py-5 bg-[#0b1220] text-white">
