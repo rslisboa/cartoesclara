@@ -74,6 +74,59 @@ function isAdminEmail(email) {
   return ADM_EMAILS.indexOf(email) !== -1;
 }
 
+// =======================
+// VEKTOR - CONTROLE DE ACESSO (WHITELIST) -- LIBERAR ACESSO AQUI!!!!!!!!!!!!!
+// =======================
+
+// ✅ Lista de e-mails autorizados a usar o Vektor (whitelist)
+var VEKTOR_WHITELIST_EMAILS = [
+  "rodrigo.lisboa@gruposbf.com.br",
+  "tainara.nascimento@gruposbf.com.br"
+  // adicione outros aqui
+];
+
+function isWhitelistedEmail_(email) {
+  if (!email) return false;
+  var e = String(email).trim().toLowerCase();
+  return VEKTOR_WHITELIST_EMAILS.map(function(x){ return String(x).trim().toLowerCase(); }).indexOf(e) !== -1;
+}
+
+// (recomendado) Use este "porteiro" no começo das funções expostas via google.script.run
+function vektorAssertWhitelisted_() {
+  var sess = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+  if (!sess) throw new Error("Não foi possível identificar seu e-mail Google.");
+  if (!isWhitelistedEmail_(sess)) throw new Error("Acesso negado: usuário não habilitado no Vektor.");
+  return sess;
+}
+
+/**
+ * Valida o login digitado no modal:
+ * - deve bater com Session.getActiveUser().getEmail()
+ * - e deve estar na whitelist
+ */
+function validarLoginVektor(emailInformado) {
+  var sess = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+  var inf  = (emailInformado || "").toString().trim().toLowerCase();
+
+  if (!sess) {
+    return { ok: false, error: "Não foi possível identificar seu e-mail Google (sessão vazia)." };
+  }
+
+  if (!inf) {
+    return { ok: false, error: "Informe seu e-mail corporativo." };
+  }
+
+  if (inf !== sess) {
+    return { ok: false, error: "O e-mail informado não confere com o seu login Google." };
+  }
+
+  if (!isWhitelistedEmail_(sess)) {
+    return { ok: false, error: "Acesso negado: seu e-mail não está habilitado no Vektor." };
+  }
+
+  return { ok: true, email: sess };
+}
+
 /**
  * Serve o HTML do chat (index.html)
  */
