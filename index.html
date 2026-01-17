@@ -421,6 +421,53 @@
 </div>
 
 </div>
+
+<!-- =======================
+     MODAL LOGIN (OBRIGATÓRIO)
+     ======================= -->
+<div id="vektorLoginModal"
+     class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60">
+  <div class="w-[95%] max-w-[520px] rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+    <!-- Header -->
+    <div class="px-6 py-5 bg-[#0b1220] text-white">
+      <div class="text-lg font-extrabold">Acesso ao Vektor</div>
+      <div class="text-xs opacity-90 mt-1">
+        Validação obrigatória. O e-mail digitado deve ser o mesmo do seu login Google e estar habilitado.
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="px-6 py-5">
+      <label class="block text-sm font-semibold text-slate-800 mb-2">
+        E-mail corporativo
+      </label>
+
+      <input id="vektorLoginEmail"
+             type="email"
+             autocomplete="email"
+             placeholder="nome.sobrenome@gruposbf.com.br"
+             class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20" />
+
+      <div id="vektorLoginHint" class="text-xs text-slate-500 mt-2">
+        Dica: use exatamente o e-mail do seu Google Workspace.
+      </div>
+
+      <div id="vektorLoginError"
+           class="hidden mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+      </div>
+
+      <button id="vektorLoginBtn"
+              type="button"
+              class="mt-4 w-full rounded-xl bg-[#005E27] text-white py-3 text-sm font-extrabold hover:opacity-95 transition">
+        Entrar
+      </button>
+
+      <div class="mt-3 text-[11px] text-slate-500">
+        Se você não tiver acesso, solicite inclusão na whitelist do Vektor.
+      </div>
+    </div>
+  </div>
+</div>
  
  <div class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
@@ -1208,6 +1255,151 @@ if (VEKTOR_MANUTENCAO_ATIVA) {
   vektorAplicarManutencao_();
   setTimeout(vektorAplicarManutencao_, 100); // garante que ninguém reescreva depois
 }
+
+// ===============================
+// VEKTOR LOGIN GATE (UI)
+// ===============================
+(function () {
+  function qs(sel) { return document.querySelector(sel); }
+  function qsa(sel) { return Array.from(document.querySelectorAll(sel)); }
+
+  function vektorSetUIEnabled(enabled) {
+    // Chat input + botões
+    var input = qs("#userInput");
+    if (input) input.disabled = !enabled;
+
+    var send = qs("#sendBtn");
+    if (send) send.disabled = !enabled;
+
+    var attach = qs("#attachBtn");
+    if (attach) attach.disabled = !enabled;
+
+    // Menu lateral (bloqueia cliques)
+    qsa("aside button").forEach(function (b) {
+      b.disabled = !enabled;
+      b.style.opacity = enabled ? "" : "0.5";
+      b.style.cursor = enabled ? "" : "not-allowed";
+    });
+
+    // Evita submit do form quando bloqueado
+    var form = qs("#chatForm");
+    if (form) {
+      form.__vektorLoginGate = form.__vektorLoginGate || function (e) {
+        if (!enabled) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      };
+      form.addEventListener("submit", form.__vektorLoginGate, true);
+    }
+  }
+
+  function openLoginModal() {
+    var m = qs("#vektorLoginModal");
+    if (m) {
+      m.classList.remove("hidden");
+      m.style.display = "flex";
+    }
+  }
+
+  function closeLoginModal() {
+    var m = qs("#vektorLoginModal");
+    if (m) {
+      m.style.display = "none";
+      m.classList.add("hidden");
+    }
+  }
+
+  function setError(msg) {
+    var box = qs("#vektorLoginError");
+    if (!box) return;
+    if (!msg) {
+      box.classList.add("hidden");
+      box.textContent = "";
+      return;
+    }
+    box.textContent = String(msg);
+    box.classList.remove("hidden");
+  }
+
+  function setLoading(isLoading) {
+    var btn = qs("#vektorLoginBtn");
+    if (!btn) return;
+    btn.disabled = !!isLoading;
+    btn.textContent = isLoading ? "Validando..." : "Entrar";
+    btn.style.opacity = isLoading ? "0.85" : "";
+  }
+
+  function attemptLogin() {
+    try {
+      setError("");
+      var email = (qs("#vektorLoginEmail") && qs("#vektorLoginEmail").value) ? qs("#vektorLoginEmail").value : "";
+      email = String(email || "").trim();
+
+      // Proteção: google.script.run precisa existir
+      if (typeof google === "undefined" || !google.script || !google.script.run) {
+        setError("google.script.run indisponível. Abra o Vektor via WebApp publicado.");
+        return;
+      }
+
+      setLoading(true);
+
+      google.script.run
+        .withSuccessHandler(function (res) {
+          setLoading(false);
+
+          if (!res || !res.ok) {
+            setError(res && res.error ? res.error : "Falha ao validar login.");
+            vektorSetUIEnabled(false);
+            openLoginModal();
+            return;
+          }
+
+          // OK: libera uso
+          closeLoginModal();
+          vektorSetUIEnabled(true);
+        })
+        .withFailureHandler(function (err) {
+          setLoading(false);
+          setError("Erro na validação: " + (err && err.message ? err.message : err));
+          vektorSetUIEnabled(false);
+          openLoginModal();
+        })
+        .validarLoginVektor(email);
+
+    } catch (e) {
+      setLoading(false);
+      setError("Erro inesperado: " + (e && e.message ? e.message : e));
+    }
+  }
+
+  // Inicialização
+  document.addEventListener("DOMContentLoaded", function () {
+    // Se estiver em manutenção, não mostra login (manutenção já bloqueia tudo)
+    if (typeof VEKTOR_MANUTENCAO_ATIVA !== "undefined" && VEKTOR_MANUTENCAO_ATIVA) return;
+
+    // Bloqueia tudo e obriga login
+    vektorSetUIEnabled(false);
+    openLoginModal();
+
+    // Bind botão + Enter no input
+    var btn = qs("#vektorLoginBtn");
+    if (btn) btn.addEventListener("click", attemptLogin);
+
+    var inp = qs("#vektorLoginEmail");
+    if (inp) {
+      inp.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          attemptLogin();
+        }
+      });
+      // foco direto
+      setTimeout(function(){ try { inp.focus(); } catch(_){} }, 50);
+    }
+  });
+})();
 
     // Estado global para o upload do Termo de Responsabilidade
   window.vektorTermoPending = null;         // guarda o arquivo em memória até receber o nome
