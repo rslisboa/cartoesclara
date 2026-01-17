@@ -401,6 +401,11 @@
     }
   </style>
 
+  <style>
+  /* VEKTOR - APP INVISÍVEL ATÉ LOGIN OK */
+  #vektorAppRoot.hidden { display: none !important; }
+</style>
+
 </head>
  <body class="text-slate-800">
 
@@ -468,7 +473,49 @@
     </div>
   </div>
 </div>
- 
+
+<!-- =======================
+     MODAL LOGIN (OBRIGATÓRIO)
+     ======================= -->
+<div id="vektorLoginModal"
+     class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/70">
+  <div class="w-[95%] max-w-[520px] rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+    <div class="px-6 py-5 bg-[#0b1220] text-white">
+      <div class="text-lg font-extrabold">Acesso ao Vektor</div>
+      <div class="text-xs opacity-90 mt-1">
+        Validação obrigatória. O e-mail deve ser o mesmo do seu login Google e estar habilitado.
+      </div>
+    </div>
+
+    <div class="px-6 py-5">
+      <label class="block text-sm font-semibold text-slate-800 mb-2">
+        E-mail corporativo
+      </label>
+
+      <input id="vektorLoginEmail"
+             type="email"
+             autocomplete="email"
+             placeholder="nome.sobrenome@gruposbf.com.br"
+             class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20" />
+
+      <div id="vektorLoginError"
+           class="hidden mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3"></div>
+
+      <button id="vektorLoginBtn"
+              type="button"
+              class="mt-4 w-full rounded-xl bg-[#005E27] text-white py-3 text-sm font-extrabold hover:opacity-95 transition">
+        Entrar
+      </button>
+
+      <div class="mt-3 text-[11px] text-slate-500">
+        Se você não tiver acesso, solicite inclusão na whitelist do Vektor.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+ <div id="vektorAppRoot" class="hidden">
  <div class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
    
@@ -1195,6 +1242,7 @@
 </div> <!-- fecha .chat-wrapper -->
 </div>   <!-- fecha coluna direita -->
 </div>     <!-- fecha layout com menu + chat -->
+</div>
 
 <?!= include('politica_dados'); ?>
 
@@ -1205,6 +1253,115 @@
 // ===============================
 // ATIVE/DESATIVE (false ou true)
 const VEKTOR_MANUTENCAO_ATIVA = false; // <--------------------- ALTERAR PARA MANUTENÇÃO SEMPRE AQUI//
+
+// ===============================
+// LOGIN GATE (ESCONDE APP ATÉ VALIDAR)
+// ===============================
+(function () {
+  function byId(id) { return document.getElementById(id); }
+
+  function hideApp_() {
+    var root = byId("vektorAppRoot");
+    if (root) root.classList.add("hidden");
+    document.body.style.overflow = "hidden";
+  }
+
+  function showApp_() {
+    var root = byId("vektorAppRoot");
+    if (root) root.classList.remove("hidden");
+    document.body.style.overflow = "";
+  }
+
+  function openModal_() {
+    var m = byId("vektorLoginModal");
+    if (!m) return;
+    m.classList.remove("hidden");
+    m.style.display = "flex";
+  }
+
+  function closeModal_() {
+    var m = byId("vektorLoginModal");
+    if (!m) return;
+    m.style.display = "none";
+    m.classList.add("hidden");
+  }
+
+  function setError_(msg) {
+    var box = byId("vektorLoginError");
+    if (!box) return;
+    if (!msg) {
+      box.textContent = "";
+      box.classList.add("hidden");
+      return;
+    }
+    box.textContent = String(msg);
+    box.classList.remove("hidden");
+  }
+
+  function setLoading_(on) {
+    var btn = byId("vektorLoginBtn");
+    if (!btn) return;
+    btn.disabled = !!on;
+    btn.textContent = on ? "Validando..." : "Entrar";
+  }
+
+  function attempt_() {
+    setError_("");
+    var email = (byId("vektorLoginEmail")?.value || "").trim();
+    if (!email) {
+      setError_("Informe seu e-mail corporativo.");
+      return;
+    }
+
+    if (typeof google === "undefined" || !google.script || !google.script.run) {
+      setError_("google.script.run indisponível. Abra o Vektor via WebApp publicado.");
+      return;
+    }
+
+    setLoading_(true);
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        setLoading_(false);
+
+        if (!res || !res.ok) {
+          hideApp_();
+          openModal_();
+          setError_(res && res.error ? res.error : "Falha ao validar login.");
+          return;
+        }
+
+        closeModal_();
+        showApp_();
+      })
+      .withFailureHandler(function (err) {
+        setLoading_(false);
+        hideApp_();
+        openModal_();
+        setError_("Erro na validação: " + (err && err.message ? err.message : err));
+      })
+      .validarLoginVektor(email);
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    // Se você usa manutenção, ela deve ter prioridade
+    if (typeof VEKTOR_MANUTENCAO_ATIVA !== "undefined" && VEKTOR_MANUTENCAO_ATIVA) return;
+
+    // Estado inicial: NADA do app aparece
+    hideApp_();
+    openModal_();
+
+    byId("vektorLoginBtn")?.addEventListener("click", attempt_);
+    byId("vektorLoginEmail")?.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        attempt_();
+      }
+    });
+
+    setTimeout(function(){ try { byId("vektorLoginEmail")?.focus(); } catch(_){} }, 50);
+  });
+})();
 
 // Mensagem manual (edite data/hora aqui)
 const VEKTOR_MSG_MANUTENCAO_HTML = `
