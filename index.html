@@ -430,8 +430,7 @@
 <!-- =======================
      MODAL LOGIN (OBRIGATÓRIO)
      ======================= -->
-<div id="vektorLoginModal"
-     class="fixed inset-0 z-[9999] hidden">
+  <div id="vektorLoginModal" class="fixed inset-0 z-[9999] hidden" style="display:none">
 
   <!-- camada que ESCONDE 100% de tudo atrás -->
   <div class="absolute inset-0 bg-white"></div>
@@ -1241,6 +1240,43 @@ const VEKTOR_MANUTENCAO_ATIVA = false; // <--------------------- ALTERAR PARA MA
 // LOGIN GATE (ESCONDE APP ATÉ VALIDAR)
 // ===============================
 (function () {
+
+    // ===============================
+  // VEKTOR - SESSAO (LOCAL, 3H)
+  // ===============================
+  const VEKTOR_SESSION_KEY = "vektor_session_token_v1";
+
+  function saveSessionToken_(token, ttlSeconds) {
+    try {
+      const exp = Date.now() + (Number(ttlSeconds || 0) * 1000);
+      localStorage.setItem(
+        VEKTOR_SESSION_KEY,
+        JSON.stringify({ token: token, exp: exp })
+      );
+    } catch (_) {}
+  }
+
+  function getSessionToken_() {
+    try {
+      const raw = localStorage.getItem(VEKTOR_SESSION_KEY);
+      if (!raw) return null;
+
+      const obj = JSON.parse(raw);
+      if (!obj || !obj.token || !obj.exp) return null;
+      if (Date.now() > Number(obj.exp)) return null;
+
+      return obj.token;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function clearSessionToken_() {
+    try {
+      localStorage.removeItem(VEKTOR_SESSION_KEY);
+    } catch (_) {}
+  }
+
   function byId(id) { return document.getElementById(id); }
 
   function hideApp_() {
@@ -1289,50 +1325,81 @@ const VEKTOR_MANUTENCAO_ATIVA = false; // <--------------------- ALTERAR PARA MA
   }
 
   function attempt_() {
-    setError_("");
-    var email = (byId("vektorLoginEmail")?.value || "").trim();
-    if (!email) {
-      setError_("Informe seu e-mail corporativo.");
-      return;
-    }
+  setError_("");
+  var email = (byId("vektorLoginEmail") && byId("vektorLoginEmail").value ? byId("vektorLoginEmail").value : "").trim();
 
-    if (typeof google === "undefined" || !google.script || !google.script.run) {
-      setError_("google.script.run indisponível. Abra o Vektor via WebApp publicado.");
-      return;
-    }
+  if (!email) {
+    setError_("Informe seu e-mail corporativo.");
+    return;
+  }
 
-    setLoading_(true);
+  if (typeof google === "undefined" || !google.script || !google.script.run) {
+    setError_("google.script.run indisponível. Abra o Vektor via WebApp publicado.");
+    return;
+  }
 
-    google.script.run
-      .withSuccessHandler(function (res) {
-        setLoading_(false);
+  setLoading_(true);
 
-        if (!res || !res.ok) {
-          hideApp_();
-          openModal_();
-          setError_(res && res.error ? res.error : "Falha ao validar login.");
-          return;
+  google.script.run
+    .withSuccessHandler(function (res) {
+      setLoading_(false);
+
+      if (res && res.ok) {
+        if (res.token && res.ttlSeconds) {
+          saveSessionToken_(res.token, res.ttlSeconds);
         }
-
         closeModal_();
         showApp_();
-      })
-      .withFailureHandler(function (err) {
-        setLoading_(false);
-        hideApp_();
-        openModal_();
-        setError_("Erro na validação: " + (err && err.message ? err.message : err));
-      })
-      .validarLoginVektor(email);
-  }
+        return;
+      }
+
+      hideApp_();
+      openModal_();
+      setError_(res && res.error ? res.error : "Acesso negado.");
+    })
+    .withFailureHandler(function (err) {
+      setLoading_(false);
+      hideApp_();
+      openModal_();
+      setError_("Erro na validação: " + (err && err.message ? err.message : err));
+    })
+    .validarLoginVektor(email);
+}
 
   document.addEventListener("DOMContentLoaded", function () {
     // Se você usa manutenção, ela deve ter prioridade
     if (typeof VEKTOR_MANUTENCAO_ATIVA !== "undefined" && VEKTOR_MANUTENCAO_ATIVA) return;
 
-    // Estado inicial: NADA do app aparece
-    hideApp_();
-    openModal_();
+      hideApp_();
+
+  const token = getSessionToken_();
+
+  if (token && typeof google !== "undefined" && google.script && google.script.run) {
+    // tenta validar sessão silenciosamente
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.ok) {
+          // sessão válida: libera sem modal
+          showApp_();
+          closeModal_();
+          return;
+        }
+
+        // sessão inválida
+        clearSessionToken_();
+        openModal_();
+      })
+      .withFailureHandler(function () {
+        clearSessionToken_();
+        openModal_();
+      })
+      .validarSessaoVektor(token);
+
+    return; // IMPORTANTÍSSIMO: não abrir modal agora
+  }
+
+  // sem token: exige login
+  openModal_();
 
     byId("vektorLoginBtn")?.addEventListener("click", attempt_);
     byId("vektorLoginEmail")?.addEventListener("keydown", function (e) {
@@ -1395,151 +1462,6 @@ if (VEKTOR_MANUTENCAO_ATIVA) {
   vektorAplicarManutencao_();
   setTimeout(vektorAplicarManutencao_, 100); // garante que ninguém reescreva depois
 }
-
-// ===============================
-// VEKTOR LOGIN GATE (UI)
-// ===============================
-(function () {
-  function qs(sel) { return document.querySelector(sel); }
-  function qsa(sel) { return Array.from(document.querySelectorAll(sel)); }
-
-  function vektorSetUIEnabled(enabled) {
-    // Chat input + botões
-    var input = qs("#userInput");
-    if (input) input.disabled = !enabled;
-
-    var send = qs("#sendBtn");
-    if (send) send.disabled = !enabled;
-
-    var attach = qs("#attachBtn");
-    if (attach) attach.disabled = !enabled;
-
-    // Menu lateral (bloqueia cliques)
-    qsa("aside button").forEach(function (b) {
-      b.disabled = !enabled;
-      b.style.opacity = enabled ? "" : "0.5";
-      b.style.cursor = enabled ? "" : "not-allowed";
-    });
-
-    // Evita submit do form quando bloqueado
-    var form = qs("#chatForm");
-    if (form) {
-      form.__vektorLoginGate = form.__vektorLoginGate || function (e) {
-        if (!enabled) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-      };
-      form.addEventListener("submit", form.__vektorLoginGate, true);
-    }
-  }
-
-  function openLoginModal() {
-    var m = qs("#vektorLoginModal");
-    if (m) {
-      m.classList.remove("hidden");
-      m.style.display = "flex";
-    }
-  }
-
-  function closeLoginModal() {
-    var m = qs("#vektorLoginModal");
-    if (m) {
-      m.style.display = "none";
-      m.classList.add("hidden");
-    }
-  }
-
-  function setError(msg) {
-    var box = qs("#vektorLoginError");
-    if (!box) return;
-    if (!msg) {
-      box.classList.add("hidden");
-      box.textContent = "";
-      return;
-    }
-    box.textContent = String(msg);
-    box.classList.remove("hidden");
-  }
-
-  function setLoading(isLoading) {
-    var btn = qs("#vektorLoginBtn");
-    if (!btn) return;
-    btn.disabled = !!isLoading;
-    btn.textContent = isLoading ? "Validando..." : "Entrar";
-    btn.style.opacity = isLoading ? "0.85" : "";
-  }
-
-  function attemptLogin() {
-    try {
-      setError("");
-      var email = (qs("#vektorLoginEmail") && qs("#vektorLoginEmail").value) ? qs("#vektorLoginEmail").value : "";
-      email = String(email || "").trim();
-
-      // Proteção: google.script.run precisa existir
-      if (typeof google === "undefined" || !google.script || !google.script.run) {
-        setError("google.script.run indisponível. Abra o Vektor via WebApp publicado.");
-        return;
-      }
-
-      setLoading(true);
-
-      google.script.run
-        .withSuccessHandler(function (res) {
-          setLoading(false);
-
-          if (!res || !res.ok) {
-            setError(res && res.error ? res.error : "Falha ao validar login.");
-            vektorSetUIEnabled(false);
-            openLoginModal();
-            return;
-          }
-
-          // OK: libera uso
-          closeLoginModal();
-          vektorSetUIEnabled(true);
-        })
-        .withFailureHandler(function (err) {
-          setLoading(false);
-          setError("Erro na validação: " + (err && err.message ? err.message : err));
-          vektorSetUIEnabled(false);
-          openLoginModal();
-        })
-        .validarLoginVektor(email);
-
-    } catch (e) {
-      setLoading(false);
-      setError("Erro inesperado: " + (e && e.message ? e.message : e));
-    }
-  }
-
-  // Inicialização
-  document.addEventListener("DOMContentLoaded", function () {
-    // Se estiver em manutenção, não mostra login (manutenção já bloqueia tudo)
-    if (typeof VEKTOR_MANUTENCAO_ATIVA !== "undefined" && VEKTOR_MANUTENCAO_ATIVA) return;
-
-    // Bloqueia tudo e obriga login
-    vektorSetUIEnabled(false);
-    openLoginModal();
-
-    // Bind botão + Enter no input
-    var btn = qs("#vektorLoginBtn");
-    if (btn) btn.addEventListener("click", attemptLogin);
-
-    var inp = qs("#vektorLoginEmail");
-    if (inp) {
-      inp.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          attemptLogin();
-        }
-      });
-      // foco direto
-      setTimeout(function(){ try { inp.focus(); } catch(_){} }, 50);
-    }
-  });
-})();
 
     // Estado global para o upload do Termo de Responsabilidade
   window.vektorTermoPending = null;         // guarda o arquivo em memória até receber o nome
