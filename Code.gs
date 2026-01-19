@@ -62,17 +62,17 @@ var props = PropertiesService.getScriptProperties();
   Logger.log("Limpou anti-spam do ciclo: " + cicloKey);
 }
 
-function isAdminEmail(email) {
-  if (!email) return false;
-  email = email.toLowerCase();
+//function isAdminEmail(email) {
+  //if (!email) return false;
+  //email = email.toLowerCase();
 
-  var ADM_EMAILS = [
-    "rodrigo.lisboa@gruposbf.com.br",
-    "tainara.nascimento@gruposbf.com.br"
-  ];
+  //var ADM_EMAILS = [
+   // "rodrigo.lisboa@gruposbf.com.br",
+    //"tainara.nascimento@gruposbf.com.br"
+  //];
 
-  return ADM_EMAILS.indexOf(email) !== -1;
-}
+  //return ADM_EMAILS.indexOf(email) !== -1;
+//}
 
 // =======================
 // VEKTOR - CONTROLE DE ACESSO (WHITELIST) -- LIBERAR ACESSO AQUI!!!!!!!!!!!!!
@@ -81,7 +81,9 @@ function isAdminEmail(email) {
 // ✅ Lista de e-mails autorizados a usar o Vektor (whitelist)
 var VEKTOR_WHITELIST_EMAILS = [
   "rodrigo.lisboa@gruposbf.com.br",
-  "tainara.nascimento@gruposbf.com.br"
+  "tainara.nascimento@gruposbf.com.br",
+  "durval.neto@centauro.com.br",
+  "gabriela.crochiquia@centauro.com.br"
   // adicione outros aqui
 ];
 
@@ -124,22 +126,177 @@ function validarLoginVektor(emailInformado) {
     return { ok: false, error: "Acesso negado: seu e-mail não está habilitado no Vektor." };
   }
 
+  // RBAC: precisa estar ATIVO na VEKTOR_EMAILS
+try {
+  var ctx = vektorGetUserRole_();
+} catch (e) {
+  var sessDebug = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+  var emailsMap = null;
+  var recDebug = null;
+
+  try {
+    emailsMap = vektorLoadEmailsRoleMap_();
+    recDebug = (emailsMap && emailsMap.byEmail) ? emailsMap.byEmail[sessDebug] : null;
+  } catch (e2) {
+    return { ok: false, error: "RBAC DEBUG: sess=" + sessDebug + " | loadEmailsRoleMap falhou: " + (e2 && e2.message ? e2.message : e2) };
+  }
+
+  return {
+    ok: false,
+    error:
+      "RBAC DEBUG: sess=" + sessDebug +
+      " | rec=" + JSON.stringify(recDebug) +
+      " | err=" + (e && e.message ? e.message : e)
+  };
+}
+
   var token = vektorCreateSessionToken_(sess);
   return { ok: true, email: sess, token: token, ttlSeconds: VEKTOR_SESSION_TTL_SECONDS };
 
 }
 
 // =======================
-// VEKTOR - SESSAO (3H)
+// VEKTOR - RBAC POR ROLE (VEKTOR_EMAILS + VEKTOR_ACESSOS)
+// Mantém WHITELIST como porteiro 0
 // =======================
-var VEKTOR_SESSION_TTL_SECONDS = 1 * 60; // 3 horas ou 5 minutos
+var VEKTOR_EMAILS_SHEET = "VEKTOR_EMAILS";
+var VEKTOR_ACESSOS_SHEET = "VEKTOR_ACESSOS";
+
+// Usa a mesma planilha do Clara (BaseClara / Info_limites etc.)
+var VEKTOR_ACL_SPREADSHEET_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI";
+
+var VEKTOR_ACL_CACHE_EMAILS = "VEKTOR_ACL_EMAILS_V1";
+var VEKTOR_ACL_CACHE_ACESSOS = "VEKTOR_ACL_ACESSOS_V1";
+var VEKTOR_ACL_CACHE_TTL = 300; // 5 min
+
+function vektorNorm_(s) {
+  return String(s || "").trim();
+}
+function vektorNormEmail_(s) {
+  return vektorNorm_(s).toLowerCase();
+}
+function vektorIsAtivo_(v) {
+  var x = String(v || "").trim().toUpperCase();
+  return v === true || x === "TRUE" || x === "SIM" || x === "S" || x === "YES";
+}
+
+function vektorLoadEmailsRoleMap_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(VEKTOR_ACL_CACHE_EMAILS);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) {}
+  }
+
+  var ss = SpreadsheetApp.openById(VEKTOR_ACL_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(VEKTOR_EMAILS_SHEET);
+  if (!sh) throw new Error('Aba "' + VEKTOR_EMAILS_SHEET + '" não encontrada.');
+
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return { byEmail: {} };
+
+  var header = values[0].map(function (h) { return vektorNorm_(h); });
+  var iEmail = header.indexOf("EMAIL");
+  var iRole  = header.indexOf("ROLE");
+  var iAtivo = header.indexOf("ATIVO");
+  if (iEmail < 0 || iRole < 0 || iAtivo < 0) {
+    throw new Error('Cabeçalho inválido em "' + VEKTOR_EMAILS_SHEET + '". Esperado: EMAIL, ROLE, ATIVO.');
+  }
+
+  var byEmail = {};
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var email = vektorNormEmail_(row[iEmail]);
+    if (!email) continue;
+
+    byEmail[email] = {
+      role: vektorNorm_(row[iRole]) || "Acesso padrão",
+      ativo: vektorIsAtivo_(row[iAtivo])
+    };
+  }
+
+  var out = { byEmail: byEmail };
+  cache.put(VEKTOR_ACL_CACHE_EMAILS, JSON.stringify(out), VEKTOR_ACL_CACHE_TTL);
+  return out;
+}
+
+function vektorLoadRoleAllowedFunctions_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(VEKTOR_ACL_CACHE_ACESSOS);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) {}
+  }
+
+  var ss = SpreadsheetApp.openById(VEKTOR_ACL_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(VEKTOR_ACESSOS_SHEET);
+  if (!sh) throw new Error('Aba "' + VEKTOR_ACESSOS_SHEET + '" não encontrada.');
+
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return { byRole: {} };
+
+  var header = values[0].map(function (h) { return vektorNorm_(h); });
+  var iRoles = header.indexOf("ROLES");
+  var iFunc  = header.indexOf("FUNCTION_ALLOW");
+  if (iRoles < 0 || iFunc < 0) {
+    throw new Error('Cabeçalho inválido em "' + VEKTOR_ACESSOS_SHEET + '". Esperado: ROLES, FUNCTION_ALLOW, DESCRIPTION.');
+  }
+
+  var byRole = {}; // role -> { all:boolean, funcs:{name:true} }
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var role = vektorNorm_(row[iRoles]);
+    var fn   = vektorNorm_(row[iFunc]);
+    if (!role || !fn) continue;
+
+    if (!byRole[role]) byRole[role] = { all: false, funcs: {} };
+
+    if (fn === "*") {
+      byRole[role].all = true;
+    } else {
+      byRole[role].funcs[fn] = true;
+    }
+  }
+
+  var out = { byRole: byRole };
+  cache.put(VEKTOR_ACL_CACHE_ACESSOS, JSON.stringify(out), VEKTOR_ACL_CACHE_TTL);
+  return out;
+}
+
+function vektorGetUserRole_() {
+  var sess = vektorAssertWhitelisted_(); // mantém whitelist intacta :contentReference[oaicite:4]{index=4}
+  var emails = vektorLoadEmailsRoleMap_();
+  var rec = emails.byEmail[vektorNormEmail_(sess)];
+
+  if (!rec || !rec.ativo) {
+    throw new Error("Não disponível para o seu perfil.");
+  }
+  return { email: sess, role: rec.role };
+}
+
+function vektorAssertFunctionAllowed_(fnName) {
+  var ctx = vektorGetUserRole_();
+  var acessos = vektorLoadRoleAllowedFunctions_();
+  var rule = acessos.byRole[ctx.role];
+
+  // Se o role não existe na VEKTOR_ACESSOS, então não tem acesso a nada.
+  if (!rule) throw new Error("Não disponível para o seu perfil.");
+
+  if (rule.all === true) return ctx;
+  if (rule.funcs && rule.funcs[String(fnName || "").trim()] === true) return ctx;
+
+  throw new Error("Não disponível para o seu perfil.");
+}
+
+// =======================
+// VEKTOR - SESSAO, TEMPO DE LOGIN
+// =======================
+var VEKTOR_SESSION_TTL_SECONDS = 5 * 60; // 3 horas ou 5 minutos
 
 function vektorCreateSessionToken_(email) {
   // token aleatório + carimbo
   var token = Utilities.getUuid() + "-" + new Date().getTime();
   var cache = CacheService.getScriptCache();
 
-  // Armazena no cache: token -> email (válido por 3h)
+  // Armazena no cache: token -> email
   cache.put("VEKTOR_SESSION_" + token, String(email || ""), VEKTOR_SESSION_TTL_SECONDS);
   return token;
 }
@@ -155,6 +312,12 @@ function vektorValidateSessionToken_(token) {
   if (!isWhitelistedEmail_(emailSessao)) {
     return { ok: false, error: "Acesso negado: usuário não habilitado no Vektor." };
   }
+
+  try {
+  vektorGetUserRole_(); // garante ATIVO
+} catch (e) {
+  return { ok: false, error: "Não disponível para o seu perfil." };
+}
 
   var cache = CacheService.getScriptCache();
   var emailDoToken = (cache.get("VEKTOR_SESSION_" + t) || "").trim().toLowerCase();
@@ -190,11 +353,12 @@ function doGet(e) {
     nome = nomeFormatado;
   }
 
- var role = "Acesso padrão";
-if (isAdminEmail(email)) {
-  role = "Administrador";
+ var role = "Sem acesso";
+try {
+  role = vektorGetUserRole_().role;
+} catch (e) {
+  role = "Sem acesso";
 }
-
 
   var template = HtmlService
     .createTemplateFromFile('index');
@@ -274,12 +438,7 @@ function registrarAlertaEnviado_(tipo, loja, time, detalhe, destinatarios, orige
  * limit: limite de linhas (ex 200)
  */
 function getAlertasRecentes(dias, limit) {
-
-    var email = Session.getActiveUser().getEmail() || "";
-  if (!isAdminEmail(email)) {
-    return { ok: false, error: "Acesso restrito: apenas Administrador." };
-  }
-
+  vektorAssertFunctionAllowed_("getAlertasRecentes");
   try {
     dias = Number(dias) || 14;
     limit = Number(limit) || 200;
@@ -502,6 +661,7 @@ function normalizarDataParaISO_(input) {
 }
 
 function getUltimasDemissoesGerentes() {
+    vektorAssertFunctionAllowed_("getUltimasDemissoesGerentes");
   try {
     var query = `
       WITH base AS (
@@ -849,6 +1009,7 @@ function _obterPendenciasLoja(lojaCodigo) {
  */
 
 function getPendenciasPorLoja(lojaCodigo) {
+  vektorAssertFunctionAllowed_("getPendenciasPorLoja");
   try {
     // 🆕 normaliza + valida na BASE
     const lojaNormalizada = normalizarLojaSeExistir(lojaCodigo);
@@ -877,6 +1038,7 @@ function getPendenciasPorLoja(lojaCodigo) {
  */
 
 function enviarPendenciasPorEmail(lojaCodigo, emailDestino) {
+  vektorAssertFunctionAllowed_("enviarPendenciasPorEmail");
   try {
     if (!emailDestino) {
       return { ok: false, error: "E-mail não informado." };
@@ -996,6 +1158,7 @@ if (emailUsuario.toLowerCase() !== emailDestino.toLowerCase()) {
 // Pendências para bloqueio: usa mesma aba CLARA_PEND, mas pega as 2 últimas datas de cobrança
 
 function getPendenciasParaBloqueio(lojaCodigo) {
+  vektorAssertFunctionAllowed_("getPendenciasParaBloqueio");
   try {
     // 🆕 normaliza + valida na BASE
     const lojaNormalizada = normalizarLojaSeExistir(lojaCodigo);
@@ -1526,6 +1689,7 @@ function calcularProjecaoPorLojaUltimosCiclos_(linhas, idxData, idxValor, idxLoj
  * É chamado pelo front via google.script.run.getResumoTransacoesPorGrupo(...)
  */
 function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, criterio) {
+  vektorAssertFunctionAllowed_("getResumoTransacoesPorGrupo");
   var info = carregarLinhasBaseClara_();
   if (info.error) {
     return { ok: false, error: info.error };
@@ -1638,6 +1802,7 @@ function getResumoTransacoesPorGrupo(grupo, dataInicioStr, dataFimStr, criterio)
  * @param {number} mesesBack  // ex.: 1 = mês corrente, 3 = últimos 3 meses, 6 = último semestre
  */
 function getFrequenciaUsoClara(tipoFiltro, valorFiltro, mesesBack) {
+  vektorAssertFunctionAllowed_("getFrequenciaUsoClara");
   try {
     tipoFiltro = (tipoFiltro || "").toString().toLowerCase().trim();
     valorFiltro = (valorFiltro || "").toString().trim();
@@ -2157,6 +2322,7 @@ function getFrequenciaUsoClara(tipoFiltro, valorFiltro, mesesBack) {
  * @param {number} janelaDiasReincidencia (default 15)
  */
 function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, janelaDiasReincidencia) {
+  vektorAssertFunctionAllowed_("getListaItensCompradosClara");
   try {
     tipoFiltro = (tipoFiltro || "").toString().toLowerCase().trim(); // "time" | "loja"
     valorFiltro = (valorFiltro || "").toString().trim();
@@ -2520,6 +2686,7 @@ for (var i = 0; i < linhasFiltradas.length; i++) {
 // =====================================================
 
 function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
+  vektorAssertFunctionAllowed_("getRelacaoSaldosClara");
   try {
     // 🔒 Apenas Administrador
     var email = Session.getActiveUser().getEmail();
@@ -3028,6 +3195,7 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
  * U (20) = Descrição (Item comprado)
  */
 function getTransacoesLojaPeriodoAberto(aliasLoja) {
+  vektorAssertFunctionAllowed_("getTransacoesLojaPeriodoAberto");
   try {
     var email = Session.getActiveUser().getEmail();
     // (opcional) se quiser restringir só ADM:
@@ -3114,6 +3282,7 @@ function getTransacoesLojaPeriodoAberto(aliasLoja) {
 }
 
 function getTabelaEstornosClara(tipoFiltro, valorFiltro) {
+  vektorAssertFunctionAllowed_("getTabelaEstornosClara");
   try {
     var info = carregarLinhasBaseClara_();
     if (!info) return { ok:false, error:"BaseClara não carregada (retorno vazio)." };
@@ -3892,6 +4061,7 @@ try {
 // ==============================
 
 function getPossivelUsoIrregularParaChat(modo) {
+  vektorAssertFunctionAllowed_("getPossivelUsoIrregularParaChat");
   try {
     var email = Session.getActiveUser().getEmail();
     if (!isAdminEmail(email)) {
@@ -3909,6 +4079,7 @@ function getPossivelUsoIrregularParaChat(modo) {
 }
 
 function getRadarIrregularidadeParaChat(modo) {
+  vektorAssertFunctionAllowed_("getRadarIrregularidadeParaChat");
   try {
     var email = Session.getActiveUser().getEmail();
     if (!isAdminEmail(email)) {
@@ -4200,37 +4371,6 @@ function montarEmailUsoIrregular_(rel) {
   html += "</tbody></table>";
   html += "<br/><p><b>Vektor - Contas a Receber</b></p>";
   return html;
-}
-
-function TESTE_ENVIAR_EMAIL_USO_IRREGULAR_CLARA() {
-  // 🔒 Mantém restrição: só Admin testa
-  var email = Session.getActiveUser().getEmail();
-  if (email && !isAdminEmail(email)) throw new Error("Acesso restrito: apenas Administrador.");
-
-  // Monta um relatório fake para validar layout e conteúdo do e-mail
-  var relFake = {
-    ok: true,
-    meta: { periodo: "TESTE (layout)" },
-    rows: [
-      {
-        loja: "0123",
-        time: "TESTE",
-        data: "2026-01-08",
-        cartao: "1234",
-        estabelecimento: "POSTO EXEMPLO LTDA",
-        qtdDia: 4,
-        somaDia: "R$ 1.980,00",
-        valor: "R$ 650,00",
-        pendenciasTxt: "Sim (2)",
-        score: 60,
-        regrasTxt: "Fracionamento (>=3 no dia) + Pendência + valor alto"
-      }
-    ]
-  };
-
-  // Envia para os admins (mesma lista do fluxo real)
-  var envio = enviarEmailUsoIrregularClara_(relFake);
-  if (!envio || !envio.ok) throw new Error("Falha no envio de teste: " + (envio && envio.error ? envio.error : envio));
 }
 
 function detectarUsoIrregularBaseClara_(opts) {
@@ -5225,6 +5365,7 @@ function getPendenciasEJustificativasPorLojas(
   dataFimStr,
   lojasFiltro
 ) {
+  vektorAssertFunctionAllowed_("getPendenciasEJustificativasPorLojas");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -5413,6 +5554,7 @@ function getPendenciasEJustificativasPorLojas(
  */
 
 function getResumoPendenciasPorLoja(grupo, dataInicioStr, dataFimStr) {
+  vektorAssertFunctionAllowed_("getResumoPendenciasPorLoja");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -5589,6 +5731,7 @@ function getResumoPendenciasPorLoja(grupo, dataInicioStr, dataFimStr) {
  */
 
 function getResumoPendenciasPorTime(dataInicioStr, dataFimStr, grupoFiltro) {
+  vektorAssertFunctionAllowed_("getResumoPendenciasPorTime");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -5802,6 +5945,7 @@ function enviarResumoPorEmail(grupo) {
  * @param {string} criterio "quantidade" | "valor"
  */
 function getResumoTransacoesPorTime(dataInicioStr, dataFimStr, criterio) {
+  vektorAssertFunctionAllowed_("getResumoTransacoesPorTime");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) return { ok:false, error: info.error };
@@ -5890,6 +6034,7 @@ function getResumoTransacoesPorTime(dataInicioStr, dataFimStr, criterio) {
  * }
  */
 function getResumoTransacoesPorTimeExtrato(extratoConta, criterio) {
+  vektorAssertFunctionAllowed_("getResumoTransacoesPorTimeExtrato");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -6015,6 +6160,7 @@ function getResumoTransacoesPorTimeExtrato(extratoConta, criterio) {
 }
 
 function exportarTransacoesFaturaXlsx(extratoConta) {
+  vektorAssertFunctionAllowed_("exportarTransacoesFaturaXlsx");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -6133,6 +6279,7 @@ return {
  * }
  */
 function getResumoTransacoesPorCategoria(dataInicioStr, dataFimStr, criterio) {
+  vektorAssertFunctionAllowed_("getResumoTransacoesPorCategoria");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -6415,6 +6562,7 @@ function montarDescricaoPeriodoSimples_(iniDate, fimDate) {
  * @param {number} topN           - quantidade de linhas desejadas (Top N)
  */
 function getMaioresTransacoesIndividuais(grupoNome, lojaCodigo, dataInicioStr, dataFimStr, topN) {
+  vektorAssertFunctionAllowed_("getMaioresTransacoesIndividuais");
   try {
     // Flag para saber se o período veio do usuário (frase) ou se é o default (últimos 30 dias)
     var periodoFoiInformadoPeloUsuario = !!(dataInicioStr && dataFimStr);
@@ -6600,6 +6748,7 @@ function getMaioresTransacoesIndividuais(grupoNome, lojaCodigo, dataInicioStr, d
  * @param {string} grupo Nome do time/grupo
  */
 function getResumoTransacoesPorCategoriaTime(dataInicioStr, dataFimStr, criterio, grupo) {
+  vektorAssertFunctionAllowed_("getResumoTransacoesPorCategoriaTime");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -6709,6 +6858,7 @@ function getResumoTransacoesPorCategoriaTime(dataInicioStr, dataFimStr, criterio
  * @param {string} lojaCodigo Código da loja (com ou sem zeros à esquerda)
  */
 function getResumoTransacoesPorCategoriaLoja(dataInicioStr, dataFimStr, criterio, lojaCodigo) {
+  vektorAssertFunctionAllowed_("getResumoTransacoesPorCategoriaLoja");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -6821,6 +6971,7 @@ function getResumoTransacoesPorCategoriaLoja(dataInicioStr, dataFimStr, criterio
  * @param {string} loja          código da loja (ex.: "0297" ou "297")
  */
 function getResumoTransacoesPorCategoriaLoja(dataInicioStr, dataFimStr, criterio, loja) {
+  vektorAssertFunctionAllowed_("getResumoTransacoesPorCategoriaLoja");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -6946,6 +7097,7 @@ function getResumoTransacoesPorCategoriaLoja(dataInicioStr, dataFimStr, criterio
 }
 
 function getTransacoesIndividuaisPorEstabelecimento(dataInicioStr, dataFimStr, estabelecimento) {
+  vektorAssertFunctionAllowed_("getTransacoesIndividuaisPorEstabelecimento");
   try {
     var info = carregarLinhasBaseClara_();
     if (!info || info.error) {
@@ -7122,6 +7274,7 @@ function getResumoTransacoesPorEstabelecimento(
   grupo,
   loja
 ) {
+  vektorAssertFunctionAllowed_("getResumoTransacoesPorEstabelecimento");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -7346,6 +7499,7 @@ function getResumoLojasPorCategoria(categoria, dataIni, dataFim) {
  */
 
 function getListaLojas() {
+  vektorAssertFunctionAllowed_("getListaLojas");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) return [];
@@ -7561,6 +7715,7 @@ function _keysSortedMes_(obj) {
  * - filtros dependentes: meses/times/lojas/etiquetas
  */
 function getGastosPorEtiquetasClara(filtro) {
+  vektorAssertFunctionAllowed_("getGastosPorEtiquetasClara");
   try {
     filtro = filtro && typeof filtro === "object" ? filtro : {};
     var fMes = String(filtro.mes || "").trim();       // "MM/yyyy"
@@ -7783,6 +7938,7 @@ function getTransacoesPorEtiquetaClara(payload) {
  * Remetente: Vektor - Grupo SBF
  */
 function enviarEmailGastosPorEtiquetasClara(payload) {
+  vektorAssertFunctionAllowed_("enviarEmailGastosPorEtiquetasClara");
   try {
     payload = payload && typeof payload === "object" ? payload : {};
 
@@ -8052,6 +8208,7 @@ function parseExtratoContaPeriodo_(texto) {
  * }
  */
 function getResumoFaturasClara() {
+  vektorAssertFunctionAllowed_("getResumoFaturasClara");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
@@ -8178,6 +8335,7 @@ function getVektorMetricSheet_() {
  * @return {Object} { ok: true, fileUrl: "..."} ou { ok: false, error: "..." }
  */
 function salvarTermoResponsabilidade(payload) {
+  vektorAssertFunctionAllowed_("salvarTermoResponsabilidade");
   try {
     if (!payload || !payload.base64) {
       throw new Error("Arquivo não recebido.");
@@ -8284,6 +8442,9 @@ function salvarTermoResponsabilidade(payload) {
 }
 
 function registrarMetricaVektor(payload) {
+  // ✅ só exige que o usuário exista e esteja ATIVO (VEKTOR_EMAILS), além da whitelist
+  vektorGetUserRole_(); // valida whitelist + VEKTOR_EMAILS (ATIVO)
+
   try {
     const sheet = getVektorMetricSheet_();
     const now = new Date();
@@ -8308,6 +8469,7 @@ function registrarMetricaVektor(payload) {
 }
 
 function getLojasOfensorasParaChat(diasJanela) {
+  vektorAssertFunctionAllowed_("getLojasOfensorasParaChat");
   diasJanela = Number(diasJanela) || 60;
 
   const rel = gerarRelatorioOfensorasPendencias_(diasJanela);
@@ -8364,6 +8526,7 @@ function getLojasOfensorasParaChat(diasJanela) {
 }
 
 function getComparativoFaturasClaraParaChat() {
+  vektorAssertFunctionAllowed_("getComparativoFaturasClaraParaChat");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) return { ok: false, error: info.error };
@@ -8964,8 +9127,12 @@ function LIMPAR_ALERTA_LIMITE() {
 }
 
 function vektorStatusSistema() {
-  const email = Session.getActiveUser().getEmail() || "";
-  const isAdmin = isAdminEmail(email);
+  // Gate por função (deve existir na VEKTOR_ACESSOS para o ROLE)
+  vektorAssertFunctionAllowed_("vektorStatusSistema");
+
+  // Admin agora vem do RBAC (VEKTOR_EMAILS)
+  var ctx = vektorGetUserRole_(); // { email, role }
+  var isAdmin = String(ctx.role || "").toLowerCase() === "administrador";
 
   const file = DriveApp.getFileById(BASE_CLARA_ID);
   const ultimaAtualizacao = file.getLastUpdated();
