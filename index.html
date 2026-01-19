@@ -622,7 +622,7 @@
   <!-- Botão: Feedback -->
   <button
     type="button"
-    onclick= "window.open('https://forms.gle/QSAS9VN4HSws78W99')"
+    onclick="window.vektorOpenFeedback()"
     class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
     📝 Feedback
@@ -811,6 +811,49 @@
     </div>
   </main>
  </div> <!-- fecha #radarView -->
+
+ <!-- VIEW: FEEDBACK (sobrepõe SOMENTE a área do chat) -->
+<div id="feedbackView" class="hidden" style="position:absolute; inset:0; z-index:20;">
+
+  <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+
+      <!-- Header do Feedback -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button type="button"
+            onclick="window.vektorShowChatView()"
+            style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:800; font-size:12px;">
+            ← Voltar ao chat
+          </button>
+
+          <div>
+            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Feedback do Vektor</div>
+            <div style="color:rgba(226,232,240,0.9); font-size:12px; margin-top:2px;">
+              Preencha e envie o formulário sem sair do Vektor
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conteúdo (iframe do Google Forms) -->
+      <div style="flex:1; background:#0b1220; padding:14px 16px;">
+        <div style="height:100%; background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
+          <iframe
+            id="feedbackFrame"
+            title="Formulário de Feedback"
+            src="https://docs.google.com/forms/d/e/1FAIpQLSfk-XlpYWvA_WgfcMq9o0VC-QhqXfygFgwdTsrlJmQ-OEyKIw/viewform?embedded=true"
+            style="width:100%; height:100%; border:0;"
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+          ></iframe>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</div> <!-- fecha #feedbackView -->
 
  <!-- Modal: Como acontece a análise? (Radar) -->
 <div id="radarAnaliseModal"
@@ -1809,7 +1852,10 @@ function openStatusVektorModal() {
 window.vektorShowChatView = function () {
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
+  const feedbackView = document.getElementById("feedbackView");
+
   if (radarView) radarView.classList.add("hidden");
+  if (feedbackView) feedbackView.classList.add("hidden");
   if (chatView) chatView.classList.remove("hidden");
 
   if (radarView) radarView.classList.remove("is-open");
@@ -1828,6 +1874,27 @@ function vektorShowRadarView_() {
   if (chatView) chatView.classList.add("hidden");
   if (radarView) radarView.classList.remove("hidden");
 }
+
+function vektorShowFeedbackView_() {
+  const chatView = document.getElementById("chatView");
+  const radarView = document.getElementById("radarView");
+  const feedbackView = document.getElementById("feedbackView");
+
+  if (chatView) chatView.classList.add("hidden");
+  if (radarView) radarView.classList.add("hidden");
+  if (feedbackView) feedbackView.classList.remove("hidden");
+}
+
+// FEEDBACK (tela cheia)
+window.vektorOpenFeedback = function () {
+  vektorShowFeedbackView_();
+
+  // (opcional) força recarregar o iframe sempre que abrir
+  const fr = document.getElementById("feedbackFrame");
+  if (fr && fr.src) {
+    fr.src = fr.src; // recarrega mantendo mesma URL
+  }
+};
 
 // ===============================
 // RADAR (tela cheia)
