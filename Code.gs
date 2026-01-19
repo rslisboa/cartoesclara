@@ -124,7 +124,49 @@ function validarLoginVektor(emailInformado) {
     return { ok: false, error: "Acesso negado: seu e-mail não está habilitado no Vektor." };
   }
 
-  return { ok: true, email: sess };
+  var token = vektorCreateSessionToken_(sess);
+  return { ok: true, email: sess, token: token, ttlSeconds: VEKTOR_SESSION_TTL_SECONDS };
+
+}
+
+// =======================
+// VEKTOR - SESSAO (3H)
+// =======================
+var VEKTOR_SESSION_TTL_SECONDS = 1 * 60; // 3 horas ou 5 minutos
+
+function vektorCreateSessionToken_(email) {
+  // token aleatório + carimbo
+  var token = Utilities.getUuid() + "-" + new Date().getTime();
+  var cache = CacheService.getScriptCache();
+
+  // Armazena no cache: token -> email (válido por 3h)
+  cache.put("VEKTOR_SESSION_" + token, String(email || ""), VEKTOR_SESSION_TTL_SECONDS);
+  return token;
+}
+
+function vektorValidateSessionToken_(token) {
+  var t = String(token || "").trim();
+  if (!t) return { ok: false, error: "Token vazio." };
+
+  var emailSessao = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+  if (!emailSessao) return { ok: false, error: "Não foi possível identificar seu e-mail Google." };
+
+  // whitelist continua sendo a fonte de verdade
+  if (!isWhitelistedEmail_(emailSessao)) {
+    return { ok: false, error: "Acesso negado: usuário não habilitado no Vektor." };
+  }
+
+  var cache = CacheService.getScriptCache();
+  var emailDoToken = (cache.get("VEKTOR_SESSION_" + t) || "").trim().toLowerCase();
+
+  if (!emailDoToken) return { ok: false, error: "Sessão expirada ou inválida. Faça login novamente." };
+  if (emailDoToken !== emailSessao) return { ok: false, error: "Sessão não corresponde ao usuário logado." };
+
+  return { ok: true, email: emailSessao };
+}
+
+function validarSessaoVektor(token) {
+  return vektorValidateSessionToken_(token);
 }
 
 /**
