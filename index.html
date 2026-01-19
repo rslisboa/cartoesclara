@@ -530,6 +530,24 @@
   </div>
 </div>
 
+  <!-- =======================
+     OVERLAY MANUTENÇÃO
+     ======================= -->
+<div id="vektorMaintenanceOverlay" class="fixed inset-0 z-[10050] hidden" style="display:none">
+  <!-- fundo (mantém o padrão branco) -->
+  <div class="absolute inset-0 bg-white"></div>
+
+  <!-- conteúdo central -->
+  <div class="absolute inset-0 flex items-center justify-center">
+    <div class="w-[95%] max-w-[560px] rounded-2xl bg-white border border-slate-200 shadow-2xl p-6 text-center">
+      <div class="text-2xl font-extrabold text-slate-900">Em manutenção</div>
+      <div class="mt-2 text-sm text-slate-600">
+        O Vektor está temporariamente indisponível. Tente novamente mais tarde.
+      </div>
+    </div>
+  </div>
+</div>
+
  <div id="vektorAppRoot" class="hidden">
  <div class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
@@ -1367,6 +1385,27 @@ const VEKTOR_MANUTENCAO_ATIVA = false; // <--------------------- ALTERAR PARA MA
     document.body.style.overflow = "";
   }
 
+  function showMaintenance_() {
+  // esconde app e modal
+  hideApp_();
+  closeModal_();
+
+  // mostra overlay de manutenção
+  var o = document.getElementById("vektorMaintenanceOverlay");
+  if (o) {
+    o.classList.remove("hidden");
+    o.style.display = "block";
+  }
+}
+
+function hideMaintenance_() {
+  var o = document.getElementById("vektorMaintenanceOverlay");
+  if (o) {
+    o.style.display = "none";
+    o.classList.add("hidden");
+  }
+}
+
   function openModal_() {
     var m = byId("vektorLoginModal");
     if (!m) return;
@@ -1442,9 +1481,14 @@ const VEKTOR_MANUTENCAO_ATIVA = false; // <--------------------- ALTERAR PARA MA
     .validarLoginVektor(email);
 }
 
-  document.addEventListener("DOMContentLoaded", function () {
-    // Se você usa manutenção, ela deve ter prioridade
-    if (typeof VEKTOR_MANUTENCAO_ATIVA !== "undefined" && VEKTOR_MANUTENCAO_ATIVA) return;
+document.addEventListener("DOMContentLoaded", function () {
+  // Manutenção tem prioridade: mostra tela e sai
+  if (typeof VEKTOR_MANUTENCAO_ATIVA !== "undefined" && VEKTOR_MANUTENCAO_ATIVA) {
+    showMaintenance_();
+    return;
+  } else {
+    hideMaintenance_();
+  }
 
       hideApp_();
 
