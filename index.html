@@ -432,6 +432,13 @@
      ======================= -->
   <div id="vektorLoginModal" class="fixed inset-0 z-[9999] hidden" style="display:none">
 
+  <!-- Título superior (acima do card) -->
+<div class="absolute top-10 left-1/2 -translate-x-1/2 w-[95%] max-w-[900px] text-center text-white z-[10020] pointer-events-none">
+  <div class="text-[18px] md:text-[20px] font-extrabold tracking-tight drop-shadow-lg">
+    Agente de Governança Financeira do Cartão Clara
+  </div>
+</div>
+
   <!-- camada que ESCONDE 100% de tudo atrás -->
   <div class="absolute inset-0 bg-white"></div>
 
@@ -468,30 +475,56 @@
       </div>
 
       <!-- Body -->
-      <div class="px-6 py-5">
-        <label class="block text-sm font-semibold text-slate-800 mb-2">
-          E-mail corporativo
-        </label>
+        <div class="px-6 py-5">
+          <label class="block text-sm font-semibold text-slate-800 mb-2">
+            E-mail corporativo
+          </label>
 
-        <input id="vektorLoginEmail"
-               type="email"
-               autocomplete="email"
-               placeholder="nome.sobrenome@gruposbf.com.br"
-               class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20" />
+          <input
+            id="vektorLoginEmail"
+            type="email"
+            autocomplete="email"
+            placeholder="nome.sobrenome@gruposbf.com.br"
+            class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20"
+          />
 
-        <div id="vektorLoginError"
-             class="hidden mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3"></div>
+          <div
+            id="vektorLoginError"
+            class="hidden mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3"
+          ></div>
 
-        <button id="vektorLoginBtn"
-                type="button"
-                class="mt-4 w-full rounded-xl bg-[#005E27] text-white py-3 text-sm font-extrabold hover:opacity-95 transition">
-          Entrar
-        </button>
+          <!-- BOTÕES (mesmo tamanho, alinhados) -->
+          <div class="mt-4 grid grid-cols-2 gap-3">
 
-        <div class="mt-3 text-[11px] text-slate-500">
-          Se você não tiver acesso, solicite inclusão na whitelist do Vektor.
+            <!-- Login com Google -->
+            <button
+              id="vektorLoginGoogleBtn"
+              type="button"
+              class="flex items-center justify-center gap-2 h-[48px] rounded-xl border border-slate-300 text-sm font-semibold text-slate-800 hover:bg-slate-50 transition"
+            >
+              <img
+                src="https://raw.githubusercontent.com/rslisboa/cartoesclara/e99ecd5a39c515e09bac6546c9aa5d2324c243c2/google.png"
+                alt=""
+                class="w-[16px] h-[16px]"
+              />
+              <span>Login com Google</span>
+            </button>
+
+            <!-- Entrar -->
+            <button
+              id="vektorLoginBtn"
+              type="button"
+              class="h-[48px] rounded-xl bg-[#005E27] text-white text-sm font-extrabold hover:opacity-95 transition"
+            >
+              Entrar
+            </button>
+
+          </div>
+
+          <div class="mt-3 text-[11px] text-slate-500">
+            Se você não tiver acesso, solicite inclusão na whitelist do Vektor.
+          </div>
         </div>
-      </div>
 
     </div>
   </div>
@@ -1402,6 +1435,25 @@ const VEKTOR_MANUTENCAO_ATIVA = false; // <--------------------- ALTERAR PARA MA
   openModal_();
 
     byId("vektorLoginBtn")?.addEventListener("click", attempt_);
+
+    // Botão "Login com Google" -> preenche com e-mail do Google Workspace (do template)
+    byId("vektorLoginGoogleBtn")?.addEventListener("click", function () {
+      try {
+        const emailGoogle = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
+        if (!emailGoogle) {
+          setError_("Não foi possível capturar seu e-mail do Google. Digite manualmente.");
+          return;
+        }
+        const inp = byId("vektorLoginEmail");
+        if (inp) inp.value = emailGoogle;
+
+        // opcional: já dispara o login automaticamente
+        attempt_();
+      } catch (e) {
+        setError_("Falha ao aplicar Login com Google.");
+      }
+    });
+
     byId("vektorLoginEmail")?.addEventListener("keydown", function (e) {
       if (e.key === "Enter") {
         e.preventDefault();
