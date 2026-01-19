@@ -435,7 +435,7 @@
   <!-- Título superior (acima do card) -->
 <div class="absolute top-10 left-1/2 -translate-x-1/2 w-[95%] max-w-[900px] text-center text-white z-[10020] pointer-events-none">
   <div class="text-[18px] md:text-[20px] font-extrabold tracking-tight drop-shadow-lg">
-    Agente de Governança Financeira do Cartão Clara
+    Plataforma de Governança Financeira do Cartão Clara
   </div>
 </div>
 
@@ -652,7 +652,7 @@
 <div class="mt-4 px-3 py-3 text-center border-t border-slate-200">
   <div class="text-[11px] text-slate-500 leading-tight">
     Vektor v1.6.0<br>
-    <span class="text-slate-400">Refresh 12/01/2026</span>
+    <span class="text-slate-400">Build 12/01/2026</span>
   </div>
 </div>
   
@@ -1371,6 +1371,33 @@ const VEKTOR_MANUTENCAO_ATIVA = false; // <--------------------- ALTERAR PARA MA
     } catch (_) {}
   }
 
+  let vektorLogoutTimer_ = null;
+
+function scheduleAutoLogout_() {
+  try {
+    if (vektorLogoutTimer_) {
+      clearTimeout(vektorLogoutTimer_);
+      vektorLogoutTimer_ = null;
+    }
+
+    const raw = localStorage.getItem(VEKTOR_SESSION_KEY);
+    if (!raw) return;
+
+    const obj = JSON.parse(raw);
+    if (!obj || !obj.exp) return;
+
+    const ms = Math.max(0, Number(obj.exp) - Date.now());
+
+    // agenda o logout automático exatamente no vencimento
+    vektorLogoutTimer_ = setTimeout(function () {
+      clearSessionToken_();
+      hideApp_();
+      openModal_();
+      setError_("Sessão expirada. Faça login novamente.");
+    }, ms);
+  } catch (_) {}
+}
+
   function byId(id) { return document.getElementById(id); }
 
   function hideApp_() {
@@ -1462,6 +1489,7 @@ function hideMaintenance_() {
       if (res && res.ok) {
         if (res.token && res.ttlSeconds) {
           saveSessionToken_(res.token, res.ttlSeconds);
+          scheduleAutoLogout_();
         }
         closeModal_();
         showApp_();
@@ -1492,6 +1520,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
       hideApp_();
 
+      scheduleAutoLogout_();
+
   const token = getSessionToken_();
 
   if (token && typeof google !== "undefined" && google.script && google.script.run) {
@@ -1502,6 +1532,7 @@ document.addEventListener("DOMContentLoaded", function () {
           // sessão válida: libera sem modal
           showApp_();
           closeModal_();
+          scheduleAutoLogout_();
           return;
         }
 
@@ -2556,7 +2587,7 @@ document.addEventListener("DOMContentLoaded", () => {
     : `Olá, ${saudacao}!`;
 
   el.innerHTML =
-    `${prefixo} Eu sou o <b>Vektor</b>, <b>Agente de Governança Financeira do Cartão Clara</b>.`;
+    `${prefixo} Esse é o <b>Vektor</b>, <b>Motor de Governança Financeira do Cartão Clara</b>.`;
 }
 
   // Executa assim que o DOM estiver pronto
@@ -2568,10 +2599,11 @@ document.addEventListener("DOMContentLoaded", () => {
 renderBotMessage(
   "HTML:" +
   "<p class='text-sm text-slate-700' style='margin-top:8px;'>" +
-    "Aqui estão alguns exemplos do que eu posso fazer por você:" +
+    "Aqui estão alguns exemplos do que o Vektor pode fazer por você:" +
   "</p>" +
   "<ul class='text-sm text-slate-700' style='margin-left:14px;margin-top:4px;line-height:1.45;'>" +
     "<li>• Consultar <b>pendências</b> e <b>justificativas</b> das lojas.</li>" +
+    "<li>• Enviar <b>alertas</b> por email sobre os principais procedimentos do cartão Clara.</li>" +
     "<li>• Exibir <b>tabelas detalhadas</b> com pendências ou justificativas completas.</li>" +
     "<li>• Mostrar <b>valor da fatura atual</b>, do mês passado ou das últimas faturas.</li>" +
     "<li>• Gerar <b>ranking</b> por loja, por time, por categoria ou por estabelecimento.</li>" +
@@ -16833,7 +16865,7 @@ if (!window.__vektorEtiquetasIntroShown) {
   bindOnce_();
   const elBoot = document.getElementById(panelId);
   if (elBoot) {
-    elBoot.innerHTML = "<p style='margin:0;opacity:0.9'>Carregando dados do período selecionado...</p>";
+    elBoot.innerHTML = "<p style='margin:0;opacity:0.9'>Carregando dados do período selecionado, pode demorar um pouco...</p>";
   }
   await loadResumo_();
 }
