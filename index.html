@@ -434,7 +434,7 @@
 
   <!-- Título superior (acima do card) -->
 <div class="absolute top-10 left-1/2 -translate-x-1/2 w-[95%] max-w-[900px] text-center text-white z-[10020] pointer-events-none">
-  <div class="text-[18px] md:text-[20px] font-extrabold tracking-tight drop-shadow-lg">
+  <div class="text-[18px] md:text-[22px] font-extrabold tracking-tight drop-shadow-lg">
     Plataforma de Governança Financeira do Cartão Clara
   </div>
 </div>
@@ -9204,7 +9204,6 @@ if (detTimeCampeao) {
   return; // encerra aqui
 }
 
-
   // 🆕 TODOS OS TIMES NO PERÍODO / RELAÇÃO DE TIMES
   const detTodosTimes = detectarTodosTimesPeriodo(msgUsuario, norm);
   if (detTodosTimes) {
@@ -9250,21 +9249,6 @@ if (detTimeCampeao) {
 
   const detFatura = detectarPerguntaFaturaClara(msgUsuario, norm);
   if (detFatura) {
-
-     // 🔒 Restrição de acesso para faturas completas
-  if (USER_ROLE_REPLACED === "Acesso padrão") {
-    renderBotMessage(
-      "HTML:" +
-      "<div class='text-sm text-slate-700'>" +
-        "<p>As informações detalhadas das <b>faturas corporativas completas</b> " +
-        "são restritas a perfis administrativos.</p>" +
-        "<p class='mt-1'>Você continua com acesso normal a consultas de " +
-        "<b>pendências, rankings, categorias, estabelecimentos</b> e demais " +
-        "visões da Clara.</p>" +
-      "</div>"
-    );
-    return; // não chama o backend de faturas
-  } 
 
     renderBotMessage(
       "HTML:<p class='text-sm text-slate-700'>" +
@@ -9443,12 +9427,23 @@ if (detTimeCampeao) {
 
         let __vektorChartFaturas = null;
       })
-      .withFailureHandler(function () {
-        renderBotMessage(
-          "HTML:<p class='text-sm text-slate-700'>Tive um erro ao consultar " +
-          "os dados de fatura na BaseClara.</p>"
-        );
-      })
+      .withFailureHandler(function (err) {
+  const msg = (err && err.message) ? err.message : String(err || "");
+  // Se for permissão, mostra mensagem curta e correta
+  if (msg.toLowerCase().includes("não disponível para o seu perfil")) {
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Não disponível para o seu perfil.</p>"
+    );
+    return;
+  }
+
+  // Caso contrário, mostra o erro real (pra debug) ou uma mensagem mais útil
+  renderBotMessage(
+    "HTML:<p class='text-sm text-slate-700'>Erro ao consultar faturas: " +
+    (msg ? msg : "erro desconhecido") +
+    "</p>"
+  );
+})
       .getResumoFaturasClara();
 
     return;
@@ -17275,14 +17270,6 @@ const isCmdTabelaEstornos = /^\s*tabela\s+de\s+estornos\b/i.test(norm);
 
 if (isCmdTabelaEstornos) {
 
-  // 🔒 Apenas Administrador
-  if (typeof USER_ROLE_REPLACED !== "undefined" && USER_ROLE_REPLACED !== "Administrador") {
-    renderBotMessage(
-      "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil <b>Administrador</b>.</p>"
-    );
-    return;
-  }
-
   const m = norm.match(/tabela\s+de\s+estornos\s+do\s+time\s+(.+)$/i);
 
   let tipoFiltro = "geral";
@@ -17299,19 +17286,40 @@ if (isCmdTabelaEstornos) {
   );
 
   google.script.run
-    .withSuccessHandler(function(res){
-      vektorRenderTabelaEstornos(res, tipoFiltro);
-    })
-    .withFailureHandler(function(err){
+  .withSuccessHandler(function (res) {
+    // Se você já recebe um HTML direto ou um array, renderiza como antes
+    // Se o seu backend já retorna {ok:false,error:"..."} em alguns casos:
+    if (res && res.ok === false) {
       renderBotMessage(
-        "HTML:<p class='text-sm text-slate-700'>Erro ao buscar estornos: " +
-        (err && err.message ? err.message : err) +
+        "HTML:<p class='text-sm text-slate-700'>" +
+        (res.error ? res.error : "Não disponível para o seu perfil.") +
         "</p>"
       );
-    })
-    .getTabelaEstornosClara(tipoFiltro, valorFiltro);
+      return;
+    }
 
-  return; // ⛔ impede cair em outros comandos
+    vektorRenderTabelaEstornos(res, tipoFiltro);
+  })
+  .withFailureHandler(function (err) {
+    const msg = (err && err.message) ? err.message : String(err || "");
+
+    // Permissão (RBAC)
+    if (msg.toLowerCase().includes("não disponível para o seu perfil")) {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-slate-700'>Esse comando não está disponível para o seu perfil.</p>"
+      );
+      return;
+    }
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Erro ao buscar estornos: " +
+      (msg ? msg : "erro desconhecido") +
+      "</p>"
+    );
+  })
+  .getTabelaEstornosClara(tipoFiltro, valorFiltro);
+
+return; // ⛔ mantém isso
 }
 
 // =====================================================
@@ -17508,9 +17516,6 @@ window.vektorPerguntarInformacoesIniciais = function () {
 
 window.vektorMostrarTabelaDemissoesAdmin = function () {
   try {
-    // Só Administrador
-    if (USER_ROLE_CLEAN !== "Administrador") return;
-
     google.script.run
       .withSuccessHandler(function (res) {
         try {
