@@ -9080,12 +9080,26 @@ if (detLojasPlural) {
 // === NOVO: CONSULTAS POR CATEGORIA (BaseClara) ===
 const detCategorias = detectarPerguntaCategorias(msgUsuario, norm);
 if (detCategorias) {
-  const periodo = detCategorias.periodo;
-  const tipo    = detCategorias.tipo || "valor";
-  const topN    = detCategorias.topN;
 
-  const dataInicioStr = (periodo && periodo.dataInicio) ? periodo.dataInicio.toISOString() : "";
-  const dataFimStr    = (periodo && periodo.dataFim)    ? periodo.dataFim.toISOString()    : "";
+  // ✅ Período padrão quando usuário não informar
+  // Sugestão: últimos 30 dias (consistente com "informações iniciais")
+  let periodo = detCategorias.periodo;
+  if (!periodo || !periodo.dataInicio || !periodo.dataFim) {
+    const fim = new Date();
+    const ini = new Date();
+    ini.setDate(fim.getDate() - 30);
+    periodo = { dataInicio: ini, dataFim: fim };
+  }
+
+  const tipo = detCategorias.tipo || "valor";
+  const topN = detCategorias.topN;
+
+  const dataInicioStr = periodo.dataInicio.toISOString();
+  const dataFimStr    = periodo.dataFim.toISOString();
+
+  // (opcional, mas recomendado) salva o período como “último período”
+  // para drilldowns e para renderResumoPorChaveGenerico conseguir usar fallback também
+  window.__vektorUltimoPeriodo = { dataInicio: periodo.dataInicio, dataFim: periodo.dataFim };
 
   renderBotMessage(
     "HTML:<p class='text-sm text-slate-700'>Montando <b>resumo por categoria</b> " +
@@ -15286,13 +15300,17 @@ else if (tipoChaveLower === "estabelecimento" && baseTabela === "estabelecimento
   }
 
   // Dica de drilldown – só para categorias
-  var dicaDrilldown = "";
-  if (tipoChaveLower === "categoria") {
-    dicaDrilldown =
-      "<p style='font-size:12px;color:#64748B;margin-top:2px;'>" +
-        "Clique em uma categoria para ver as transações individuais dela no mesmo período." +
-      "</p>";
-  }
+    var dicaDrilldown = "";
+    if (tipoChaveLower === "categoria") {
+      dicaDrilldown =
+        (periodoHtml || "") +  // 👈 período vem logo acima da dica
+        "<p style='font-size:12px;color:#64748B;margin-top:2px;'>" +
+          "Clique em uma categoria para ver as transações individuais dela no mesmo período." +
+        "</p>";
+
+      // Como o período foi “movido” para cá, evita duplicar mais abaixo
+      periodoHtml = "";
+    }
 
   // Dica de drilldown – para estabelecimentos
 if (tipoChaveLower === "estabelecimento") {
