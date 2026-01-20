@@ -289,7 +289,7 @@ function vektorAssertFunctionAllowed_(fnName) {
 // =======================
 // VEKTOR - SESSAO, TEMPO DE LOGIN
 // =======================
-var VEKTOR_SESSION_TTL_SECONDS = 5 * 60; // 3 horas ou 5 minutos
+var VEKTOR_SESSION_TTL_SECONDS = 3 * 60 * 60; // 3 horas ou 5 minutos
 
 function vektorCreateSessionToken_(email) {
   // token aleatório + carimbo
@@ -4061,13 +4061,9 @@ try {
 // ==============================
 
 function getPossivelUsoIrregularParaChat(modo) {
+  // 🔒 RBAC por VEKTOR_ACESSOS (ROLE -> FUNCTION_ALLOW)
   vektorAssertFunctionAllowed_("getPossivelUsoIrregularParaChat");
   try {
-    var email = Session.getActiveUser().getEmail();
-    if (!isAdminEmail(email)) {
-      return { ok: false, restrito: true, error: "Acesso restrito: apenas Administrador." };
-    }
-
     modo = (modo || "7d").toString().toLowerCase().trim(); // default 7 dias
 
     var rel = detectarUsoIrregularBaseClara_({ modo: modo });
@@ -4081,10 +4077,6 @@ function getPossivelUsoIrregularParaChat(modo) {
 function getRadarIrregularidadeParaChat(modo) {
   vektorAssertFunctionAllowed_("getRadarIrregularidadeParaChat");
   try {
-    var email = Session.getActiveUser().getEmail();
-    if (!isAdminEmail(email)) {
-      return { ok: false, restrito: true, error: "Acesso restrito: apenas Administrador." };
-    }
 
     modo = (modo || "7d").toString().toLowerCase().trim();
 
@@ -4281,13 +4273,9 @@ function ENVIAR_EMAIL_USO_IRREGULAR_CLARA() {
 }
 
 function enviarEmailUsoIrregularClara_(rel) {
+  // 🔒 RBAC por ROLE (VEKTOR_ACESSOS)
+  vektorAssertFunctionAllowed_("enviarEmailUsoIrregularClara_");
   try {
-    // Segurança: apenas Admin pode disparar manualmente também
-    var email = Session.getActiveUser().getEmail();
-    if (email && !isAdminEmail(email)) {
-      return { ok: false, error: "Acesso restrito: apenas Administrador." };
-    }
-
     var destinatarios = getAdminEmails_(); // já existe no seu arquivo :contentReference[oaicite:4]{index=4}
     if (!destinatarios || !destinatarios.length) {
       return { ok: false, error: "Lista de admins vazia." };
@@ -6388,6 +6376,7 @@ function getResumoTransacoesPorCategoria(dataInicioStr, dataFimStr, criterio) {
 }
 
 function getTransacoesPorCategoria(dataInicioStr, dataFimStr, categoriaNome) {
+  vektorAssertFunctionAllowed_("getTransacoesPorCategoria");
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) {
