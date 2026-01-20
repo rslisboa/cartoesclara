@@ -371,6 +371,26 @@
     color: #0f172a !important;         /* mantém cor do ícone */
 }
 
+/* === FIX: opções de SELECT visíveis no tema escuro (My Alerts) === */
+#myAlertsView select,
+#myAlertsView option {
+  color: #ffffff;
+}
+
+#myAlertsView option {
+  background: #0b1220; /* mesmo fundo do header/cards */
+}
+
+/* multi-select (etiquetas) */
+#myAlertsView select[multiple] option {
+  background: #0b1220;
+}
+
+/* hover/selecionado (alguns browsers) */
+#myAlertsView option:checked,
+#myAlertsView option:hover {
+  background: rgba(22,163,74,0.35);
+}
 
 </style>
 
@@ -616,6 +636,14 @@
   ❓ Como usar o Vektor
 </button>
 
+<button
+  type="button"
+  onclick="window.vektorOpenMyAlerts()"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+>
+  🔔 Meus Alertas
+</button>
+
 <? if ((userRole || "") === "Administrador") { ?>
 
   <!-- Botão: Alertas Recentes (somente Admin) -->
@@ -829,6 +857,159 @@
     </div>
   </main>
  </div> <!-- fecha #radarView -->
+
+ <!-- VIEW: MEUS ALERTAS (sobrepõe SOMENTE a área do chat) -->
+<div id="myAlertsView" class="hidden" style="position:absolute; inset:0; z-index:20;">
+
+  <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+
+      <!-- Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button type="button"
+            onclick="window.vektorShowChatView()"
+            style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:800; font-size:12px;">
+            ← Voltar ao chat
+          </button>
+
+          <div>
+            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Meus Alertas</div>
+            <div style="color:rgba(226,232,240,0.9); font-size:12px; margin-top:2px;">
+              Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div style="flex:1; overflow:auto; background:#070b14; padding:14px 16px;">
+
+        <!-- Cards: Criar + Listagem -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          
+          <!-- Card: Criar alerta -->
+          <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+            <div style="color:#fff; font-weight:900; font-size:13px;">Criar alerta</div>
+            <div style="color:rgba(226,232,240,0.75); font-size:11px; margin-top:2px;">
+              O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).
+            </div>
+
+            <div style="margin-top:10px; display:grid; gap:10px;">
+              
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div>
+                  <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Frequência</label>
+                  <select id="myAl_freq" style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
+                    <option value="DAILY">Diário</option>
+                    <option value="3D">A cada 3 dias</option>
+                    <option value="WEEKLY">Semanal</option>
+                    <option value="MONTHLY">Mensal</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Janela de análise (dias)</label>
+                  <input id="myAl_windowDays" type="number" min="1" max="365" placeholder="30"
+                  title="Se vazio, considera automaticamente os últimos 30 dias."
+                    style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+                </div>
+              </div>
+
+              <div>
+                <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Time</label>
+                <select id="myAl_team" style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
+                <option value="__ALL__">Todos os times</option>
+                <option value="" disabled>Carregando…</option>
+              </select>
+              </div>
+
+              <div>
+                <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Lojas (do time)</label>
+                <div id="myAl_storesBox" style="max-height:160px; overflow:auto; border-radius:12px; border:1px solid rgba(148,163,184,0.18); padding:10px; background:rgba(255,255,255,0.03); color:#fff;">
+                  <div style="opacity:0.8; font-size:12px;">Selecione um time para listar as lojas.</div>
+                </div>
+              </div>
+
+            <div>
+              <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
+                Etiquetas (multi-seleção)
+              </label>
+
+              <select id="myAl_label" multiple
+                style="width:100%; min-height:120px; border-radius:12px; background:rgba(255,255,255,0.06);
+                      color:#fff; border:1px solid rgba(148,163,184,0.18); padding:8px 10px; font-size:12px;">
+                <option value="__ALL__">Todas</option>
+              </select>
+
+              <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
+                Dica: segure Ctrl (Windows) ou Cmd (Mac) para selecionar mais de uma etiqueta.
+              </div>
+            </div>
+
+              <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+                <button type="button" onclick="window.vektorMyAlertsCreate()"
+                  style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;">
+                  Criar alerta
+                </button>
+
+                <button type="button" onclick="window.vektorMyAlertsRefresh()"
+                  style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+                  Atualizar lista
+                </button>
+              </div>
+
+              <div id="myAl_createStatus" style="margin-top:4px; font-size:12px; color:rgba(226,232,240,0.85);"></div>
+
+            </div>
+          </div>
+
+          <!-- Card: Alertas existentes -->
+          <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:10px;">
+              <div>
+                <div style="color:#fff; font-weight:900; font-size:13px;">Alertas cadastrados</div>
+                <div style="color:rgba(226,232,240,0.75); font-size:11px; margin-top:2px;">
+                  Seu histórico é privado. Administrador pode ver todos (com filtro).
+                </div>
+              </div>
+
+              <div id="myAl_adminFilterBox" style="display:none;">
+                <div style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Filtro (Admin)</div>
+                <input id="myAl_adminEmail" type="text" placeholder="filtrar por e-mail"
+                  style="width:240px; height:34px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+              </div>
+            </div>
+
+            <div id="myAl_list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ Overlay / Toast (My Alerts) -->
+      <div id="myAl_overlay" style="display:none; position:absolute; inset:0; z-index:60; background:rgba(0,0,0,0.55);">
+        <div style="height:100%; display:flex; align-items:center; justify-content:center; padding:16px;">
+          <div style="width:min(420px, 92vw); background:#0b1220; border:1px solid rgba(148,163,184,0.25); border-radius:16px; padding:14px;">
+            <div style="display:flex; gap:10px; align-items:center;">
+              <div class="vektor-spinner" style="border-top-color:#16a34a;"></div>
+              <div>
+                <div id="myAl_overlayTitle" style="color:#fff; font-weight:900; font-size:13px;">Carregando…</div>
+                <div id="myAl_overlaySub" style="color:rgba(226,232,240,0.75); font-size:12px; margin-top:2px;">Aguarde um instante.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="myAl_toast" style="display:none; position:absolute; right:16px; bottom:16px; z-index:70;
+        background:#0b1220; border:1px solid rgba(148,163,184,0.25); border-radius:14px; padding:10px 12px; min-width:260px;">
+        <div id="myAl_toastMsg" style="color:#fff; font-weight:900; font-size:12px;">OK</div>
+      </div>
+
+  </main>
+</div>
 
  <!-- VIEW: FEEDBACK (sobrepõe SOMENTE a área do chat) -->
 <div id="feedbackView" class="hidden" style="position:absolute; inset:0; z-index:20;">
@@ -1509,7 +1690,39 @@ function hideMaintenance_() {
     .validarLoginVektor(email);
 }
 
+let __vektorLoginHandlersBound = false;
+
+function bindLoginHandlers_() {
+  if (__vektorLoginHandlersBound) return;
+  __vektorLoginHandlersBound = true;
+
+  byId("vektorLoginBtn")?.addEventListener("click", attempt_);
+
+  byId("vektorLoginGoogleBtn")?.addEventListener("click", function () {
+    try {
+      const emailGoogle = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
+      if (!emailGoogle) {
+        setError_("Não foi possível capturar seu e-mail do Google. Digite manualmente.");
+        return;
+      }
+      const inp = byId("vektorLoginEmail");
+      if (inp) inp.value = emailGoogle;
+      attempt_();
+    } catch (e) {
+      setError_("Falha ao aplicar Login com Google.");
+    }
+  });
+
+  byId("vektorLoginEmail")?.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      attempt_();
+    }
+  });
+}
+
 document.addEventListener("DOMContentLoaded", function () {
+  bindLoginHandlers_(); // ✅ garante listeners sempre
   // Manutenção tem prioridade: mostra tela e sai
   if (typeof VEKTOR_MANUTENCAO_ATIVA !== "undefined" && VEKTOR_MANUTENCAO_ATIVA) {
     showMaintenance_();
@@ -1928,17 +2141,18 @@ window.vektorShowChatView = function () {
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
   const feedbackView = document.getElementById("feedbackView");
+  const myAlertsView = document.getElementById("myAlertsView");
 
   if (radarView) radarView.classList.add("hidden");
   if (feedbackView) feedbackView.classList.add("hidden");
+  if (myAlertsView) myAlertsView.classList.add("hidden");
+
   if (chatView) chatView.classList.remove("hidden");
 
   if (radarView) radarView.classList.remove("is-open");
 
-  // garante layout flex do chatView
   if (chatView) chatView.style.display = "flex";
 
-  // devolve foco
   const input = document.getElementById("userInput");
   if (input && !input.disabled) setTimeout(() => input.focus(), 50);
 };
@@ -2377,6 +2591,525 @@ function renderRadarRanking_(lojas, detalhesPorLoja) {
     `;
   }).join("");
 }
+
+// ===============================
+// MEUS ALERTAS (Transações por Etiqueta)
+// ===============================
+
+function vektorShowMyAlertsView_() {
+  const chat = document.getElementById("chatView");
+  const radar = document.getElementById("radarView");
+  const fb = document.getElementById("feedbackView");
+  const my = document.getElementById("myAlertsView");
+
+  if (chat) chat.style.display = "none";
+  if (radar) radar.classList.add("hidden");
+  if (fb) fb.classList.add("hidden");
+  if (my) my.classList.remove("hidden");
+}
+
+window.vektorOpenMyAlerts = function () {
+  vektorShowMyAlertsView_();
+
+  // Admin: habilita filtro visual (sem vazar dados no front; o back controla)
+  try {
+    const isAdmin = (typeof USER_ROLE_REPLACED !== "undefined" && USER_ROLE_REPLACED === "Administrador");
+    const box = document.getElementById("myAl_adminFilterBox");
+    if (box) box.style.display = isAdmin ? "block" : "none";
+  } catch (_) {}
+
+  window.vektorMyAlertsInit_();
+};
+
+window.vektorMyAlertsInit_ = function () {
+  // 1) carrega times/lojas
+  if (typeof google === "undefined" || !google.script || !google.script.run) return;
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.ok) return;
+
+      // popula times
+      const teamSel = document.getElementById("myAl_team");
+      if (teamSel) {
+        teamSel.innerHTML =
+          "<option value='__ALL__'>Todos os times</option>" +
+          "<option value='' disabled>Selecione…</option>";
+
+        (res.times || []).forEach(t => {
+          const op = document.createElement("option");
+          op.value = t;
+          op.textContent = t;
+          teamSel.appendChild(op);
+        });
+
+        teamSel.onchange = function () {
+        const val = String(teamSel.value || "").trim();
+        const box = document.getElementById("myAl_storesBox");
+
+        if (val === "__ALL__") {
+          // ✅ Todos os times => todas as lojas (não precisa selecionar nada)
+          if (box) {
+            box.innerHTML =
+              "<div style='opacity:0.95; font-size:12px; font-weight:900; color:#B5FF20;'>Aplicado para todas as lojas</div>" +
+              "<div style='opacity:0.75; font-size:11px; margin-top:4px; color:#E2E8F0;'>Selecione um time específico para escolher lojas.</div>";
+
+            // efeito visual de desativado
+            box.style.pointerEvents = "none";
+            box.style.opacity = "0.75";
+          }
+          return;
+        }
+
+        // ✅ Time específico => habilita e renderiza lojas
+        if (box) {
+          box.style.pointerEvents = "auto";
+          box.style.opacity = "1";
+        }
+        window.vektorMyAlertsRenderStores_(res.lojasPorTime || {}, val);
+        };
+      }
+
+      // default: limpa lojas
+      window.vektorMyAlertsRenderStores_(res.lojasPorTime || {}, "");
+    })
+    .getTimesELojasParaAlertasVektor(); // Code.gs
+
+  // 1.1) carrega etiquetas
+  google.script.run
+    .withSuccessHandler(function (res2) {
+      const sel = document.getElementById("myAl_label");
+      if (!sel) return;
+
+      sel.innerHTML = "";
+
+      // opção "todas"
+      const opAll = document.createElement("option");
+      opAll.value = "__ALL__";
+      opAll.textContent = "Todas";
+      sel.appendChild(opAll);
+
+      (res2 && res2.ok ? (res2.etiquetas || []) : []).forEach(function (t) {
+        const op = document.createElement("option");
+        op.value = t;
+        op.textContent = t;
+        sel.appendChild(op);
+      });
+
+      // ✅ UX: se selecionar "Todas", seleciona visualmente tudo
+      sel.onchange = function () {
+        const pickedAll = Array.from(sel.selectedOptions || []).some(op => op.value === "__ALL__");
+        if (!pickedAll) return;
+
+        Array.from(sel.options || []).forEach(op => { op.selected = true; });
+      };
+    })
+    .getEtiquetasDisponiveisVektor();
+
+  // 2) carrega lista
+  window.vektorMyAlertsRefresh();
+};
+
+window.vektorMyAlertsRenderStores_ = function (map, time) {
+  const box = document.getElementById("myAl_storesBox");
+  if (!box) return;
+
+  const lojas = (time && map && map[time]) ? map[time] : [];
+  if (!time) {
+    box.innerHTML = "<div style='opacity:0.8; font-size:12px;'>Selecione um time para listar as lojas.</div>";
+    return;
+  }
+  if (!lojas.length) {
+    box.innerHTML = "<div style='opacity:0.8; font-size:12px;'>Nenhuma loja encontrada para esse time.</div>";
+    return;
+  }
+
+  box.innerHTML = "";
+
+// ✅ Selecionar todas
+const wrapAll = document.createElement("label");
+wrapAll.style.display = "flex";
+wrapAll.style.alignItems = "center";
+wrapAll.style.gap = "8px";
+wrapAll.style.fontSize = "12px";
+wrapAll.style.marginBottom = "10px";
+wrapAll.style.fontWeight = "900";
+wrapAll.innerHTML =
+  "<input type='checkbox' id='myAl_store_all' />" +
+  "<span style='opacity:0.95;'>Selecionar todas</span>";
+box.appendChild(wrapAll);
+
+const cbAll = wrapAll.querySelector("#myAl_store_all");
+if (cbAll) {
+  cbAll.addEventListener("change", function () {
+    const on = !!cbAll.checked;
+    box.querySelectorAll("input[type='checkbox'][data-loja]").forEach(cb => {
+      cb.checked = on;
+    });
+  });
+}
+
+// ✅ lista de lojas
+lojas.forEach(function (l) {
+  const id = "myAl_store_" + String(l).replace(/\W+/g, "_");
+  const row = document.createElement("label");
+  row.style.display = "flex";
+  row.style.alignItems = "center";
+  row.style.gap = "8px";
+  row.style.fontSize = "12px";
+  row.style.marginBottom = "6px";
+  row.innerHTML =
+    "<input type='checkbox' id='" + id + "' data-loja='" + String(l) + "' />" +
+    "<span style='opacity:0.95;'>" + String(l) + "</span>";
+  box.appendChild(row);
+});
+
+// Se desmarcar qualquer uma, desmarca “todas”
+box.querySelectorAll("input[type='checkbox'][data-loja]").forEach(cb => {
+  cb.addEventListener("change", function(){
+    if (!cb.checked && cbAll) cbAll.checked = false;
+  });
+});
+  
+};
+
+window.vektorMyAlertsCreate = function () {
+  const status = document.getElementById("myAl_createStatus");
+  const setStatus = (t) => { if (status) status.textContent = String(t || ""); };
+
+  try {
+    const email = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
+    const role  = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "").trim() : "");
+
+    const freq = (document.getElementById("myAl_freq")?.value || "DAILY").trim();
+
+    // ✅ Janela: se vazio -> 30
+    const winRaw = String(document.getElementById("myAl_windowDays")?.value || "").trim();
+    const windowDays = Number(winRaw || 30) || 30;
+
+    const time = (document.getElementById("myAl_team")?.value || "").trim();
+
+    // ✅ Etiquetas: multi (select multiple) ou fallback input
+    const etiquetas = [];
+    const labelEl = document.getElementById("myAl_label");
+    if (labelEl) {
+      if (labelEl.tagName === "SELECT" && labelEl.multiple) {
+        Array.from(labelEl.selectedOptions || []).forEach(op => {
+          const v = String(op.value || "").trim();
+          if (v) etiquetas.push(v);
+        });
+      } else {
+        const v = String(labelEl.value || "").trim();
+        if (v) etiquetas.push(v);
+      }
+    }
+
+    const isAll = etiquetas.includes("__ALL__");
+    const etiquetasFinal = isAll ? [] : etiquetas.filter(x => x && x !== "__ALL__");
+
+    const storesBox = document.getElementById("myAl_storesBox");
+    const lojas = [];
+    if (storesBox) {
+      storesBox.querySelectorAll("input[type='checkbox'][data-loja]").forEach(cb => {
+        if (cb.checked) lojas.push(cb.getAttribute("data-loja"));
+      });
+    }
+
+    // validações mínimas
+    if (!email) { setStatus("Não foi possível identificar seu e-mail."); return; }
+    if (!time) { setStatus("Selecione um time."); return; }
+    // ✅ Se "Todos os times", não exige lojas (vale para todas)
+      if (time !== "__ALL__" && !lojas.length) {
+        setStatus("Selecione ao menos 1 loja.");
+        return;
+      }
+    if (windowDays < 1 || windowDays > 365) { setStatus("Janela de análise deve estar entre 1 e 365 dias."); return; }
+
+    // ✅ Overlay
+    if (window.vektorMyAlertsShowLoading_) window.vektorMyAlertsShowLoading_("Criando alerta...", "Aguarde.");
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
+
+        if (!res || !res.ok) {
+          const msg = "Falha: " + (res && res.error ? res.error : "erro desconhecido");
+          setStatus(msg);
+          if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
+          return;
+        }
+
+        const okMsg = "Alerta criado com sucesso. ID: " + res.alertId;
+        setStatus(okMsg);
+        if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Alerta criado com sucesso!", "success");
+
+        window.vektorMyAlertsRefresh();
+      })
+      .withFailureHandler(function (err) {
+        if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
+
+        const msg = "Erro: " + (err && err.message ? err.message : err);
+        setStatus(msg);
+        if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
+      })
+      .criarAlertaEtiquetaVektor({
+        email: email,
+        role: role,
+        freq: freq,
+        windowDays: windowDays,
+        time: time,
+        lojas: lojas,
+
+        // multi (novo)
+        etiquetas: etiquetasFinal,
+
+        // fallback (se seu Code.gs ainda espera string)
+        etiqueta: (etiquetasFinal[0] || "")
+      });
+
+  } catch (e) {
+    if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
+    setStatus("Erro inesperado ao criar alerta.");
+    if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Erro inesperado ao criar alerta.", "error");
+  }
+};
+
+window.vektorMyAlertsShowLoading_ = function(title, sub){
+  const ov = document.getElementById("myAl_overlay");
+  const t  = document.getElementById("myAl_overlayTitle");
+  const s  = document.getElementById("myAl_overlaySub");
+  if (t) t.textContent = String(title || "Carregando…");
+  if (s) s.textContent = String(sub || "Aguarde um instante.");
+  if (ov) ov.style.display = "block";
+};
+
+window.vektorMyAlertsHideLoading_ = function(){
+  const ov = document.getElementById("myAl_overlay");
+  if (ov) ov.style.display = "none";
+};
+
+window.vektorMyAlertsToast_ = function(msg, kind){
+  const box = document.getElementById("myAl_toast");
+  const el  = document.getElementById("myAl_toastMsg");
+  if (el) el.textContent = String(msg || "");
+
+  if (box) {
+    // ✅ centraliza no meio da tela do myAlertsView
+    box.style.left = "50%";
+    box.style.top = "50%";
+    box.style.right = "auto";
+    box.style.bottom = "auto";
+    box.style.transform = "translate(-50%, -50%)";
+    box.style.minWidth = "320px";
+    box.style.textAlign = "center";
+
+    box.style.borderColor = (kind === "error") ? "rgba(248,113,113,0.55)" : "rgba(34,197,94,0.45)";
+    box.style.display = "block";
+    setTimeout(()=>{ box.style.display = "none"; }, 2600);
+  }
+};
+
+window.vektorMyAlertsDelete = function(alertId) {
+  if (!alertId) return;
+
+  const ok = confirm("Deseja excluir este alerta? Essa ação não poderá ser desfeita.");
+  if (!ok) return;
+
+  const email = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
+  const role  = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "").trim() : "");
+
+  window.vektorMyAlertsShowLoading_("Excluindo alerta...");
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      window.vektorMyAlertsHideLoading_();
+      if (!res || !res.ok) {
+        window.vektorMyAlertsToast_("Falha ao excluir: " + (res && res.error ? res.error : "erro desconhecido"), "error");
+        return;
+      }
+      window.vektorMyAlertsToast_("Alerta excluído com sucesso.", "success");
+      window.vektorMyAlertsRefresh();
+    })
+    .withFailureHandler(function(err){
+      window.vektorMyAlertsHideLoading_();
+      window.vektorMyAlertsToast_("Erro ao excluir: " + (err && err.message ? err.message : err), "error");
+    })
+    .excluirAlertaVektor({ alertId: alertId, email: email, role: role });
+};
+
+window.vektorMyAlertsRefresh = function () {
+  const list = document.getElementById("myAl_list");
+  if (list) list.innerHTML = "<div style='color:rgba(226,232,240,0.85); font-size:12px;'>Carregando…</div>";
+
+  const email = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
+  const role = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "").trim() : "");
+
+  const adminEmail = document.getElementById("myAl_adminEmail")?.value || "";
+  const adminFilter = (role === "Administrador") ? String(adminEmail).trim() : "";
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!list) return;
+      if (!res || !res.ok) {
+        list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>Falha ao carregar alertas.</div>";
+        return;
+      }
+
+      const rows = Array.isArray(res.alertas) ? res.alertas : [];
+      if (!rows.length) {
+        list.innerHTML = "<div style='color:rgba(226,232,240,0.85); font-size:12px;'>Nenhum alerta cadastrado.</div>";
+        return;
+      }
+
+      list.innerHTML = "";
+      rows.forEach(a => {
+        const card = document.createElement("div");
+        card.style.border = "1px solid rgba(148,163,184,0.18)";
+        card.style.background = "rgba(255,255,255,0.03)";
+        card.style.borderRadius = "12px";
+        card.style.padding = "10px";
+        card.style.color = "rgba(226,232,240,0.92)";
+        card.style.fontSize = "12px";
+
+        // ✅ labels para ALL
+        const timeLabel = (a && a.time === "__ALL__") ? "Todos" : (a.time || "—");
+        const lojasLabel = (a && a.time === "__ALL__") ? "Todos" : String((a.lojasCount || 0));
+
+        const etiquetaLabel =
+          (a.etiquetaLabel != null && a.etiquetaLabel !== "")
+            ? a.etiquetaLabel
+            : ((a.etiqueta && String(a.etiqueta).trim()) ? String(a.etiqueta).trim() : "Todas");
+
+        const head =
+          "<div style='display:flex; justify-content:space-between; gap:10px; align-items:flex-start;'>" +
+            "<div>" +
+              "<div style='font-weight:900; color:#fff; font-size:13px;'>ID: " + (a.alertId || "—") + "</div>" +
+              "<div style='opacity:0.85; margin-top:2px;'>" +
+                "<b>Etiqueta:</b> " + etiquetaLabel +
+                " &nbsp; <b>Time:</b> " + timeLabel +
+                " &nbsp; <b>Lojas:</b> " + lojasLabel +
+                " &nbsp; <b>Freq:</b> " + (a.freqLabel || a.freq || "—") +
+              "</div>" +
+              "<div style='opacity:0.75; margin-top:2px;'>" +
+                "<b>Dono:</b> " + (a.ownerEmail || "—") +
+                " &nbsp; <b>Última execução:</b> " + (a.lastRunAt || "—") +
+              "</div>" +
+            "</div>" +
+            "<div style='display:flex; gap:8px;'>" +
+              "<button type='button' data-id='" + a.alertId + "' class='myAl_runBtn' " +
+                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;'>Executar</button>" +
+
+              "<button type='button' data-id='" + a.alertId + "' class='myAl_toggleBtn' " +
+                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;'>" +
+                (a.isActive ? "Desativar" : "Ativar") + "</button>" +
+
+              "<button type='button' data-id='" + a.alertId + "' class='myAl_delBtn' " +
+                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(239,68,68,0.22); color:#fff; font-weight:900; font-size:12px;'>Excluir</button>" +
+            "</div>" +
+          "</div>";
+
+        card.innerHTML = head;
+        list.appendChild(card);
+      });
+
+      // bind botões
+      list.querySelectorAll(".myAl_runBtn").forEach(btn => {
+        btn.onclick = function () {
+          const alertId = btn.getAttribute("data-id");
+          google.script.run
+            .withSuccessHandler(function (r2) {
+              if (r2 && r2.ok) {
+                const html = window.vektorRenderTabelaTransacoesEtiquetaAlert_(r2);
+                if (html) renderBotMessage("HTML:" + html);
+                window.vektorMyAlertsRefresh();
+              }
+            })
+            .executarAlertaEtiquetaVektor({ alertId: alertId, preview: true });
+        };
+      });
+
+      list.querySelectorAll(".myAl_toggleBtn").forEach(btn => {
+        btn.onclick = function () {
+          const alertId = btn.getAttribute("data-id");
+          google.script.run
+            .withSuccessHandler(function () { window.vektorMyAlertsRefresh(); })
+            .toggleAlertaEtiquetaVektor({ alertId: alertId });
+        };
+      });
+
+      list.querySelectorAll(".myAl_delBtn").forEach(btn => {
+        btn.onclick = function () {
+          const alertId = btn.getAttribute("data-id");
+          if (!alertId) return;
+
+          if (!confirm("Deseja excluir este alerta? Essa ação não pode ser desfeita.")) return;
+
+          google.script.run
+            .withSuccessHandler(function () {
+              window.vektorMyAlertsRefresh();
+            })
+            .withFailureHandler(function (err) {
+              const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+              alert("Falha ao excluir: " + msg);
+            })
+            .excluirAlertaVektor({ alertId: alertId });
+        };
+      });
+
+    })
+    .withFailureHandler(function () {
+      if (list) list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>Falha ao carregar alertas.</div>";
+    })
+    .listarAlertasUsuarioVektor({ email: email, role: role, adminFilterEmail: adminFilter });
+};
+
+// Render “bonito” do alerta no chat (reaproveita o padrão da sua tabela já existente)
+window.vektorRenderTabelaTransacoesEtiquetaAlert_ = function (resp) {
+  const rows = Array.isArray(resp.rows) ? resp.rows : [];
+  const periodo = resp.periodo ? (resp.periodo.inicio + " a " + resp.periodo.fim) : "—";
+  const titulo = "🔔 Visual de Transações Via Alerta do Vektor";
+  const subt = "<div style='margin-top:4px; font-size:12px; color:#64748B; text-align:center;'>" +
+    "<b>Período:</b> " + periodo +
+    " &nbsp; <b>Etiqueta:</b> " + (resp.etiqueta || "—") +
+    " &nbsp; <b>Linhas:</b> " + rows.length +
+  "</div>";
+
+  if (!rows.length) {
+    return "<div class='text-sm text-slate-700'><p style='text-align:center;font-weight:bold;'>" + titulo + "</p>" + subt +
+      "<p style='margin-top:8px; text-align:center;'>Nenhuma transação encontrada para o filtro.</p></div>";
+  }
+
+  // tabela simples (mesmas colunas do seu padrão)
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+  const fmt = (v) => (typeof v === "number" ? v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : String(v||""));
+
+  let h = "";
+  h += "<div class='text-sm text-slate-700'>";
+  h += "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>";
+  h += subt;
+  h += "<div style='overflow:auto;border:1px solid rgba(0,0,0,0.12);border-radius:10px;margin-top:10px;'>";
+  h += "<table style='border-collapse:collapse;width:100%;font-size:12px;'>";
+  h += "<thead><tr style='background:#B5FF20;'>";
+  ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta inserida","Item comprado (descrição)"].forEach(t => {
+    h += "<th style='border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;white-space:nowrap;position:sticky;top:0;z-index:10;'>" + esc(t) + "</th>";
+  });
+  h += "</tr></thead><tbody>";
+
+  rows.slice(0, 60).forEach(r => {
+    h += "<tr>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.loja) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.time) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.data) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:260px;'>" + esc(r.estabelecimento) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;white-space:nowrap;'>" + esc(fmt(r.valor)) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:240px;'>" + esc(r.etiqueta) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:360px;'>" + esc(r.descricao) + "</td>";
+    h += "</tr>";
+  });
+
+  h += "</tbody></table></div></div>";
+  return h;
+};
 
 function closeStatusVektorModal() {
   document.getElementById("statusVektorModal").style.display = "none";
