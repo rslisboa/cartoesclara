@@ -638,6 +638,676 @@ function getStatusOperacionalVektor() {
   }
 }
 
+// =====================================================
+// MEUS ALERTAS (Transações por Etiqueta) - Back-end
+// =====================================================
+
+function getOrCreateUserAlertsSheet_() {
+  // Reaproveita o mesmo spreadsheet do log de alertas
+  var logSh = getOrCreateAlertasLogSheet_();
+  var ss = logSh.getParent();
+
+  var name = "VEKTOR_USER_ALERTS";
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.appendRow([
+      "alertId", "ownerEmail", "ownerRole",
+      "createdAt", "isActive",
+      "freq", "windowDays",
+      "time", "lojasCsv", "etiqueta",
+      "lastRunAt", "lastRowCount"
+    ]);
+  }
+  return sh;
+}
+
+function getOrCreateUserAlertsRunsSheet_() {
+  var logSh = getOrCreateAlertasLogSheet_();
+  var ss = logSh.getParent();
+
+  var name = "VEKTOR_USER_ALERT_RUNS";
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.appendRow([
+      "runId", "alertId", "ownerEmail",
+      "runAt", "periodoIni", "periodoFim",
+      "rowCount", "rowsJsonPreview"
+    ]);
+  }
+  return sh;
+}
+
+function getTimesELojasParaAlertasVektor() {
+  try {
+    // Estratégia: derive de BaseClara via colunas de Loja/Time (header lookup) ou use sua fonte já existente de lojas/time.
+    // Aqui, eu faço via BigQuery (se você preferir), mas vou tentar via BaseClara para não depender de tabela externa.
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) return { ok:false, error:"Aba BaseClara não encontrada." };
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 2) return { ok:true, times:[], lojasPorTime:{} };
+
+    var header = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
+
+    var idxBy = function (names) {
+      for (var i=0; i<names.length; i++) {
+        var p = names[i].toLowerCase();
+        for (var c=0; c<header.length; c++) {
+          var h = String(header[c]||"").toLowerCase().trim();
+          if (h === p) return c;
+        }
+      }
+      return -1;
+    };
+
+    var iLoja = idxBy(["loja", "cod_loja", "código da loja", "codigo da loja"]);
+    var iTime = idxBy(["time", "grupo", "regional", "times"]);
+
+    if (iLoja < 0 || iTime < 0) {
+      return { ok:false, error:"Não encontrei colunas de Loja/Time no cabeçalho da BaseClara. Ajuste o header lookup." };
+    }
+
+    // lê amostra grande o suficiente
+    var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+    var map = {};
+    var timesSet = {};
+    values.forEach(function (r) {
+      var loja = String(r[iLoja] || "").trim();
+      var time = String(r[iTime] || "").trim();
+      if (!loja || !time) return;
+
+      timesSet[time] = true;
+      if (!map[time]) map[time] = {};
+      map[time][loja] = true;
+    });
+
+    var times = Object.keys(timesSet).sort();
+    var lojasPorTime = {};
+    times.forEach(function (t) {
+      lojasPorTime[t] = Object.keys(map[t] || {}).sort();
+    });
+
+    return { ok:true, times: times, lojasPorTime: lojasPorTime };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function criarAlertaEtiquetaVektor(payload) {
+  try {
+    payload = payload || {};
+    var email = String(payload.email || "").trim().toLowerCase();
+    var role = String(payload.role || "").trim();
+    var freq = String(payload.freq || "DAILY").trim();
+    var windowDays = Number(payload.windowDays || 30) || 30;
+    var time = String(payload.time || "").trim();
+
+    // ✅ novo: pode vir array (multi) OU string (legado)
+    var etiquetasArr = Array.isArray(payload.etiquetas) ? payload.etiquetas.map(function(x){ return String(x || "").trim(); }) : [];
+    etiquetasArr = etiquetasArr.filter(function(x){ return x && x !== "__ALL__"; });
+
+    var etiquetaLegacy = String(payload.etiqueta || "").trim();
+    var etiquetaFinalCsv = "";
+
+    // Se veio array, usa array; se não veio, usa legado
+    if (etiquetasArr.length) {
+      etiquetaFinalCsv = etiquetasArr.join(" | ");
+    } else if (etiquetaLegacy && etiquetaLegacy !== "__ALL__") {
+      etiquetaFinalCsv = etiquetaLegacy;
+    } else {
+      // ✅ “todas”: deixa vazio no armazenamento (sem filtro)
+      etiquetaFinalCsv = "";
+    }
+
+    var lojas = Array.isArray(payload.lojas) ? payload.lojas.map(String) : [];
+    lojas = lojas.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+
+    if (!email) return { ok:false, error:"E-mail obrigatório." };
+    if (!time) return { ok:false, error:"Time obrigatório." };
+    // ✅ Se "Todos os times", lojas pode ser vazio (significa todas)
+      if (time !== "__ALL__" && !lojas.length) {
+        return { ok:false, error:"Selecione ao menos 1 loja." };
+      }
+    if (windowDays < 1 || windowDays > 365) return { ok:false, error:"Janela inválida (1..365)." };
+
+    if (["DAILY","3D","WEEKLY","MONTHLY"].indexOf(freq) < 0) return { ok:false, error:"Frequência inválida." };
+
+    var sh = getOrCreateUserAlertsSheet_();
+    var alertId = "AL" + Utilities.getUuid().replace(/-/g,"").slice(0, 12).toUpperCase();
+    var now = new Date();
+
+    sh.appendRow([
+      alertId,
+      email,
+      role,
+      now,
+      true,
+      freq,
+      windowDays,
+      time,
+      lojas.join(","),
+      etiquetaFinalCsv, // ✅ agora pode ser vazio (todas) ou "A | B | C"
+      "",   // lastRunAt
+      ""    // lastRowCount
+    ]);
+
+    return { ok:true, alertId: alertId };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Retorna Times e Lojas (por Time) para a tela "Meus Alertas".
+ * SEMPRE por índice (BaseClara não muda de posição).
+ *
+ * BaseClara (A..W = 23 colunas):
+ * - Loja (Alias do Cartão) = H = 8 => idx 7
+ * - Time (Grupos)          = R = 18 => idx 17
+ */
+function getTimesELojasParaAlertasVektor() {
+  try {
+    // Recomendado: manter RBAC coerente com o resto do projeto
+    // (se não existir no seu projeto, comente a linha abaixo)
+    if (typeof vektorAssertFunctionAllowed_ === "function") {
+      vektorAssertFunctionAllowed_("getTimesELojasParaAlertasVektor");
+    }
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) return { ok: false, error: "Aba BaseClara não encontrada." };
+
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return { ok: true, times: [], lojasPorTime: {} };
+
+    // Lê A..W (23 colunas)
+    var values = sh.getRange(2, 1, lastRow - 1, 23).getValues();
+
+    var IDX_LOJA_ALIAS = 7;   // H
+    var IDX_TIME_GRUPO = 17;  // R
+
+    var timesSet = {};
+    var map = {}; // time -> { loja:true }
+
+    values.forEach(function (r) {
+      var loja = String(r[IDX_LOJA_ALIAS] || "").trim();
+      var time = String(r[IDX_TIME_GRUPO] || "").trim();
+      if (!loja || !time) return;
+
+      timesSet[time] = true;
+      if (!map[time]) map[time] = {};
+      map[time][loja] = true;
+    });
+
+    var times = Object.keys(timesSet).sort();
+    var lojasPorTime = {};
+    times.forEach(function (t) {
+      lojasPorTime[t] = Object.keys(map[t] || {}).sort();
+    });
+
+    return { ok: true, times: times, lojasPorTime: lojasPorTime };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Lista todas as etiquetas existentes na BaseClara (coluna T).
+ * Suporta células com múltiplas tags (separadas por vírgula, ponto e vírgula ou barra).
+ */
+function getEtiquetasDisponiveisVektor() {
+  try {
+    if (typeof vektorAssertFunctionAllowed_ === "function") {
+      vektorAssertFunctionAllowed_("getEtiquetasDisponiveisVektor");
+    }
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) return { ok: false, error: "Aba BaseClara não encontrada." };
+
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return { ok: true, etiquetas: [] };
+
+    // lê só a coluna T (20) de 2..lastRow
+    var colT = sh.getRange(2, 20, lastRow - 1, 1).getValues(); // T
+
+    var set = {};
+
+    // ✅ exclusões
+    var EXCLUIR = {
+      "AR": true,
+      "POSTAGEM": true,
+      "USO INDEVIDO - EXCLUSIVA FINANCEIRO": true,
+      "NULL": true
+    };
+
+    colT.forEach(function (r) {
+      var cell = String(r[0] || "").trim();
+      if (!cell) return;
+
+      cell
+        .split(/[;,\/\|]+/g)
+        .map(function (s) { return String(s || "").trim(); })
+        .filter(Boolean)
+        .forEach(function (t) {
+          var tag = String(t || "").trim();
+          if (!tag) return;
+
+          var up = tag.toUpperCase().trim();
+          if (EXCLUIR[up] === true) return;
+          if (tag.toLowerCase().trim() === "null") return;
+
+          set[tag] = true;
+        });
+    });
+
+    return { ok: true, etiquetas: Object.keys(set).sort() };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function listarAlertasUsuarioVektor(req) {
+  try {
+    req = req || {};
+    var email = String(req.email || "").trim().toLowerCase();
+    var role = String(req.role || "").trim();
+    var adminFilterEmail = String(req.adminFilterEmail || "").trim().toLowerCase();
+
+    var sh = getOrCreateUserAlertsSheet_();
+    var values = sh.getDataRange().getValues();
+    if (values.length < 2) return { ok: true, alertas: [] };
+
+    var head = values[0].map(String);
+    var idx = function (name) { return head.indexOf(name); };
+
+    var iAlertId = idx("alertId");
+    var iOwner   = idx("ownerEmail");
+    var iActive  = idx("isActive");
+    var iFreq    = idx("freq");
+    var iWin     = idx("windowDays");
+    var iTime    = idx("time");
+    var iLojas   = idx("lojasCsv");
+    var iEtq     = idx("etiqueta");
+    var iLastRun = idx("lastRunAt");
+
+    var isAdmin = (role === "Administrador");
+
+    var out = [];
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r];
+      var owner = String(row[iOwner] || "").trim().toLowerCase();
+
+      // Regra de visibilidade
+      if (!isAdmin) {
+        if (owner !== email) continue;
+      } else {
+        if (adminFilterEmail && owner.indexOf(adminFilterEmail) === -1) continue;
+      }
+
+      var lojasCsv = String(row[iLojas] || "");
+      var lojasCount = lojasCsv ? lojasCsv.split(",").filter(Boolean).length : 0;
+
+      var f = String(row[iFreq] || "").trim();
+      var freqLabel =
+        (f === "DAILY")   ? "Diário"  :
+        (f === "3D")      ? "3 dias"  :
+        (f === "WEEKLY")  ? "Semanal" :
+        (f === "MONTHLY") ? "Mensal"  :
+        (f || "—");
+
+        var etiquetaRaw = String(row[iEtq] || "").trim();
+        var etqs = etiquetaRaw ? etiquetaRaw.split("|").map(function(s){ return String(s||"").trim(); }).filter(Boolean) : [];
+        var etiquetaCount = etqs.length;
+
+        var etiquetaLabel = "Todas";
+        if (etiquetaCount === 1) etiquetaLabel = etqs[0];
+        else if (etiquetaCount > 1) etiquetaLabel = etiquetaCount + " etiquetas";
+
+      out.push({
+        alertId: String(row[iAlertId] || ""),
+        ownerEmail: owner,
+        isActive: row[iActive] === true,
+        freq: f,
+        freqLabel: freqLabel,
+        windowDays: Number(row[iWin] || 1),
+        time: String(row[iTime] || ""),
+        lojasCount: lojasCount,
+        etiqueta: etiquetaRaw,
+        etiquetaCount: etiquetaCount,
+        etiquetaLabel: etiquetaLabel,
+        lastRunAt: (row[iLastRun] instanceof Date)
+          ? Utilities.formatDate(row[iLastRun], Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy HH:mm")
+          : (row[iLastRun] ? String(row[iLastRun]) : "—")
+      });
+    }
+
+    out.reverse();
+    return { ok: true, alertas: out };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function toggleAlertaEtiquetaVektor(req) {
+  try {
+    req = req || {};
+    var alertId = String(req.alertId || "").trim();
+    if (!alertId) return { ok:false, error:"alertId obrigatório." };
+
+    var sh = getOrCreateUserAlertsSheet_();
+    var values = sh.getDataRange().getValues();
+    if (values.length < 2) return { ok:false, error:"Sem alertas." };
+
+    var head = values[0].map(String);
+    var iAlertId = head.indexOf("alertId");
+    var iActive = head.indexOf("isActive");
+
+    for (var r=1; r<values.length; r++) {
+      if (String(values[r][iAlertId] || "") === alertId) {
+        var cur = (values[r][iActive] === true);
+        sh.getRange(r+1, iActive+1).setValue(!cur);
+        return { ok:true, isActive: !cur };
+      }
+    }
+    return { ok:false, error:"Alerta não encontrado." };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function excluirAlertaVektor(req) {
+  try {
+    req = req || {};
+    var alertId = String(req.alertId || "").trim();
+    if (!alertId) return { ok:false, error:"alertId obrigatório." };
+
+    var sh = getOrCreateUserAlertsSheet_();
+    var values = sh.getDataRange().getValues();
+    if (values.length < 2) return { ok:false, error:"Sem alertas." };
+
+    var head = values[0].map(String);
+    var iAlertId = head.indexOf("alertId");
+
+    for (var r = 1; r < values.length; r++) {
+      if (String(values[r][iAlertId] || "") === alertId) {
+        sh.deleteRow(r + 1);
+        return { ok:true };
+      }
+    }
+
+    return { ok:false, error:"Alerta não encontrado." };
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+// Executa 1 alerta (preview=true: para uso do front; preview=false: para execução agendada)
+function executarAlertaEtiquetaVektor(req) {
+  try {
+    req = req || {};
+    var alertId = String(req.alertId || "").trim();
+    var preview = !!req.preview;
+
+    var sh = getOrCreateUserAlertsSheet_();
+    var values = sh.getDataRange().getValues();
+    var head = values[0].map(String);
+    var idx = function (name) { return head.indexOf(name); };
+
+    var iAlertId  = idx("alertId");
+    var iOwner    = idx("ownerEmail");
+    var iActive   = idx("isActive");
+    var iFreq     = idx("freq");
+    var iWin      = idx("windowDays");
+    var iTime     = idx("time");
+    var iLojas    = idx("lojasCsv");
+    var iEtq      = idx("etiqueta");     // agora pode ser "" ou "A | B | C"
+    var iLastRun  = idx("lastRunAt");
+    var iLastCnt  = idx("lastRowCount");
+
+    var rowIdx = -1;
+    for (var r = 1; r < values.length; r++) {
+      if (String(values[r][iAlertId] || "") === alertId) { rowIdx = r; break; }
+    }
+    if (rowIdx < 0) return { ok: false, error: "Alerta não encontrado." };
+
+    var row = values[rowIdx];
+    var isActive = (row[iActive] === true);
+    if (!isActive && !preview) return { ok: true, skipped: true, reason: "inativo" };
+
+    var ownerEmail = String(row[iOwner] || "");
+    var freq = String(row[iFreq] || "DAILY");
+    var windowDays = Number(row[iWin] || 30) || 30;
+    var time = String(row[iTime] || "");
+    var lojas = String(row[iLojas] || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+
+    // Etiquetas: "" => todas | "A | B | C" => múltiplas
+    var etiquetaCsv = String(row[iEtq] || "").trim();
+    var etiquetas = etiquetaCsv
+      ? etiquetaCsv.split("|").map(function (s) { return String(s || "").trim(); }).filter(Boolean)
+      : []; // vazio = todas
+
+    // Período: últimos N dias
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var now = new Date();
+    var ini = new Date(now.getTime() - (windowDays * 24 * 60 * 60 * 1000));
+    var periodo = {
+      inicio: Utilities.formatDate(ini, tz, "dd/MM/yyyy"),
+      fim: Utilities.formatDate(now, tz, "dd/MM/yyyy")
+    };
+
+    // Busca transações na BaseClara
+    var rows = [];
+    if (!etiquetas.length) {
+      // ✅ todas as etiquetas
+      rows = queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, "");
+    } else {
+      // ✅ múltiplas etiquetas (OR)
+      var acc = [];
+      etiquetas.forEach(function (et) {
+        acc = acc.concat(queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, et));
+      });
+      rows = acc;
+    }
+
+    // Atualiza lastRunAt/lastRowCount
+    sh.getRange(rowIdx + 1, iLastRun + 1).setValue(now);
+    sh.getRange(rowIdx + 1, iLastCnt + 1).setValue(rows.length);
+
+    // Log de execução (guarda preview de no máx. 60 linhas para não explodir célula)
+    var runsSh = getOrCreateUserAlertsRunsSheet_();
+    var previewRows = rows.slice(0, 60);
+    runsSh.appendRow([
+      "RUN" + Utilities.getUuid().replace(/-/g, "").slice(0, 10).toUpperCase(),
+      alertId,
+      ownerEmail,
+      now,
+      periodo.inicio,
+      periodo.fim,
+      rows.length,
+      JSON.stringify(previewRows)
+    ]);
+
+    return {
+      ok: true,
+      alertId: alertId,
+      ownerEmail: ownerEmail,
+      freq: freq,
+      time: time,
+      // para o front exibir:
+      etiqueta: etiquetaCsv || "", // "" significa "todas"
+      etiquetaCount: etiquetas.length, // 0 = todas
+      periodo: periodo,
+      rows: previewRows
+    };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+// Gatilho diário (você cria no editor de Apps Script como time-driven 1x por dia)
+function RUN_USER_ALERTS_DAILY() {
+  var sh = getOrCreateUserAlertsSheet_();
+  var values = sh.getDataRange().getValues();
+  if (values.length < 2) return;
+
+  var head = values[0].map(String);
+  var iAlertId = head.indexOf("alertId");
+  var iActive = head.indexOf("isActive");
+  var iFreq = head.indexOf("freq");
+  var iLastRun = head.indexOf("lastRunAt");
+
+  var now = new Date();
+
+  for (var r=1; r<values.length; r++) {
+    var row = values[r];
+    if (row[iActive] !== true) continue;
+
+    var freq = String(row[iFreq] || "DAILY");
+    var lastRun = row[iLastRun] instanceof Date ? row[iLastRun] : null;
+
+    // Decide se está “due”
+    var due = false;
+    if (!lastRun) due = true;
+    else {
+      var days = Math.floor((now.getTime() - lastRun.getTime()) / (24*60*60*1000));
+      if (freq === "DAILY") due = (days >= 1);
+      else if (freq === "3D") due = (days >= 3);
+      else if (freq === "WEEKLY") due = (days >= 7);
+    }
+    if (!due) continue;
+
+    var alertId = String(row[iAlertId] || "");
+    if (alertId) {
+      // executa “de verdade” (preview=false)
+      executarAlertaEtiquetaVektor({ alertId: alertId, preview: false });
+    }
+  }
+}
+
+// Busca robusta por header (evita quebrar quando mudarem posições)
+function queryTransacoesBaseClaraPorEtiqueta_(ini, fim, time, lojas, etiqueta) {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName("BaseClara");
+  if (!sh) return [];
+
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return [];
+
+  // =========================
+  // ÍNDICES FIXOS (0-based)
+  // BaseClara: A..W
+  // =========================
+  var I_DATA = 0;        // A - Data da Transação
+  var I_ESTAB = 2;       // C - Transação (Estabelecimento)
+  var I_VALOR_RS = 5;    // F - Valor em R$
+  var I_LOJA = 7;        // H - Alias Do Cartão (Loja)
+  var I_TIME = 17;       // R - Grupos (Time)
+  var I_ETIQUETAS = 19;  // T - Etiquetas
+  var I_DESC = 20;       // U - Descrição (Item comprado)
+
+  // Lê somente A..W (23 colunas)
+  var NUM_COLS = 23;
+  var values = sh.getRange(2, 1, lastRow - 1, NUM_COLS).getValues();
+
+  // Normalização
+  var norm = function (s) {
+    return String(s == null ? "" : s).trim().toLowerCase();
+  };
+
+  // Set de lojas permitidas (comparação por string exata normalizada)
+  var lojasSet = {};
+  (lojas || []).forEach(function (l) {
+    var x = String(l == null ? "" : l).trim();
+    if (x) lojasSet[norm(x)] = true;
+  });
+  var hasLojasFilter = Object.keys(lojasSet).length > 0;
+
+  // Etiqueta alvo (normalizada)
+  var etqTarget = norm(etiqueta);
+
+  // Se Etiquetas vier com múltiplos valores (ex.: "Alimentação, Viagem"),
+  // vamos considerar "match" se uma das etiquetas for exatamente igual ao alvo
+  var etiquetaMatch = function (cellValue) {
+    if (!etqTarget) return true;
+    var raw = String(cellValue == null ? "" : cellValue);
+    if (!raw.trim()) return false;
+
+    // separadores comuns
+    var parts = raw.split(/[,;|]+/).map(function (p) { return norm(p); }).filter(Boolean);
+    if (!parts.length) return (norm(raw) === etqTarget);
+
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i] === etqTarget) return true;
+    }
+    return false;
+  };
+
+  // Garantir que ini/fim são Date
+  var iniD = (ini instanceof Date) ? ini : new Date(ini);
+  var fimD = (fim instanceof Date) ? fim : new Date(fim);
+
+  if (!(iniD instanceof Date) || isNaN(iniD.getTime())) return [];
+  if (!(fimD instanceof Date) || isNaN(fimD.getTime())) return [];
+
+  var out = [];
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+  for (var i = 0; i < values.length; i++) {
+    var r = values[i];
+
+    var loja = String(r[I_LOJA] == null ? "" : r[I_LOJA]).trim();   // Alias do Cartão
+    var t = String(r[I_TIME] == null ? "" : r[I_TIME]).trim();     // Grupos
+    var etqCell = r[I_ETIQUETAS];
+
+    // Filtros: time e lojas
+    // ✅ "__ALL__" significa não filtrar time
+    if (time && time !== "__ALL__" && t !== time) continue;
+
+    if (hasLojasFilter) {
+      if (!loja) continue;
+      if (!lojasSet[norm(loja)]) continue;
+    }
+
+    // Filtro: etiqueta
+    if (!etiquetaMatch(etqCell)) continue;
+
+    // Data
+    var d = r[I_DATA];
+    var dObj = (d instanceof Date) ? d : new Date(d);
+    if (!(dObj instanceof Date) || isNaN(dObj.getTime())) continue;
+    if (dObj < iniD || dObj > fimD) continue;
+
+    // Valor (F pode vir como número ou string)
+    var v = r[I_VALOR_RS];
+    var valor = (typeof v === "number") ? v : Number(String(v || "").replace(/\./g, "").replace(",", "."));
+
+    out.push({
+      loja: loja,
+      time: t,
+      data: Utilities.formatDate(dObj, tz, "dd/MM/yyyy"),
+      estabelecimento: String(r[I_ESTAB] == null ? "" : r[I_ESTAB]),
+      valor: isNaN(valor) ? 0 : valor,
+      etiqueta: String(etqCell == null ? "" : etqCell),
+      descricao: String(r[I_DESC] == null ? "" : r[I_DESC])
+    });
+  }
+
+  return out;
+}
+
 /**
  * Busca demissões de gerentes (Senior/RH via BigQuery) a partir de uma data (inclusive).
  * Retorna colunas: matricula, des_email_corporativo, des_titulo_cargo,
