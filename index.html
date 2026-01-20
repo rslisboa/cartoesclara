@@ -3320,6 +3320,23 @@ function vektorDetectarFuncaoOrigem() {
   }
 }
 
+window.renderBotMessage = renderBotMessage;
+
+// ---- RELATÓRIO GERENCIAL LOOKER STUDIO EMBUTIDO NO CHAT (sem abrir nova aba)
+window.vektorAbrirRelatorioGerencialNoChat = function () {
+  try {
+    // Mesmo comportamento do comando "abrir relatório gerencial..."
+    renderBotMessage("HTML:" + htmlRelatorioGerencial);
+
+    if (typeof scrollToBottom === "function") {
+      setTimeout(scrollToBottom, 50);
+    }
+  } catch (e) {
+    console.warn("Falha ao abrir relatório gerencial no chat:", e);
+    renderBotMessage("Não consegui abrir o relatório gerencial no chat.");
+  }
+};
+
           // ========= EXPORTAÇÃO DE TABELA PARA CSV =========
 
   // Usado pelo botão "⬇ Exportar CSV" dentro das respostas com tabela.
@@ -7204,12 +7221,12 @@ function vektorSugerirTopicosGerais(msgOriginal) {
     ) {
       blocos.push(
         "<div style='margin-top:10px;'>" +
-          "<p>Se quiser uma visão completa (gráficos, filtros e detalhamentos), você pode abrir o relatório gerencial no <b>Looker Studio</b>:</p>" +
+          "<p>Se quiser uma visão completa (gráficos, filtros e detalhamentos), posso abrir o <b>relatório gerencial</b> aqui no chat:</p>" +
           "<button type='button' " +
-            "onclick=\"window.open('" + LOOKER_RELATORIO_URL + "','_blank')\" " +
+            "onclick=\"window.vektorAbrirRelatorioGerencialNoChat()\" " +
             "style='margin-top:6px;background:#005E27;color:#fff;border:none;" +
-                   "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
-            "Abrir relatório gerencial (Looker Studio)" +
+                  "padding:6px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;'>" +
+            "Abrir relatório gerencial no chat" +
           "</button>" +
         "</div>"
       );
@@ -17047,15 +17064,6 @@ function listarEtiquetasClara() {
 
         if (isCmdListaItens) {
 
-
-        // 🔒 Apenas Administrador
-        if (typeof USER_ROLE_REPLACED !== "undefined" && USER_ROLE_REPLACED !== "Administrador") {
-            renderBotMessage(
-                "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil <b>Administrador</b>.</p>"
-            );
-            return;
-        }
-
         // ✅ Caso geral (sem loja/time)
 if (/\bno\s+geral\b/i.test(norm)) {
   const periodo = extrairIntervaloDatas(texto);
@@ -17116,8 +17124,10 @@ if (/\bno\s+geral\b/i.test(norm)) {
             return;
         }
 
-        // ✅ remove "este mês / neste mês" que veio grudado no nome do time/loja
-        valor = valor.replace(/\b(neste|nesta|este|esta)\s+mes\b.*$/i, "").trim();
+        // ✅ remove "este mês / neste mês / esse mês / nesse mês" que veio grudado no nome do time/loja
+        valor = valor
+          .replace(/\b(neste|nesta|este|esta|nesse|nessa|esse|essa)\s+m[eê]s\b.*$/i, "")
+          .trim();
 
         if (!valor) {
             renderBotMessage(
@@ -17171,14 +17181,6 @@ const isCmdRelacaoSaldos = /^\s*rela[cç][aã]o\s+de\s+saldos\b/i.test(norm);
 
 if (isCmdRelacaoSaldos) {
 
-  // 🔒 Apenas Administrador
-  if (typeof USER_ROLE_REPLACED !== "undefined" && USER_ROLE_REPLACED !== "Administrador") {
-    renderBotMessage(
-      "HTML:<p class='text-sm text-slate-700'>Esse comando está disponível apenas para perfil <b>Administrador</b>.</p>"
-    );
-    return;
-  }
-
   let tipo = "geral";
 let valor = "";
 
@@ -17224,7 +17226,8 @@ if (/\b(no\s+geral|geral)\b/i.test(norm)) {
     })
     .withFailureHandler(function (err) {
       console.error(err);
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao consultar relação de saldos.</p>");
+      var msg = (err && (err.message || err.toString)) ? (err.message || String(err)) : "Falha ao consultar relação de saldos.";
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>" + msg + "</p>");
     })
     .getRelacaoSaldosClara(tipo, valor);
 
