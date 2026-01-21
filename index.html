@@ -917,6 +917,17 @@
         </div>
 
         <div>
+          <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
+            Horário do e-mail (opcional)
+          </label>
+          <input id="myAl_sendAt" type="time"
+            style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+          <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
+            Se vazio, o Vektor dispara assim que a frequência vencer.
+          </div>
+        </div>
+
+        <div>
           <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Time</label>
           <select id="myAl_team" style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
             <option value="__ALL__">Todos os times</option>
@@ -2843,13 +2854,17 @@ window.vektorMyAlertsCreate = function () {
 
     const freq = (document.getElementById("myAl_freq")?.value || "DAILY").trim();
 
-    // ✅ Janela: se vazio -> 30
+    // Janela: se vazio -> 30
     const winRaw = String(document.getElementById("myAl_windowDays")?.value || "").trim();
     const windowDays = Number(winRaw || 30) || 30;
 
+    // ATENÇÃO: time aqui é Time/Grupo
     const time = (document.getElementById("myAl_team")?.value || "").trim();
 
-    // ✅ Etiquetas: multi (select multiple) ou fallback input
+    // ✅ Horário do e-mail (opcional): "HH:mm" ou ""
+    const sendAt = String(document.getElementById("myAl_sendAt")?.value || "").trim();
+
+    // Etiquetas: multi (select multiple) ou fallback input
     const etiquetas = [];
     const labelEl = document.getElementById("myAl_label");
     if (labelEl) {
@@ -2878,14 +2893,25 @@ window.vektorMyAlertsCreate = function () {
     // validações mínimas
     if (!email) { setStatus("Não foi possível identificar seu e-mail."); return; }
     if (!time) { setStatus("Selecione um time."); return; }
-    // ✅ Se "Todos os times", não exige lojas (vale para todas)
-      if (time !== "__ALL__" && !lojas.length) {
-        setStatus("Selecione ao menos 1 loja.");
-        return;
-      }
-    if (windowDays < 1 || windowDays > 365) { setStatus("Janela de análise deve estar entre 1 e 365 dias."); return; }
 
-    // ✅ Overlay
+    // Se "Todos os times", não exige lojas
+    if (time !== "__ALL__" && !lojas.length) {
+      setStatus("Selecione ao menos 1 loja.");
+      return;
+    }
+
+    if (windowDays < 1 || windowDays > 365) {
+      setStatus("Janela de análise deve estar entre 1 e 365 dias.");
+      return;
+    }
+
+    // validação do horário (opcional)
+    if (sendAt && !/^\d{2}:\d{2}$/.test(sendAt)) {
+      setStatus("Horário inválido. Use HH:mm (ex.: 08:30).");
+      return;
+    }
+
+    // Overlay
     if (window.vektorMyAlertsShowLoading_) window.vektorMyAlertsShowLoading_("Criando alerta...", "Aguarde.");
 
     google.script.run
@@ -2917,13 +2943,19 @@ window.vektorMyAlertsCreate = function () {
         role: role,
         freq: freq,
         windowDays: windowDays,
+
+        // Time/Grupo
         time: time,
+
+        // ✅ horário do e-mail
+        sendAt: sendAt,
+
         lojas: lojas,
 
-        // multi (novo)
+        // multi
         etiquetas: etiquetasFinal,
 
-        // fallback (se seu Code.gs ainda espera string)
+        // fallback (se Code.gs ainda espera string)
         etiqueta: (etiquetasFinal[0] || "")
       });
 
