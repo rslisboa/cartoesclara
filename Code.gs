@@ -62,17 +62,24 @@ var props = PropertiesService.getScriptProperties();
   Logger.log("Limpou anti-spam do ciclo: " + cicloKey);
 }
 
-//function isAdminEmail(email) {
-  //if (!email) return false;
-  //email = email.toLowerCase();
+function isAdminEmail(email) {
+  try {
+    var e = String(email || "").trim().toLowerCase();
+    if (!e) return false;
 
-  //var ADM_EMAILS = [
-   // "rodrigo.lisboa@gruposbf.com.br",
-    //"tainara.nascimento@gruposbf.com.br"
-  //];
+    // RBAC: mapa de e-mails e roles
+    var map = vektorLoadEmailsRoleMap_(); // esperado: { byEmail: { "a@b": { role:"Administrador", ativo:true } } }
+    var rec = map && map.byEmail ? map.byEmail[e] : null;
 
-  //return ADM_EMAILS.indexOf(email) !== -1;
-//}
+    if (!rec) return false;
+    if (rec.ativo === false) return false;
+
+    var role = String(rec.role || "").trim().toLowerCase();
+    return role === "administrador";
+  } catch (err) {
+    return false;
+  }
+}
 
 // =======================
 // VEKTOR - CONTROLE DE ACESSO (WHITELIST) -- LIBERAR ACESSO AQUI!!!!!!!!!!!!!
@@ -676,17 +683,26 @@ function getOrCreateUserAlertsSheet_() {
   var name = "VEKTOR_USER_ALERTS";
   var sh = ss.getSheetByName(name);
   if (!sh) {
-    sh = ss.insertSheet(name);
-    sh.appendRow([
-      "alertId", "ownerEmail", "ownerRole",
-      "createdAt", "isActive",
-      "freq", "windowDays",
-      "time", "lojasCsv", "etiqueta",
-      "lastRunAt", "lastRowCount"
-    ]);
-  }
-  return sh;
-}
+  sh = ss.insertSheet(name);
+  sh.appendRow([
+    "alertId", "ownerEmail", "ownerRole",
+    "createdAt", "isActive",
+    "freq", "windowDays",
+    "time", "sendAt", "lojasCsv", "etiqueta",
+    "lastRunAt", "lastRowCount"
+  ]);
+    } else {
+      // MIGRAÇÃO: adiciona sendAt se não existir
+      var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+      if (head.indexOf("sendAt") < 0) {
+        // insere a coluna sendAt logo após "time"
+        var iTime = head.indexOf("time");
+        var insertPos = (iTime >= 0 ? iTime + 2 : head.length + 1); // 1-based
+        sh.insertColumnAfter(insertPos - 1);
+        sh.getRange(1, insertPos).setValue("sendAt");
+      }
+    }
+    return sh;}
 
 function getOrCreateUserAlertsRunsSheet_() {
   var logSh = getOrCreateAlertasLogSheet_();
@@ -773,6 +789,7 @@ function criarAlertaEtiquetaVektor(payload) {
     var freq = String(payload.freq || "DAILY").trim();
     var windowDays = Number(payload.windowDays || 30) || 30;
     var time = String(payload.time || "").trim();
+    var sendAt = String(payload.sendAt || "").trim(); // "HH:mm" ou vazio
 
     // ✅ novo: pode vir array (multi) OU string (legado)
     var etiquetasArr = Array.isArray(payload.etiquetas) ? payload.etiquetas.map(function(x){ return String(x || "").trim(); }) : [];
@@ -803,6 +820,9 @@ function criarAlertaEtiquetaVektor(payload) {
     if (windowDays < 1 || windowDays > 365) return { ok:false, error:"Janela inválida (1..365)." };
 
     if (["DAILY","3D","WEEKLY","MONTHLY"].indexOf(freq) < 0) return { ok:false, error:"Frequência inválida." };
+    if (sendAt && !/^\d{2}:\d{2}$/.test(sendAt)) {
+      return { ok:false, error:"Horário inválido. Use HH:mm (ex.: 08:30)." };
+    }
 
     var sh = getOrCreateUserAlertsSheet_();
     var alertId = "AL" + Utilities.getUuid().replace(/-/g,"").slice(0, 12).toUpperCase();
@@ -817,6 +837,7 @@ function criarAlertaEtiquetaVektor(payload) {
       freq,
       windowDays,
       time,
+      sendAt,
       lojas.join(","),
       etiquetaFinalCsv, // ✅ agora pode ser vazio (todas) ou "A | B | C"
       "",   // lastRunAt
@@ -1123,6 +1144,112 @@ function excluirAlertaVektor(req) {
   }
 }
 
+function buildAlertXlsxAttachment_(alertId, periodo, rows) {
+  // 1. Cria planilha temporária
+  var ss = SpreadsheetApp.create("Vektor_Alerta_" + alertId);
+  var sh = ss.getSheets()[0];
+  sh.setName("Alerta");
+
+  var header = ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
+  sh.getRange(1, 1, 1, header.length).setValues([header]);
+
+  if (rows && rows.length) {
+    var values = rows.map(function (r) {
+      return [
+        r.loja || "",
+        r.time || "",
+        r.data || "",
+        r.estabelecimento || "",
+        r.valor || "",
+        r.etiqueta || "",
+        r.descricao || ""
+      ];
+    });
+    sh.getRange(2, 1, values.length, header.length).setValues(values);
+  }
+
+  sh.setFrozenRows(1);
+  try { sh.autoResizeColumns(1, header.length); } catch (_) {}
+
+  var fileId = ss.getId();
+
+  // 2. EXPORTAÇÃO REAL PARA XLSX (isso é o que faltava)
+  var url = "https://www.googleapis.com/drive/v3/files/" + fileId + "/export" +
+            "?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+  var token = ScriptApp.getOAuthToken();
+  var resp = UrlFetchApp.fetch(url, {
+    headers: {
+      Authorization: "Bearer " + token
+    },
+    muteHttpExceptions: true
+  });
+
+  // 3. Blob XLSX válido
+  var blob = resp.getBlob().setName(
+    "Vektor - Alerta " + alertId +
+    " (" + periodo.inicio + " a " + periodo.fim + ").xlsx"
+  );
+
+  // 4. Limpa a planilha temporária
+  try {
+    DriveApp.getFileById(fileId).setTrashed(true);
+  } catch (_) {}
+
+  return blob;
+}
+
+function buildAlertAttachmentSmart_(alertId, periodo, rows) {
+  // Heurística simples: se for muita linha, já vai de CSV
+  // Ajuste esses limites conforme seu volume real.
+  var CSV_ROW_LIMIT = 8000; // acima disso, XLSX tende a ficar grande/lento
+  var CSV_SIZE_LIMIT_BYTES = 18 * 1024 * 1024; // ~18MB (buffer abaixo do limite do Gmail)
+
+  // Se muito grande em linhas, já retorna CSV
+  if (rows && rows.length > CSV_ROW_LIMIT) {
+    return buildAlertCsvAttachment_(alertId, periodo, rows);
+  }
+
+  // Tenta XLSX e, se passar do tamanho, cai pra CSV
+  var xlsx = buildAlertXlsxAttachment_(alertId, periodo, rows);
+  if (xlsx && xlsx.getBytes && xlsx.getBytes().length > CSV_SIZE_LIMIT_BYTES) {
+    return buildAlertCsvAttachment_(alertId, periodo, rows);
+  }
+
+  return xlsx;
+}
+
+function buildAlertCsvAttachment_(alertId, periodo, rows) {
+  var esc = function (s) {
+    // CSV com aspas e escape de aspas duplas
+    var t = String(s == null ? "" : s);
+    t = t.replace(/"/g, '""');
+    return '"' + t + '"';
+  };
+
+  var header = ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
+  var lines = [];
+  lines.push(header.map(esc).join(";")); // separador ; (pt-BR)
+
+  (rows || []).forEach(function (r) {
+    lines.push([
+      r.loja || "",
+      r.time || "",
+      r.data || "",
+      r.estabelecimento || "",
+      r.valor || "",
+      r.etiqueta || "",
+      r.descricao || ""
+    ].map(esc).join(";"));
+  });
+
+  var csv = lines.join("\n");
+
+  return Utilities.newBlob(csv, "text/csv", 
+    "Vektor - Alerta " + alertId + " (" + periodo.inicio + " a " + periodo.fim + ").csv"
+  );
+}
+
 // Executa 1 alerta (preview=true: para uso do front; preview=false: para execução agendada)
 function executarAlertaEtiquetaVektor(req) {
   try {
@@ -1132,6 +1259,8 @@ function executarAlertaEtiquetaVektor(req) {
 
     var sh = getOrCreateUserAlertsSheet_();
     var values = sh.getDataRange().getValues();
+    if (!values || values.length < 2) return { ok: false, error: "Base de alertas vazia." };
+
     var head = values[0].map(String);
     var idx = function (name) { return head.indexOf(name); };
 
@@ -1142,7 +1271,7 @@ function executarAlertaEtiquetaVektor(req) {
     var iWin      = idx("windowDays");
     var iTime     = idx("time");
     var iLojas    = idx("lojasCsv");
-    var iEtq      = idx("etiqueta");     // agora pode ser "" ou "A | B | C"
+    var iEtq      = idx("etiqueta");
     var iLastRun  = idx("lastRunAt");
     var iLastCnt  = idx("lastRowCount");
 
@@ -1156,22 +1285,26 @@ function executarAlertaEtiquetaVektor(req) {
     var isActive = (row[iActive] === true);
     if (!isActive && !preview) return { ok: true, skipped: true, reason: "inativo" };
 
-    var ownerEmail = String(row[iOwner] || "");
-    var freq = String(row[iFreq] || "DAILY");
+    var ownerEmail = String(row[iOwner] || "").trim();
+    var freq = String(row[iFreq] || "DAILY").trim();
     var windowDays = Number(row[iWin] || 30) || 30;
-    var time = String(row[iTime] || "");
-    var lojas = String(row[iLojas] || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
+
+    // ATENÇÃO: "time" aqui é o Time/Grupo (não é horário)
+    var time = String(row[iTime] || "").trim();
+    var lojas = String(row[iLojas] || "")
+      .split(",").map(function (s) { return String(s || "").trim(); }).filter(Boolean);
 
     // Etiquetas: "" => todas | "A | B | C" => múltiplas
     var etiquetaCsv = String(row[iEtq] || "").trim();
     var etiquetas = etiquetaCsv
       ? etiquetaCsv.split("|").map(function (s) { return String(s || "").trim(); }).filter(Boolean)
-      : []; // vazio = todas
+      : [];
 
     // Período: últimos N dias
     var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
     var now = new Date();
     var ini = new Date(now.getTime() - (windowDays * 24 * 60 * 60 * 1000));
+
     var periodo = {
       inicio: Utilities.formatDate(ini, tz, "dd/MM/yyyy"),
       fim: Utilities.formatDate(now, tz, "dd/MM/yyyy")
@@ -1180,10 +1313,10 @@ function executarAlertaEtiquetaVektor(req) {
     // Busca transações na BaseClara
     var rows = [];
     if (!etiquetas.length) {
-      // ✅ todas as etiquetas
+      // todas as etiquetas
       rows = queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, "");
     } else {
-      // ✅ múltiplas etiquetas (OR)
+      // múltiplas etiquetas (OR)
       var acc = [];
       etiquetas.forEach(function (et) {
         acc = acc.concat(queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, et));
@@ -1192,12 +1325,13 @@ function executarAlertaEtiquetaVektor(req) {
     }
 
     // Atualiza lastRunAt/lastRowCount
-    sh.getRange(rowIdx + 1, iLastRun + 1).setValue(now);
-    sh.getRange(rowIdx + 1, iLastCnt + 1).setValue(rows.length);
+    if (iLastRun >= 0) sh.getRange(rowIdx + 1, iLastRun + 1).setValue(now);
+    if (iLastCnt >= 0) sh.getRange(rowIdx + 1, iLastCnt + 1).setValue(rows.length);
 
-    // Log de execução (guarda preview de no máx. 60 linhas para não explodir célula)
+    // Log de execução (guarda preview de no máx. 60 linhas)
     var runsSh = getOrCreateUserAlertsRunsSheet_();
     var previewRows = rows.slice(0, 60);
+
     runsSh.appendRow([
       "RUN" + Utilities.getUuid().replace(/-/g, "").slice(0, 10).toUpperCase(),
       alertId,
@@ -1209,15 +1343,42 @@ function executarAlertaEtiquetaVektor(req) {
       JSON.stringify(previewRows)
     ]);
 
+   // ✅ Envio de e-mail SOMENTE quando NÃO for preview
+    if (!preview) {
+      try {
+        var assunto = "[Vektor - Grupo SBF] Alerta de transações Clara — " +
+          periodo.inicio + " a " + periodo.fim;
+
+        var htmlBody = montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows);
+        var attachment = buildAlertAttachmentSmart_(alertId, periodo, rows);
+
+        if (ownerEmail) {
+          MailApp.sendEmail({
+            name: "Vektor - Grupo SBF",
+            to: ownerEmail,
+            subject: assunto,
+            htmlBody: htmlBody,
+            attachments: [attachment]
+          });
+        } else {
+          Logger.log("Alerta " + alertId + " sem ownerEmail: não enviou e-mail.");
+        }
+      } catch (mailErr) {
+        Logger.log(
+          "Falha ao enviar e-mail do alerta " + alertId + ": " +
+          (mailErr && mailErr.message ? mailErr.message : mailErr)
+        );
+      }
+    }
+
     return {
       ok: true,
       alertId: alertId,
       ownerEmail: ownerEmail,
       freq: freq,
       time: time,
-      // para o front exibir:
-      etiqueta: etiquetaCsv || "", // "" significa "todas"
-      etiquetaCount: etiquetas.length, // 0 = todas
+      etiqueta: etiquetaCsv || "",
+      etiquetaCount: etiquetas.length,
       periodo: periodo,
       rows: previewRows
     };
@@ -1227,44 +1388,175 @@ function executarAlertaEtiquetaVektor(req) {
   }
 }
 
+function montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows) {
+  var esc = function (s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  };
+
+  var etiquetaTxt = etiquetaCsv ? esc(etiquetaCsv) : "Todas";
+  var max = 120; // evita e-mails gigantes
+  var view = (rows || []).slice(0, max);
+
+  // Soma do valor total no período
+  var totalValor = 0;
+  (rows || []).forEach(function (r) {
+    // remove R$, pontos e troca vírgula por ponto
+    var v = String(r.valor || "")
+      .replace(/[R$\s]/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".");
+    var n = Number(v);
+    if (!isNaN(n)) totalValor += n;
+  });
+
+  // Formatação BRL
+  var totalValorFmt = totalValor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+
+  var h = "";
+  h += "<div style='font-family:Arial,sans-serif;font-size:13px;color:#0f172a'>";
+  h += "<h2 style='margin:0 0 8px 0'>Vektor — Alerta automático</h2>";
+  h += "<div style='margin:0 0 10px 0'>";
+  h += "<b>ID:</b> " + esc(alertId) + "<br/>";
+  h += "<b>Time:</b> " + esc(time) + "<br/>";
+  h += "<b>Etiqueta:</b> " + etiquetaTxt + "<br/>";
+  h += "<b>Período:</b> " + esc(periodo.inicio) + " a " + esc(periodo.fim) + "<br/>";
+  h += "<b>Total de linhas:</b> " + esc((rows || []).length) + (rows.length > max ? " (mostrando " + max + ")" : "") + "<br/>";
+  h += "<b>Valor total no período analisado:</b> " + esc(totalValorFmt);
+  h += "</div>";
+
+  if (!view.length) {
+    h += "<div style='padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc'>";
+    h += "Nenhuma transação encontrada para este alerta no período.";
+    h += "</div></div>";
+    return h;
+  }
+
+  h += "<div style='overflow:auto;border:1px solid #e2e8f0;border-radius:10px'>";
+  h += "<table style='border-collapse:collapse;width:100%'>";
+  h += "<thead><tr style='background:#0b1220;color:#fff'>";
+  ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"].forEach(function(c){
+    h += "<th style='text-align:left;padding:8px;border:1px solid #111827;font-size:12px;white-space:nowrap'>" + c + "</th>";
+  });
+  h += "</tr></thead><tbody>";
+
+  view.forEach(function(r){
+    h += "<tr>";
+    h += "<td style='padding:6px;border:1px solid #e2e8f0;white-space:nowrap'>" + esc(r.loja) + "</td>";
+    h += "<td style='padding:6px;border:1px solid #e2e8f0;white-space:nowrap'>" + esc(r.time) + "</td>";
+    h += "<td style='padding:6px;border:1px solid #e2e8f0;white-space:nowrap'>" + esc(r.data) + "</td>";
+    h += "<td style='padding:6px;border:1px solid #e2e8f0'>" + esc(r.estabelecimento) + "</td>";
+    h += "<td style='padding:6px;border:1px solid #e2e8f0;white-space:nowrap;text-align:right'>" + esc(r.valor) + "</td>";
+    h += "<td style='padding:6px;border:1px solid #e2e8f0'>" + esc(r.etiqueta) + "</td>";
+    h += "<td style='padding:6px;border:1px solid #e2e8f0'>" + esc(r.descricao) + "</td>";
+    h += "</tr>";
+  });
+
+  h += "</tbody></table></div></div>";
+  return h;
+}
+
 // Gatilho diário (você cria no editor de Apps Script como time-driven 1x por dia)
-function RUN_USER_ALERTS_DAILY() {
+function RUN_USER_ALERTS_SCHEDULER() {
   var sh = getOrCreateUserAlertsSheet_();
   var values = sh.getDataRange().getValues();
   if (values.length < 2) return;
 
   var head = values[0].map(String);
-  var iAlertId = head.indexOf("alertId");
-  var iActive = head.indexOf("isActive");
-  var iFreq = head.indexOf("freq");
-  var iLastRun = head.indexOf("lastRunAt");
+  var idx = function(n){ return head.indexOf(n); };
 
+  var iAlertId = idx("alertId");
+  var iActive  = idx("isActive");
+  var iFreq    = idx("freq");
+  var iLastRun = idx("lastRunAt");
+  var iSendAt  = idx("sendAt");
+
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
   var now = new Date();
 
   for (var r=1; r<values.length; r++) {
     var row = values[r];
     if (row[iActive] !== true) continue;
 
-    var freq = String(row[iFreq] || "DAILY");
-    var lastRun = row[iLastRun] instanceof Date ? row[iLastRun] : null;
+    var alertId = String(row[iAlertId] || "").trim();
+    if (!alertId) continue;
 
-    // Decide se está “due”
-    var due = false;
-    if (!lastRun) due = true;
-    else {
-      var days = Math.floor((now.getTime() - lastRun.getTime()) / (24*60*60*1000));
-      if (freq === "DAILY") due = (days >= 1);
-      else if (freq === "3D") due = (days >= 3);
-      else if (freq === "WEEKLY") due = (days >= 7);
-    }
-    if (!due) continue;
+    var freq = String(row[iFreq] || "DAILY").trim();
+    var lastRun = (row[iLastRun] instanceof Date) ? row[iLastRun] : null;
 
-    var alertId = String(row[iAlertId] || "");
-    if (alertId) {
-      // executa “de verdade” (preview=false)
-      executarAlertaEtiquetaVektor({ alertId: alertId, preview: false });
-    }
+    var sendAtRaw = (iSendAt >= 0) ? row[iSendAt] : "";
+    if (!isDueBySchedule_(freq, lastRun, sendAtRaw, now, tz)) continue;
+
+    executarAlertaEtiquetaVektor({ alertId: alertId, preview: false });
   }
+}
+
+function parseSendAt_(v, tz) {
+  // Retorna {hh, mm} ou null
+  if (v == null || v === "") return null;
+
+  // Caso 1: string "HH:mm"
+  if (typeof v === "string") {
+    var s = v.trim();
+    var m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (m) {
+      var hh = Number(m[1]), mm = Number(m[2]);
+      if (hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) return { hh: hh, mm: mm };
+    }
+    return null;
+  }
+
+  // Caso 2: Date (Sheets pode guardar horário como Date)
+  if (Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime())) {
+    // Extrai hora/minuto no timezone do script
+    var hh2 = Number(Utilities.formatDate(v, tz, "H"));
+    var mm2 = Number(Utilities.formatDate(v, tz, "m"));
+    return { hh: hh2, mm: mm2 };
+  }
+
+  // Caso 3: número (fração do dia): 0.583333 = 14:00
+  if (typeof v === "number" && isFinite(v)) {
+    var totalMinutes = Math.round(v * 24 * 60);
+    var hh3 = Math.floor(totalMinutes / 60) % 24;
+    var mm3 = totalMinutes % 60;
+    return { hh: hh3, mm: mm3 };
+  }
+
+  return null;
+}
+
+function isDueBySchedule_(freq, lastRun, sendAtRaw, now, tz) {
+  // sendAtRaw pode ser string, number, Date
+  var t = parseSendAt_(sendAtRaw, tz);
+
+  // Se tem horário, só permite disparo depois daquele horário no "dia atual"
+  if (t) {
+    var todayAt = new Date(now);
+    todayAt.setHours(t.hh, t.mm, 0, 0);
+
+    // Compara em "relógio local" do script
+    if (now.getTime() < todayAt.getTime()) return false;
+  }
+
+  // Nunca rodou → pode rodar (desde que passou do horário, se houver)
+  if (!(lastRun instanceof Date) || isNaN(lastRun.getTime())) return true;
+
+  var diffMs = now.getTime() - lastRun.getTime();
+  var diffDays = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+
+  if (freq === "DAILY") return diffDays >= 1;
+  if (freq === "3D") return diffDays >= 3;
+  if (freq === "WEEKLY") return diffDays >= 7;
+
+  if (freq === "MONTHLY") {
+    return now.getFullYear() !== lastRun.getFullYear() || now.getMonth() !== lastRun.getMonth();
+  }
+
+  return false;
 }
 
 // Busca robusta por header (evita quebrar quando mudarem posições)
@@ -4256,7 +4548,7 @@ function enviarAlertasLimitesClaraDiario() {
 }
 
   // Segurança: só roda para Admin
-  var email = Session.getActiveUser().getEmail();
+  var email = Session.getEffectiveUser().getEmail();
   if (!isAdminEmail(email)) {
     return { ok: false, error: "Acesso restrito: apenas Administrador pode disparar alertas." };
   }
