@@ -959,7 +959,7 @@
         </div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-          <button type="button" onclick="window.vektorMyAlertsCreate()"
+          <button id="myAl_saveBtn" type="button" onclick="window.vektorMyAlertsCreate()"
             style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;">
             Criar alerta
           </button>
@@ -2667,7 +2667,14 @@ window.vektorMyAlertsInit_ = function () {
 
   google.script.run
     .withSuccessHandler(function (res) {
-      if (!res || !res.ok) return;
+      // ✅ NÃO falhar silencioso
+      if (!res || !res.ok) {
+        const msg = "Falha ao carregar Times/Lojas: " + (res && res.error ? res.error : "sem permissão ou erro desconhecido");
+        if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
+        return;
+      }
+
+      window.__myAl_lojasPorTime = res.lojasPorTime || {};
 
       // popula times
       const teamSel = document.getElementById("myAl_team");
@@ -2684,40 +2691,51 @@ window.vektorMyAlertsInit_ = function () {
         });
 
         teamSel.onchange = function () {
-        const val = String(teamSel.value || "").trim();
-        const box = document.getElementById("myAl_storesBox");
+          const val = String(teamSel.value || "").trim();
+          const box = document.getElementById("myAl_storesBox");
 
-        if (val === "__ALL__") {
-          // ✅ Todos os times => todas as lojas (não precisa selecionar nada)
-          if (box) {
-            box.innerHTML =
-              "<div style='opacity:0.95; font-size:12px; font-weight:900; color:#B5FF20;'>Aplicado para todas as lojas</div>" +
-              "<div style='opacity:0.75; font-size:11px; margin-top:4px; color:#E2E8F0;'>Selecione um time específico para escolher lojas.</div>";
+          if (val === "__ALL__") {
+            // ✅ Todos os times => todas as lojas (não precisa selecionar nada)
+            if (box) {
+              box.innerHTML =
+                "<div style='opacity:0.95; font-size:12px; font-weight:900; color:#B5FF20;'>Aplicado para todas as lojas</div>" +
+                "<div style='opacity:0.75; font-size:11px; margin-top:4px; color:#E2E8F0;'>Selecione um time específico para escolher lojas.</div>";
 
-            // efeito visual de desativado
-            box.style.pointerEvents = "none";
-            box.style.opacity = "0.75";
+              // efeito visual de desativado
+              box.style.pointerEvents = "none";
+              box.style.opacity = "0.75";
+            }
+            return;
           }
-          return;
-        }
 
-        // ✅ Time específico => habilita e renderiza lojas
-        if (box) {
-          box.style.pointerEvents = "auto";
-          box.style.opacity = "1";
-        }
-        window.vektorMyAlertsRenderStores_(res.lojasPorTime || {}, val);
+          // ✅ Time específico => habilita e renderiza lojas
+          if (box) {
+            box.style.pointerEvents = "auto";
+            box.style.opacity = "1";
+          }
+          window.vektorMyAlertsRenderStores_(window.__myAl_lojasPorTime || {}, val);
         };
       }
 
       // default: limpa lojas
-      window.vektorMyAlertsRenderStores_(res.lojasPorTime || {}, "");
+      window.vektorMyAlertsRenderStores_(window.__myAl_lojasPorTime || {}, "");
+    })
+    .withFailureHandler(function (err) {
+      const msg = "Erro ao carregar Times/Lojas: " + (err && err.message ? err.message : err);
+      if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
     })
     .getTimesELojasParaAlertasVektor(); // Code.gs
 
   // 1.1) carrega etiquetas
   google.script.run
     .withSuccessHandler(function (res2) {
+      // ✅ NÃO falhar silencioso
+      if (!res2 || !res2.ok) {
+        const msg = "Falha ao carregar Etiquetas: " + (res2 && res2.error ? res2.error : "sem permissão ou erro desconhecido");
+        if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
+        return;
+      }
+
       const sel = document.getElementById("myAl_label");
       if (!sel) return;
 
@@ -2729,7 +2747,7 @@ window.vektorMyAlertsInit_ = function () {
       opAll.textContent = "Todas";
       sel.appendChild(opAll);
 
-      (res2 && res2.ok ? (res2.etiquetas || []) : []).forEach(function (t) {
+      (res2.etiquetas || []).forEach(function (t) {
         const op = document.createElement("option");
         op.value = t;
         op.textContent = t;
@@ -2740,41 +2758,47 @@ window.vektorMyAlertsInit_ = function () {
       sel.onchange = function () {
         const pickedAll = Array.from(sel.selectedOptions || []).some(op => op.value === "__ALL__");
         if (!pickedAll) return;
-
         Array.from(sel.options || []).forEach(op => { op.selected = true; });
       };
+    })
+    .withFailureHandler(function (err) {
+      const msg = "Erro ao carregar Etiquetas: " + (err && err.message ? err.message : err);
+      if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
     })
     .getEtiquetasDisponiveisVektor();
 
   // ✅ Filtros Admin: popular "Área" + atualizar lista ao mudar filtros
-try {
-  const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "");
-  const isAdmin = (roleTxt.trim().toLowerCase() === "administrador");
+  try {
+    const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "");
+    const isAdmin = (roleTxt.trim().toLowerCase() === "administrador");
 
-  const emailInp = document.getElementById("myAl_adminEmail");
-  const roleSel  = document.getElementById("myAl_adminRole");
+    const emailInp = document.getElementById("myAl_adminEmail");
+    const roleSel  = document.getElementById("myAl_adminRole");
 
-  // listeners (funciona mesmo se o box estiver hidden; quando aparecer já está ligado)
-  if (emailInp) emailInp.oninput = function () { window.vektorMyAlertsRefresh(); };
-  if (roleSel)  roleSel.onchange = function () { window.vektorMyAlertsRefresh(); };
+    if (emailInp) emailInp.oninput = function () { window.vektorMyAlertsRefresh(); };
+    if (roleSel)  roleSel.onchange = function () { window.vektorMyAlertsRefresh(); };
 
-  // popula as áreas só para Admin
-  if (isAdmin && roleSel && typeof google !== "undefined" && google.script && google.script.run) {
-    roleSel.innerHTML = "<option value=''>Todas as áreas</option>";
+    // popula as áreas só para Admin
+    if (isAdmin && roleSel && typeof google !== "undefined" && google.script && google.script.run) {
+      roleSel.innerHTML = "<option value=''>Todas as áreas</option>";
 
-    google.script.run
-      .withSuccessHandler(function (r) {
-        if (!r || !r.ok) return;
-        (r.roles || []).forEach(function (name) {
-          const op = document.createElement("option");
-          op.value = name;
-          op.textContent = name;
-          roleSel.appendChild(op);
-        });
-      })
-      .getRolesParaFiltroAlertasVektor();
-  }
-} catch (_) {}
+      google.script.run
+        .withSuccessHandler(function (r) {
+          if (!r || !r.ok) return;
+          (r.roles || []).forEach(function (name) {
+            const op = document.createElement("option");
+            op.value = name;
+            op.textContent = name;
+            roleSel.appendChild(op);
+          });
+        })
+        .withFailureHandler(function (err) {
+          const msg = "Erro ao carregar Áreas (Admin): " + (err && err.message ? err.message : err);
+          if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
+        })
+        .getRolesParaFiltroAlertasVektor();
+    }
+  } catch (_) {}
 
   // 2) carrega lista
   window.vektorMyAlertsRefresh();
@@ -2857,13 +2881,13 @@ window.vektorMyAlertsCreate = function () {
     const winRaw = String(document.getElementById("myAl_windowDays")?.value || "").trim();
     const windowDays = Number(winRaw || 30) || 30;
 
-    // ATENÇÃO: time aqui é Time/Grupo
+    // Time / Grupo
     const time = (document.getElementById("myAl_team")?.value || "").trim();
 
-    // ✅ Horário do e-mail (opcional): "HH:mm" ou ""
+    // Horário (HH:mm)
     const sendAt = String(document.getElementById("myAl_sendAt")?.value || "").trim();
 
-    // Etiquetas: multi (select multiple) ou fallback input
+    // Etiquetas
     const etiquetas = [];
     const labelEl = document.getElementById("myAl_label");
     if (labelEl) {
@@ -2881,6 +2905,7 @@ window.vektorMyAlertsCreate = function () {
     const isAll = etiquetas.includes("__ALL__");
     const etiquetasFinal = isAll ? [] : etiquetas.filter(x => x && x !== "__ALL__");
 
+    // Lojas
     const storesBox = document.getElementById("myAl_storesBox");
     const lojas = [];
     if (storesBox) {
@@ -2889,11 +2914,10 @@ window.vektorMyAlertsCreate = function () {
       });
     }
 
-    // validações mínimas
+    // Validações
     if (!email) { setStatus("Não foi possível identificar seu e-mail."); return; }
     if (!time) { setStatus("Selecione um time."); return; }
 
-    // Se "Todos os times", não exige lojas
     if (time !== "__ALL__" && !lojas.length) {
       setStatus("Selecione ao menos 1 loja.");
       return;
@@ -2904,16 +2928,36 @@ window.vektorMyAlertsCreate = function () {
       return;
     }
 
-    // validação do horário (opcional)
     if (sendAt && !/^\d{2}:\d{2}$/.test(sendAt)) {
       setStatus("Horário inválido. Use HH:mm (ex.: 08:30).");
       return;
     }
 
-    // Overlay
-    if (window.vektorMyAlertsShowLoading_) window.vektorMyAlertsShowLoading_("Criando alerta...", "Aguarde.");
+    const editingId = window.__myAl_editingAlertId ? String(window.__myAl_editingAlertId) : "";
 
-    google.script.run
+    // Overlay
+    if (window.vektorMyAlertsShowLoading_) {
+      window.vektorMyAlertsShowLoading_(
+        editingId ? "Salvando edição..." : "Criando alerta...",
+        "Aguarde."
+      );
+    }
+
+    // Payload
+    const payload = {
+      email: email,
+      role: role,
+      freq: freq,
+      windowDays: windowDays,
+      time: time,
+      sendAt: sendAt,
+      lojas: lojas,
+      etiquetas: etiquetasFinal,
+      etiqueta: (etiquetasFinal[0] || "")
+    };
+
+    // ✅ CORREÇÃO CRÍTICA: handlers ligados à chamada real
+    const runner = google.script.run
       .withSuccessHandler(function (res) {
         if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
 
@@ -2924,44 +2968,38 @@ window.vektorMyAlertsCreate = function () {
           return;
         }
 
-        const okMsg = "Alerta criado com sucesso. ID: " + res.alertId;
-        setStatus(okMsg);
-        if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Alerta criado com sucesso!", "success");
+        if (editingId) {
+          setStatus("Alerta atualizado com sucesso. ID mantido: " + editingId);
+          if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Alerta atualizado com sucesso!", "success");
+          window.__myAl_editingAlertId = "";
+          const btn = document.getElementById("myAl_saveBtn");
+          if (btn) btn.textContent = "Criar alerta";
+        } else {
+          setStatus("Alerta criado com sucesso. ID: " + (res.alertId || "—"));
+          if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Alerta criado com sucesso!", "success");
+        }
 
         window.vektorMyAlertsRefresh();
       })
       .withFailureHandler(function (err) {
         if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
-
         const msg = "Erro: " + (err && err.message ? err.message : err);
         setStatus(msg);
         if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
-      })
-      .criarAlertaEtiquetaVektor({
-        email: email,
-        role: role,
-        freq: freq,
-        windowDays: windowDays,
-
-        // Time/Grupo
-        time: time,
-
-        // ✅ horário do e-mail
-        sendAt: sendAt,
-
-        lojas: lojas,
-
-        // multi
-        etiquetas: etiquetasFinal,
-
-        // fallback (se Code.gs ainda espera string)
-        etiqueta: (etiquetasFinal[0] || "")
       });
+
+    // 🔥 chamada REAL
+    if (editingId) {
+      payload.alertId = editingId;
+      runner.atualizarAlertaEtiquetaVektor(payload);
+    } else {
+      runner.criarAlertaEtiquetaVektor(payload);
+    }
 
   } catch (e) {
     if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
-    setStatus("Erro inesperado ao criar alerta.");
-    if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Erro inesperado ao criar alerta.", "error");
+    setStatus("Erro inesperado ao salvar alerta.");
+    if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Erro inesperado ao salvar alerta.", "error");
   }
 };
 
@@ -3028,6 +3066,80 @@ window.vektorMyAlertsDelete = function(alertId) {
     .excluirAlertaVektor({ alertId: alertId, email: email, role: role });
 };
 
+window.vektorMyAlertsStartEdit_ = function (a) {
+  if (!a || !a.alertId) return;
+
+  window.__myAl_editingAlertId = String(a.alertId);
+
+  // muda texto do botão
+  const btn = document.getElementById("myAl_saveBtn");
+  if (btn) btn.textContent = "Salvar edição";
+
+  // status
+  const st = document.getElementById("myAl_createStatus");
+  if (st) st.textContent = "Editando alerta " + a.alertId + " (não será gerado novo ID).";
+
+  // freq
+  const freqEl = document.getElementById("myAl_freq");
+  if (freqEl && a.freq) freqEl.value = a.freq;
+
+  // janela
+  const winEl = document.getElementById("myAl_windowDays");
+  if (winEl) winEl.value = String(a.windowDays || 30);
+
+  // hora
+  const sendAtEl = document.getElementById("myAl_sendAt");
+  if (sendAtEl) sendAtEl.value = String(a.sendAt || "").trim();
+
+  // time (isso re-renderiza lojas)
+  const teamSel = document.getElementById("myAl_team");
+  if (teamSel) {
+    teamSel.value = String(a.time || "").trim();
+    if (typeof teamSel.onchange === "function") teamSel.onchange();
+  }
+
+  // etiquetas (multi)
+  const labelEl = document.getElementById("myAl_label");
+  if (labelEl && labelEl.tagName === "SELECT") {
+    const raw = String(a.etiqueta || "").trim(); // "A | B | C" ou ""
+    const tags = raw
+      ? raw.split("|").map(s => String(s || "").trim()).filter(Boolean)
+      : [];
+
+    // limpa seleção
+    Array.from(labelEl.options || []).forEach(op => { op.selected = false; });
+
+    if (!tags.length) {
+      // “todas”
+      Array.from(labelEl.options || []).forEach(op => { op.selected = true; });
+    } else {
+      const set = {};
+      tags.forEach(t => { set[t] = true; });
+      Array.from(labelEl.options || []).forEach(op => {
+        if (set[String(op.value || "").trim()]) op.selected = true;
+      });
+    }
+  }
+
+  // lojas: precisa do DOM já renderizado
+  const lojasCsv = String(a.lojasCsv || "");
+  const lojas = lojasCsv ? lojasCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
+
+  if (String(a.time || "").trim() !== "__ALL__") {
+    const box = document.getElementById("myAl_storesBox");
+    if (box) {
+      // marca checkboxes após render
+      box.querySelectorAll("input[type='checkbox'][data-loja]").forEach(cb => {
+        const l = cb.getAttribute("data-loja");
+        cb.checked = (lojas.indexOf(l) >= 0);
+      });
+    }
+  }
+
+  // opcional: levar o usuário para o topo do formulário
+  try { document.getElementById("myAlertsView")?.scrollTo?.(0, 0); } catch (_) {}
+};
+
 window.vektorMyAlertsRefresh = function () {
   const list = document.getElementById("myAl_list");
   if (list) {
@@ -3087,6 +3199,10 @@ window.vektorMyAlertsRefresh = function () {
             ? String(a.etiquetaLabel)
             : ((a.etiqueta && String(a.etiqueta).trim()) ? String(a.etiqueta).trim() : "Todas");
 
+            const horaLabel = (a.sendAt && String(a.sendAt).trim())
+          ? String(a.sendAt).trim()
+          : "Imediato";
+
         const head =
           "<div style='display:flex; justify-content:space-between; gap:10px; align-items:flex-start;'>" +
             "<div>" +
@@ -3097,30 +3213,39 @@ window.vektorMyAlertsRefresh = function () {
                 " &nbsp; <b>Lojas:</b> " + lojasLabel +
                 " &nbsp; <b>Freq:</b> " + (a.freqLabel || a.freq || "—") +
               "</div>" +
-              "<div style='opacity:0.75; margin-top:2px;'>" +
-                "<b>Dono:</b> " + (a.ownerEmail || "—") +
-                " &nbsp; <b>Última execução:</b> " + (a.lastRunAt || "—") +
-              "</div>" +
+
+            "<div style='opacity:0.75; margin-top:2px;'>" +
+              "<b>Dono:</b> " + (a.ownerEmail || "—") +
+              " &nbsp; <b>Hora:</b> " + horaLabel +
+              " &nbsp; <b>Última execução:</b> " + (a.lastRunAt || "—") +
+            "</div>" +
             "</div>" +
 
-            "<div style='display:flex; gap:8px;'>" +
+            "<div style='display:flex; gap:8px; align-items:flex-start;'>" +
 
-              "<button type='button' data-id='" + a.alertId + "' class='myAl_runBtn' " +
-                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;'>" +
-                "Executar</button>" +
+            // Executar (fica sozinho)
+            "<button type='button' data-id='" + a.alertId + "' class='myAl_runBtn' " +
+              "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;'>" +
+              "Executar</button>" +
 
-            // Botão Ativar/Desativar (inalterado)
-            "<button type='button' data-id='" + a.alertId + "' class='myAl_toggleBtn' " +
-              "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;'>" +
-              (a.isActive ? "Desativar" : "Ativar") +
-            "</button>" +
+            // Coluna da direita
+            "<div style='display:flex; flex-direction:column; gap:6px;'>" +
 
-            // Botão Excluir (inalterado)
-            "<button type='button' data-id='" + a.alertId + "' class='myAl_delBtn' " +
-              "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(239,68,68,0.22); color:#fff; font-weight:900; font-size:12px;'>Excluir</button>" +
+              "<button type='button' data-id='" + a.alertId + "' class='myAl_toggleBtn' " +
+                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;'>" +
+                (a.isActive ? "Desativar" : "Ativar") +
+              "</button>" +
 
-"</div>" +
-          "</div>";
+              // ✅ Novo botão Editar (abaixo do Desativar)
+              "<button type='button' data-id='" + a.alertId + "' class='myAl_editBtn' " +
+                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(59,130,246,0.22); color:#fff; font-weight:900; font-size:12px;'>" +
+                "Editar</button>" +
+
+              "<button type='button' data-id='" + a.alertId + "' class='myAl_delBtn' " +
+                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(239,68,68,0.22); color:#fff; font-weight:900; font-size:12px;'>Excluir</button>" +
+
+            "</div>" +
+          "</div>"
 
         card.innerHTML = head;
         list.appendChild(card);
@@ -3169,6 +3294,22 @@ window.vektorMyAlertsRefresh = function () {
               if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
             })
             .toggleAlertaEtiquetaVektor({ alertId: alertId });
+        };
+      });
+
+            list.querySelectorAll(".myAl_editBtn").forEach(btn => {
+        btn.onclick = function () {
+          const alertId = btn.getAttribute("data-id");
+          if (!alertId) return;
+
+          // acha o objeto do alerta pelo id dentro de "rows"
+          const a = rows.find(x => String(x.alertId) === String(alertId));
+          if (!a) {
+            if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Não foi possível localizar os dados do alerta para editar.", "error");
+            return;
+          }
+
+          window.vektorMyAlertsStartEdit_(a);
         };
       });
 
