@@ -975,18 +975,29 @@
               </div>
 
               <div id="myAl_adminFilterBox" style="display:none;">
-                <div style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Filtro (Admin)</div>
+              <div style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
+                Filtros (Admin)
+              </div>
+
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <!-- filtro por e-mail -->
                 <input id="myAl_adminEmail" type="text" placeholder="filtrar por e-mail"
                   style="width:240px; height:34px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+
+                <!-- filtro por área/role (carregado do backend) -->
+                <select id="myAl_adminRole"
+                  style="width:220px; height:34px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
+                  <option value="">Todas as áreas</option>
+                </select>
               </div>
             </div>
+            </div>
 
-            <div id="myAl_list" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
+            <!-- ✅ LISTA: onde o JS renderiza os cards de alertas -->
+          <div id="myAl_list"
+            style="margin-top:12px; display:flex; flex-direction:column; gap:10px; max-height:520px; overflow:auto; padding-right:6px;">
+            <div style="color:rgba(226,232,240,0.85); font-size:12px;">Carregando…</div>
           </div>
-
-        </div>
-      </div>
-    </div>
 
     <!-- ✅ Overlay / Toast (My Alerts) -->
       <div id="myAl_overlay" style="display:none; position:absolute; inset:0; z-index:60; background:rgba(0,0,0,0.55);">
@@ -2939,19 +2950,32 @@ window.vektorMyAlertsDelete = function(alertId) {
 
 window.vektorMyAlertsRefresh = function () {
   const list = document.getElementById("myAl_list");
-  if (list) list.innerHTML = "<div style='color:rgba(226,232,240,0.85); font-size:12px;'>Carregando…</div>";
+  if (list) {
+    list.innerHTML = "<div style='color:rgba(226,232,240,0.85); font-size:12px;'>Carregando…</div>";
+  }
 
   const email = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
-  const role = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "").trim() : "");
+  const role  = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "").trim() : "");
 
-  const adminEmail = document.getElementById("myAl_adminEmail")?.value || "";
-  const adminFilter = (role === "Administrador") ? String(adminEmail).trim() : "";
+  // filtros admin
+  const adminEmailEl = document.getElementById("myAl_adminEmail");
+  const adminRoleEl  = document.getElementById("myAl_adminRole");
+
+  const adminFilterEmail = (role === "Administrador" && adminEmailEl) ? String(adminEmailEl.value || "").trim() : "";
+  const adminFilterRole  = (role === "Administrador" && adminRoleEl)  ? String(adminRoleEl.value  || "").trim() : "";
+
+  if (typeof google === "undefined" || !google.script || !google.script.run) {
+    if (list) list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>google.script.run indisponível.</div>";
+    return;
+  }
 
   google.script.run
     .withSuccessHandler(function (res) {
       if (!list) return;
+
       if (!res || !res.ok) {
-        list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>Falha ao carregar alertas.</div>";
+        const msg = (res && res.error) ? String(res.error) : "Falha ao carregar alertas.";
+        list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>" + msg + "</div>";
         return;
       }
 
@@ -2962,6 +2986,7 @@ window.vektorMyAlertsRefresh = function () {
       }
 
       list.innerHTML = "";
+
       rows.forEach(a => {
         const card = document.createElement("div");
         card.style.border = "1px solid rgba(148,163,184,0.18)";
@@ -2971,13 +2996,15 @@ window.vektorMyAlertsRefresh = function () {
         card.style.color = "rgba(226,232,240,0.92)";
         card.style.fontSize = "12px";
 
-        // ✅ labels para ALL
-        const timeLabel = (a && a.time === "__ALL__") ? "Todos" : (a.time || "—");
-        const lojasLabel = (a && a.time === "__ALL__") ? "Todos" : String((a.lojasCount || 0));
+        const timeLabel =
+          (String(a.time || "").trim() === "__ALL__") ? "Todos" : (a.time || "—");
+
+        const lojasLabel =
+          (String(a.time || "").trim() === "__ALL__") ? "Todos" : String(a.lojasCount || 0);
 
         const etiquetaLabel =
-          (a.etiquetaLabel != null && a.etiquetaLabel !== "")
-            ? a.etiquetaLabel
+          (a.etiquetaLabel != null && String(a.etiquetaLabel).trim() !== "")
+            ? String(a.etiquetaLabel)
             : ((a.etiqueta && String(a.etiqueta).trim()) ? String(a.etiqueta).trim() : "Todas");
 
         const head =
@@ -2995,13 +3022,15 @@ window.vektorMyAlertsRefresh = function () {
                 " &nbsp; <b>Última execução:</b> " + (a.lastRunAt || "—") +
               "</div>" +
             "</div>" +
+
             "<div style='display:flex; gap:8px;'>" +
               "<button type='button' data-id='" + a.alertId + "' class='myAl_runBtn' " +
                 "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;'>Executar</button>" +
 
               "<button type='button' data-id='" + a.alertId + "' class='myAl_toggleBtn' " +
                 "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;'>" +
-                (a.isActive ? "Desativar" : "Ativar") + "</button>" +
+                (a.isActive ? "Desativar" : "Ativar") +
+              "</button>" +
 
               "<button type='button' data-id='" + a.alertId + "' class='myAl_delBtn' " +
                 "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(239,68,68,0.22); color:#fff; font-weight:900; font-size:12px;'>Excluir</button>" +
@@ -3012,17 +3041,32 @@ window.vektorMyAlertsRefresh = function () {
         list.appendChild(card);
       });
 
-      // bind botões
+      // bind botões (não deixe erro aqui derrubar o painel)
       list.querySelectorAll(".myAl_runBtn").forEach(btn => {
         btn.onclick = function () {
           const alertId = btn.getAttribute("data-id");
+          if (!alertId) return;
+
+          if (window.vektorMyAlertsShowLoading_) window.vektorMyAlertsShowLoading_("Executando alerta...", "Aguarde.");
+
           google.script.run
             .withSuccessHandler(function (r2) {
+              if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
+
               if (r2 && r2.ok) {
                 const html = window.vektorRenderTabelaTransacoesEtiquetaAlert_(r2);
                 if (html) renderBotMessage("HTML:" + html);
+                if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Sucesso na execução!", "success");
                 window.vektorMyAlertsRefresh();
+              } else {
+                const msg = "Falha na execução: " + (r2 && r2.error ? r2.error : "erro desconhecido");
+                if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
               }
+            })
+            .withFailureHandler(function (err) {
+              if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
+              const msg = "Erro na execução: " + (err && err.message ? err.message : err);
+              if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
             })
             .executarAlertaEtiquetaVektor({ alertId: alertId, preview: true });
         };
@@ -3031,8 +3075,14 @@ window.vektorMyAlertsRefresh = function () {
       list.querySelectorAll(".myAl_toggleBtn").forEach(btn => {
         btn.onclick = function () {
           const alertId = btn.getAttribute("data-id");
+          if (!alertId) return;
+
           google.script.run
             .withSuccessHandler(function () { window.vektorMyAlertsRefresh(); })
+            .withFailureHandler(function (err) {
+              const msg = "Falha ao alterar status: " + (err && err.message ? err.message : err);
+              if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
+            })
             .toggleAlertaEtiquetaVektor({ alertId: alertId });
         };
       });
@@ -3045,29 +3095,33 @@ window.vektorMyAlertsRefresh = function () {
           if (!confirm("Deseja excluir este alerta? Essa ação não pode ser desfeita.")) return;
 
           google.script.run
-            .withSuccessHandler(function () {
-              window.vektorMyAlertsRefresh();
-            })
+            .withSuccessHandler(function () { window.vektorMyAlertsRefresh(); })
             .withFailureHandler(function (err) {
-              const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
-              alert("Falha ao excluir: " + msg);
+              const msg = "Falha ao excluir: " + (err && err.message ? err.message : err);
+              if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
             })
-            .excluirAlertaVektor({ alertId: alertId });
+            .excluirAlertaVektor({ alertId: alertId }); // ✅ nome correto
         };
       });
-
     })
-    .withFailureHandler(function () {
-      if (list) list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>Falha ao carregar alertas.</div>";
+    .withFailureHandler(function (err) {
+      if (!list) return;
+      const msg = "Falha ao carregar alertas: " + (err && err.message ? err.message : err);
+      list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>" + msg + "</div>";
     })
-    .listarAlertasUsuarioVektor({ email: email, role: role, adminFilterEmail: adminFilter });
+    .listarAlertasUsuarioVektor({
+      email: email,
+      role: role,
+      adminFilterEmail: adminFilterEmail,
+      adminFilterRole: adminFilterRole
+    });
 };
 
 // Render “bonito” do alerta no chat (reaproveita o padrão da sua tabela já existente)
 window.vektorRenderTabelaTransacoesEtiquetaAlert_ = function (resp) {
   const rows = Array.isArray(resp.rows) ? resp.rows : [];
   const periodo = resp.periodo ? (resp.periodo.inicio + " a " + resp.periodo.fim) : "—";
-  const titulo = "🔔 Visual de Transações Via Alerta do Vektor";
+  const titulo = "🔔 Visual de Transações Via Alerta do Vektor — " + (resp.alertId || "—");
   const subt = "<div style='margin-top:4px; font-size:12px; color:#64748B; text-align:center;'>" +
     "<b>Período:</b> " + periodo +
     " &nbsp; <b>Etiqueta:</b> " + (resp.etiqueta || "—") +
@@ -3080,35 +3134,36 @@ window.vektorRenderTabelaTransacoesEtiquetaAlert_ = function (resp) {
   }
 
   // tabela simples (mesmas colunas do seu padrão)
-  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
-  const fmt = (v) => (typeof v === "number" ? v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : String(v||""));
+    const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+    const fmt = (v) => (typeof v === "number" ? v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : String(v||""));
 
-  let h = "";
-  h += "<div class='text-sm text-slate-700'>";
-  h += "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>";
-  h += subt;
-  h += "<div style='overflow:auto;border:1px solid rgba(0,0,0,0.12);border-radius:10px;margin-top:10px;'>";
-  h += "<table style='border-collapse:collapse;width:100%;font-size:12px;'>";
-  h += "<thead><tr style='background:#B5FF20;'>";
-  ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta inserida","Item comprado (descrição)"].forEach(t => {
-    h += "<th style='border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;white-space:nowrap;position:sticky;top:0;z-index:10;'>" + esc(t) + "</th>";
-  });
-  h += "</tr></thead><tbody>";
+    let h = "";
+    h += "<div class='text-sm text-slate-700'>";
+    h += "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>";
+    h += subt;
+    h += "<div style='overflow:auto;border:1px solid rgba(0,0,0,0.12);border-radius:10px;margin-top:10px;'>";
+    h += "<table style='border-collapse:collapse;width:100%;font-size:12px;'>";
+    h += "<thead><tr style='background:#B5FF20;'>";
+    ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta inserida","Item comprado (descrição)"].forEach(t => {
+      h += "<th style='background:#B5FF20;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;white-space:nowrap;position:sticky;top:0;z-index:10;'>" + esc(t) + "</th>";
+    });
+    h += "</tr></thead><tbody>";
 
-  rows.slice(0, 60).forEach(r => {
-    h += "<tr>";
-    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.loja) + "</td>";
-    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.time) + "</td>";
-    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.data) + "</td>";
-    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:260px;'>" + esc(r.estabelecimento) + "</td>";
-    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;white-space:nowrap;'>" + esc(fmt(r.valor)) + "</td>";
-    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:240px;'>" + esc(r.etiqueta) + "</td>";
-    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:360px;'>" + esc(r.descricao) + "</td>";
-    h += "</tr>";
-  });
+    rows.slice(0, 60).forEach(r => {
+      h += "<tr>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.loja) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.time) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.data) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:260px;'>" + esc(r.estabelecimento) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;white-space:nowrap;'>" + esc(fmt(r.valor)) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:240px;'>" + esc(r.etiqueta) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:360px;'>" + esc(r.descricao) + "</td>";
+      h += "</tr>";
+    });
 
-  h += "</tbody></table></div></div>";
-  return h;
+    h += "</tbody></table></div></div>";
+    return h;
+
 };
 
 function closeStatusVektorModal() {
