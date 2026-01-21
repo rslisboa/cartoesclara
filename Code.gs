@@ -90,7 +90,8 @@ var VEKTOR_WHITELIST_EMAILS = [
   "rodrigo.lisboa@gruposbf.com.br",
   "tainara.nascimento@gruposbf.com.br",
   "durval.neto@centauro.com.br",
-  "gabriela.crochiquia@centauro.com.br"
+  "gabriela.crochiquia@centauro.com.br",
+  "rodrigo.lisboa25@gmail.com"
   // adicione outros aqui
 ];
 
@@ -844,6 +845,17 @@ function criarAlertaEtiquetaVektor(payload) {
       ""    // lastRowCount
     ]);
 
+    // ✅ FIX: força sendAt como TEXTO (evita virar Date 30/12/1899)
+      try {
+        var row = sh.getLastRow();            // a linha recém inserida
+        var colSendAt = 9;                    // sendAt é a 9ª coluna (ver header)
+        var cell = sh.getRange(row, colSendAt);
+        cell.setNumberFormat("@");            // texto
+        cell.setValue(String(sendAt || "").trim());
+      } catch (eFmt) {
+        // não quebra criação se formatação falhar
+      }
+
     return { ok:true, alertId: alertId };
 
   } catch (e) {
@@ -986,6 +998,7 @@ function listarAlertasUsuarioVektor(req) {
     var iFreq      = idx("freq");
     var iWin       = idx("windowDays");
     var iTime      = idx("time");
+    var iSendAt    = idx("sendAt");
     var iLojas     = idx("lojasCsv");
     var iEtq       = idx("etiqueta");
     var iLastRun   = idx("lastRunAt");
@@ -1063,6 +1076,23 @@ function listarAlertasUsuarioVektor(req) {
       else if (etiquetaCount === 1) etiquetaLabel = etqs[0];
       else etiquetaLabel = etiquetaCount + " etiquetas";
 
+      var tz = Session.getScriptTimeZone();
+
+      function formatSendAt_(v) {
+        if (!v) return "";
+        // Se vier como Date (Sheets time), formata HH:mm
+        if (Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime())) {
+          return Utilities.formatDate(v, tz, "HH:mm");
+        }
+        // Se vier como texto, tenta normalizar
+        var s = String(v).trim();
+        // Se já estiver HH:mm, ok
+        if (/^\d{2}:\d{2}$/.test(s)) return s;
+        // Se vier com segundos HH:mm:ss, corta
+        if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s.slice(0,5);
+        return s; // fallback
+      }
+
       out.push({
         alertId: String(row[iAlertId] || ""),
         ownerEmail: owner,
@@ -1072,6 +1102,7 @@ function listarAlertasUsuarioVektor(req) {
         freqLabel: freqLabel,
         windowDays: Number(row[iWin] || 30),
         time: String(row[iTime] || ""),
+        sendAt: (iSendAt >= 0 ? formatSendAt_(row[iSendAt]) : ""),
         lojasCount: lojasCount,
         etiqueta: etiquetaRaw,
         etiquetaCount: etiquetaCount,
@@ -1112,6 +1143,94 @@ function toggleAlertaEtiquetaVektor(req) {
       }
     }
     return { ok:false, error:"Alerta não encontrado." };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function atualizarAlertaEtiquetaVektor(payload) {
+  try {
+    payload = payload || {};
+    var alertId = String(payload.alertId || "").trim();
+    if (!alertId) return { ok: false, error: "alertId obrigatório." };
+
+    var email = String(payload.email || "").trim().toLowerCase();
+    var role  = String(payload.role || "").trim();
+
+    var freq = String(payload.freq || "DAILY").trim();
+    var windowDays = Number(payload.windowDays || 30) || 30;
+    var time = String(payload.time || "").trim();
+    var sendAt = String(payload.sendAt || "").trim(); // "HH:mm" ou ""
+
+    // Multi etiquetas (mesma regra do criar)
+    var etiquetasArr = Array.isArray(payload.etiquetas)
+      ? payload.etiquetas.map(function(x){ return String(x || "").trim(); }).filter(Boolean)
+      : [];
+    etiquetasArr = etiquetasArr.filter(function(x){ return x && x !== "__ALL__"; });
+
+    var etiquetaLegacy = String(payload.etiqueta || "").trim();
+    var etiquetaFinalCsv = "";
+    if (etiquetasArr.length) etiquetaFinalCsv = etiquetasArr.join(" | ");
+    else if (etiquetaLegacy && etiquetaLegacy !== "__ALL__") etiquetaFinalCsv = etiquetaLegacy;
+    else etiquetaFinalCsv = ""; // todas
+
+    var lojas = Array.isArray(payload.lojas) ? payload.lojas.map(String) : [];
+    lojas = lojas.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+
+    // validações mínimas (iguais ao criar)
+    if (!email) return { ok:false, error:"E-mail obrigatório." };
+    if (!time) return { ok:false, error:"Time obrigatório." };
+    if (time !== "__ALL__" && !lojas.length) return { ok:false, error:"Selecione ao menos 1 loja." };
+    if (windowDays < 1 || windowDays > 365) return { ok:false, error:"Janela inválida (1..365)." };
+    if (["DAILY","3D","WEEKLY","MONTHLY"].indexOf(freq) < 0) return { ok:false, error:"Frequência inválida." };
+    if (sendAt && !/^\d{2}:\d{2}$/.test(sendAt)) return { ok:false, error:"Horário inválido. Use HH:mm (ex.: 08:30)." };
+
+    var sh = getOrCreateUserAlertsSheet_();
+    var values = sh.getDataRange().getValues();
+    if (!values || values.length < 2) return { ok:false, error:"Sem alertas cadastrados." };
+
+    var head = values[0].map(String);
+    var idx = function (name) { return head.indexOf(name); };
+
+    var iAlertId = idx("alertId");
+    var iOwner   = idx("ownerEmail");
+    var iFreq    = idx("freq");
+    var iWin     = idx("windowDays");
+    var iTime    = idx("time");
+    var iSendAt  = idx("sendAt");
+    var iLojas   = idx("lojasCsv");
+    var iEtq     = idx("etiqueta");
+
+    if (iAlertId < 0) return { ok:false, error:"Cabeçalho inválido: alertId não encontrado." };
+
+    // encontra linha
+    var rowIndex = -1;
+    for (var r = 1; r < values.length; r++) {
+      if (String(values[r][iAlertId] || "").trim() === alertId) { rowIndex = r; break; }
+    }
+    if (rowIndex < 0) return { ok:false, error:"Alerta não encontrado." };
+
+    // permissão: usuário comum só edita o próprio alerta
+    var ownerEmail = (iOwner >= 0) ? String(values[rowIndex][iOwner] || "").trim().toLowerCase() : "";
+    var isAdmin = (role === "Administrador");
+    if (!isAdmin && ownerEmail && ownerEmail !== email) {
+      return { ok:false, error:"Você não tem permissão para editar este alerta." };
+    }
+
+    // atualiza campos
+    if (iFreq   >= 0) sh.getRange(rowIndex + 1, iFreq   + 1).setValue(freq);
+    if (iWin    >= 0) sh.getRange(rowIndex + 1, iWin    + 1).setValue(windowDays);
+    if (iTime   >= 0) sh.getRange(rowIndex + 1, iTime   + 1).setValue(time);
+    if (iSendAt >= 0) {
+    var cell = sh.getRange(rowIndex + 1, iSendAt + 1);
+    cell.setNumberFormat("@"); // texto
+    cell.setValue(String(sendAt || "").trim());
+  }
+    if (iLojas  >= 0) sh.getRange(rowIndex + 1, iLojas  + 1).setValue(lojas.join(","));
+    if (iEtq    >= 0) sh.getRange(rowIndex + 1, iEtq    + 1).setValue(etiquetaFinalCsv);
+
+    return { ok:true, alertId: alertId };
 
   } catch (e) {
     return { ok:false, error: (e && e.message) ? e.message : String(e) };
@@ -1419,7 +1538,7 @@ function montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows) {
 
   var h = "";
   h += "<div style='font-family:Arial,sans-serif;font-size:13px;color:#0f172a'>";
-  h += "<h2 style='margin:0 0 8px 0'>Vektor — Alerta automático</h2>";
+  h += "<h2 style='margin:0 0 8px 0'>Plataforma de Governança Financeira do Cartão Clara</h2>";
   h += "<div style='margin:0 0 10px 0'>";
   h += "<b>ID:</b> " + esc(alertId) + "<br/>";
   h += "<b>Time:</b> " + esc(time) + "<br/>";
