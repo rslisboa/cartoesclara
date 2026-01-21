@@ -219,6 +219,32 @@ function vektorLoadEmailsRoleMap_() {
   return out;
 }
 
+/**
+ * Retorna lista única de "ROLE" da VEKTOR_EMAILS (para filtro Admin em Meus Alertas)
+ */
+function getRolesParaFiltroAlertasVektor() {
+  try {
+    if (typeof vektorAssertFunctionAllowed_ === "function") {
+      vektorAssertFunctionAllowed_("getRolesParaFiltroAlertasVektor");
+    }
+
+    var map = vektorLoadEmailsRoleMap_();
+    var set = {};
+
+    if (map && map.byEmail) {
+      Object.keys(map.byEmail).forEach(function (email) {
+        var role = map.byEmail[email] && map.byEmail[email].role ? String(map.byEmail[email].role).trim() : "";
+        if (!role) return;
+        set[role] = true;
+      });
+    }
+
+    return { ok: true, roles: Object.keys(set).sort() };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 function vektorLoadRoleAllowedFunctions_() {
   var cache = CacheService.getScriptCache();
   var cached = cache.get(VEKTOR_ACL_CACHE_ACESSOS);
@@ -922,6 +948,7 @@ function listarAlertasUsuarioVektor(req) {
     var email = String(req.email || "").trim().toLowerCase();
     var role = String(req.role || "").trim();
     var adminFilterEmail = String(req.adminFilterEmail || "").trim().toLowerCase();
+    var adminFilterRole = String(req.adminFilterRole || "").trim(); // ✅ novo
 
     var sh = getOrCreateUserAlertsSheet_();
     var values = sh.getDataRange().getValues();
@@ -932,6 +959,7 @@ function listarAlertasUsuarioVektor(req) {
 
     var iAlertId = idx("alertId");
     var iOwner   = idx("ownerEmail");
+    var iOwnerRole = idx("ownerRole"); // pode existir ou não
     var iActive  = idx("isActive");
     var iFreq    = idx("freq");
     var iWin     = idx("windowDays");
@@ -945,13 +973,24 @@ function listarAlertasUsuarioVektor(req) {
     var out = [];
     for (var r = 1; r < values.length; r++) {
       var row = values[r];
+
       var owner = String(row[iOwner] || "").trim().toLowerCase();
+
+      // ✅ ownerRole: se a coluna não existir, usa o role da criação (coluna 3) se estiver no header,
+      // senão fica vazio.
+      var ownerRole = "";
+      if (iOwnerRole >= 0) ownerRole = String(row[iOwnerRole] || "").trim();
+      else {
+        var iRoleFallback = idx("role");
+        ownerRole = (iRoleFallback >= 0) ? String(row[iRoleFallback] || "").trim() : "";
+      }
 
       // Regra de visibilidade
       if (!isAdmin) {
         if (owner !== email) continue;
       } else {
         if (adminFilterEmail && owner.indexOf(adminFilterEmail) === -1) continue;
+        if (adminFilterRole && ownerRole !== adminFilterRole) continue; // ✅ filtro por área/role
       }
 
       var lojasCsv = String(row[iLojas] || "");
@@ -965,21 +1004,23 @@ function listarAlertasUsuarioVektor(req) {
         (f === "MONTHLY") ? "Mensal"  :
         (f || "—");
 
-        var etiquetaRaw = String(row[iEtq] || "").trim();
-        var etqs = etiquetaRaw ? etiquetaRaw.split("|").map(function(s){ return String(s||"").trim(); }).filter(Boolean) : [];
-        var etiquetaCount = etqs.length;
-
-        var etiquetaLabel = "Todas";
-        if (etiquetaCount === 1) etiquetaLabel = etqs[0];
-        else if (etiquetaCount > 1) etiquetaLabel = etiquetaCount + " etiquetas";
+      // Etiquetas: pode vir "" (todas) ou "A | B | C"
+      var etiquetaRaw = String(row[iEtq] || "").trim();
+      var etqs = etiquetaRaw ? etiquetaRaw.split("|").map(function(s){return String(s||"").trim();}).filter(Boolean) : [];
+      var etiquetaCount = etqs.length;
+      var etiquetaLabel = "";
+      if (!etiquetaRaw) etiquetaLabel = "Todas";
+      else if (etiquetaCount === 1) etiquetaLabel = etqs[0];
+      else etiquetaLabel = etiquetaCount + " etiquetas";
 
       out.push({
         alertId: String(row[iAlertId] || ""),
         ownerEmail: owner,
+        ownerRole: ownerRole,
         isActive: row[iActive] === true,
         freq: f,
         freqLabel: freqLabel,
-        windowDays: Number(row[iWin] || 1),
+        windowDays: Number(row[iWin] || 30),
         time: String(row[iTime] || ""),
         lojasCount: lojasCount,
         etiqueta: etiquetaRaw,
