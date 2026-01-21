@@ -947,8 +947,9 @@ function listarAlertasUsuarioVektor(req) {
     req = req || {};
     var email = String(req.email || "").trim().toLowerCase();
     var role = String(req.role || "").trim();
+
     var adminFilterEmail = String(req.adminFilterEmail || "").trim().toLowerCase();
-    var adminFilterRole = String(req.adminFilterRole || "").trim(); // ✅ novo
+    var adminFilterRole  = String(req.adminFilterRole  || "").trim();
 
     var sh = getOrCreateUserAlertsSheet_();
     var values = sh.getDataRange().getValues();
@@ -957,18 +958,34 @@ function listarAlertasUsuarioVektor(req) {
     var head = values[0].map(String);
     var idx = function (name) { return head.indexOf(name); };
 
-    var iAlertId = idx("alertId");
-    var iOwner   = idx("ownerEmail");
+    var iAlertId   = idx("alertId");
+    var iOwner     = idx("ownerEmail");
     var iOwnerRole = idx("ownerRole"); // pode existir ou não
-    var iActive  = idx("isActive");
-    var iFreq    = idx("freq");
-    var iWin     = idx("windowDays");
-    var iTime    = idx("time");
-    var iLojas   = idx("lojasCsv");
-    var iEtq     = idx("etiqueta");
-    var iLastRun = idx("lastRunAt");
+    var iActive    = idx("isActive");
+    var iFreq      = idx("freq");
+    var iWin       = idx("windowDays");
+    var iTime      = idx("time");
+    var iLojas     = idx("lojasCsv");
+    var iEtq       = idx("etiqueta");
+    var iLastRun   = idx("lastRunAt");
 
     var isAdmin = (role === "Administrador");
+
+    // Normalização (evita falha por maiúsculas/minúsculas/espacos)
+    var norm_ = function (s) { return String(s || "").trim().toLowerCase(); };
+
+    // Carrega ACL 1 vez, só se precisar
+    var acl = null;
+    var getRoleFromAcl_ = function (emailLower) {
+      try {
+        if (!emailLower) return "";
+        if (!acl) acl = vektorLoadEmailsRoleMap_(); // => { byEmail: { "a@b": {role:"X", ativo:true} } }
+        if (!acl || !acl.byEmail || !acl.byEmail[emailLower]) return "";
+        return String(acl.byEmail[emailLower].role || "").trim();
+      } catch (e) {
+        return "";
+      }
+    };
 
     var out = [];
     for (var r = 1; r < values.length; r++) {
@@ -976,21 +993,31 @@ function listarAlertasUsuarioVektor(req) {
 
       var owner = String(row[iOwner] || "").trim().toLowerCase();
 
-      // ✅ ownerRole: se a coluna não existir, usa o role da criação (coluna 3) se estiver no header,
-      // senão fica vazio.
+      // 1) ownerRole pela planilha
       var ownerRole = "";
       if (iOwnerRole >= 0) ownerRole = String(row[iOwnerRole] || "").trim();
-      else {
+
+      // 2) fallback: coluna "role" (se existir)
+      if (!ownerRole) {
         var iRoleFallback = idx("role");
         ownerRole = (iRoleFallback >= 0) ? String(row[iRoleFallback] || "").trim() : "";
       }
 
-      // Regra de visibilidade
+      // 3) fallback final: ACL (fonte de verdade)
+      if (!ownerRole) {
+        ownerRole = getRoleFromAcl_(owner);
+      }
+
+      // Regra de visibilidade + filtros
       if (!isAdmin) {
         if (owner !== email) continue;
       } else {
         if (adminFilterEmail && owner.indexOf(adminFilterEmail) === -1) continue;
-        if (adminFilterRole && ownerRole !== adminFilterRole) continue; // ✅ filtro por área/role
+
+        // ✅ filtro por área/role (NORMALIZADO + com fallback ACL)
+        if (adminFilterRole) {
+          if (norm_(ownerRole) !== norm_(adminFilterRole)) continue;
+        }
       }
 
       var lojasCsv = String(row[iLojas] || "");
@@ -1004,10 +1031,12 @@ function listarAlertasUsuarioVektor(req) {
         (f === "MONTHLY") ? "Mensal"  :
         (f || "—");
 
-      // Etiquetas: pode vir "" (todas) ou "A | B | C"
       var etiquetaRaw = String(row[iEtq] || "").trim();
-      var etqs = etiquetaRaw ? etiquetaRaw.split("|").map(function(s){return String(s||"").trim();}).filter(Boolean) : [];
+      var etqs = etiquetaRaw
+        ? etiquetaRaw.split("|").map(function (s) { return String(s || "").trim(); }).filter(Boolean)
+        : [];
       var etiquetaCount = etqs.length;
+
       var etiquetaLabel = "";
       if (!etiquetaRaw) etiquetaLabel = "Todas";
       else if (etiquetaCount === 1) etiquetaLabel = etqs[0];
