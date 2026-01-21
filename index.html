@@ -592,13 +592,13 @@
   </div>
 
   <!-- Conteúdo rolável do menu (botões) -->
-<div class="flex-1 min-h-0 overflow-y-auto space-y-4 pb-3">
+<div class="flex-1 min-h-0 overflow-y-auto space-y-3.5 pb-2.5">
 
   <!-- Botão: assistir apresentação -->
   <button
     type="button"
     onclick="window.open('https://drive.google.com/file/d/1nYhrveAoL2A5cYfV_LdzXECC2_5BpM-b/view?usp=sharing','_blank')"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
   >
     ▶ Apresentação Vektor
   </button>
@@ -607,7 +607,7 @@
   <button
     type="button"
     onclick="window.open('https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF/edit','_blank')"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
   >
     📊 Relatório Clara (Looker Studio)
   </button> -->
@@ -615,7 +615,7 @@
   <button
   type="button"
   onclick="openStatusVektorModal()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
 >
   🟢 Estado Operacional
 </button>
@@ -623,7 +623,7 @@
   <button
   type="button"
   onclick="window.open(POLITICA_CARTOES_CLARA_LINK,'_blank')"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
 >
   📘 Regras e Políticas
 </button>
@@ -631,7 +631,7 @@
 <button
   type="button"
   onclick="openAjudaVektorModal()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
 >
   ❓ Como usar o Vektor
 </button>
@@ -639,9 +639,9 @@
 <button
   type="button"
   onclick="window.vektorOpenMyAlerts()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
 >
-  🔔 Meus Alertas
+  ⏱️ Alertas Programados
 </button>
 
 <? if ((userRole || "") === "Administrador") { ?>
@@ -650,16 +650,16 @@
   <button
     type="button"
     onclick="openAlertasRecentesModal()"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
   >
-    🔔 Alertas Recentes
+    📋 Disparo de Ocorrências
   </button>
 
   <!-- Botão: Radar de Irregularidade (somente Admin) -->
   <button
     type="button"
     onclick="window.vektorOpenRadar('7d')"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
   >
     📈 Radar de Irregularidade
   </button>
@@ -669,7 +669,7 @@
   <button
     type="button"
     onclick="window.vektorOpenFeedback()"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
   >
     📝 Feedback
   </button>
@@ -874,7 +874,7 @@
           </button>
 
           <div>
-            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Meus Alertas</div>
+            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Definição de Alertas</div>
             <div style="color:rgba(226,232,240,0.9); font-size:13px; margin-top:2px;">
               Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)
             </div>
@@ -1440,7 +1440,7 @@
     <!-- Header -->
     <div class="px-5 py-4 bg-[#005E27] text-white flex items-center justify-between">
       <div>
-        <div class="text-base font-extrabold">🔔 Alertas Recentes</div>
+        <div class="text-base font-extrabold">📋 Ocorrências</div>
         <div class="text-xs opacity-90">Rastreabilidade de alertas enviados (limite, pendências, possíveis irregularidades)</div>
       </div>
       <button type="button"
@@ -3105,17 +3105,34 @@ window.vektorMyAlertsRefresh = function () {
             "</div>" +
 
             "<div style='display:flex; gap:8px;'>" +
+
+          // ✅ Executar com tooltip
+            "<span class='vektor-btn-wrapper' style='display:inline-block; position:relative;'>" +
+
               "<button type='button' data-id='" + a.alertId + "' class='myAl_runBtn' " +
-                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;'>Executar</button>" +
+                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;'>" +
+                "Executar</button>" +
 
-              "<button type='button' data-id='" + a.alertId + "' class='myAl_toggleBtn' " +
-                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;'>" +
-                (a.isActive ? "Desativar" : "Ativar") +
-              "</button>" +
+              "<span class='vektor-tooltip-base' " +
+                "style='background:#fff9c4; color:#000; white-space:normal; width:280px; padding:10px; border-radius:8px; border:1px solid rgba(0,0,0,0.18); box-shadow:0 10px 25px rgba(0,0,0,0.25);'>" +
+                "Esta execução exibirá o resultado do alerta diretamente no <b>chat</b>.<br/><br/>" +
+                "<b>Nenhum e-mail será enviado agora.</b><br/><br/>" +
+                "O envio por e-mail ocorrerá automaticamente conforme a <b>frequência</b> configurada neste alerta." +
+              "</span>" +
 
-              "<button type='button' data-id='" + a.alertId + "' class='myAl_delBtn' " +
-                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(239,68,68,0.22); color:#fff; font-weight:900; font-size:12px;'>Excluir</button>" +
-            "</div>" +
+            "</span>" +
+
+            // Botão Ativar/Desativar (inalterado)
+            "<button type='button' data-id='" + a.alertId + "' class='myAl_toggleBtn' " +
+              "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;'>" +
+              (a.isActive ? "Desativar" : "Ativar") +
+            "</button>" +
+
+            // Botão Excluir (inalterado)
+            "<button type='button' data-id='" + a.alertId + "' class='myAl_delBtn' " +
+              "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(239,68,68,0.22); color:#fff; font-weight:900; font-size:12px;'>Excluir</button>" +
+
+"</div>" +
           "</div>";
 
         card.innerHTML = head;
@@ -3457,7 +3474,7 @@ document.addEventListener("DOMContentLoaded", () => {
     : `Olá, ${saudacao}!`;
 
   el.innerHTML =
-    `${prefixo} Esse é o <b>Vektor</b>, <b>Motor de Governança Financeira do Cartão Clara</b>.`;
+    `${prefixo} Esse é o <b>Vektor</b>, <b>Plataforma de Governança Financeira do Cartão Clara</b>.`;
 }
 
   // Executa assim que o DOM estiver pronto
