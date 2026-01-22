@@ -889,8 +889,20 @@
           <div>
             <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Definição de Alertas</div>
             <div style="color:rgba(226,232,240,0.9); font-size:13px; margin-top:2px;">
-              Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)
+              <span id="myAl_subtitle">Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)</span>
             </div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+          <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
+            <div style="color:rgba(226,232,240,0.85); font-size:11px; font-weight:900;">Tipo de alerta</div>
+            <select id="myAl_alertType"
+              style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
+                    border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
+              <option value="TRANSACOES">Transações</option>
+              <option value="PENDENCIAS">Pendências</option>
+            </select>
           </div>
         </div>
       </div>
@@ -905,7 +917,7 @@
     <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
       <div style="color:#fff; font-weight:900; font-size:14px;">Criar alerta</div>
       <div style="color:rgba(226,232,240,0.75); font-size:12px; margin-top:2px;">
-        O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).
+        <span id="myAl_createHint">O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).</span>
       </div>
 
       <div style="margin-top:10px; display:grid; gap:10px;">
@@ -956,6 +968,7 @@
         </div>
 
         <div>
+          <div id="myAl_labelWrap">
           <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
             Etiquetas (multi-seleção)
           </label>
@@ -968,6 +981,7 @@
 
           <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
             Dica: segure Ctrl (Windows) ou Cmd (Mac) para selecionar mais de uma etiqueta.
+            </div>
           </div>
         </div>
 
@@ -1355,7 +1369,7 @@
     <div class="text-sm text-slate-700 space-y-3 max-h-[60vh] overflow-y-auto pr-2">
 
       <p>
-        O Vektor é um assistente operacional da Clara: consulta bases, aplica regras padronizadas e orienta ações para reduzir pendências.
+        O Vektor é a plataforma de governança financeira do cartão Clara, onde é possível, entre outras coisas: consultar bases, aplicar regras padronizadas e criar ações para reduzir pendências.
       </p>
 
       <div>
@@ -2810,6 +2824,42 @@ window.vektorMyAlertsInit_ = function () {
     })
     .getEtiquetasDisponiveisVektor();
 
+      // =========================
+  // Tipo de alerta (Transações vs Pendências)
+  // =========================
+  try {
+    const typeSel = document.getElementById("myAl_alertType");
+    const subtitle = document.getElementById("myAl_subtitle");
+    const hint = document.getElementById("myAl_createHint");
+    const labelWrap = document.getElementById("myAl_labelWrap");
+
+    const applyType = () => {
+      const t = String(typeSel?.value || "TRANSACOES").trim();
+
+      if (t === "PENDENCIAS") {
+        if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada)";
+        if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
+        if (labelWrap) labelWrap.style.display = "none";
+      } else {
+        if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)";
+        if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
+        if (labelWrap) labelWrap.style.display = "block";
+      }
+    };
+
+    if (typeSel) {
+      typeSel.onchange = function () {
+        // ao trocar tipo, limpa edição (evita editar pendências como transações)
+        window.__myAl_editingAlertId = "";
+        const btn = document.getElementById("myAl_saveBtn");
+        if (btn) btn.textContent = "Criar alerta";
+        applyType();
+      };
+    }
+
+    applyType();
+  } catch (_) {}
+
   // ✅ Filtros Admin: popular "Área" + atualizar lista ao mudar filtros
   try {
     const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "");
@@ -2930,6 +2980,9 @@ window.vektorMyAlertsCreate = function () {
     // Horário (HH:mm)
     const sendAt = String(document.getElementById("myAl_sendAt")?.value || "").trim();
 
+    // Tipo de alerta
+    const alertType = String(document.getElementById("myAl_alertType")?.value || "TRANSACOES").trim();
+
     // Etiquetas
     const etiquetas = [];
     const labelEl = document.getElementById("myAl_label");
@@ -2947,6 +3000,9 @@ window.vektorMyAlertsCreate = function () {
 
     const isAll = etiquetas.includes("__ALL__");
     const etiquetasFinal = isAll ? [] : etiquetas.filter(x => x && x !== "__ALL__");
+
+    // ✅ regra: Pendências não usa etiquetas
+    const etiquetasFinalEff = (alertType === "PENDENCIAS") ? [] : etiquetasFinal;
 
     // Lojas
     const storesBox = document.getElementById("myAl_storesBox");
@@ -2990,16 +3046,22 @@ window.vektorMyAlertsCreate = function () {
     const payload = {
       email: email,
       role: role,
+
+      // ✅ novo
+      alertType: alertType,
+
       freq: freq,
       windowDays: windowDays,
       time: time,
       sendAt: sendAt,
       lojas: lojas,
-      etiquetas: etiquetasFinal,
-      etiqueta: (etiquetasFinal[0] || "")
+
+      // ✅ transações usam etiquetas; pendências sempre vazio
+      etiquetas: etiquetasFinalEff,
+      etiqueta: (etiquetasFinalEff[0] || "")
     };
 
-    // ✅ CORREÇÃO CRÍTICA: handlers ligados à chamada real
+    // ✅ handlers ligados à chamada real
     const runner = google.script.run
       .withSuccessHandler(function (res) {
         if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
@@ -3031,7 +3093,7 @@ window.vektorMyAlertsCreate = function () {
         if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
       });
 
-    // 🔥 chamada REAL
+    // chamada REAL
     if (editingId) {
       payload.alertId = editingId;
       runner.atualizarAlertaEtiquetaVektor(payload);
@@ -3122,6 +3184,25 @@ window.vektorMyAlertsStartEdit_ = function (a) {
   const st = document.getElementById("myAl_createStatus");
   if (st) st.textContent = "Editando alerta " + a.alertId + " (não será gerado novo ID).";
 
+  // ✅ tipo de alerta + UI (subtítulo/hint/etiquetas)
+  const typeSel = document.getElementById("myAl_alertType");
+  const labelWrap = document.getElementById("myAl_labelWrap");
+  const subtitle = document.getElementById("myAl_subtitle");
+  const hint = document.getElementById("myAl_createHint");
+
+  const t = String(a.alertType || "TRANSACOES").trim();
+  if (typeSel) typeSel.value = t;
+
+  if (t === "PENDENCIAS") {
+    if (labelWrap) labelWrap.style.display = "none";
+    if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada)";
+    if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
+  } else {
+    if (labelWrap) labelWrap.style.display = "block";
+    if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)";
+    if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
+  }
+
   // freq
   const freqEl = document.getElementById("myAl_freq");
   if (freqEl && a.freq) freqEl.value = a.freq;
@@ -3141,26 +3222,28 @@ window.vektorMyAlertsStartEdit_ = function (a) {
     if (typeof teamSel.onchange === "function") teamSel.onchange();
   }
 
-  // etiquetas (multi)
-  const labelEl = document.getElementById("myAl_label");
-  if (labelEl && labelEl.tagName === "SELECT") {
-    const raw = String(a.etiqueta || "").trim(); // "A | B | C" ou ""
-    const tags = raw
-      ? raw.split("|").map(s => String(s || "").trim()).filter(Boolean)
-      : [];
+  // etiquetas (multi) — ✅ só para Transações
+  if (t !== "PENDENCIAS") {
+    const labelEl = document.getElementById("myAl_label");
+    if (labelEl && labelEl.tagName === "SELECT") {
+      const raw = String(a.etiqueta || "").trim(); // "A | B | C" ou ""
+      const tags = raw
+        ? raw.split("|").map(s => String(s || "").trim()).filter(Boolean)
+        : [];
 
-    // limpa seleção
-    Array.from(labelEl.options || []).forEach(op => { op.selected = false; });
+      // limpa seleção
+      Array.from(labelEl.options || []).forEach(op => { op.selected = false; });
 
-    if (!tags.length) {
-      // “todas”
-      Array.from(labelEl.options || []).forEach(op => { op.selected = true; });
-    } else {
-      const set = {};
-      tags.forEach(t => { set[t] = true; });
-      Array.from(labelEl.options || []).forEach(op => {
-        if (set[String(op.value || "").trim()]) op.selected = true;
-      });
+      if (!tags.length) {
+        // “todas”
+        Array.from(labelEl.options || []).forEach(op => { op.selected = true; });
+      } else {
+        const set = {};
+        tags.forEach(tg => { set[tg] = true; });
+        Array.from(labelEl.options || []).forEach(op => {
+          if (set[String(op.value || "").trim()]) op.selected = true;
+        });
+      }
     }
   }
 
@@ -3246,16 +3329,22 @@ window.vektorMyAlertsRefresh = function () {
           ? String(a.sendAt).trim()
           : "Imediato";
 
-        const head =
-          "<div style='display:flex; justify-content:space-between; gap:10px; align-items:flex-start;'>" +
-            "<div>" +
-              "<div style='font-weight:900; color:#fff; font-size:13px;'>ID: " + (a.alertId || "—") + "</div>" +
-              "<div style='opacity:0.85; margin-top:2px;'>" +
-                "<b>Etiqueta:</b> " + etiquetaLabel +
-                " &nbsp; <b>Time:</b> " + timeLabel +
-                " &nbsp; <b>Lojas:</b> " + lojasLabel +
-                " &nbsp; <b>Freq:</b> " + (a.freqLabel || a.freq || "—") +
-              "</div>" +
+            const t = String(a.alertType || "TRANSACOES").trim();
+            const tipoLbl = (a.alertTypeLabel || (t === "PENDENCIAS" ? "Pendências" : "Transações"));
+
+            const head =
+              "<div style='display:flex; justify-content:space-between; gap:10px; align-items:flex-start;'>" +
+                "<div>" +
+                  "<div style='font-weight:900; color:#fff; font-size:13px;'>" +
+                    "ID: " + (a.alertId || "—") +
+                    " &nbsp; <span style='opacity:0.85; font-weight:900;'>TIPO ALERTA:</span> " + tipoLbl +
+                  "</div>" +
+                  "<div style='opacity:0.85; margin-top:2px;'>" +
+                    (t === "PENDENCIAS" ? "" : ("<b>Etiqueta:</b> " + etiquetaLabel + " &nbsp; ")) +
+                    "<b>Time:</b> " + timeLabel +
+                    " &nbsp; <b>Lojas:</b> " + lojasLabel +
+                    " &nbsp; <b>Freq:</b> " + (a.freqLabel || a.freq || "—") +
+                  "</div>" +
 
             "<div style='opacity:0.75; margin-top:2px;'>" +
               "<b>Dono:</b> " + (a.ownerEmail || "—") +
@@ -3390,30 +3479,33 @@ window.vektorMyAlertsRefresh = function () {
 window.vektorRenderTabelaTransacoesEtiquetaAlert_ = function (resp) {
   const rows = Array.isArray(resp.rows) ? resp.rows : [];
   const periodo = resp.periodo ? (resp.periodo.inicio + " a " + resp.periodo.fim) : "—";
-  const titulo = "🔔 Visual de Transações Via Alerta do Vektor — " + (resp.alertId || "—");
-  const subt = "<div style='margin-top:4px; font-size:12px; color:#64748B; text-align:center;'>" +
-    "<b>Período:</b> " + periodo +
-    " &nbsp; <b>Etiqueta:</b> " + (resp.etiqueta || "—") +
-    " &nbsp; <b>Linhas:</b> " + rows.length +
-  "</div>";
 
-  if (!rows.length) {
-    return "<div class='text-sm text-slate-700'><p style='text-align:center;font-weight:bold;'>" + titulo + "</p>" + subt +
-      "<p style='margin-top:8px; text-align:center;'>Nenhuma transação encontrada para o filtro.</p></div>";
-  }
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+  const fmt = (v) => (typeof v === "number" ? v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : String(v||""));
 
-  // tabela simples (mesmas colunas do seu padrão)
-    const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
-    const fmt = (v) => (typeof v === "number" ? v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : String(v||""));
+  // ==========================
+  // NOVO: Pendências
+  // ==========================
+  if (String(resp.alertType || "") === "PENDENCIAS") {
+    const tituloP = "🔔 Visual de Pendências Via Alerta do Vektor — " + (resp.alertId || "—");
+    const subtP = "<div style='margin-top:4px; font-size:12px; color:#64748B; text-align:center;'>" +
+      "<b>Período:</b> " + esc(periodo) +
+      " &nbsp; <b>Linhas:</b> " + rows.length +
+    "</div>";
+
+    if (!rows.length) {
+      return "<div class='text-sm text-slate-700'><p style='text-align:center;font-weight:bold;'>" + tituloP + "</p>" + subtP +
+        "<p style='margin-top:8px; text-align:center;'>Nenhuma pendência encontrada para o filtro.</p></div>";
+    }
 
     let h = "";
     h += "<div class='text-sm text-slate-700'>";
-    h += "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>";
-    h += subt;
+    h += "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + tituloP + "</p>";
+    h += subtP;
     h += "<div style='overflow:auto;border:1px solid rgba(0,0,0,0.12);border-radius:10px;margin-top:10px;'>";
     h += "<table style='border-collapse:collapse;width:100%;font-size:12px;'>";
     h += "<thead><tr style='background:#B5FF20;'>";
-    ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta inserida","Item comprado (descrição)"].forEach(t => {
+    ["Loja","Time","Data da Transação","Valor (R$)","Estabelecimento","Titular","Pendências"].forEach(t => {
       h += "<th style='background:#B5FF20;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;white-space:nowrap;position:sticky;top:0;z-index:10;'>" + esc(t) + "</th>";
     });
     h += "</tr></thead><tbody>";
@@ -3423,16 +3515,58 @@ window.vektorRenderTabelaTransacoesEtiquetaAlert_ = function (resp) {
       h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.loja) + "</td>";
       h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.time) + "</td>";
       h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.data) + "</td>";
-      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:260px;'>" + esc(r.estabelecimento) + "</td>";
       h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;white-space:nowrap;'>" + esc(fmt(r.valor)) + "</td>";
-      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:240px;'>" + esc(r.etiqueta) + "</td>";
-      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:360px;'>" + esc(r.descricao) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:260px;'>" + esc(r.estabelecimento) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.titular) + "</td>";
+      h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:240px;'>" + esc(r.pendencias) + "</td>";
       h += "</tr>";
     });
 
     h += "</tbody></table></div></div>";
     return h;
+  }
 
+  // ==========================
+  // Original: Transações
+  // ==========================
+  const titulo = "🔔 Visual de Transações Via Alerta do Vektor — " + (resp.alertId || "—");
+  const subt = "<div style='margin-top:4px; font-size:12px; color:#64748B; text-align:center;'>" +
+    "<b>Período:</b> " + esc(periodo) +
+    " &nbsp; <b>Etiqueta:</b> " + esc(resp.etiqueta || "—") +
+    " &nbsp; <b>Linhas:</b> " + rows.length +
+  "</div>";
+
+  if (!rows.length) {
+    return "<div class='text-sm text-slate-700'><p style='text-align:center;font-weight:bold;'>" + titulo + "</p>" + subt +
+      "<p style='margin-top:8px; text-align:center;'>Nenhuma transação encontrada para o filtro.</p></div>";
+  }
+
+  let h = "";
+  h += "<div class='text-sm text-slate-700'>";
+  h += "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>";
+  h += subt;
+  h += "<div style='overflow:auto;border:1px solid rgba(0,0,0,0.12);border-radius:10px;margin-top:10px;'>";
+  h += "<table style='border-collapse:collapse;width:100%;font-size:12px;'>";
+  h += "<thead><tr style='background:#B5FF20;'>";
+  ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta inserida","Item comprado (descrição)"].forEach(t => {
+    h += "<th style='background:#B5FF20;border:1px solid #000;border-bottom:3px double #000;padding:6px 8px;white-space:nowrap;position:sticky;top:0;z-index:10;'>" + esc(t) + "</th>";
+  });
+  h += "</tr></thead><tbody>";
+
+  rows.slice(0, 60).forEach(r => {
+    h += "<tr>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.loja) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.time) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;white-space:nowrap;'>" + esc(r.data) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:260px;'>" + esc(r.estabelecimento) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;text-align:right;white-space:nowrap;'>" + esc(fmt(r.valor)) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:240px;'>" + esc(r.etiqueta) + "</td>";
+    h += "<td style='border:1px solid #000;border-bottom:2px double #000;padding:4px 8px;min-width:360px;'>" + esc(r.descricao) + "</td>";
+    h += "</tr>";
+  });
+
+  h += "</tbody></table></div></div>";
+  return h;
 };
 
 function closeStatusVektorModal() {
