@@ -715,6 +715,21 @@ function getOrCreateUserAlertsSheet_() {
         sh.insertColumnAfter(insertPos - 1);
         sh.getRange(1, insertPos).setValue("sendAt");
       }
+      // MIGRAÇÃO: adiciona alertType se não existir (default: TRANSACOES)
+      head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+      if (head.indexOf("alertType") < 0) {
+        var lastCol = sh.getLastColumn();
+        sh.insertColumnAfter(lastCol);
+        sh.getRange(1, lastCol + 1).setValue("alertType");
+
+        // Preenche as linhas existentes com default TRANSACOES
+        var lr = sh.getLastRow();
+        if (lr >= 2) {
+          var fill = [];
+          for (var r = 2; r <= lr; r++) fill.push(["TRANSACOES"]);
+          sh.getRange(2, lastCol + 1, lr - 1, 1).setValues(fill);
+        }
+      }
     }
     return sh;}
 
@@ -1306,11 +1321,28 @@ function buildAlertXlsxAttachment_(alertId, periodo, rows) {
   var sh = ss.getSheets()[0];
   sh.setName("Alerta");
 
-  var header = ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
+    // Detecta se é "Pendências" pela estrutura das linhas (sem depender do layout do front)
+  var isPendencias = !!((rows && rows.length) && (rows[0] && (rows[0].pendencias != null || rows[0].titular != null)));
+
+  var header = isPendencias
+    ? ["Loja","Time","Data","Valor","Estabelecimento","Titular","Pendências"]
+    : ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
+
   sh.getRange(1, 1, 1, header.length).setValues([header]);
 
   if (rows && rows.length) {
     var values = rows.map(function (r) {
+      if (isPendencias) {
+        return [
+          r.loja || "",
+          r.time || "",
+          r.data || "",
+          r.valor || "",
+          r.estabelecimento || "",
+          r.titular || "",
+          r.pendencias || ""
+        ];
+      }
       return [
         r.loja || "",
         r.time || "",
@@ -1383,11 +1415,29 @@ function buildAlertCsvAttachment_(alertId, periodo, rows) {
     return '"' + t + '"';
   };
 
-  var header = ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
+    var isPendencias = !!((rows && rows.length) && (rows[0] && (rows[0].pendencias != null || rows[0].titular != null)));
+
+  var header = isPendencias
+    ? ["Loja","Time","Data","Valor","Estabelecimento","Titular","Pendências"]
+    : ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
+
   var lines = [];
   lines.push(header.map(esc).join(";")); // separador ; (pt-BR)
 
   (rows || []).forEach(function (r) {
+    if (isPendencias) {
+      lines.push([
+        r.loja || "",
+        r.time || "",
+        r.data || "",
+        r.valor || "",
+        r.estabelecimento || "",
+        r.titular || "",
+        r.pendencias || ""
+      ].map(esc).join(";"));
+      return;
+    }
+
     lines.push([
       r.loja || "",
       r.time || "",
@@ -1430,6 +1480,8 @@ function executarAlertaEtiquetaVektor(req) {
     var iEtq      = idx("etiqueta");
     var iLastRun  = idx("lastRunAt");
     var iLastCnt  = idx("lastRowCount");
+    var iType    = idx("alertType");
+
 
     var rowIdx = -1;
     for (var r = 1; r < values.length; r++) {
@@ -1444,6 +1496,9 @@ function executarAlertaEtiquetaVektor(req) {
     var ownerEmail = String(row[iOwner] || "").trim();
     var freq = String(row[iFreq] || "DAILY").trim();
     var windowDays = Number(row[iWin] || 30) || 30;
+    var alertType = (iType >= 0 ? String(row[iType] || "TRANSACOES").trim() : "TRANSACOES");
+      if (alertType !== "TRANSACOES" && alertType !== "PENDENCIAS") alertType = "TRANSACOES";
+
 
     // ATENÇÃO: "time" aqui é o Time/Grupo (não é horário)
     var time = String(row[iTime] || "").trim();
@@ -1466,19 +1521,26 @@ function executarAlertaEtiquetaVektor(req) {
       fim: Utilities.formatDate(now, tz, "dd/MM/yyyy")
     };
 
-    // Busca transações na BaseClara
-    var rows = [];
-    if (!etiquetas.length) {
-      // todas as etiquetas
-      rows = queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, "");
-    } else {
-      // múltiplas etiquetas (OR)
-      var acc = [];
-      etiquetas.forEach(function (et) {
-        acc = acc.concat(queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, et));
-      });
-      rows = acc;
-    }
+    // Busca dados (Transações OU Pendências)
+      var rows = [];
+
+      if (alertType === "PENDENCIAS") {
+        // Pendências não usam etiqueta
+        rows = queryPendenciasBaseClaraAlert_(ini, now, time, lojas);
+      } else {
+        // Transações por etiqueta (como já era)
+        if (!etiquetas.length) {
+          // todas as etiquetas
+          rows = queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, "");
+        } else {
+          // múltiplas etiquetas (OR)
+          var acc = [];
+          etiquetas.forEach(function (et) {
+            acc = acc.concat(queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, et));
+          });
+          rows = acc;
+        }
+      }
 
     // Atualiza lastRunAt/lastRowCount
     if (iLastRun >= 0) sh.getRange(rowIdx + 1, iLastRun + 1).setValue(now);
@@ -1502,10 +1564,16 @@ function executarAlertaEtiquetaVektor(req) {
    // ✅ Envio de e-mail SOMENTE quando NÃO for preview
     if (!preview) {
       try {
-        var assunto = "[Vektor - Grupo SBF] Alerta de transações Clara — " +
-          periodo.inicio + " a " + periodo.fim;
+                // ✅ assunto e template por tipo
+        var assunto = (String(alertType || "TRANSACOES") === "PENDENCIAS")
+          ? "[Vektor - Grupo SBF] Alerta de Pendencias Clara — " + periodo.inicio + " a " + periodo.fim
+          : "[Vektor - Grupo SBF] Alerta de transações Clara — " + periodo.inicio + " a " + periodo.fim;
 
-        var htmlBody = montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows);
+        var htmlBody = (String(alertType || "TRANSACOES") === "PENDENCIAS")
+          ? montarEmailUserAlertPendencias_(alertId, time, periodo, rows)
+          : montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows);
+
+        // ✅ anexo já sai certo porque buildAlertXlsx/CSV agora detectam "pendencias/titular"
         var attachment = buildAlertAttachmentSmart_(alertId, periodo, rows);
 
         if (ownerEmail) {
@@ -1533,8 +1601,9 @@ function executarAlertaEtiquetaVektor(req) {
       ownerEmail: ownerEmail,
       freq: freq,
       time: time,
-      etiqueta: etiquetaCsv || "",
-      etiquetaCount: etiquetas.length,
+      alertType: alertType,
+      etiqueta: (alertType === "PENDENCIAS" ? "" : (etiquetaCsv || "")),
+      etiquetaCount: (alertType === "PENDENCIAS" ? 0 : etiquetas.length),
       periodo: periodo,
       rows: previewRows
     };
@@ -1542,6 +1611,109 @@ function executarAlertaEtiquetaVektor(req) {
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
+}
+
+function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName("BaseClara");
+  if (!sh) throw new Error("Aba BaseClara não encontrada.");
+
+  var lr = sh.getLastRow();
+  if (lr < 2) return [];
+
+  // Lê A..W (23 colunas)
+  var values = sh.getRange(2, 1, lr - 1, 23).getValues();
+
+  // Índices zero-based (A..W)
+  var IDX_DATA  = 0;   // A
+  var IDX_ESTAB = 2;   // C  ✅ você pediu explicitamente
+  var IDX_VALOR = 5;   // F
+  var IDX_RECIBO = 14; // O
+  var IDX_TITULAR = 16;// Q
+  var IDX_GRUPO = 17;  // R (time/grupo)
+  var IDX_ETIQUETA = 19; // T
+  var IDX_DESC = 20;     // U
+  var IDX_LOJA_NUM = 21; // V
+
+  // Normaliza filtros
+  var timeSel = String(timeFiltro || "").trim();
+  var lojasSet = {};
+  (lojasFiltro || []).forEach(function(l){
+    var k = String(l || "").trim();
+    if (k) lojasSet[k] = true;
+  });
+
+  function isVazio_(x) {
+    var s = String(x == null ? "" : x).trim();
+    return (!s || s === "-" || s === "—");
+  }
+
+  // Converte para datas comparáveis
+  var iniMs = (ini instanceof Date) ? ini.getTime() : new Date(ini).getTime();
+  var fimMs = (fim instanceof Date) ? fim.getTime() : new Date(fim).getTime();
+
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+  var out = [];
+
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+
+    var dt = row[IDX_DATA];
+    var dt2 = (dt instanceof Date) ? dt : new Date(dt);
+    if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
+
+    var tms = dt2.getTime();
+    if (tms < iniMs || tms > fimMs) continue;
+
+    // Loja
+    var loja = String(row[IDX_LOJA_NUM] || "").trim();
+    if (!loja) continue;
+
+    // Filtro lojas (quando time != __ALL__)
+    if (timeSel !== "__ALL__" && Object.keys(lojasSet).length) {
+      if (!lojasSet[loja]) continue;
+    }
+
+    // Time
+    var grp = String(row[IDX_GRUPO] || "").trim();
+
+    // Filtro por time
+    if (timeSel && timeSel !== "__ALL__") {
+      if (grp !== timeSel) continue;
+    }
+
+    var estab = String(row[IDX_ESTAB] || "").trim();
+    var titular = String(row[IDX_TITULAR] || "").trim();
+    var valor = Number(row[IDX_VALOR]) || 0;
+
+    var etiquetas = String(row[IDX_ETIQUETA] || "").trim();
+    var recibo = String(row[IDX_RECIBO] || "").trim();
+    var desc = String(row[IDX_DESC] || "").trim();
+
+    var pendEtiqueta = isVazio_(etiquetas);
+    var pendNF = isVazio_(recibo);
+    var pendDesc = isVazio_(desc);
+
+    if (!pendEtiqueta && !pendNF && !pendDesc) continue;
+
+    var pendList = [];
+    if (pendEtiqueta) pendList.push("Etiqueta");
+    if (pendDesc) pendList.push("Descrição");
+    if (pendNF) pendList.push("Nota fiscal/Recibo");
+
+    out.push({
+      loja: loja,
+      time: grp || "—",
+      data: Utilities.formatDate(dt2, tz, "dd/MM/yyyy"),
+      valor: valor,
+      estabelecimento: estab,
+      titular: titular,
+      pendencias: pendList.join(", ")
+    });
+  }
+
+  return out;
 }
 
 function montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows) {
@@ -1613,6 +1785,151 @@ function montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows) {
   });
 
   h += "</tbody></table></div></div>";
+  return h;
+}
+
+function montarEmailUserAlertPendencias_(alertId, time, periodo, rows) {
+  var esc = function (s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  };
+
+  var max = 120; // evita e-mail gigante
+  var view = (rows || []).slice(0, max);
+
+  // ---- Normaliza e conta tipos de pendência
+  // Esperado em r.pendencias: "Etiqueta, Descrição, Nota fiscal/Recibo" (variações possíveis)
+  var catCount = { "Etiqueta": 0, "Descrição": 0, "Nota fiscal/Recibo": 0, "Outros": 0 };
+
+  function normalizarPendTipo_(p) {
+    var x = String(p || "").trim().toLowerCase();
+    if (!x) return "";
+    if (x.indexOf("etiqueta") >= 0) return "Etiqueta";
+    if (x.indexOf("descr") >= 0) return "Descrição";
+    if (x.indexOf("nota") >= 0 || x.indexOf("recibo") >= 0) return "Nota fiscal/Recibo";
+    return "Outros";
+  }
+
+  var totalPendencias = 0;
+
+  // ---- Maior loja ofensora (por quantidade de pendências)
+  var lojaPendCount = {}; // loja -> total pendências (somatório por ocorrência)
+
+  // ---- Soma do valor total (pendente) no período
+  var totalValor = 0;
+
+  (rows || []).forEach(function (r) {
+    // soma valor (aceita número ou string "R$ 1.234,56")
+    var vNum = 0;
+    if (typeof r.valor === "number") {
+      vNum = r.valor;
+    } else {
+      var v = String(r.valor || "")
+        .replace(/[R$\s]/g, "")
+        .replace(/\./g, "")
+        .replace(",", ".");
+      var n = Number(v);
+      vNum = isNaN(n) ? 0 : n;
+    }
+    totalValor += vNum;
+
+    // conta pendências
+    var pendRaw = String(r.pendencias || "").trim();
+    if (!pendRaw) return;
+
+    // separa por vírgula
+    var parts = pendRaw.split(",").map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+
+    var lojaKey = String(r.loja || "").trim() || "—";
+    if (!lojaPendCount[lojaKey]) lojaPendCount[lojaKey] = 0;
+
+    parts.forEach(function (p) {
+      var cat = normalizarPendTipo_(p) || "Outros";
+      if (!catCount[cat]) catCount[cat] = 0;
+      catCount[cat] += 1;
+      totalPendencias += 1;
+      lojaPendCount[lojaKey] += 1;
+    });
+  });
+
+  // maior ofensor (tipo)
+  var maiorOfensor = "—";
+  var maiorOfensorQtd = -1;
+  Object.keys(catCount).forEach(function (k) {
+    if ((catCount[k] || 0) > maiorOfensorQtd) {
+      maiorOfensorQtd = catCount[k] || 0;
+      maiorOfensor = k;
+    }
+  });
+  if (maiorOfensorQtd <= 0) maiorOfensor = "—";
+
+  // maior loja ofensora
+  var maiorLoja = "—";
+  var maiorLojaQtd = -1;
+  Object.keys(lojaPendCount).forEach(function (lk) {
+    if ((lojaPendCount[lk] || 0) > maiorLojaQtd) {
+      maiorLojaQtd = lojaPendCount[lk] || 0;
+      maiorLoja = lk;
+    }
+  });
+  if (maiorLojaQtd <= 0) maiorLoja = "—";
+
+  // Formatação BRL
+  var totalValorFmt = totalValor.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+
+  // ---- Corpo do e-mail (com o “template” que você pediu)
+  var h = "";
+  h += "<div style='font-family:Arial,sans-serif;font-size:13px;color:#0f172a'>";
+  h += "<h2 style='margin:0 0 8px 0'>Plataforma de Governança Financeira do Cartão Clara</h2>";
+  h += "<div style='margin:0 0 10px 0'>";
+  h += "<b>ID:</b> " + esc(alertId) + "<br/>";
+  h += "<b>Time:</b> " + esc(time) + "<br/>";
+  h += "<b>Período:</b> " + esc(periodo.inicio) + " a " + esc(periodo.fim) + "<br/>";
+  h += "<b>Total de linhas:</b> " + esc((rows || []).length) + (rows.length > max ? " (mostrando apenas " + max + ")" : "") + "<br/>";
+  h += "<b>Quantidade Pendencias:</b> " + esc(totalPendencias) + "<br/>";
+  h += "<b>Maior Ofensor:</b> " + esc(maiorOfensor) + (maiorOfensor !== "—" ? (" (" + esc(maiorOfensorQtd) + ")") : "") + "<br/>";
+  h += "<b>Maior Loja ofensora:</b> " + esc(maiorLoja) + (maiorLoja !== "—" ? (" (" + esc(maiorLojaQtd) + ")") : "") + "<br/>";
+  h += "<b>Valor total pendente no período analisado:</b> " + esc(totalValorFmt) + "<br/>";
+  h += "</div>";
+
+  // ---- Tabela (preview)
+  if (!view.length) {
+    h += "<p>Nenhuma pendência encontrada para o filtro configurado.</p>";
+    h += "<p style='margin-top:14px'><b>Vektor - Grupo SBF</b></p>";
+    h += "</div>";
+    return h;
+  }
+
+  var th = "background:#0b1220;color:#fff;border:1px solid #111827;padding:8px;font-size:12px;white-space:nowrap;";
+  var td = "border:1px solid #e2e8f0;padding:6px;font-size:12px;vertical-align:top;";
+
+  h += "<div style='overflow:auto;border:1px solid #e2e8f0;border-radius:10px'>";
+  h += "<table style='border-collapse:collapse;width:100%'>";
+  h += "<thead><tr>";
+  ["Loja","Time","Data","Valor","Estabelecimento","Titular","Pendências"].forEach(function(c){
+    h += "<th style='" + th + "'>" + esc(c) + "</th>";
+  });
+  h += "</tr></thead><tbody>";
+
+  view.forEach(function(r){
+    h += "<tr>";
+    h += "<td style='" + td + "white-space:nowrap'>" + esc(r.loja) + "</td>";
+    h += "<td style='" + td + "white-space:nowrap'>" + esc(r.time) + "</td>";
+    h += "<td style='" + td + "white-space:nowrap'>" + esc(r.data) + "</td>";
+    h += "<td style='" + td + "white-space:nowrap;text-align:right'>" + esc(r.valor) + "</td>";
+    h += "<td style='" + td + "'>" + esc(r.estabelecimento) + "</td>";
+    h += "<td style='" + td + "'>" + esc(r.titular) + "</td>";
+    h += "<td style='" + td + "'>" + esc(r.pendencias) + "</td>";
+    h += "</tr>";
+  });
+
+  h += "</tbody></table></div>";
+  h += "<p style='margin-top:14px'><b>Vektor - Grupo SBF</b></p>";
+  h += "</div>";
   return h;
 }
 
