@@ -703,7 +703,7 @@ function getOrCreateUserAlertsSheet_() {
     "createdAt", "isActive",
     "freq", "windowDays",
     "time", "sendAt", "lojasCsv", "etiqueta",
-    "lastRunAt", "lastRowCount"
+    "lastRunAt", "lastRowCount", "alertType"
   ]);
     } else {
       // MIGRAÇÃO: adiciona sendAt se não existir
@@ -804,6 +804,10 @@ function criarAlertaEtiquetaVektor(payload) {
     var windowDays = Number(payload.windowDays || 30) || 30;
     var time = String(payload.time || "").trim();
     var sendAt = String(payload.sendAt || "").trim(); // "HH:mm" ou vazio
+    var alertType = String(payload.alertType || "TRANSACOES").trim();
+    
+    if (alertType !== "TRANSACOES" && alertType !== "PENDENCIAS") alertType = "TRANSACOES";
+
 
     // ✅ novo: pode vir array (multi) OU string (legado)
     var etiquetasArr = Array.isArray(payload.etiquetas) ? payload.etiquetas.map(function(x){ return String(x || "").trim(); }) : [];
@@ -855,7 +859,8 @@ function criarAlertaEtiquetaVektor(payload) {
       lojas.join(","),
       etiquetaFinalCsv, // ✅ agora pode ser vazio (todas) ou "A | B | C"
       "",   // lastRunAt
-      ""    // lastRowCount
+      "",    // lastRowCount
+      alertType // ✅ NOVO
     ]);
 
     // ✅ FIX: força sendAt como TEXTO (evita virar Date 30/12/1899)
@@ -1015,6 +1020,8 @@ function listarAlertasUsuarioVektor(req) {
     var iLojas     = idx("lojasCsv");
     var iEtq       = idx("etiqueta");
     var iLastRun   = idx("lastRunAt");
+    var iType      = idx("alertType");
+
 
     var isAdmin = (role === "Administrador");
 
@@ -1117,9 +1124,16 @@ function listarAlertasUsuarioVektor(req) {
         time: String(row[iTime] || ""),
         sendAt: (iSendAt >= 0 ? formatSendAt_(row[iSendAt]) : ""),
         lojasCount: lojasCount,
+
+        // etiquetas continuam existindo para Transações
         etiqueta: etiquetaRaw,
         etiquetaCount: etiquetaCount,
         etiquetaLabel: etiquetaLabel,
+
+        // ✅ NOVO: tipo
+        alertType: (iType >= 0 ? String(row[iType] || "TRANSACOES").trim() : "TRANSACOES"),
+        alertTypeLabel: ((iType >= 0 ? String(row[iType] || "").trim() : "") === "PENDENCIAS" ? "Pendências" : "Transações"),
+
         lastRunAt: (row[iLastRun] instanceof Date)
           ? Utilities.formatDate(row[iLastRun], Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy HH:mm")
           : (row[iLastRun] ? String(row[iLastRun]) : "—")
@@ -1176,6 +1190,9 @@ function atualizarAlertaEtiquetaVektor(payload) {
     var time = String(payload.time || "").trim();
     var sendAt = String(payload.sendAt || "").trim(); // "HH:mm" ou ""
 
+    var alertType = String(payload.alertType || "TRANSACOES").trim();
+    if (alertType !== "TRANSACOES" && alertType !== "PENDENCIAS") alertType = "TRANSACOES";
+
     // Multi etiquetas (mesma regra do criar)
     var etiquetasArr = Array.isArray(payload.etiquetas)
       ? payload.etiquetas.map(function(x){ return String(x || "").trim(); }).filter(Boolean)
@@ -1187,6 +1204,9 @@ function atualizarAlertaEtiquetaVektor(payload) {
     if (etiquetasArr.length) etiquetaFinalCsv = etiquetasArr.join(" | ");
     else if (etiquetaLegacy && etiquetaLegacy !== "__ALL__") etiquetaFinalCsv = etiquetaLegacy;
     else etiquetaFinalCsv = ""; // todas
+
+    // ✅ Pendências não usa etiqueta: sempre vazio
+    if (alertType === "PENDENCIAS") etiquetaFinalCsv = "";
 
     var lojas = Array.isArray(payload.lojas) ? payload.lojas.map(String) : [];
     lojas = lojas.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
@@ -1214,6 +1234,7 @@ function atualizarAlertaEtiquetaVektor(payload) {
     var iSendAt  = idx("sendAt");
     var iLojas   = idx("lojasCsv");
     var iEtq     = idx("etiqueta");
+    var iType    = idx("alertType");
 
     if (iAlertId < 0) return { ok:false, error:"Cabeçalho inválido: alertId não encontrado." };
 
@@ -1236,12 +1257,15 @@ function atualizarAlertaEtiquetaVektor(payload) {
     if (iWin    >= 0) sh.getRange(rowIndex + 1, iWin    + 1).setValue(windowDays);
     if (iTime   >= 0) sh.getRange(rowIndex + 1, iTime   + 1).setValue(time);
     if (iSendAt >= 0) {
-    var cell = sh.getRange(rowIndex + 1, iSendAt + 1);
-    cell.setNumberFormat("@"); // texto
-    cell.setValue(String(sendAt || "").trim());
-  }
+      var cell = sh.getRange(rowIndex + 1, iSendAt + 1);
+      cell.setNumberFormat("@"); // texto
+      cell.setValue(String(sendAt || "").trim());
+    }
     if (iLojas  >= 0) sh.getRange(rowIndex + 1, iLojas  + 1).setValue(lojas.join(","));
     if (iEtq    >= 0) sh.getRange(rowIndex + 1, iEtq    + 1).setValue(etiquetaFinalCsv);
+
+    // ✅ NOVO: salva alertType
+    if (iType >= 0) sh.getRange(rowIndex + 1, iType + 1).setValue(alertType);
 
     return { ok:true, alertId: alertId };
 
