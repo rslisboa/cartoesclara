@@ -323,7 +323,7 @@ function vektorAssertFunctionAllowed_(fnName) {
 // =======================
 // VEKTOR - SESSAO, TEMPO DE LOGIN
 // =======================
-var VEKTOR_SESSION_TTL_SECONDS = 3 * 60 * 60; // 3 horas ou 5 minutos
+var VEKTOR_SESSION_TTL_SECONDS = 30 * 60; // 3 horas ou 5 minutos
 
 function vektorCreateSessionToken_(email) {
   // token aleatório + carimbo
@@ -364,6 +364,19 @@ function vektorValidateSessionToken_(token) {
 
 function validarSessaoVektor(token) {
   return vektorValidateSessionToken_(token);
+}
+
+function encerrarSessaoVektor(token) {
+  try {
+    var t = String(token || "").trim();
+    if (!t) return { ok: true };
+
+    var cache = CacheService.getScriptCache();
+    cache.remove("VEKTOR_SESSION_" + t);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
 }
 
 /**
