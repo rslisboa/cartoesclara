@@ -1250,6 +1250,9 @@ function atualizarAlertaEtiquetaVektor(payload) {
     var iLojas   = idx("lojasCsv");
     var iEtq     = idx("etiqueta");
     var iType    = idx("alertType");
+    var iLastRun = idx("lastRunAt");
+    var iLastCnt = idx("lastRowCount");
+
 
     if (iAlertId < 0) return { ok:false, error:"Cabeçalho inválido: alertId não encontrado." };
 
@@ -1266,6 +1269,39 @@ function atualizarAlertaEtiquetaVektor(payload) {
     if (!isAdmin && ownerEmail && ownerEmail !== email) {
       return { ok:false, error:"Você não tem permissão para editar este alerta." };
     }
+
+    // ✅ Se mudou freq e/ou sendAt, zera lastRunAt para permitir novo disparo no mesmo dia
+try {
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+  var oldFreq = (iFreq >= 0) ? String(values[rowIndex][iFreq] || "").trim() : "";
+
+  // Normaliza sendAt antigo (pode vir Date/number/string)
+  var oldSendAtRaw = (iSendAt >= 0) ? values[rowIndex][iSendAt] : "";
+  var oldSendAt = "";
+
+  if (Object.prototype.toString.call(oldSendAtRaw) === "[object Date]" && !isNaN(oldSendAtRaw.getTime())) {
+    oldSendAt = Utilities.formatDate(oldSendAtRaw, tz, "HH:mm");
+  } else if (typeof oldSendAtRaw === "number" && isFinite(oldSendAtRaw)) {
+    var totalMinutes = Math.round(oldSendAtRaw * 24 * 60);
+    var hh = Math.floor(totalMinutes / 60) % 24;
+    var mm = totalMinutes % 60;
+    oldSendAt = (String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0"));
+  } else {
+    oldSendAt = String(oldSendAtRaw || "").trim();
+    if (/^\d{2}:\d{2}:\d{2}$/.test(oldSendAt)) oldSendAt = oldSendAt.slice(0, 5);
+  }
+
+  var newSendAt = String(sendAt || "").trim();
+  if (/^\d{2}:\d{2}:\d{2}$/.test(newSendAt)) newSendAt = newSendAt.slice(0, 5);
+
+  var changedSchedule = (oldFreq !== freq) || (oldSendAt !== newSendAt);
+
+  if (changedSchedule) {
+    if (iLastRun >= 0) sh.getRange(rowIndex + 1, iLastRun + 1).setValue("");
+    if (iLastCnt >= 0) sh.getRange(rowIndex + 1, iLastCnt + 1).setValue("");
+  }
+} catch (_) {}
 
     // atualiza campos
     if (iFreq   >= 0) sh.getRange(rowIndex + 1, iFreq   + 1).setValue(freq);
@@ -1542,9 +1578,12 @@ function executarAlertaEtiquetaVektor(req) {
         }
       }
 
-    // Atualiza lastRunAt/lastRowCount
-    if (iLastRun >= 0) sh.getRange(rowIdx + 1, iLastRun + 1).setValue(now);
-    if (iLastCnt >= 0) sh.getRange(rowIdx + 1, iLastCnt + 1).setValue(rows.length);
+      // Atualiza lastRunAt/lastRowCount
+      // ✅ IMPORTANTE: preview NÃO pode marcar execução, senão bloqueia o scheduler do mesmo dia
+      if (!preview) {
+        if (iLastRun >= 0) sh.getRange(rowIdx + 1, iLastRun + 1).setValue(now);
+        if (iLastCnt >= 0) sh.getRange(rowIdx + 1, iLastCnt + 1).setValue(rows.length);
+      }
 
     // Log de execução (guarda preview de no máx. 60 linhas)
     var runsSh = getOrCreateUserAlertsRunsSheet_();
@@ -1567,7 +1606,7 @@ function executarAlertaEtiquetaVektor(req) {
                 // ✅ assunto e template por tipo
         var assunto = (String(alertType || "TRANSACOES") === "PENDENCIAS")
           ? "[Vektor - Grupo SBF] Alerta de Pendencias Clara — " + periodo.inicio + " a " + periodo.fim
-          : "[Vektor - Grupo SBF] Alerta de transações Clara — " + periodo.inicio + " a " + periodo.fim;
+          : "[Vektor - Grupo SBF] Alerta de Transações Clara — " + periodo.inicio + " a " + periodo.fim;
 
         var htmlBody = (String(alertType || "TRANSACOES") === "PENDENCIAS")
           ? montarEmailUserAlertPendencias_(alertId, time, periodo, rows)
@@ -1643,9 +1682,27 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
     if (k) lojasSet[k] = true;
   });
 
-  function isVazio_(x) {
-    var s = String(x == null ? "" : x).trim();
-    return (!s || s === "-" || s === "—");
+    function isVazio_(v) {
+    if (v === null || v === undefined) return true;
+
+    // IMPORTANTÍSSIMO: no Google Sheets, checkbox pode virar boolean
+    if (v === false) return true;
+
+    var s = String(v).trim().toLowerCase();
+
+    // placeholders comuns
+    if (!s) return true;
+    if (s === "-" || s === "—" || s === "n/a" || s === "na") return true;
+
+    // casos que na BaseClara significam "sem recibo" (pendência)
+    if (s === "não" || s === "nao") return true;
+    if (s === "false" || s === "0") return true;
+
+    // textos livres comuns
+    if (s.indexOf("sem recibo") >= 0) return true;
+    if (s.indexOf("sem nota") >= 0) return true;
+
+    return false;
   }
 
   // Converte para datas comparáveis
@@ -1795,6 +1852,8 @@ function montarEmailUserAlertPendencias_(alertId, time, periodo, rows) {
       .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
   };
 
+  var timeLabel = (String(time || "").trim() === "__ALL__") ? "Todos" : String(time || "").trim();
+
   var max = 120; // evita e-mail gigante
   var view = (rows || []).slice(0, max);
 
@@ -1887,7 +1946,7 @@ function montarEmailUserAlertPendencias_(alertId, time, periodo, rows) {
   h += "<h2 style='margin:0 0 8px 0'>Plataforma de Governança Financeira do Cartão Clara</h2>";
   h += "<div style='margin:0 0 10px 0'>";
   h += "<b>ID:</b> " + esc(alertId) + "<br/>";
-  h += "<b>Time:</b> " + esc(time) + "<br/>";
+  h += "<b>Time:</b> " + esc(timeLabel) + "<br/>";
   h += "<b>Período:</b> " + esc(periodo.inicio) + " a " + esc(periodo.fim) + "<br/>";
   h += "<b>Total de linhas:</b> " + esc((rows || []).length) + (rows.length > max ? " (mostrando apenas " + max + ")" : "") + "<br/>";
   h += "<b>Quantidade Pendencias:</b> " + esc(totalPendencias) + "<br/>";
