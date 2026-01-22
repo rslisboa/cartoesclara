@@ -995,6 +995,24 @@
             style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
             Atualizar lista
           </button>
+
+          <button id="myAl_cancelEditBtn" type="button" onclick="window.vektorMyAlertsCancelEdit_()"
+            style="display:none;
+            height:36px;
+            padding:0 14px;
+            border-radius:10px;
+            border:1px solid rgba(148,163,184,0.18);
+            background:rgba(255,255,255,0.06);
+            color:#fff;
+            font-weight:900;
+            font-size:12px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            line-height:1;">
+            Cancelar edição
+          </button>
+
         </div>
 
         <div id="myAl_createStatus" style="margin-top:4px; font-size:12px; color:rgba(226,232,240,0.85);"></div>
@@ -3079,6 +3097,8 @@ window.vektorMyAlertsCreate = function () {
           window.__myAl_editingAlertId = "";
           const btn = document.getElementById("myAl_saveBtn");
           if (btn) btn.textContent = "Criar alerta";
+          const cancelBtn = document.getElementById("myAl_cancelEditBtn");
+          if (cancelBtn) cancelBtn.style.display = "none";
         } else {
           setStatus("Alerta criado com sucesso. ID: " + (res.alertId || "—"));
           if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Alerta criado com sucesso!", "success");
@@ -3171,6 +3191,21 @@ window.vektorMyAlertsDelete = function(alertId) {
     .excluirAlertaVektor({ alertId: alertId, email: email, role: role });
 };
 
+window.vektorMyAlertsCancelEdit_ = function () {
+  try {
+    window.__myAl_editingAlertId = "";
+
+    const btn = document.getElementById("myAl_saveBtn");
+    if (btn) btn.textContent = "Criar alerta";
+
+    const cancelBtn = document.getElementById("myAl_cancelEditBtn");
+    if (cancelBtn) cancelBtn.style.display = "none";
+
+    const st = document.getElementById("myAl_createStatus");
+    if (st) st.textContent = "Edição cancelada.";
+  } catch (_) {}
+};
+
 window.vektorMyAlertsStartEdit_ = function (a) {
   if (!a || !a.alertId) return;
 
@@ -3179,6 +3214,10 @@ window.vektorMyAlertsStartEdit_ = function (a) {
   // muda texto do botão
   const btn = document.getElementById("myAl_saveBtn");
   if (btn) btn.textContent = "Salvar edição";
+
+  // ✅ mostra botão "Cancelar edição"
+  const cancelBtn = document.getElementById("myAl_cancelEditBtn");
+  if (cancelBtn) cancelBtn.style.display = "inline-flex";
 
   // status
   const st = document.getElementById("myAl_createStatus");
