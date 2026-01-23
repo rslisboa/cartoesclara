@@ -9330,8 +9330,43 @@ const INTENT_RULES = [
     return s;
   },
   run: function (msgOriginal, norm) {
-    return "ACAO_LISTAR_ETIQUETAS_CLARA";
-  }}
+  // Se a frase pede visão de gasto/valor/percentual/relatório, é "Gastos por etiquetas"
+  const falaGasto =
+    norm.includes("gasto por etiqueta") ||
+    norm.includes("gastos por etiqueta") ||
+    norm.includes("gastos por etiquetas") ||
+    norm.includes("despesa por etiqueta") ||
+    norm.includes("despesas por etiqueta") ||
+    norm.includes("resumo por etiqueta") ||
+    norm.includes("resumo de etiquetas") ||
+    norm.includes("consolidado por etiqueta");
+
+  const falaPercentual =
+    norm.includes("percentual por etiqueta") ||
+    norm.includes("porcentagem por etiqueta") ||
+    norm.includes("percentual de uso das etiquetas") ||
+    norm.includes("porcentagem de uso das etiquetas");
+
+  const falaValor =
+    norm.includes("valor por etiqueta") ||
+    norm.includes("valores por etiqueta") ||
+    norm.includes("quanto foi gasto em cada etiqueta");
+
+  const falaVisao =
+    norm.includes("visao por etiqueta") ||
+    norm.includes("visão por etiqueta") ||
+    norm.includes("relatorio por etiqueta") ||
+    norm.includes("relatório por etiqueta") ||
+    norm.includes("ranking de etiquetas");
+
+  if (falaGasto || falaPercentual || falaValor || falaVisao) {
+    return "ACAO_GASTOS_ETIQUETAS_CLARA";
+  }
+
+  // Caso contrário, é a listagem explicativa/catálogo
+  return "ACAO_LISTAR_ETIQUETAS_CLARA";
+}
+  }
 
   ,{
   id: "INTENT_LISTA_DEMISSOES",
@@ -18955,10 +18990,24 @@ if (isCmdLojasOfensoras) {
     // ✅ Agora sim: gera a resposta (e então usa ACOES)
     const resposta = gerarRespostaDoBot(texto);
 
-    // Se a intenção for listar etiquetas, chama a função específica e para aqui
+   // ✅ Gastos por etiquetas -> abre calendário + tabela
+    if (resposta === "ACAO_GASTOS_ETIQUETAS_CLARA") {
+      abrirPeriodoGastosEtiquetas_();
+      return;
+    }
+
+    // ✅ Listagem de etiquetas -> resposta explicativa (catálogo)
     if (resposta === "ACAO_LISTAR_ETIQUETAS_CLARA") {
-        abrirPeriodoGastosEtiquetas_();
-        return;
+      try {
+        renderBotMessage(respCatalogoEtiquetas());
+      } catch (e) {
+        console.error("Erro ao montar catálogo de etiquetas:", e);
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'>Não consegui montar a listagem de etiquetas agora.</p>" +
+          "<p class='text-xs text-slate-500 mt-1'>Detalhe: " + (e && e.message ? String(e.message) : String(e || "—")) + "</p>"
+        );
+      }
+      return;
     }
 
     if (resposta === "ACAO_FREQUENCIA_USO_CLARA") {
