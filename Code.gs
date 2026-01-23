@@ -91,7 +91,7 @@ var VEKTOR_WHITELIST_EMAILS = [
   "tainara.nascimento@gruposbf.com.br",
   "durval.neto@centauro.com.br",
   "gabriela.crochiquia@centauro.com.br",
-  "rodrigo.lisboa25@gmail.com"
+  "julia.ssantos@gruposbf.com.br"
   // adicione outros aqui
 ];
 
