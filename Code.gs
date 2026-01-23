@@ -1676,10 +1676,11 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
 
   // Normaliza filtros
   var timeSel = String(timeFiltro || "").trim();
-  var lojasSet = {};
+    var lojasSet = {};
   (lojasFiltro || []).forEach(function(l){
-    var k = String(l || "").trim();
-    if (k) lojasSet[k] = true;
+    // normaliza "CE0147" / "0147" / 147 => "147"
+    var n = normalizarLojaNumero_(l);
+    if (n !== null) lojasSet[String(n)] = true;
   });
 
     function isVazio_(v) {
@@ -1705,6 +1706,16 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
     return false;
   }
 
+    function isBlank_(v) {
+    return String(v == null ? "" : v).trim() === "";
+  }
+
+  function isReciboPendente_(v) {
+    // regra: pendência de NF quando coluna O for "Não"
+    var s = String(v == null ? "" : v).trim().toLowerCase();
+    return (s === "não" || s === "nao");
+  }
+
   // Converte para datas comparáveis
   var iniMs = (ini instanceof Date) ? ini.getTime() : new Date(ini).getTime();
   var fimMs = (fim instanceof Date) ? fim.getTime() : new Date(fim).getTime();
@@ -1723,13 +1734,19 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
     var tms = dt2.getTime();
     if (tms < iniMs || tms > fimMs) continue;
 
-    // Loja
-    var loja = String(row[IDX_LOJA_NUM] || "").trim();
-    if (!loja) continue;
+        // Loja (BaseClara coluna V = LojaNum)
+    var lojaNum = normalizarLojaNumero_(row[IDX_LOJA_NUM]);
+    if (lojaNum === null) continue;
+
+    // para filtrar, usa chave numérica (sem "CE" e sem zeros à esquerda)
+    var lojaKey = String(lojaNum);
+
+    // para exibir, você pode padronizar como "CE####"
+    var loja = "CE" + String(lojaNum).padStart(4, "0");
 
     // Filtro lojas (quando time != __ALL__)
     if (timeSel !== "__ALL__" && Object.keys(lojasSet).length) {
-      if (!lojasSet[loja]) continue;
+      if (!lojasSet[lojaKey]) continue;
     }
 
     // Time
@@ -1748,9 +1765,9 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
     var recibo = String(row[IDX_RECIBO] || "").trim();
     var desc = String(row[IDX_DESC] || "").trim();
 
-    var pendEtiqueta = isVazio_(etiquetas);
-    var pendNF = isVazio_(recibo);
-    var pendDesc = isVazio_(desc);
+    var pendEtiqueta = isBlank_(etiquetas);        // T vazia
+    var pendNF       = isReciboPendente_(recibo); // O = "Não"
+    var pendDesc     = isBlank_(desc);            // U vazia
 
     if (!pendEtiqueta && !pendNF && !pendDesc) continue;
 
