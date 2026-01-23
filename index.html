@@ -633,13 +633,13 @@
   🟢 Estado Operacional
 </button>
 
-  <button
+  <!--<button
   type="button"
   onclick="window.open(POLITICA_CARTOES_CLARA_LINK,'_blank')"
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
   📘 Regras e Políticas
-</button>
+</button>-->
 
 <button
   type="button"
@@ -647,6 +647,14 @@
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
   ❓ Como usar o Vektor
+</button>
+
+<button
+  type="button"
+  onclick="window.vektorOpenFluxograma()"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+>
+  🧩 Fluxograma
 </button>
 
 <button
@@ -1137,6 +1145,151 @@
 
 </div> <!-- fecha #feedbackView -->
 
+<!-- VIEW: FLUXOGRAMA (sobrepõe SOMENTE a área do chat) -->
+<div id="fluxogramaView" class="hidden" style="position:absolute; inset:0; z-index:20;">
+
+  <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+
+      <!-- Header do Fluxograma -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button type="button"
+            onclick="window.vektorShowChatView()"
+            style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:800; font-size:12px;">
+            ← Voltar ao chat
+          </button>
+
+          <div>
+            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Fluxograma do Vektor</div>
+            <div style="color:rgba(226,232,240,0.9); font-size:14px; margin-top:2px;">
+              Visão interna do funcionamento (bases, jobs, consultas e entregas)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div style="flex:1; padding:16px; overflow:auto; background:radial-gradient(1200px 900px at 20% 0%, rgba(181,255,32,0.14), transparent 55%), radial-gradient(900px 700px at 90% 20%, rgba(0,94,39,0.22), transparent 55%), #07110c;">
+        <div style="max-width:1100px; margin:0 auto;">
+
+          <!-- Legend -->
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <div style="color:rgba(226,232,240,0.92); font-size:14px;">
+              <b>Objetivo:</b> mostrar como o Vektor percorre <b>fontes → processamento → regras → saídas</b>.
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid rgba(181,255,32,0.35); background:rgba(2,6,23,0.35); color:#fff; font-size:11px; font-weight:800;">
+                ■ Caixas: componentes
+              </span>
+              <span style="display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; border:1px solid rgba(181,255,32,0.35); background:rgba(2,6,23,0.35); color:#fff; font-size:11px; font-weight:800;">
+                ⟶ Setas: fluxo de dados
+              </span>
+            </div>
+          </div>
+
+          <!-- Flow container (zig-zag) -->
+          <div class="flow-container" style="position:relative; padding:14px 12px 24px; border-radius:18px; border:1px solid rgba(148,163,184,0.20); background:rgba(2,6,23,0.35);">
+
+            <!-- SVG overlay dos conectores (setas “coladas” nas caixas, com cotovelo reto) -->
+            <svg id="fluxoConnectorsSvg"
+                style="position:absolute; inset:0; width:100%; height:100%; z-index:5; pointer-events:none; shape-rendering:geometricPrecision;"
+                viewBox="0 0 1000 1000" preserveAspectRatio="none">
+              <defs>
+              <marker id="arrowHeadGreen" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+              <polygon points="0,0 7,3.5 0,7" fill="rgb(181,255,32)" fill-opacity="1"></polygon>
+            </marker>
+
+            <marker id="arrowHeadDarkGreen" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">
+              <polygon points="0,0 7,3.5 0,7" fill="rgb(34,197,94)" fill-opacity="1"></polygon>
+            </marker>
+
+              </defs>
+            </svg>
+
+            <!-- Step 1 (left) -->
+            <div style="display:flex; justify-content:flex-start;">
+              <div id="fgStep1" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+                <div style="font-weight:1000; letter-spacing:0.2px;">1) Fontes (entrada)</div>
+                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+                  • <b>Google Sheets</b>: BaseClara e abas auxiliares (pendências/justificativas/históricos)<br/>
+                  • <b>BigQuery</b>: consultas agregadas/validações (quando aplicável)<br/>
+                  • <b>PropertiesService</b>: chaves de controle (última execução, assinaturas, anti-spam)<br/>
+                  • <b>Drive</b>: anexos/exports (CSV/XLSX) quando o fluxo pede evidência
+                </div>
+              </div>
+            </div>
+
+            <!-- Spacer (sem connector SVG solto) -->
+            <div style="height:26px;"></div>
+
+            <!-- Step 2 (right) -->
+            <div style="display:flex; justify-content:flex-end;">
+              <div id="fgStep2" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(34,197,94,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+                <div style="font-weight:1000; letter-spacing:0.2px;">2) Orquestração (jobs & gatilhos)</div>
+                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+                  • <b>Triggers</b>: agendadores (ex.: execução a cada 5 min para alertas)<br/>
+                  • <b>Jobs</b>: rotinas de consolidação/checagens e atualização de sinais<br/>
+                  • <b>Logs</b>: registro de execução (sucesso/erro) e auditoria operacional
+                </div>
+              </div>
+            </div>
+
+            <!-- Spacer -->
+            <div style="height:26px;"></div>
+
+            <!-- Step 3 (left) -->
+            <div style="display:flex; justify-content:flex-start;">
+              <div id="fgStep3" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+                <div style="font-weight:1000; letter-spacing:0.2px;">3) Motor de regras (classificação & pendências)</div>
+                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+                  • Detecta <b>pendências</b> por coluna/índice (ex.: etiqueta vazia, recibo = “Não”, descrição vazia)<br/>
+                  • Aplica regras de padronização e normalização (datas, valores, textos)<br/>
+                  • Consolida métricas por <b>Loja</b>, <b>Time</b> e <b>tipo</b> (Etiqueta / NF / Descrição)
+                </div>
+              </div>
+            </div>
+
+            <!-- Spacer -->
+            <div style="height:26px;"></div>
+
+            <!-- Step 4 (right) -->
+            <div style="display:flex; justify-content:flex-end;">
+              <div id="fgStep4" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(34,197,94,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+                <div style="font-weight:1000; letter-spacing:0.2px;">4) Produtos (saídas visíveis)</div>
+                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+                  • <b>Chat</b>: tabelas/resumos e explicação de “como foi calculado”<br/>
+                  • <b>Alertas Programados</b>: Transações e Pendências (histórico + execução)<br/>
+                  • <b>Radar</b> (quando aplicável): indicadores e ranking de risco (admin)
+                </div>
+              </div>
+            </div>
+
+            <!-- Spacer -->
+            <div style="height:26px;"></div>
+
+            <!-- Step 5 (left) -->
+            <div style="display:flex; justify-content:flex-start;">
+              <div id="fgStep5" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+                <div style="font-weight:1000; letter-spacing:0.2px;">5) Evidências e governança</div>
+                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+                  • <b>E-mail (MailApp)</b>: envio com <b>anexo</b> (CSV/XLSX) e corpo consolidado<br/>
+                  • <b>Logs de execução</b>: rastreabilidade por alerta/rodada/quantidade de linhas<br/>
+                  • <b>Controle de acesso</b>: recursos liberados por role - RBAC (sem expor dados indevidos)
+                </div>
+              </div>
+            </div>
+
+          </div><!-- /flow container -->
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+</div> <!-- fecha #fluxogramaView -->
+
  <!-- Modal: Como acontece a análise? (Radar) -->
 <div id="radarAnaliseModal"
      class="fixed inset-0 bg-black/60 z-[60] hidden items-center justify-center">
@@ -1426,7 +1579,7 @@
                     <li style="margin-top:10px;">
             <b>6) Alertas Programados (e-mail)</b><br/>
             • Permite cadastrar alertas recorrentes, com envio automático por e-mail e anexo (CSV/XLSX), conforme filtros configurados.<br/>
-            • Existem 2 tipos: <b>Transações</b> (por Lojas/Times/Tags) e <b>Pendências</b> (por Lojas/Times e Tipos de pendÊncias).<br/>
+            • Existem 2 tipos: <b>Transações</b> (por Lojas/Times/Tags) e <b>Pendências</b> (por Lojas/Times e Tipos de pendências).<br/>
             <i>Como acessar:</i> Menu → “⏱️ Alertas Programados”.<br/>
             <i>Dicas:</i> use “Executar” para testar o alerta imediatamente no chat; o envio por e-mail segue a frequência/horário configurados.
           </li>
@@ -2263,10 +2416,12 @@ window.vektorShowChatView = function () {
   const radarView = document.getElementById("radarView");
   const feedbackView = document.getElementById("feedbackView");
   const myAlertsView = document.getElementById("myAlertsView");
+  const fluxView = document.getElementById("fluxogramaView");
 
   if (radarView) radarView.classList.add("hidden");
   if (feedbackView) feedbackView.classList.add("hidden");
   if (myAlertsView) myAlertsView.classList.add("hidden");
+  if (fluxView) fluxView.classList.add("hidden");
 
   if (chatView) chatView.classList.remove("hidden");
 
@@ -2293,6 +2448,126 @@ function vektorShowFeedbackView_() {
   if (chatView) chatView.classList.add("hidden");
   if (radarView) radarView.classList.add("hidden");
   if (feedbackView) feedbackView.classList.remove("hidden");
+}
+
+function vektorShowFluxogramaView_() {
+  const chatView = document.getElementById("chatView");
+  const radarView = document.getElementById("radarView");
+  const feedbackView = document.getElementById("feedbackView");
+  const myAlertsView = document.getElementById("myAlertsView");
+  const fluxView = document.getElementById("fluxogramaView");
+
+  if (chatView) chatView.classList.add("hidden");
+  if (radarView) radarView.classList.add("hidden");
+  if (feedbackView) feedbackView.classList.add("hidden");
+  if (myAlertsView) myAlertsView.classList.add("hidden");
+
+  if (fluxView) fluxView.classList.remove("hidden");
+}
+
+window.vektorOpenFluxograma = function () {
+  vektorShowFluxogramaView_();
+
+  // desenha após layout estabilizar
+  setTimeout(vektorDrawFluxogramaConnectors_, 50);
+  setTimeout(vektorDrawFluxogramaConnectors_, 220);
+};
+
+window.addEventListener("resize", function () {
+  // só tenta redesenhar se a view estiver aberta
+  const v = document.getElementById("fluxogramaView");
+  if (v && !v.classList.contains("hidden")) {
+    vektorDrawFluxogramaConnectors_();
+  }
+});
+
+function vektorDrawFluxogramaConnectors_() {
+  try {
+    const flow = document.querySelector("#fluxogramaView .flow-container") || null;
+    const svg = document.getElementById("fluxoConnectorsSvg");
+    if (!svg) return;
+
+    const s1 = document.getElementById("fgStep1");
+    const s2 = document.getElementById("fgStep2");
+    const s3 = document.getElementById("fgStep3");
+    const s4 = document.getElementById("fgStep4");
+    const s5 = document.getElementById("fgStep5");
+    if (!s1 || !s2 || !s3 || !s4 || !s5) return;
+
+    // o SVG está dentro do flow container (position:relative). Precisamos de coordenadas relativas a ele
+    const svgRect = svg.getBoundingClientRect();
+
+    const rect = (el) => el.getBoundingClientRect();
+
+    function midY(r) { return r.top + r.height / 2; }
+
+    // ponto de saída = centro vertical na borda "externa" da caixa
+      function outPoint(fromRect, side) {
+        const GAP = 8; // << controla o quanto o traço fica FORA da caixa
+        const x = (side === "right") ? (fromRect.right + GAP) : (fromRect.left - GAP);
+        const y = midY(fromRect);
+        return { x: x - svgRect.left, y: y - svgRect.top };
+      }
+
+      // ponto de entrada = centro vertical na borda "interna" da caixa
+      function inPoint(toRect, side) {
+        const GAP = 8; // mesmo GAP, para não “entrar” na borda
+        const x = (side === "left") ? (toRect.left - GAP) : (toRect.right + GAP);
+        const y = midY(toRect);
+        return { x: x - svgRect.left, y: y - svgRect.top };
+      }
+
+
+    function elbowPath(p1, p2, bendX) {
+      // horizontal → vertical → horizontal
+      // p1 -> (bendX, p1.y) -> (bendX, p2.y) -> p2
+      return `M ${p1.x} ${p1.y} L ${bendX} ${p1.y} L ${bendX} ${p2.y} L ${p2.x} ${p2.y}`;
+    }
+
+    function drawOne(fromEl, toEl, dir, stroke, markerId) {
+      const r1 = rect(fromEl);
+      const r2 = rect(toEl);
+
+      // dir = "L2R" (step esquerdo para step direito) ou "R2L"
+      const p1 = outPoint(r1, dir === "L2R" ? "right" : "left");
+      const p2 = inPoint(r2, dir === "L2R" ? "left" : "right");
+
+      // define um bendX mais ou menos no meio, mas preservando “reto saindo e entrando”
+      const bendX = (dir === "L2R")
+        ? Math.min(p1.x + 180, (p1.x + p2.x) / 2)
+        : Math.max(p1.x - 180, (p1.x + p2.x) / 2);
+
+      const d = elbowPath(p1, p2, bendX);
+
+      return `<path d="${d}"
+        fill="none"
+        stroke="${stroke}"
+        stroke-opacity="1"
+        stroke-width="2"
+        stroke-linecap="square"
+        stroke-linejoin="miter"
+        marker-end="url(#${markerId})"
+        shape-rendering="crispEdges"
+      ></path>`;
+
+    }
+
+    // limpa e redesenha
+    const paths = [];
+    paths.push(drawOne(s1, s2, "L2R", "rgb(181,255,32)", "arrowHeadGreen"));
+    paths.push(drawOne(s2, s3, "R2L", "rgb(34,197,94)", "arrowHeadDarkGreen"));
+    paths.push(drawOne(s3, s4, "L2R", "rgb(181,255,32)", "arrowHeadGreen"));
+    paths.push(drawOne(s4, s5, "R2L", "rgb(34,197,94)", "arrowHeadDarkGreen"));
+
+    // mantém defs e injeta paths
+    const defs = svg.querySelector("defs")?.outerHTML || "";
+    svg.innerHTML = defs + paths.join("");
+
+    // ajusta viewBox para o tamanho atual do SVG
+    svg.setAttribute("viewBox", `0 0 ${svgRect.width} ${svgRect.height}`);
+  } catch (e) {
+    // silencioso
+  }
 }
 
 // FEEDBACK (tela cheia)
@@ -2722,10 +2997,12 @@ function vektorShowMyAlertsView_() {
   const radar = document.getElementById("radarView");
   const fb = document.getElementById("feedbackView");
   const my = document.getElementById("myAlertsView");
+  const fluxView = document.getElementById("fluxogramaView");
 
   if (chat) chat.style.display = "none";
   if (radar) radar.classList.add("hidden");
   if (fb) fb.classList.add("hidden");
+  if (fluxView) fluxView.classList.add("hidden");
   if (my) my.classList.remove("hidden");
 }
 
