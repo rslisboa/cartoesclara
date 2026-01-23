@@ -18123,6 +18123,10 @@ h +=
 
       "<div style='display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap'>" +
         "<button type='button' data-etq-email-action='cancelar' style='background:#e2e8f0;color:#0f172a;border:none;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer'>Cancelar</button>" +
+
+        // ✅ NOVO: usar meu e-mail
+        "<button type='button' data-etq-email-action='meuemail' style='background:#f1f5f9;color:#0f172a;border:1px solid #cbd5e1;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer'>Usar meu e-mail</button>" +
+
         "<button type='button' data-etq-email-action='enviar' style='background:#0f172a;color:#fff;border:none;padding:8px 12px;border-radius:8px;font-size:12px;cursor:pointer'>Enviar</button>" +
       "</div>" +
 
@@ -18346,6 +18350,10 @@ if (btnAplicarPeriodo) {
     const errEl  = document.querySelector("#" + wrapId + " #vektor-etq-email-erro");
     const btnSend = modal.querySelector("[data-etq-email-action='enviar']");
 
+    const meuEmail = (typeof USER_EMAIL_REPLACED !== "undefined"
+    ? String(USER_EMAIL_REPLACED || "").trim()
+    : "");
+
     // limpa estado visual
     if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
     if (toEl) toEl.value = "";
@@ -18363,6 +18371,16 @@ if (btnAplicarPeriodo) {
     }
 
     modal.addEventListener("click", function(ev) {
+  // ✅ novo botão: preencher destinatário com meu e-mail
+      const useMyBtn = ev.target && ev.target.closest && ev.target.closest("[data-etq-email-action='meuemail']");
+      if (useMyBtn) {
+        if (toEl) toEl.value = meuEmail || "";
+        if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+        if (toEl) toEl.focus();
+        return;
+      }
+
+      // fechar/cancelar
       const closeBtn = ev.target && ev.target.closest && ev.target.closest("[data-etq-email-action='fechar'],[data-etq-email-action='cancelar']");
       if (closeBtn) closeModal_();
     });
