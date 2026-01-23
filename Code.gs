@@ -1889,8 +1889,9 @@ function montarEmailUserAlertPendencias_(alertId, time, periodo, rows) {
 
   var totalPendencias = 0;
 
-  // ---- Maior loja ofensora (por quantidade de pendências)
-  var lojaPendCount = {}; // loja -> total pendências (somatório por ocorrência)
+    // ---- Maior loja ofensora (por quantidade de transações pendentes)
+  var lojaTxCount = {};   // loja -> quantidade de linhas (transações) com alguma pendência
+  var lojaPendCount = {}; // loja -> total de pendências (tipos) (usado apenas para estatísticas, se quiser)
 
   // ---- Soma do valor total (pendente) no período
   var totalValor = 0;
@@ -1917,7 +1918,13 @@ function montarEmailUserAlertPendencias_(alertId, time, periodo, rows) {
     // separa por vírgula
     var parts = pendRaw.split(",").map(function(s){ return String(s||"").trim(); }).filter(Boolean);
 
-    var lojaKey = String(r.loja || "").trim() || "—";
+        var lojaKey = String(r.loja || "").trim() || "—";
+
+    // conta transação pendente (1 por linha)
+    if (!lojaTxCount[lojaKey]) lojaTxCount[lojaKey] = 0;
+    lojaTxCount[lojaKey] += 1;
+
+    // (opcional) conta tipos de pendência (para total e maior ofensor)
     if (!lojaPendCount[lojaKey]) lojaPendCount[lojaKey] = 0;
 
     parts.forEach(function (p) {
@@ -1925,31 +1932,61 @@ function montarEmailUserAlertPendencias_(alertId, time, periodo, rows) {
       if (!catCount[cat]) catCount[cat] = 0;
       catCount[cat] += 1;
       totalPendencias += 1;
+
+      // total de tipos por loja (não usado para "maior loja", mas pode manter)
       lojaPendCount[lojaKey] += 1;
     });
   });
 
-  // maior ofensor (tipo)
-  var maiorOfensor = "—";
+    // maior ofensor (tipo) — só mostra se houver 2+ lojas e vencedor único (sem empate)
+  var maiorOfensor = "";
   var maiorOfensorQtd = -1;
-  Object.keys(catCount).forEach(function (k) {
-    if ((catCount[k] || 0) > maiorOfensorQtd) {
-      maiorOfensorQtd = catCount[k] || 0;
-      maiorOfensor = k;
-    }
-  });
-  if (maiorOfensorQtd <= 0) maiorOfensor = "—";
+  var empateOfensor = false;
 
-  // maior loja ofensora
-  var maiorLoja = "—";
+  var lojasDistintas = Object.keys(lojaTxCount).length;
+
+  if (lojasDistintas >= 2) {
+    Object.keys(catCount).forEach(function (k) {
+      var v = catCount[k] || 0;
+      if (v > maiorOfensorQtd) {
+        maiorOfensorQtd = v;
+        maiorOfensor = k;
+        empateOfensor = false;
+      } else if (v === maiorOfensorQtd && v > 0) {
+        empateOfensor = true;
+      }
+    });
+
+    if (maiorOfensorQtd <= 0 || empateOfensor) {
+      maiorOfensor = "";
+      maiorOfensorQtd = 0;
+    }
+  } else {
+    maiorOfensor = "";
+    maiorOfensorQtd = 0;
+  }
+
+    // maior loja ofensora (por transações pendentes) — só mostra se houver vencedor único
+  var maiorLoja = "";
   var maiorLojaQtd = -1;
-  Object.keys(lojaPendCount).forEach(function (lk) {
-    if ((lojaPendCount[lk] || 0) > maiorLojaQtd) {
-      maiorLojaQtd = lojaPendCount[lk] || 0;
+  var empateLoja = false;
+
+  Object.keys(lojaTxCount).forEach(function (lk) {
+    var v = lojaTxCount[lk] || 0;
+    if (v > maiorLojaQtd) {
+      maiorLojaQtd = v;
       maiorLoja = lk;
+      empateLoja = false;
+    } else if (v === maiorLojaQtd && v > 0) {
+      empateLoja = true;
     }
   });
-  if (maiorLojaQtd <= 0) maiorLoja = "—";
+
+  // se não tem vencedor único (empate) ou não tem dados, fica vazio
+  if (maiorLojaQtd <= 0 || empateLoja) {
+    maiorLoja = "";
+    maiorLojaQtd = 0;
+  }
 
   // Formatação BRL
   var totalValorFmt = totalValor.toLocaleString("pt-BR", {
@@ -1967,8 +2004,8 @@ function montarEmailUserAlertPendencias_(alertId, time, periodo, rows) {
   h += "<b>Período:</b> " + esc(periodo.inicio) + " a " + esc(periodo.fim) + "<br/>";
   h += "<b>Total de linhas:</b> " + esc((rows || []).length) + (rows.length > max ? " (mostrando apenas " + max + ")" : "") + "<br/>";
   h += "<b>Quantidade Pendencias:</b> " + esc(totalPendencias) + "<br/>";
-  h += "<b>Maior Ofensor:</b> " + esc(maiorOfensor) + (maiorOfensor !== "—" ? (" (" + esc(maiorOfensorQtd) + ")") : "") + "<br/>";
-  h += "<b>Maior Loja ofensora:</b> " + esc(maiorLoja) + (maiorLoja !== "—" ? (" (" + esc(maiorLojaQtd) + ")") : "") + "<br/>";
+  h += "<b>Maior Ofensor:</b> " + (maiorOfensor ? (esc(maiorOfensor) + " (" + esc(maiorOfensorQtd) + ")") : "") + "<br/>";
+  h += "<b>Maior Loja ofensora:</b> " + (maiorLoja ? (esc(maiorLoja) + " (" + esc(maiorLojaQtd) + ")") : "") + "<br/>";
   h += "<b>Valor total pendente no período analisado:</b> " + esc(totalValorFmt) + "<br/>";
   h += "</div>";
 
