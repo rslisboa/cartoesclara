@@ -2667,16 +2667,15 @@ if (!emailUsuario) {
   return { ok: false, error: "Usuário sem e-mail ativo." };
 }
 
-var emailDestino = String(
-  (payload && payload.emailDestino) ? payload.emailDestino : emailUsuario
-).trim();
+// ✅ usa o parâmetro recebido do front; fallback para o e-mail do usuário logado
+emailDestino = String(emailDestino || emailUsuario).trim();
 
 // 🔒 trava domínio
-var emailRegex = /^[^\s@]+@((gruposbf|centauro)\.com\.br)$/i;
+var emailRegex = /^[^\s@]+@((gruposbf|centauro|fisia)\.com\.br)$/i;
 if (!emailRegex.test(emailDestino)) {
   return {
     ok: false,
-    error: "Informe um e-mail válido dos domínios @gruposbf.com.br ou @centauro.com.br."
+    error: "Informe um e-mail válido dos domínios do Grupo SBF."
   };
 }
 
@@ -9556,9 +9555,9 @@ function enviarEmailGastosPorEtiquetasClara(payload) {
     var emailDestino = String(payload.emailDestino ? payload.emailDestino : emailUsuario).trim();
 
     // 🔒 trava domínio: apenas @gruposbf.com.br ou @centauro.com.br
-    var emailRegex = /^[^\s@]+@((gruposbf|centauro)\.com\.br)$/i;
+    var emailRegex = /^[^\s@]+@((gruposbf|centauro|fisia)\.com\.br)$/i;
     if (!emailRegex.test(emailDestino)) {
-      return { ok: false, error: "E-mail inválido. Use apenas @gruposbf.com.br ou @centauro.com.br." };
+      return { ok: false, error: "E-mail inválido. Use apenas @gruposbf.com.br, @centauro.com.br ou @fisia.com.br." };
     }
 
     // CC: por padrão o usuário logado, exceto quando ele é o próprio destinatário
