@@ -904,7 +904,7 @@
 
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
           <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-            <div style="color:rgba(226,232,240,0.85); font-size:11px; font-weight:900;">Tipo de alerta</div>
+            <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Tipo de alerta</div>
             <select id="myAl_alertType"
               style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
                     border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
@@ -1208,77 +1208,82 @@
             </svg>
 
             <!-- Step 1 (left) -->
-            <div style="display:flex; justify-content:flex-start;">
-              <div id="fgStep1" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
-                <div style="font-weight:1000; letter-spacing:0.2px;">1) Fontes (entrada)</div>
-                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
-                  • <b>Google Sheets</b>: BaseClara e abas auxiliares (pendências/justificativas/históricos)<br/>
-                  • <b>BigQuery</b>: consultas agregadas/validações (quando aplicável)<br/>
-                  • <b>PropertiesService</b>: chaves de controle (última execução, assinaturas, anti-spam)<br/>
-                  • <b>Drive</b>: anexos/exports (CSV/XLSX) quando o fluxo pede evidência
-                </div>
-              </div>
-            </div>
+<div style="display:flex; justify-content:flex-start;">
+  <div id="fgStep1" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+    <div style="font-weight:1000; letter-spacing:0.2px;">1) Fontes (entrada)</div>
+    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+      • <b>Google Sheets</b>: BaseClara (transações) + abas auxiliares (pendências, justificativas, históricos, cadastros)<br/>
+      • <b>BigQuery</b>: consultas e validações (deduplicação, agregações e cruzamentos quando aplicável)<br/>
+      • <b>PropertiesService</b>: controle de execução (última execução, estado de jobs, parâmetros, anti-spam)<br/>
+      • <b>Drive</b>: anexos/exports (CSV/XLSX), evidências e arquivos de apoio
+    </div>
+  </div>
+</div>
 
-            <!-- Spacer (sem connector SVG solto) -->
-            <div style="height:26px;"></div>
+<!-- Spacer (sem connector SVG solto) -->
+<div style="height:26px;"></div>
 
-            <!-- Step 2 (right) -->
-            <div style="display:flex; justify-content:flex-end;">
-              <div id="fgStep2" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(34,197,94,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
-                <div style="font-weight:1000; letter-spacing:0.2px;">2) Orquestração (jobs & gatilhos)</div>
-                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
-                  • <b>Triggers</b>: agendadores (ex.: execução a cada 5 min para alertas)<br/>
-                  • <b>Jobs</b>: rotinas de consolidação/checagens e atualização de sinais<br/>
-                  • <b>Logs</b>: registro de execução (sucesso/erro) e auditoria operacional
-                </div>
-              </div>
-            </div>
+<!-- Step 2 (right) -->
+<div style="display:flex; justify-content:flex-end;">
+  <div id="fgStep2" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(34,197,94,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+    <div style="font-weight:1000; letter-spacing:0.2px;">2) Orquestração (jobs & gatilhos)</div>
+    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+      • <b>Triggers</b>: agendadores (ex.: execução periódica para alertas, monitoramento e rotinas)<br/>
+      • <b>Jobs</b>: consolidação, verificação de consistência, enriquecimento e atualização de sinais operacionais<br/>
+      • <b>APIs/Serviços</b>: Drive, Sheets, BigQuery, MailApp (chamadas conforme necessidade do fluxo)<br/>
+      • <b>Logs</b>: registro de execução (sucesso/erro), auditoria e rastreabilidade operacional
+    </div>
+  </div>
+</div>
 
-            <!-- Spacer -->
-            <div style="height:26px;"></div>
+<!-- Spacer -->
+<div style="height:26px;"></div>
 
-            <!-- Step 3 (left) -->
-            <div style="display:flex; justify-content:flex-start;">
-              <div id="fgStep3" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
-                <div style="font-weight:1000; letter-spacing:0.2px;">3) Motor de regras (classificação & pendências)</div>
-                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
-                  • Detecta <b>pendências</b> por coluna/índice (ex.: etiqueta vazia, recibo = “Não”, descrição vazia)<br/>
-                  • Aplica regras de padronização e normalização (datas, valores, textos)<br/>
-                  • Consolida métricas por <b>Loja</b>, <b>Time</b> e <b>tipo</b> (Etiqueta / NF / Descrição)
-                </div>
-              </div>
-            </div>
+<!-- Step 3 (left) -->
+<div style="display:flex; justify-content:flex-start;">
+  <div id="fgStep3" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+    <div style="font-weight:1000; letter-spacing:0.2px;">3) Motor de regras (governança & inteligência)</div>
+    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+      • <b>Regras de pendência</b>: etiqueta vazia, recibo = “Não”, descrição vazia<br/>
+      • <b>Classificações e alertas</b>: padrões, exceções, limites, lojas ofensoras e possíveis irregularidades (quando aplicável)<br/>
+      • <b>Normalização</b>: datas, valores, textos, lojas (CE####), times e filtros consistentes<br/>
+      • <b>Consolidações</b>: métricas por Loja, Time, período e tipo (Etiqueta / NF / Descrição)
+    </div>
+  </div>
+</div>
 
-            <!-- Spacer -->
-            <div style="height:26px;"></div>
+<!-- Spacer -->
+<div style="height:26px;"></div>
 
-            <!-- Step 4 (right) -->
-            <div style="display:flex; justify-content:flex-end;">
-              <div id="fgStep4" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(34,197,94,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
-                <div style="font-weight:1000; letter-spacing:0.2px;">4) Produtos (saídas visíveis)</div>
-                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
-                  • <b>Chat</b>: tabelas/resumos e explicação de “como foi calculado”<br/>
-                  • <b>Alertas Programados</b>: Transações e Pendências (histórico + execução)<br/>
-                  • <b>Radar</b> (quando aplicável): indicadores e ranking de risco (admin)
-                </div>
-              </div>
-            </div>
+<!-- Step 4 (right) -->
+<div style="display:flex; justify-content:flex-end;">
+  <div id="fgStep4" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(34,197,94,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+    <div style="font-weight:1000; letter-spacing:0.2px;">4) Produtos (saídas visíveis)</div>
+    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+      • <b>Chat</b>: consultas, tabelas, rankings e resumos com explicação de “como foi calculado”<br/>
+      • <b>Alertas Programados</b>: Transações e Pendências (histórico + execução programada por e-mail)<br/>
+      • <b>Alertas Operacionais</b>: limites de cartões, lojas ofensoras, irregularidades e monitoramentos (quando aplicável)<br/>
+      • <b>Radar</b>: indicadores e ranking de risco (admin, quando aplicável)<br/>
+      • <b>Exportações</b>: CSV/XLSX e evidências conforme necessidade do processo
+    </div>
+  </div>
+</div>
 
-            <!-- Spacer -->
-            <div style="height:26px;"></div>
+<!-- Spacer -->
+<div style="height:26px;"></div>
 
-            <!-- Step 5 (left) -->
-            <div style="display:flex; justify-content:flex-start;">
-              <div id="fgStep5" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
-                <div style="font-weight:1000; letter-spacing:0.2px;">5) Evidências e governança</div>
-                <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
-                  • <b>E-mail (MailApp)</b>: envio com <b>anexo</b> (CSV/XLSX) e corpo consolidado<br/>
-                  • <b>Logs de execução</b>: rastreabilidade por alerta/rodada/quantidade de linhas<br/>
-                  • <b>Controle de acesso</b>: recursos liberados por role - RBAC (sem expor dados indevidos)
-                </div>
-              </div>
-            </div>
+<!-- Step 5 (left) -->
+<div style="display:flex; justify-content:flex-start;">
+  <div id="fgStep5" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
+    <div style="font-weight:1000; letter-spacing:0.2px;">5) Evidências, auditoria & governança</div>
+    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+      • <b>E-mail (MailApp)</b>: envio com <b>anexo</b> (CSV/XLSX) e corpo consolidado (quando aplicável)<br/>
+      • <b>Logs de execução</b>: rastreabilidade por job/alerta/rodada/quantidade de linhas e período<br/>
+      • <b>RBAC</b>: controle de acesso por role/whitelist (sem expor dados indevidos)<br/>
+      • <b>Confiabilidade</b>: validações, consistência e histórico para suporte e auditoria
+    </div>
+  </div>
+</div>
 
           </div><!-- /flow container -->
 
