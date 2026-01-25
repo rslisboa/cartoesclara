@@ -159,6 +159,12 @@ try {
 }
 
   var token = vektorCreateSessionToken_(sess);
+    // ✅ registra usuário como "ativo hoje" (inclui o próprio acesso)
+  try {
+    vektorTrackActiveUserToday_(sess);
+  } catch (eTrack) {
+    // não pode quebrar login por falha de log
+  }
   return { ok: true, email: sess, token: token, ttlSeconds: VEKTOR_SESSION_TTL_SECONDS };
 
 }
@@ -335,6 +341,61 @@ function vektorCreateSessionToken_(email) {
   return token;
 }
 
+// =======================
+// VEKTOR - USUÁRIOS ATIVOS HOJE (por dia)
+// =======================
+
+function vektorActiveUsersKey_(tz) {
+  var z = tz || Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var now = new Date();
+  return Utilities.formatDate(now, z, "yyyy-MM-dd");
+}
+
+// Armazena em Script Properties um JSON com e-mails únicos do dia
+function vektorTrackActiveUserToday_(email) {
+  var em = String(email || "").trim().toLowerCase();
+  if (!em) return;
+
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var dayKey = vektorActiveUsersKey_(tz);
+  var propKey = "VEKTOR_ACTIVE_USERS_" + dayKey;
+
+  var lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var raw = props.getProperty(propKey) || "[]";
+    var arr;
+    try { arr = JSON.parse(raw); } catch (_) { arr = []; }
+    if (!Array.isArray(arr)) arr = [];
+
+    if (arr.indexOf(em) < 0) {
+      arr.push(em);
+      props.setProperty(propKey, JSON.stringify(arr));
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function vektorGetActiveUsersTodayCount_(tz) {
+  var z = tz || Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var dayKey = Utilities.formatDate(new Date(), z, "yyyy-MM-dd");
+  var propKey = "VEKTOR_ACTIVE_USERS_" + dayKey;
+
+  var props = PropertiesService.getScriptProperties();
+  var raw = props.getProperty(propKey) || "[]";
+
+  try {
+    var arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return 0;
+    return arr.length;
+  } catch (e) {
+    return 0;
+  }
+}
+
 function vektorValidateSessionToken_(token) {
   var t = String(token || "").trim();
   if (!t) return { ok: false, error: "Token vazio." };
@@ -358,6 +419,13 @@ function vektorValidateSessionToken_(token) {
 
   if (!emailDoToken) return { ok: false, error: "Sessão expirada ou inválida. Faça login novamente." };
   if (emailDoToken !== emailSessao) return { ok: false, error: "Sessão não corresponde ao usuário logado." };
+
+    // ✅ marca o usuário como "ativo hoje" sempre que a sessão for validada
+    try {
+      vektorTrackActiveUserToday_(emailSessao);
+    } catch (eTrack) {
+      // não quebra validação por falha de log
+    }
 
   return { ok: true, email: emailSessao };
 }
@@ -10836,6 +10904,10 @@ function vektorStatusSistema() {
 
   // Admin agora vem do RBAC (VEKTOR_EMAILS)
   var ctx = vektorGetUserRole_(); // { email, role }
+    // ✅ garante que quem abriu o modal entre como "ativo hoje"
+  try {
+    vektorTrackActiveUserToday_(ctx.email);
+  } catch (eTrack) {}
   var isAdmin = String(ctx.role || "").toLowerCase() === "administrador";
 
   const file = DriveApp.getFileById(BASE_CLARA_ID);
@@ -10910,6 +10982,7 @@ try {
     google: googleTxt,
     bigquery: bqTxt,
     alertas: "Ativos",
+    usuariosAtivosHoje: vektorGetActiveUsersTodayCount_(Session.getScriptTimeZone()),
     geral: "Em operação"
   };
 }
