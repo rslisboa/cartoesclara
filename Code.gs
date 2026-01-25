@@ -2081,6 +2081,101 @@ function RUN_USER_ALERTS_SCHEDULER() {
   }
 }
 
+// ==============================
+// DIAS ÚTEIS / FERIADOS / EMENDAS
+// ==============================
+
+// Calendário público de feriados do Brasil (Google)
+var VEKTOR_BR_HOLIDAY_CAL_ID = "pt.brazilian#holiday@group.v.calendar.google.com";
+
+// Cache simples (evita bater no Calendar toda hora)
+var __vektorHolidayCache = { year: null, map: null };
+
+// Converte Date -> "yyyy-MM-dd" no TZ do script
+function vektorDateKey_(d, tz) {
+  return Utilities.formatDate(d, tz || Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
+}
+
+// Retorna um Set/mapa { "yyyy-MM-dd": true } com feriados do ano
+function vektorLoadBrHolidaysMap_(year, tz) {
+  try {
+    if (__vektorHolidayCache.year === year && __vektorHolidayCache.map) {
+      return __vektorHolidayCache.map;
+    }
+
+    var out = {};
+    var cal = CalendarApp.getCalendarById(VEKTOR_BR_HOLIDAY_CAL_ID);
+
+    // Range do ano inteiro
+    var ini = new Date(year, 0, 1);  ini.setHours(0,0,0,0);
+    var fim = new Date(year, 11, 31); fim.setHours(23,59,59,999);
+
+    // eventos de dia inteiro (feriados)
+    var events = cal.getEvents(ini, fim);
+    events.forEach(function(ev) {
+      var allDay = ev.isAllDayEvent && ev.isAllDayEvent();
+      // Mesmo se não for all-day, ainda marca o dia do start
+      var d0 = ev.getStartTime();
+      d0.setHours(0,0,0,0);
+      out[vektorDateKey_(d0, tz)] = true;
+    });
+
+    // ✅ Extras manuais (para exceções corporativas, se quiser):
+    // Script Properties: VEKTOR_EXTRA_OFF_DAYS="2026-02-16,2026-02-17"
+    try {
+      var extraRaw = PropertiesService.getScriptProperties().getProperty("VEKTOR_EXTRA_OFF_DAYS") || "";
+      extraRaw.split(",").map(function(s){ return String(s||"").trim(); }).filter(Boolean).forEach(function(k){
+        out[k] = true;
+      });
+    } catch (_) {}
+
+    __vektorHolidayCache.year = year;
+    __vektorHolidayCache.map = out;
+    return out;
+
+  } catch (e) {
+    // Fallback mínimo: sem calendário, considera só fim de semana
+    return {};
+  }
+}
+
+// Emenda nacional (regra simples e explícita):
+// - Se feriado cai na TERÇA => SEGUNDA vira off
+// - Se feriado cai na QUINTA => SEXTA vira off
+function vektorIsBridgeDay_(dateObj, holidaysMap, tz) {
+  var d = new Date(dateObj); d.setHours(0,0,0,0);
+
+  // se amanhã é feriado e amanhã é terça => hoje (segunda) é emenda
+  var tomorrow = new Date(d); tomorrow.setDate(d.getDate() + 1);
+  var keyTomorrow = vektorDateKey_(tomorrow, tz);
+  if (holidaysMap[keyTomorrow] && tomorrow.getDay() === 2) return true; // 2 = terça
+
+  // se ontem foi feriado e ontem foi quinta => hoje (sexta) é emenda
+  var yesterday = new Date(d); yesterday.setDate(d.getDate() - 1);
+  var keyYesterday = vektorDateKey_(yesterday, tz);
+  if (holidaysMap[keyYesterday] && yesterday.getDay() === 4) return true; // 4 = quinta
+
+  return false;
+}
+
+// Dia útil = não sábado/domingo, não feriado e não emenda (regra acima)
+function vektorIsBusinessDay_(dateObj, tz) {
+  var d = new Date(dateObj);
+  d.setHours(0,0,0,0);
+
+  var day = d.getDay();
+  if (day === 0 || day === 6) return false; // domingo/sábado
+
+  var year = d.getFullYear();
+  var holidaysMap = vektorLoadBrHolidaysMap_(year, tz);
+  var key = vektorDateKey_(d, tz);
+
+  if (holidaysMap[key]) return false;
+  if (vektorIsBridgeDay_(d, holidaysMap, tz)) return false;
+
+  return true;
+}
+
 function parseSendAt_(v, tz) {
   // Retorna {hh, mm} ou null
   if (v == null || v === "") return null;
@@ -2127,6 +2222,9 @@ function isDueBySchedule_(freq, lastRun, sendAtRaw, now, tz) {
     // Compara em "relógio local" do script
     if (now.getTime() < todayAt.getTime()) return false;
   }
+
+  // ✅ NOVO: só permite disparo em dia útil
+  if (!vektorIsBusinessDay_(now, tz)) return false;
 
   // Nunca rodou → pode rodar (desde que passou do horário, se houver)
   if (!(lastRun instanceof Date) || isNaN(lastRun.getTime())) return true;
