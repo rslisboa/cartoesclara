@@ -517,7 +517,7 @@
             id="vektorLoginEmail"
             type="email"
             autocomplete="email"
-            placeholder="nome.sobrenome@gruposbf.com.br"
+            placeholder="insira seu email aqui"
             class="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-slate-900/20"
           />
 
@@ -5734,29 +5734,55 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
   const texto = normalize(msgOriginal || "");
   const encontrados = [];
 
+  // Helper: escape para regex
+  const _escRe_ = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // Helper: match por palavra inteira (evita "i" bater em "time", por exemplo)
+  const _hasWord_ = (txt, w) => {
+    if (!w) return false;
+    return new RegExp("\\b" + _escRe_(w) + "\\b", "i").test(txt);
+  };
+
+  // Stopwords e tokens problemáticos
+  const _stop = new Set([
+    "do","da","de","dos","das","sp","sul",
+    // romanos/curtos que geram falso positivo
+    "i","ii","iii","iv","v","vi","vii","viii","ix","x"
+  ]);
+
+  // Percorre todos os times oficiais
   TIMES_OFICIAIS.forEach((nome) => {
     const nomeNorm = normalize(nome);
 
-    // usa as mesmas regras do encontrarTimeNaMensagem,
-    // mas aqui a ideia é pegar TODOS os que apareçam
-    const tokens = nomeNorm
+    // Tokens relevantes: remove stopwords e ignora tokens muito curtos (<=2)
+    let tokens = nomeNorm
       .split(" ")
-      .filter(t => !["do","da","de","dos","das","sp","sul"].includes(t));
+      .map(t => t.trim())
+      .filter(t => t && !_stop.has(t) && t.length >= 3);
+
+    // Se o usuário digitou o nome completo do time
+    const nomeCompletoNoTexto = texto.includes(nomeNorm);
 
     let score = 0;
     tokens.forEach((tk) => {
-      if (!tk) return;
-      if (texto.includes(tk)) score += 1;
+      if (_hasWord_(texto, tk)) score += 1;
     });
 
-    if (score > 0) {
+    // Regras de decisão:
+    // - Nome completo no texto → inclui
+    // - 2+ tokens relevantes → exige pelo menos 2 matches
+    // - 1 token relevante → exige match por palavra inteira
+    const ok =
+      nomeCompletoNoTexto ||
+      (tokens.length >= 2 ? score >= 2 : score >= 1);
+
+    if (ok) {
       encontrados.push(nome);
     }
   });
 
   return encontrados;
 }
-
 
     /* ========= DADOS / TABELAS ========= */
 
@@ -19364,7 +19390,7 @@ window.vektorRespostaInfoIniciais = function (resposta) {
           "<li><b>Times com mais pendências</b> nos últimos 30 dias;</li>" +
           "<li><b>Estabelecimentos mais usados</b> (Top 10);</li>" +
           "<li><b>Categorias com maior valor de transações</b> nos últimos 30 dias;</li>" +
-          "<li><b>Valor das últimas faturas</b> Clara (Somente para perfil de admnistrador).</li>" +
+          "<li><b>Valor das últimas faturas</b> Clara.</li>" +
         "</ul>" +
         "<p class='mt-2'>Irei enviar cada tabela em sequência.</p>" +
       "</div>"
