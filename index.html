@@ -799,7 +799,7 @@
 
           <div>
             <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Radar de Irregularidade</div>
-            <div style="color:rgba(226,232,240,0.9); font-size:12px; margin-top:2px;">
+            <div style="color:rgba(226,232,240,0.9); font-size:13px; margin-top:2px;">
               Correlação entre métricas + ranking de proximidade por loja
             </div>
           </div>
@@ -844,7 +844,7 @@
         <div id="radarContent" style="display:grid; grid-template-columns: 1.2fr 0.8fr; gap:12px;">
           <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
             <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:10px;">
-              <div style="color:#fff; font-weight:900; font-size:13px;">Correlação (Pearson)</div>
+              <div style="color:#fff; font-weight:900; font-size:14px;">Correlação (Pearson)</div>
               <div style="color:rgba(226,232,240,0.75); font-size:11px;">-1 · 0 · +1</div>
             </div>
             <div id="radarHeatmap" style="margin-top:10px;"></div>
@@ -857,7 +857,7 @@
                 color:rgba(226,232,240,0.9);
                 font-size:12px; line-height:1.5;
                 max-height:180px; overflow:auto;">
-              <div style="font-weight:900; color:#fff; margin-bottom:6px;">
+              <div style="font-weight:900; color:#fff; margin-bottom:6px; font-size:14px;">
                 Leitura automática do Radar
               </div>
               <div style="opacity:0.85;">
@@ -866,8 +866,8 @@
             </div>
           </div>
           <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-            <div style="color:#fff; font-weight:900; font-size:13px;">Lojas mais próximas</div>
-            <div style="color:rgba(226,232,240,0.7); font-size:11px; margin-top:2px;">
+            <div style="color:#fff; font-weight:900; font-size:14px;">Lojas mais próximas</div>
+            <div style="color:rgba(226,232,240,0.7); font-size:12px; margin-top:2px;">
               Score composto (MAX_SCORE + CASOS + PEND_RATE)
             </div>
             <div id="radarRanking" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
@@ -2854,7 +2854,7 @@ function renderRadarInsights_(lojas) {
 
     "</div>" +
 
-    "<div style='margin-top:10px;font-size:11px;opacity:0.85; line-height:1.35;'>" +
+    "<div style='margin-top:10px;font-size:12px;opacity:0.85; line-height:1.35;'>" +
       "<b>Nota:</b> correlação indica associação (não causalidade). " +
       "Ação recomendada: selecione a loja em <b>Lojas mais próximas</b> e, se precisar confirmar, use o chat <b>“Possível uso irregular”</b> para ver transações e regras." +
     "</div>";
