@@ -11073,6 +11073,102 @@ if (detTimeCampeao) {
               msgFechamento +
             "</p>"
           );
+
+          // ✅ NOVO: insights de pendências do ciclo atual (início do ciclo -> agora)
+google.script.run
+  .withSuccessHandler(function(resP) {
+    try {
+      if (!resP || !resP.ok) {
+        // se não tiver dados, não quebra o fluxo da fatura
+        return;
+      }
+
+      const t = resP.totais || {};
+      const periodo = resP.periodo || {};
+      const top = Array.isArray(resP.topLojas) ? resP.topLojas : [];
+
+      const lojasInfo = resP.lojas || {};
+      const totalLojas = Number(lojasInfo.total) || 0;
+      const lojasPend = Number(lojasInfo.comPendencia) || 0;
+
+      const pctLojas = totalLojas
+  ? (100 * lojasPend / totalLojas).toFixed(1).replace(".", ",") + "%"
+  : "0%";
+
+      const pct = (n, d) => {
+        const nn = Number(n) || 0;
+        const dd = Number(d) || 0;
+        if (!dd) return "0%";
+        return (100 * nn / dd).toFixed(1).replace(".", ",") + "%";
+      };
+
+      // totalPendTrans = total de transações com pelo menos 1 pendência
+      const base = Number(t.totalPendTrans) || 0;
+
+      // Atenção: uma transação pode contar em mais de 1 tipo
+      const pEtiq = pct(t.pendEtiqueta, base);
+      const pDesc = pct(t.pendDescricao, base);
+      const pRec  = pct(t.pendRecibo, base);
+
+      let textoTop = "";
+      if (top.length) {
+        textoTop = "<ul class='list-disc ml-5 mt-1 space-y-1'>";
+        top.slice(0,3).forEach(function(x){
+          const loja = x.loja || "—";
+          const time = x.time || "—";
+          const qtd  = Number(x.totalPendencias || 0).toLocaleString("pt-BR");
+          const val  = Number(x.valorPendente || 0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+          textoTop += "<li><b>Loja " + loja + "</b> (" + time + "): <b>" + qtd + "</b> pendências, <b>" + val + "</b> pendente</li>";
+        });
+        textoTop += "</ul>";
+      }
+
+      const iniTxt = periodo.inicio || "";
+      const fimTxt = periodo.fim || "";
+
+      const html =
+      "HTML:<div class='text-sm text-slate-700 mt-2'>" +
+        "<p><b>Leitura rápida das pendências no ciclo atual</b> (" + iniTxt + " → " + fimTxt + "):</p>" +
+        "<p class='mt-1'>Até agora, encontrei <b>" + base.toLocaleString("pt-BR") + "</b> transações com algum tipo de pendência. " +
+        "Esses casos estão distribuídos em <b>" + lojasPend + "</b> lojas, " +
+        "o que representa <b>" + pctLojas + "</b> de todas as lojas ativas no ciclo atual.</p><br>" +
+
+        "<p>Quando eu separo por natureza do problema:</p>" +
+        "<ul class='list-disc ml-5 mt-1 space-y-1'>" +
+          "<li><b>Nota fiscal/Recibo</b>: " + Number(t.pendRecibo||0).toLocaleString("pt-BR") + " (" + pRec + ")</li>" +
+          "<li><b>Etiqueta</b>: " + Number(t.pendEtiqueta||0).toLocaleString("pt-BR") + " (" + pEtiq + ")</li>" +
+          "<li><b>Descrição</b>: " + Number(t.pendDescricao||0).toLocaleString("pt-BR") + " (" + pDesc + ")</li>" +
+        "</ul>" +
+
+        "<p class='mt-2 text-xs text-slate-500'>Obs.: uma mesma transação pode aparecer em mais de um tipo (ex.: sem etiqueta e sem descrição).</p>" +
+
+        (textoTop
+          ? ("<p class='mt-2'><b>Top 3 lojas ofensoras no ciclo:</b></p>" + textoTop)
+          : ""
+        ) +
+
+        // 🔽 NOVO: botão de download
+        "<div style='margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;'>" +
+          "<button type='button' " +
+            "onclick='window.vektorBaixarLojasComPendenciasCicloAtual(event)' " +
+            "style='background:#0F172A;color:#fff;border:none;padding:8px 12px;" +
+                  "border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>" +
+            "Baixar lojas com pendências" +
+          "</button>" +
+        "</div>" +
+      "</div>";
+
+      renderBotMessage(html);
+
+    } catch (e) {
+      console.error("Falha ao montar insights pendências ciclo:", e);
+    }
+  })
+  .withFailureHandler(function(err) {
+    console.error("Falha ao consultar pendências ciclo:", err);
+  })
+  .getPendenciasResumoCicloAtual();  // Code.gs
+
         }
 
         let __vektorChartFaturas = null;
@@ -15239,6 +15335,63 @@ window.vektorBaixarTransacoesFaturaLink = function (ev, el) {
     return window.vektorBaixarTransacoesFatura(ev, extrato);
   } catch (e) {
     console.error("Erro em vektorBaixarTransacoesFaturaLink:", e);
+    return false;
+  }
+};
+
+// ===============================
+// DOWNLOAD — LOJAS COM PENDÊNCIAS (ciclo atual) — BaseClara FULL
+// ===============================
+window.vektorBaixarLojasComPendenciasCicloAtual = function (ev) {
+  try {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Gerando Excel apenas das <b>lojas com pendências</b> no ciclo atual…</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.ok || !res.xlsxBase64) {
+          var msg = (res && res.error) ? res.error : "Não consegui gerar o Excel agora.";
+          renderBotMessage("HTML:<p class='text-sm text-slate-700'><b>Falha ao exportar:</b> " + msg + "</p>");
+          console.error("Resposta export XLSX (pendências ciclo):", res);
+          return;
+        }
+
+        // base64 -> bytes
+        var b64 = res.xlsxBase64;
+        var byteChars = atob(b64);
+        var byteNumbers = new Array(byteChars.length);
+        for (var i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+        var byteArray = new Uint8Array(byteNumbers);
+
+        var blob = new Blob([byteArray], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        });
+        var url = URL.createObjectURL(blob);
+
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = res.filename || "vektor_lojas_pendencias_ciclo_atual.xlsx";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      })
+      .withFailureHandler(function (err) {
+        console.error("Erro ao exportar XLSX (pendências ciclo):", err);
+        var msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+        renderBotMessage("HTML:<p class='text-sm text-slate-700'>Erro ao gerar o Excel: " + msg + "</p>");
+      })
+      .exportarLojasComPendenciasCicloAtualXlsx(); // ✅ NOVA função no Code.gs
+    return false;
+  } catch (e) {
+    console.error("Erro em vektorBaixarLojasComPendenciasCicloAtual:", e);
     return false;
   }
 };
