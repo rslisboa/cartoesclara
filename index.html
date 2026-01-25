@@ -897,14 +897,14 @@
           <div>
             <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Definição de Alertas</div>
             <div style="color:rgba(226,232,240,0.9); font-size:13px; margin-top:2px;">
-              <span id="myAl_subtitle">Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)</span>
+              <span id="myAl_subtitle">Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.</span>
             </div>
           </div>
         </div>
 
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
           <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
-            <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Tipo de alerta</div>
+            <div style="color:rgba(226,232,240,0.85); font-size:13px; font-weight:900;">Tipo de alerta</div>
             <select id="myAl_alertType"
               style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
                     border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
@@ -923,7 +923,7 @@
 
     <!-- Card: Criar alerta -->
     <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-      <div style="color:#fff; font-weight:900; font-size:14px;">Criar alerta</div>
+      <div style="color:#fff; font-weight:900; font-size:15px;">Criar alerta</div>
       <div style="color:rgba(226,232,240,0.75); font-size:12px; margin-top:2px;">
         <span id="myAl_createHint">O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).</span>
       </div>
@@ -1014,7 +1014,6 @@
             color:#fff;
             font-weight:900;
             font-size:12px;
-            display:flex;
             align-items:center;
             justify-content:center;
             line-height:1;">
@@ -1033,7 +1032,7 @@
 
       <!-- Header do card -->
       <div style="display:flex; flex-direction:column; gap:6px;">
-        <div style="color:#fff; font-weight:900; font-size:14px;">
+        <div style="color:#fff; font-weight:900; font-size:15px;">
           Alertas cadastrados
         </div>
         <div style="color:rgba(226,232,240,0.75); font-size:12px;">
@@ -1515,9 +1514,10 @@
     <? if ((userRole || "") === "Administrador") { ?>
       <!-- Somente Admin -->
       <li><b>Última execução dos jobs:</b> <span id="status-jobs">—</span></li>
+      <li><b>Usuários ativos hoje:</b> <span id="status-ativos-hoje">—</span></li>
       <li><b>Serviços Google (Apps Script / E-mail):</b> <span id="status-google">—</span></li>
       <li><b>BigQuery:</b> <span id="status-bigquery">—</span></li>
-      <li><b>Manutenção:</b> <span id="status-manutencao">—</span></li>
+      <!-- <li><b>Manutenção:</b> <span id="status-manutencao">—</span></li>-->
     <? } ?>
   </ul>
 
@@ -2397,6 +2397,8 @@ function openStatusVektorModal() {
       // A partir daqui: campos admin-only (só preenche se existirem)
       setText("status-jobs", data && data.jobs);
 
+      setText("status-ativos-hoje", data && (data.usuariosAtivosHoje ?? data.ativosHoje));
+
       // Serviços Google (Apps Script / E-mail)
       const googleStatus = data && (data.google ?? data.googleStatus ?? data.servicosGoogle);
       setText("status-google", googleStatus || "Indisponível");
@@ -3145,11 +3147,11 @@ window.vektorMyAlertsInit_ = function () {
       const t = String(typeSel?.value || "TRANSACOES").trim();
 
       if (t === "PENDENCIAS") {
-        if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada)";
+        if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis";
         if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
         if (labelWrap) labelWrap.style.display = "none";
       } else {
-        if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)";
+        if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
         if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
         if (labelWrap) labelWrap.style.display = "block";
       }
@@ -3524,11 +3526,11 @@ window.vektorMyAlertsStartEdit_ = function (a) {
 
   if (t === "PENDENCIAS") {
     if (labelWrap) labelWrap.style.display = "none";
-    if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada)";
+    if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
     if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
   } else {
     if (labelWrap) labelWrap.style.display = "block";
-    if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada)";
+    if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
     if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
   }
 
