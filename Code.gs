@@ -3348,6 +3348,210 @@ function getPeriodoCicloOffset_(offsetMeses) {
   return { inicio: start, fim: end, tz: tz };
 }
 
+function getPendenciasResumoCicloAtual() {
+  try {
+    // ✅ Restrito a Administrador (não depende de VEKTOR_ACESSOS)
+    var sess = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+    if (!isAdminEmail(sess)) {
+      return { ok: false, restrito: true, error: "Não disponível para o seu perfil." };
+    }
+
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+    // Período do ciclo atual (06 -> agora)
+    var per = getPeriodoCicloOffset_(0); // {inicio,fim,tz}
+    var ini = per && per.inicio ? per.inicio : null;
+    if (!ini) return { ok: false, error: "Não consegui identificar o início do ciclo atual." };
+
+    var fim = new Date();
+
+    // BaseClara
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) return { ok: false, error: "Aba BaseClara não encontrada." };
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 2) {
+      return {
+        ok: true,
+        periodo: {
+          inicio: Utilities.formatDate(ini, tz, "dd/MM/yyyy"),
+          fim: Utilities.formatDate(fim, tz, "dd/MM/yyyy")
+        },
+        totais: { totalPendTrans: 0, pendEtiqueta: 0, pendDescricao: 0, pendRecibo: 0 },
+        lojas: { total: 0, comPendencia: 0 },
+        lojasComPendenciaLista: [],
+        topLojas: []
+      };
+    }
+
+    // Lê tudo (header + rows)
+    var values = sh.getRange(1, 1, lastRow, lastCol).getValues();
+    var header = values[0].map(function (h) { return String(h || "").trim(); });
+    var rows = values.slice(1);
+
+    // helper: aliases exatos (igual você já vinha usando)
+    function idxOf(possiveis) {
+      for (var i = 0; i < possiveis.length; i++) {
+        var p = possiveis[i];
+        var ix = header.indexOf(p);
+        if (ix >= 0) return ix;
+      }
+      return -1;
+    }
+
+    // helper local: match EXATO (evita "Recibo" bater em coluna errada)
+    function findHeaderExactLocal_(headerArr, label) {
+      var alvo = normalizarTexto_(label || "");
+      for (var i = 0; i < headerArr.length; i++) {
+        var h = normalizarTexto_(String(headerArr[i] || ""));
+        if (h === alvo) return i;
+      }
+      return -1;
+    }
+
+    // ✅ índices principais
+    var idxDataTrans  = idxOf(["Data da Transação", "Data Transação", "Data"]);
+    var idxValorBRL   = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLojaNum    = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
+
+    if (idxDataTrans < 0) throw new Error("Não encontrei a coluna 'Data da Transação' na BaseClara.");
+    if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna 'Valor em R$' na BaseClara.");
+    if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna 'LojaNum' na BaseClara.");
+
+    // ✅ índices de pendência (EXATO primeiro, depois fallback fixo)
+    var idxRecibo = findHeaderExactLocal_(header, "Recibo");
+    if (idxRecibo < 0) idxRecibo = encontrarIndiceColuna_(header, ["Recibo", "NF / Recibo", "NF/Recibo"]);
+    if (idxRecibo < 0) idxRecibo = 14; // O (0-based)
+
+    var idxEtiquetas = findHeaderExactLocal_(header, "Etiquetas");
+    if (idxEtiquetas < 0) idxEtiquetas = findHeaderExactLocal_(header, "Etiqueta");
+    if (idxEtiquetas < 0) idxEtiquetas = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    if (idxEtiquetas < 0) idxEtiquetas = 19; // T (0-based)
+
+    var idxDescricao = findHeaderExactLocal_(header, "Descrição");
+    if (idxDescricao < 0) idxDescricao = findHeaderExactLocal_(header, "Descricao");
+    if (idxDescricao < 0) idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao"]);
+    if (idxDescricao < 0) idxDescricao = 20; // U (0-based)
+
+    // (2) Mapa Loja->Time usando a sua regra oficial (col R=Time, V=LojaNum)
+    var mapLojaTime = construirMapaLojaParaTime_();
+
+    function parseNumberSafe_(v) {
+      if (v === null || v === undefined || v === "") return 0;
+      if (typeof v === "number") return v;
+      var s = String(v).trim().replace(/\./g, "").replace(",", ".");
+      var n = Number(s);
+      return isFinite(n) ? n : 0;
+    }
+
+    function isVazio_(v) {
+      if (v === null || v === undefined) return true;
+      if (typeof v === "boolean") return (v === false); // checkbox
+      var s = String(v).trim().toLowerCase();
+      if (!s) return true;
+      if (s === "-" || s === "—" || s === "n/a" || s === "na") return true;
+      if (s === "false" || s === "0") return true;
+      if (s === "não" || s === "nao") return true;
+      if (s.indexOf("sem recibo") >= 0) return true;
+      if (s.indexOf("sem etiqueta") >= 0) return true;
+      return false;
+    }
+
+    // (3) Agregação
+    var totPendTrans = 0;
+    var totPEtiq = 0, totPDesc = 0, totPRec = 0;
+
+    var mapaLojas = {}; // loja(4d) -> {loja,time,totalPendencias,valorPendente}
+
+    for (var r = 0; r < rows.length; r++) {
+      var row = rows[r];
+
+      // Data (filtra pelo ciclo atual: ini -> agora)
+      var dt = row[idxDataTrans];
+      var dtx = (dt instanceof Date) ? dt : new Date(dt);
+      if (!(dtx instanceof Date) || isNaN(dtx.getTime())) continue;
+      if (dtx < ini || dtx > fim) continue;
+
+      // Loja
+      var lojaNum = normalizarLojaNumero_(row[idxLojaNum]);
+      if (!lojaNum) continue;
+      var loja4 = String(lojaNum).padStart(4, "0");
+
+      // Valor
+      var valor = parseNumberSafe_(row[idxValorBRL]);
+
+      // ✅ Campos de pendência (agora usando os índices corretos)
+      var etiquetas = row[idxEtiquetas];
+      var recibo = row[idxRecibo];
+      var desc = row[idxDescricao];
+
+      var temPendEtiqueta = isVazio_(etiquetas);
+      var temPendRecibo   = isVazio_(recibo);
+      var temPendDesc     = isVazio_(desc);
+
+      var temPend = temPendEtiqueta || temPendRecibo || temPendDesc;
+      if (!temPend) continue;
+
+      totPendTrans++;
+
+      if (temPendEtiqueta) totPEtiq++;
+      if (temPendDesc)     totPDesc++;
+      if (temPendRecibo)   totPRec++;
+
+      if (!mapaLojas[loja4]) {
+        mapaLojas[loja4] = {
+          loja: loja4,
+          time: mapLojaTime[Number(lojaNum)] || "—",
+          totalPendencias: 0,
+          valorPendente: 0
+        };
+      }
+
+      mapaLojas[loja4].totalPendencias++;
+      mapaLojas[loja4].valorPendente += valor;
+    }
+
+    // lista explícita (para export)
+    var lojasComPendenciaLista = Object.keys(mapaLojas || {}).sort();
+
+    // Métrica de abrangência por loja
+    var totalLojasAtivas = Object.keys(mapLojaTime || {}).length;
+    var lojasComPendencia = lojasComPendenciaLista.length;
+
+    // Top lojas
+    var topLojas = Object.keys(mapaLojas).map(function (k) { return mapaLojas[k]; });
+    topLojas.sort(function(a,b){
+      if (b.valorPendente !== a.valorPendente) return b.valorPendente - a.valorPendente;
+      return b.totalPendencias - a.totalPendencias;
+    });
+
+    return {
+      ok: true,
+      periodo: {
+        inicio: Utilities.formatDate(ini, tz, "dd/MM/yyyy"),
+        fim: Utilities.formatDate(fim, tz, "dd/MM/yyyy")
+      },
+      totais: {
+        totalPendTrans: totPendTrans,
+        pendEtiqueta: totPEtiq,
+        pendDescricao: totPDesc,
+        pendRecibo: totPRec
+      },
+      lojas: {
+        total: totalLojasAtivas,
+        comPendencia: lojasComPendencia
+      },
+      lojasComPendenciaLista: lojasComPendenciaLista,
+      topLojas: topLojas.slice(0, 10)
+    };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 /**
  * Projeção de gasto por loja para o ciclo atual (06->05), usando sazonalidade:
  * - Base: média dos últimos 6 ciclos completos
@@ -7340,6 +7544,31 @@ function getResumoPendenciasPorLoja(grupo, dataInicioStr, dataFimStr) {
     var IDX_GRUPO = 17;  // "Grupos"
     var IDX_LOJA  = 21;  // "LojaNum"
 
+    // helper local: match EXATO (evita "Recibo" bater em "Nome dos Recibos")
+    function findHeaderExactLocal_(headerArr, label) {
+      var alvo = normalizarTexto_(label || "");
+      for (var i = 0; i < headerArr.length; i++) {
+        var h = normalizarTexto_(String(headerArr[i] || ""));
+        if (h === alvo) return i;
+      }
+      return -1;
+    }
+
+    // === índices EXATOS primeiro, depois fallback ===
+    var idxRecibo = findHeaderExactLocal_(header, "Recibo");
+    if (idxRecibo < 0) idxRecibo = encontrarIndiceColuna_(header, ["Recibo", "NF / Recibo", "NF/Recibo"]);
+    if (idxRecibo < 0) idxRecibo = 14; // O (fallback fixo)
+
+    var idxEtiqueta = findHeaderExactLocal_(header, "Etiquetas");
+    if (idxEtiqueta < 0) idxEtiqueta = findHeaderExactLocal_(header, "Etiqueta");
+    if (idxEtiqueta < 0) idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    if (idxEtiqueta < 0) idxEtiqueta = 19; // T
+
+    var idxDescricao = findHeaderExactLocal_(header, "Descrição");
+    if (idxDescricao < 0) idxDescricao = findHeaderExactLocal_(header, "Descricao");
+    if (idxDescricao < 0) idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao"]);
+    if (idxDescricao < 0) idxDescricao = 20; // U
+
     var idxRecibo = encontrarIndiceColuna_(header, ["Recibo", "NF / Recibo", "NF/Recibo"]);
     var idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
     var idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao", "Comentário"]);
@@ -7515,6 +7744,31 @@ function getResumoPendenciasPorTime(dataInicioStr, dataFimStr, grupoFiltro) {
     var IDX_DATA  = 0;
     var IDX_VALOR = 5;
     var IDX_GRUPO = 17;
+
+    // helper local: match EXATO (evita "Recibo" bater em "Nome dos Recibos")
+    function findHeaderExactLocal_(headerArr, label) {
+      var alvo = normalizarTexto_(label || "");
+      for (var i = 0; i < headerArr.length; i++) {
+        var h = normalizarTexto_(String(headerArr[i] || ""));
+        if (h === alvo) return i;
+      }
+      return -1;
+    }
+
+    // === índices EXATOS primeiro, depois fallback ===
+    var idxRecibo = findHeaderExactLocal_(header, "Recibo");
+    if (idxRecibo < 0) idxRecibo = encontrarIndiceColuna_(header, ["Recibo", "NF / Recibo", "NF/Recibo"]);
+    if (idxRecibo < 0) idxRecibo = 14; // O (fallback fixo)
+
+    var idxEtiqueta = findHeaderExactLocal_(header, "Etiquetas");
+    if (idxEtiqueta < 0) idxEtiqueta = findHeaderExactLocal_(header, "Etiqueta");
+    if (idxEtiqueta < 0) idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    if (idxEtiqueta < 0) idxEtiqueta = 19; // T
+
+    var idxDescricao = findHeaderExactLocal_(header, "Descrição");
+    if (idxDescricao < 0) idxDescricao = findHeaderExactLocal_(header, "Descricao");
+    if (idxDescricao < 0) idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao"]);
+    if (idxDescricao < 0) idxDescricao = 20; // U
 
     var idxRecibo = encontrarIndiceColuna_(header, ["Recibo", "NF / Recibo", "NF/Recibo"]);
     var idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
@@ -8029,6 +8283,181 @@ return {
   } catch (e) {
     return { ok: false, error: e.message || String(e) };
   }
+}
+
+function exportarLojasComPendenciasCicloAtualXlsx() {
+  // ✅ RBAC (admin-only): cadastre esta função no VEKTOR_ACESSOS para Administrador
+  vektorAssertFunctionAllowed_("exportarLojasComPendenciasCicloAtualXlsx");
+
+  try {
+    // 1) Pega o “universo” de lojas com pendência no ciclo atual
+    var resumo = getPendenciasResumoCicloAtual();
+    if (!resumo || !resumo.ok) {
+      return { ok: false, error: (resumo && resumo.error) ? resumo.error : "Falha ao obter resumo de pendências do ciclo atual." };
+    }
+
+    // ✅ Fonte correta: lista explícita (novo campo)
+    var lojas = (resumo && Array.isArray(resumo.lojasComPendenciaLista)) ? resumo.lojasComPendenciaLista : [];
+
+    // Fallback: tenta extrair das topLojas (caso a lista não exista por alguma razão)
+    if (!lojas.length) {
+      var top = (resumo && Array.isArray(resumo.topLojas)) ? resumo.topLojas : [];
+      lojas = top.map(function (x) { return String(x && x.loja ? x.loja : "").trim(); }).filter(Boolean);
+    }
+
+    if (!Array.isArray(lojas) || !lojas.length) {
+      return { ok: false, error: "Não encontrei lojas com pendências no ciclo atual para exportar." };
+    }
+
+    // normaliza para set rápido
+    var set = {};
+    lojas.forEach(function (l) {
+      var dig = String(l || "").replace(/\D/g, "");
+      if (!dig) return;
+      var cod = String(Number(dig)).padStart(4, "0");
+      set[cod] = true;
+    });
+
+    // 2) Lê BaseClara inteira (header + linhas)
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return { ok: false, error: info.error };
+
+    var header = info.header || [];
+    var linhas = info.linhas || [];
+
+    // 3) Descobre colunas necessárias para filtrar (Loja + Data do ciclo)
+    var idxLoja = encontrarIndiceColuna_(header, ["LojaNum", "Loja", "Código da loja", "Codigo da loja", "cod_loja"]);
+    if (idxLoja < 0) return { ok: false, error: "Não encontrei coluna de Loja na BaseClara (LojaNum/Loja/cod_loja)." };
+
+    var idxData = encontrarIndiceColuna_(header, ["Data da Transação", "Data", "Data_transacao", "Data transacao"]);
+    if (idxData < 0) return { ok: false, error: "Não encontrei coluna de Data na BaseClara (Data da Transação/Data)." };
+
+    // ✅ índices para aplicar filtro de pendência (mesma regra do resumo)
+    var idxRecibo = encontrarIndiceColuna_(header, ["Recibo"]);
+    if (idxRecibo < 0) return { ok:false, error:"Não encontrei coluna 'Recibo' na BaseClara." };
+
+    var idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas"]);
+    if (idxEtiqueta < 0) return { ok:false, error:"Não encontrei coluna 'Etiquetas' na BaseClara." };
+
+    var idxDescricao = encontrarIndiceColuna_(header, ["Descrição"]);
+    if (idxDescricao < 0) return { ok:false, error:"Não encontrei coluna 'Descrição' na BaseClara." };
+
+    function isVazioPend_(v) {
+      if (v === null || v === undefined) return true;
+      // trata boolean (checkbox)
+      if (typeof v === "boolean") return (v === false);
+
+      var s = String(v).trim().toLowerCase();
+      if (!s) return true;
+
+      // padrões de "não tenho / vazio"
+      if (s === "-" || s === "—" || s === "n/a") return true;
+      if (s === "não" || s === "nao") return true;
+      if (s === "false" || s === "0") return true;
+
+      return false;
+    }
+
+    // 4) Calcula período do ciclo (06->hoje)
+    var pc = getPeriodoCicloClara_();
+    var ini = pc && pc.inicio ? pc.inicio : null;
+    var fim = new Date();
+
+    if (!ini) return { ok: false, error: "Não consegui identificar o início do ciclo atual." };
+
+    // 5) Filtra linhas: (loja ∈ set) e (data ∈ [ini..fim])
+    var filtradas = [];
+    for (var i = 0; i < linhas.length; i++) {
+      var row = linhas[i];
+
+      var lojaRaw = String(row[idxLoja] || "").trim();
+      var dig = lojaRaw.replace(/\D/g, "");
+      if (!dig) continue;
+      var loja4 = String(Number(dig)).padStart(4, "0");
+      if (!set[loja4]) continue;
+
+      var d = parseDateClara_(row[idxData]);
+      if (!d) continue;
+      if (d < ini || d > fim) continue;
+
+      // ✅ só exporta transações com pendência (recibo OU etiqueta OU descrição)
+      var recibo = row[idxRecibo];
+      var etiqueta = row[idxEtiqueta];
+      var desc = row[idxDescricao];
+
+      var temPendRecibo = isVazioPend_(recibo);
+      var temPendEtiqueta = isVazioPend_(etiqueta);
+      var temPendDescricao = isVazioPend_(desc);
+
+      if (!(temPendRecibo || temPendEtiqueta || temPendDescricao)) continue;
+
+      // agora sim exporta
+      filtradas.push(row);
+    }
+
+    if (!filtradas.length) {
+      return { ok: false, error: "Nenhuma transação com pendência encontrada para essas lojas no ciclo atual." };
+    }
+
+    // 6) Gera XLSX temporário e devolve base64
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var nome = "Vektor - Lojas com pendências (ciclo atual) - " + Utilities.formatDate(new Date(), tz, "yyyyMMdd_HHmm") + ".xlsx";
+
+    var xlsxBlob = buildXlsxFromTable_(header, filtradas, "BaseClara_filtrada");
+    var b64 = Utilities.base64Encode(xlsxBlob.getBytes());
+
+    return {
+      ok: true,
+      filename: nome,
+      xlsxBase64: b64,
+      meta: { totalRows: filtradas.length, totalLojas: Object.keys(set).length }
+    };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Helper: cria um XLSX a partir de (header + rows2d).
+ * Usa planilha temporária e exporta para XLSX.
+ */
+function buildXlsxFromTable_(header, rows2d, sheetName) {
+  sheetName = sheetName || "Export";
+
+  // cria planilha temp
+  var temp = SpreadsheetApp.create("TEMP_VEKTOR_EXPORT_" + new Date().getTime());
+  var fileId = temp.getId();
+
+  var sh = temp.getSheets()[0];
+  sh.setName(sheetName);
+
+  // escreve header + dados
+  var all = [header].concat(rows2d);
+  sh.getRange(1, 1, all.length, header.length).setValues(all);
+  sh.setFrozenRows(1);
+
+  // exporta XLSX via endpoint do Drive
+  var url = "https://www.googleapis.com/drive/v3/files/" + fileId + "/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  var token = ScriptApp.getOAuthToken();
+
+  var resp = UrlFetchApp.fetch(url, {
+    headers: { Authorization: "Bearer " + token },
+    muteHttpExceptions: true
+  });
+
+  if (resp.getResponseCode() !== 200) {
+    // tenta limpar
+    try { DriveApp.getFileById(fileId).setTrashed(true); } catch (_) {}
+    throw new Error("Falha ao exportar XLSX (HTTP " + resp.getResponseCode() + "): " + resp.getContentText());
+  }
+
+  var blob = resp.getBlob().setName("export.xlsx");
+
+  // limpa temp
+  try { DriveApp.getFileById(fileId).setTrashed(true); } catch (_) {}
+
+  return blob;
 }
 
 /**
