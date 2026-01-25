@@ -1036,7 +1036,7 @@
           Alertas cadastrados
         </div>
         <div style="color:rgba(226,232,240,0.75); font-size:12px;">
-          Seu histórico é privado. Administrador pode ver todos (com filtro). O botão <b>Executar</b> irá enviar o alerta diretamente aqui no chat. O envio por e-mail ocorrerá <b>automaticamente</b> conforme a <b>frequência</b> configurada neste alerta.
+          Seu histórico é privado. O botão <b>Executar</b> irá enviar o alerta diretamente aqui no chat. O envio por e-mail ocorrerá <b>automaticamente</b> conforme a <b>frequência</b> configurada neste alerta.
         </div>
       </div>
 
@@ -3147,7 +3147,7 @@ window.vektorMyAlertsInit_ = function () {
       const t = String(typeSel?.value || "TRANSACOES").trim();
 
       if (t === "PENDENCIAS") {
-        if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis";
+        if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
         if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
         if (labelWrap) labelWrap.style.display = "none";
       } else {
