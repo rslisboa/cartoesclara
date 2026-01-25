@@ -2443,18 +2443,41 @@ window.vektorShowChatView = function () {
 function vektorShowRadarView_() {
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
+  const feedbackView = document.getElementById("feedbackView");
+  const myAlertsView = document.getElementById("myAlertsView");
+  const fluxView = document.getElementById("fluxogramaView");
+
+  // fecha as demais páginas
   if (chatView) chatView.classList.add("hidden");
+  if (feedbackView) feedbackView.classList.add("hidden");
+  if (myAlertsView) myAlertsView.classList.add("hidden");
+  if (fluxView) fluxView.classList.add("hidden");
+
+  // abre o Radar
   if (radarView) radarView.classList.remove("hidden");
+
+  // (opcional, mas recomendado: mantém comportamento visual do Radar)
+  if (radarView) radarView.classList.add("is-open");
 }
 
 function vektorShowFeedbackView_() {
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
   const feedbackView = document.getElementById("feedbackView");
+  const myAlertsView = document.getElementById("myAlertsView");
+  const fluxView = document.getElementById("fluxogramaView");
 
+  // fecha as demais páginas
   if (chatView) chatView.classList.add("hidden");
   if (radarView) radarView.classList.add("hidden");
+  if (myAlertsView) myAlertsView.classList.add("hidden");
+  if (fluxView) fluxView.classList.add("hidden");
+
+  // abre feedback
   if (feedbackView) feedbackView.classList.remove("hidden");
+
+  // opcional: garante estado do radar
+  if (radarView) radarView.classList.remove("is-open");
 }
 
 function vektorShowFluxogramaView_() {
@@ -2592,18 +2615,22 @@ window.vektorOpenFeedback = function () {
 // RADAR (tela cheia)
 // ===============================
 window.vektorOpenRadar = function (modo) {
+  // abre Radar e fecha outras views (base)
   vektorShowRadarView_();
 
-  vektorShowRadarView_();
+  // ✅ garante que Alertas Programados não fique por cima
+  const myAlertsView = document.getElementById("myAlertsView");
+  if (myAlertsView) myAlertsView.classList.add("hidden");
 
-const radarView = document.getElementById("radarView");
-if (radarView) radarView.classList.add("is-open");
+  const radarView = document.getElementById("radarView");
+  if (radarView) radarView.classList.add("is-open");
 
   setRadarActiveBtn_(modo);
 
   const loading = document.getElementById("radarLoading");
   const heat = document.getElementById("radarHeatmap");
   const rank = document.getElementById("radarRanking");
+
   if (loading) loading.style.display = "block";
   if (heat) heat.innerHTML = "";
   if (rank) rank.innerHTML = "";
@@ -2613,14 +2640,20 @@ if (radarView) radarView.classList.add("is-open");
       if (loading) loading.style.display = "none";
 
       if (!res || !res.ok) {
-        const msg = (res && res.restrito) ? "Acesso restrito: apenas Administrador." : "Falha ao carregar dados do Radar.";
-        if (heat) heat.innerHTML = `<div style="color:rgba(226,232,240,0.85); font-weight:700; font-size:13px;">${msg}</div>`;
+        const msg = (res && res.restrito)
+          ? "Acesso restrito: apenas Administrador."
+          : "Falha ao carregar dados do Radar.";
+        if (heat) {
+          heat.innerHTML = `<div style="color:rgba(226,232,240,0.85); font-weight:700; font-size:13px;">${msg}</div>`;
+        }
         return;
       }
 
       const lojas = Array.isArray(res.lojas) ? res.lojas : [];
       if (!lojas.length) {
-        if (heat) heat.innerHTML = `<div style="color:rgba(226,232,240,0.85); font-weight:700; font-size:13px;">Sem dados suficientes no período.</div>`;
+        if (heat) {
+          heat.innerHTML = `<div style="color:rgba(226,232,240,0.85); font-weight:700; font-size:13px;">Sem dados suficientes no período.</div>`;
+        }
         return;
       }
 
@@ -2632,7 +2665,9 @@ if (radarView) radarView.classList.add("is-open");
     .withFailureHandler(function (err) {
       if (loading) loading.style.display = "none";
       const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
-      if (heat) heat.innerHTML = `<div style="color:rgba(248,113,113,0.95); font-weight:800; font-size:13px;">Falha: ${msg}</div>`;
+      if (heat) {
+        heat.innerHTML = `<div style="color:rgba(248,113,113,0.95); font-weight:800; font-size:13px;">Falha: ${msg}</div>`;
+      }
     })
     .getRadarIrregularidadeParaChat(modo);
 };
