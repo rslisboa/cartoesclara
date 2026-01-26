@@ -11147,16 +11147,24 @@ google.script.run
           : ""
         ) +
 
-        // 🔽 NOVO: botão de download
+        // 🔽 NOVO: botões de download e email
         "<div style='margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;'>" +
+
           "<button type='button' " +
             "onclick='window.vektorBaixarLojasComPendenciasCicloAtual(event)' " +
             "style='background:#0F172A;color:#fff;border:none;padding:8px 12px;" +
                   "border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>" +
             "Baixar lojas com pendências" +
           "</button>" +
+
+          "<button type='button' " +
+            "onclick='window.vektorEnviarLojasComPendenciasCicloAtualEmail(event)' " +
+            "style='background:#005E27;color:#fff;border:none;padding:8px 12px;" +
+                  "border-radius:10px;font-size:12px;font-weight:900;cursor:pointer;'>" +
+            "Enviar listagem por e-mail" +
+          "</button>" +
         "</div>" +
-      "</div>";
+              "</div>";
 
       renderBotMessage(html);
 
@@ -15350,7 +15358,7 @@ window.vektorBaixarLojasComPendenciasCicloAtual = function (ev) {
     }
 
     renderBotMessage(
-      "HTML:<p class='text-sm text-slate-700'>Gerando Excel apenas das <b>lojas com pendências</b> no ciclo atual…</p>"
+      "HTML:<p class='text-sm text-slate-700'>Gerando Excel apenas das <b>lojas com pendências</b> no ciclo atual, aguarde um momento.</p>"
     );
 
     google.script.run
@@ -15393,6 +15401,47 @@ window.vektorBaixarLojasComPendenciasCicloAtual = function (ev) {
   } catch (e) {
     console.error("Erro em vektorBaixarLojasComPendenciasCicloAtual:", e);
     return false;
+  }
+};
+
+// ===============================
+// E-MAIL — LOJAS COM PENDÊNCIAS (ciclo atual) — anexo XLSX
+// ===============================
+window.vektorEnviarLojasComPendenciasCicloAtualEmail = function (ev) {
+  try {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Enviando a listagem de <b>lojas com pendências</b> do ciclo atual para o seu e-mail, aguarde um momento.</p>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.ok) {
+          var msg = (res && res.error) ? res.error : "Não consegui enviar o e-mail agora.";
+          renderBotMessage("HTML:<p class='text-sm text-slate-700'><b>Falha ao enviar e-mail:</b> " + msg + "</p>");
+          console.error("Resposta enviar e-mail (pendências ciclo):", res);
+          return;
+        }
+
+        var to = (res && res.to) ? res.to : "seu e-mail";
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'><b>Pronto.</b> Enviei a listagem por e-mail para <b>" + to + "</b>.</p>"
+        );
+      })
+      .withFailureHandler(function (err) {
+        var msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+        renderBotMessage(
+          "HTML:<p class='text-sm text-slate-700'><b>Falha ao enviar e-mail:</b> " + msg + "</p>"
+        );
+      })
+      .enviarLojasComPendenciasCicloAtualEmail(); // Code.gs
+  } catch (e) {
+    console.error("Erro em vektorEnviarLojasComPendenciasCicloAtualEmail:", e);
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Falha ao enviar e-mail agora.</p>");
   }
 };
 
