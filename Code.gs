@@ -8436,6 +8436,56 @@ function exportarLojasComPendenciasCicloAtualXlsx() {
   }
 }
 
+function enviarLojasComPendenciasCicloAtualEmail() {
+  // ✅ RBAC (admin-only): cadastre esta função no VEKTOR_ACESSOS para Administrador
+  vektorAssertFunctionAllowed_("enviarLojasComPendenciasCicloAtualEmail");
+
+  try {
+    var to = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+    if (!to) {
+      return { ok: false, error: "Não foi possível identificar seu e-mail Google (sessão vazia)." };
+    }
+
+    // Reaproveita o mesmo export (fonte única da verdade)
+    var exp = exportarLojasComPendenciasCicloAtualXlsx();
+    if (!exp || !exp.ok || !exp.xlsxBase64) {
+      return { ok: false, error: (exp && exp.error) ? exp.error : "Falha ao gerar o anexo para envio." };
+    }
+
+    var bytes = Utilities.base64Decode(exp.xlsxBase64);
+    var filename = exp.filename || "Vektor - Lojas com pendências (ciclo atual).xlsx";
+
+    var blob = Utilities.newBlob(
+      bytes,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      filename
+    );
+
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var hoje = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy HH:mm");
+
+    var subject = "Vektor | Lojas com pendências (ciclo atual)";
+    var htmlBody =
+      "<div style='font-family:Arial,sans-serif; font-size:13px; color:#0f172a;'>" +
+        "<p>Segue em anexo a listagem de <b>transações com pendências</b> do ciclo atual (extração: " + hoje + ").</p>" +
+        "<p style='color:#64748b; font-size:12px;'>Enviado automaticamente pelo Vektor.</p>" +
+      "</div>";
+
+    MailApp.sendEmail({
+      to: to,
+      subject: subject,
+      htmlBody: htmlBody,
+      attachments: [blob],
+      name: "Vektor - Grupo SBF"
+    });
+
+    return { ok: true, to: to, filename: filename, meta: exp.meta || {} };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 /**
  * Helper: cria um XLSX a partir de (header + rows2d).
  * Usa planilha temporária e exporta para XLSX.
