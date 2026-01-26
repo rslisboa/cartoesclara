@@ -2,7 +2,7 @@
 // CONFIGURAÇÕES GLOBAIS
 // =======================
 
-var BASE_CLARA_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI"; // ID real da planilha BaseClara
+var BASE_CLARA_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI"; // ID real da planilha que uso
 var HIST_PEND_CLARA_RAW = "HIST_PEND_CLARA_RAW";
 
 function normalizarLojaNumero_(valor) {
@@ -3226,21 +3226,36 @@ function getBaseClaraSheet_() {
 
 // Converte o valor da coluna "Data da Transação" para Date
 function parseDateClara_(value) {
-  if (!value) return null;
+  if (value === null || value === undefined || value === "") return null;
+
+  // Date direto
   if (Object.prototype.toString.call(value) === "[object Date]") {
-    return value;
+    return isNaN(value.getTime()) ? null : value;
   }
-  if (typeof value === "string") {
-    // tenta formato dd/MM/yyyy
-    var parts = value.split("/");
-    if (parts.length === 3) {
-      var d = parseInt(parts[0], 10);
-      var m = parseInt(parts[1], 10) - 1;
-      var y = parseInt(parts[2], 10);
-      return new Date(y, m, d);
-    }
+
+  // Número (data serial do Sheets/Excel)
+  if (typeof value === "number") {
+    // Google Sheets usa base 1899-12-30
+    var d0 = new Date(Date.UTC(1899, 11, 30));
+    var d = new Date(d0.getTime() + value * 24 * 60 * 60 * 1000);
+    return isNaN(d.getTime()) ? null : d;
   }
-  return null;
+
+  var s = String(value).trim();
+  if (!s) return null;
+
+  // dd/MM/yyyy ou dd/MM/yyyy HH:mm(:ss)
+  var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (m1) {
+    var dd = Number(m1[1]), mm = Number(m1[2]) - 1, yy = Number(m1[3]);
+    var hh = Number(m1[4] || 0), mi = Number(m1[5] || 0), ss = Number(m1[6] || 0);
+    var d1 = new Date(yy, mm, dd, hh, mi, ss);
+    return isNaN(d1.getTime()) ? null : d1;
+  }
+
+  // ISO yyyy-MM-dd (com ou sem hora)
+  var d2 = new Date(s);
+  return isNaN(d2.getTime()) ? null : d2;
 }
 
 // Lê todas as linhas da BaseClara (ignorando cabeçalho)
@@ -3522,10 +3537,12 @@ function getPendenciasResumoCicloAtual() {
 
     // Top lojas
     var topLojas = Object.keys(mapaLojas).map(function (k) { return mapaLojas[k]; });
-    topLojas.sort(function(a,b){
-      if (b.valorPendente !== a.valorPendente) return b.valorPendente - a.valorPendente;
-      return b.totalPendencias - a.totalPendencias;
-    });
+
+    // ✅ ordena: MAIOR VOLUME de pendências, depois MAIOR valor pendente
+      topLojas.sort(function(a,b){
+        if (b.totalPendencias !== a.totalPendencias) return b.totalPendencias - a.totalPendencias;
+        return b.valorPendente - a.valorPendente;
+      });
 
     return {
       ok: true,
@@ -8296,8 +8313,13 @@ function exportarLojasComPendenciasCicloAtualXlsx() {
       return { ok: false, error: (resumo && resumo.error) ? resumo.error : "Falha ao obter resumo de pendências do ciclo atual." };
     }
 
-    // ✅ Fonte correta: lista explícita (novo campo)
-    var lojas = (resumo && Array.isArray(resumo.lojasComPendenciaLista)) ? resumo.lojasComPendenciaLista : [];
+    // ✅ Fonte correta: lista explícita (prioriza ROOT; fallback para formato antigo dentro de "lojas")
+    var lojas =
+      (resumo && Array.isArray(resumo.lojasComPendenciaLista))
+        ? resumo.lojasComPendenciaLista
+        : ((resumo && resumo.lojas && Array.isArray(resumo.lojas.lojasComPendenciaLista))
+            ? resumo.lojas.lojasComPendenciaLista
+            : []);
 
     // Fallback: tenta extrair das topLojas (caso a lista não exista por alguma razão)
     if (!lojas.length) {
@@ -8333,24 +8355,22 @@ function exportarLojasComPendenciasCicloAtualXlsx() {
     if (idxData < 0) return { ok: false, error: "Não encontrei coluna de Data na BaseClara (Data da Transação/Data)." };
 
     // ✅ índices para aplicar filtro de pendência (mesma regra do resumo)
-    var idxRecibo = encontrarIndiceColuna_(header, ["Recibo"]);
-    if (idxRecibo < 0) return { ok:false, error:"Não encontrei coluna 'Recibo' na BaseClara." };
+    var idxRecibo = encontrarIndiceColuna_(header, ["Recibo", "NF / Recibo", "NF/Recibo"]);
+    if (idxRecibo < 0) return { ok: false, error: "Não encontrei coluna 'Recibo' na BaseClara." };
 
-    var idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas"]);
-    if (idxEtiqueta < 0) return { ok:false, error:"Não encontrei coluna 'Etiquetas' na BaseClara." };
+    var idxEtiqueta = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    if (idxEtiqueta < 0) return { ok: false, error: "Não encontrei coluna 'Etiquetas' na BaseClara." };
 
-    var idxDescricao = encontrarIndiceColuna_(header, ["Descrição"]);
-    if (idxDescricao < 0) return { ok:false, error:"Não encontrei coluna 'Descrição' na BaseClara." };
+    var idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao"]);
+    if (idxDescricao < 0) return { ok: false, error: "Não encontrei coluna 'Descrição' na BaseClara." };
 
     function isVazioPend_(v) {
       if (v === null || v === undefined) return true;
-      // trata boolean (checkbox)
       if (typeof v === "boolean") return (v === false);
 
       var s = String(v).trim().toLowerCase();
       if (!s) return true;
 
-      // padrões de "não tenho / vazio"
       if (s === "-" || s === "—" || s === "n/a") return true;
       if (s === "não" || s === "nao") return true;
       if (s === "false" || s === "0") return true;
@@ -8365,7 +8385,7 @@ function exportarLojasComPendenciasCicloAtualXlsx() {
 
     if (!ini) return { ok: false, error: "Não consegui identificar o início do ciclo atual." };
 
-    // 5) Filtra linhas: (loja ∈ set) e (data ∈ [ini..fim])
+    // 5) Filtra linhas: (loja ∈ set) e (data ∈ [ini..fim]) e (tem pendência)
     var filtradas = [];
     for (var i = 0; i < linhas.length; i++) {
       var row = linhas[i];
@@ -8380,7 +8400,6 @@ function exportarLojasComPendenciasCicloAtualXlsx() {
       if (!d) continue;
       if (d < ini || d > fim) continue;
 
-      // ✅ só exporta transações com pendência (recibo OU etiqueta OU descrição)
       var recibo = row[idxRecibo];
       var etiqueta = row[idxEtiqueta];
       var desc = row[idxDescricao];
@@ -8391,7 +8410,6 @@ function exportarLojasComPendenciasCicloAtualXlsx() {
 
       if (!(temPendRecibo || temPendEtiqueta || temPendDescricao)) continue;
 
-      // agora sim exporta
       filtradas.push(row);
     }
 
