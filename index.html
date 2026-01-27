@@ -837,8 +837,19 @@ input[type="date"]::-webkit-clear-button {
             Revisar linhas
           </button>
 
-          <button type="button" onclick="window.vektorEnvioPendenciasEnviarSelecionadas()"
-            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(34,197,94,0.35); background:rgba(34,197,94,0.15); color:#fff; font-weight:900; font-size:12px;">
+          <button type="button"
+                  onclick="window.vektorEnvioPendenciasEnviarSelecionadas()"
+                  style="
+                    height:36px;
+                    padding:0 14px;
+                    border-radius:10px;
+                    border:none;
+                    background:#B5FF20;
+                    color:#0b1f3a;
+                    font-weight:900;
+                    font-size:12px;
+                    cursor:pointer;
+                  ">
             Enviar selecionadas
           </button>
         </div>
@@ -896,7 +907,7 @@ input[type="date"]::-webkit-clear-button {
           Desmarcar tudo
         </button>
         <button type="button" onclick="window.vektorEnvioPendenciasFecharModal()"
-          style="height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(248,113,113,0.35); background:rgba(248,113,113,0.12); color:#fff; font-weight:900;">
+          style="height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(248,113,113,0.35); background:rgba(248,113,113,0.12); color:#fff; font-weight:900;font-size:12px;">
           Fechar
         </button>
       </div>
@@ -2934,7 +2945,7 @@ window.vektorEnvioPendenciasPreview = function () {
                     d="${dPath}"
                     fill="none"
                     stroke="#ffffff"
-                    stroke-width="2.8"
+                    stroke-width="2.0"
                     stroke-linecap="round"
                     stroke-linejoin="round" />
 
@@ -2943,7 +2954,7 @@ window.vektorEnvioPendenciasPreview = function () {
                     d="${dPath}"
                     fill="none"
                     stroke="rgba(255,255,255,0.45)"
-                    stroke-width="4.0"
+                    stroke-width="3.0"
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     stroke-dasharray="10 18" />
