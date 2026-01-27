@@ -392,6 +392,19 @@
   background: rgba(22,163,74,0.35);
 }
 
+/* Ícone do calendário (Chrome/Edge) */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.6);
+  opacity: 1;
+  cursor: pointer;
+}
+
+/* remove “botões” extras se aparecerem */
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button {
+  display: none;
+}
+
 </style>
 
 <style>
@@ -684,6 +697,15 @@
   >
     📈 Radar de Irregularidade
   </button>
+
+  <button
+  type="button"
+  onclick="window.vektorOpenEnvioPendencias()"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+>
+  📩 Envio de Pendências
+</button>
+
 <? } ?>
 
   <!-- Botão: Feedback -->
@@ -781,6 +803,124 @@
     </form>
   </footer>
 </div> <!-- fecha #chatView -->
+
+<!-- VIEW: ENVIO DE PENDÊNCIAS (sobrepõe SOMENTE a área do chat) -->
+<div id="envioPendView" class="hidden" style="position:absolute; inset:0; z-index:20;">
+  <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+
+      <!-- Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <button type="button"
+            onclick="window.vektorShowChatView()"
+            style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:800; font-size:12px;">
+            ← Voltar ao chat
+          </button>
+
+          <div>
+            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Envio de Pendências</div>
+            <div style="color:rgba(226,232,240,0.85); font-size:12px; margin-top:2px;">
+              Prévia + seleção (checkbox) + rastreabilidade (envio único por transação)
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" onclick="window.vektorEnvioPendenciasPreview()"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+            Gerar prévia
+          </button>
+
+          <button type="button" onclick="window.vektorEnvioPendenciasAbrirModal()"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(59,130,246,0.35); background:rgba(59,130,246,0.15); color:#fff; font-weight:900; font-size:12px;">
+            Revisar linhas
+          </button>
+
+          <button type="button" onclick="window.vektorEnvioPendenciasEnviarSelecionadas()"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(34,197,94,0.35); background:rgba(34,197,94,0.15); color:#fff; font-weight:900; font-size:12px;">
+            Enviar selecionadas
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div style="flex:1; overflow:auto; background:#070b14; padding:14px 16px;">
+        <!-- filtros -->
+        <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:900;">Data inicial</label>
+              <input id="envPend_ini" type="date"
+                style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <label style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:900;">Data final</label>
+              <input id="envPend_fim" type="date"
+                style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+            </div>
+
+            <div id="envPend_status" style="color:rgba(226,232,240,0.75); font-size:12px; font-weight:800;">
+              —
+            </div>
+          </div>
+        </div>
+
+        <!-- resumo -->
+        <div class="mt-3" style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+          <div style="color:#fff; font-weight:900; font-size:14px;">Resumo</div>
+          <div id="envPend_resumo" style="margin-top:8px; color:rgba(226,232,240,0.85); font-size:12px;">
+            Gere uma prévia para ver o resumo.
+          </div>
+          <div id="envPend_falhas" style="margin-top:10px;"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- MODAL: Revisar pré-listagem (checkbox) -->
+<div id="envPendModal" class="hidden" style="position:absolute; inset:0; z-index:60; background:rgba(0,0,0,0.55);">
+  <div style="position:absolute; inset:22px; background:#0b1220; border:1px solid rgba(148,163,184,0.25); border-radius:16px; overflow:hidden; display:flex; flex-direction:column;">
+    <div style="padding:12px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(148,163,184,0.18);">
+      <div style="color:#fff; font-weight:900;">Revisar linhas (desmarque o que não deve ir)</div>
+      <div style="display:flex; gap:8px;">
+        <button type="button" onclick="window.vektorEnvPendSelectAll(true)"
+          style="height:32px; padding:0 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+          Marcar tudo
+        </button>
+        <button type="button" onclick="window.vektorEnvPendSelectAll(false)"
+          style="height:32px; padding:0 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+          Desmarcar tudo
+        </button>
+        <button type="button" onclick="window.vektorEnvioPendenciasFecharModal()"
+          style="height:32px; padding:0 12px; border-radius:10px; border:1px solid rgba(248,113,113,0.35); background:rgba(248,113,113,0.12); color:#fff; font-weight:900;">
+          Fechar
+        </button>
+      </div>
+    </div>
+
+    <div style="padding:12px 14px; flex:1; overflow:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:12px; color:rgba(226,232,240,0.9);">
+        <thead>
+          <tr>
+            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Enviar</th>
+            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Loja</th>
+            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Data</th>
+            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Estabelecimento</th>
+            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Valor</th>
+            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Cartão</th>
+            <th style="position:sticky; top:0; background:#ef4444; color:#fff; padding:8px; text-align:left;">Pendências</th>
+            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Já enviado?</th>
+          </tr>
+        </thead>
+        <tbody id="envPend_tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
 <!-- VIEW: RADAR (sobrepõe SOMENTE a área do chat) -->
 <div id="radarView" class="hidden" style="position:absolute; inset:0; z-index:20;">
@@ -2425,10 +2565,18 @@ window.vektorShowChatView = function () {
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
 
+  // ✅ NOVO: Envio de Pendências
+  const envioPendView = document.getElementById("envioPendView");
+  const envPendModal = document.getElementById("envPendModal");
+
   if (radarView) radarView.classList.add("hidden");
   if (feedbackView) feedbackView.classList.add("hidden");
   if (myAlertsView) myAlertsView.classList.add("hidden");
   if (fluxView) fluxView.classList.add("hidden");
+
+  // ✅ fecha página e modal
+  if (envioPendView) envioPendView.classList.add("hidden");
+  if (envPendModal) envPendModal.classList.add("hidden");
 
   if (chatView) chatView.classList.remove("hidden");
 
@@ -2494,6 +2642,238 @@ function vektorShowFluxogramaView_() {
 
   if (fluxView) fluxView.classList.remove("hidden");
 }
+
+// ===============================
+// ENVIO DE PENDÊNCIAS (view + modal + fluxo)
+// ===============================
+function vektorShowEnvioPendenciasView_() {
+  const chatView = document.getElementById("chatView");
+  const radarView = document.getElementById("radarView");
+  const feedbackView = document.getElementById("feedbackView");
+  const myAlertsView = document.getElementById("myAlertsView");
+  const fluxView = document.getElementById("fluxogramaView");
+  const envView = document.getElementById("envioPendView");
+
+  if (chatView) chatView.classList.add("hidden");
+  if (radarView) radarView.classList.add("hidden");
+  if (feedbackView) feedbackView.classList.add("hidden");
+  if (myAlertsView) myAlertsView.classList.add("hidden");
+  if (fluxView) fluxView.classList.add("hidden");
+
+  if (envView) envView.classList.remove("hidden");
+
+  if (radarView) radarView.classList.remove("is-open");
+}
+
+window.vektorOpenEnvioPendencias = function () {
+  vektorShowEnvioPendenciasView_();
+};
+
+// estado local da página
+window.__envPend = {
+  periodo: { iniIso: "", fimIso: "" },
+  rows: [],        // preview detalhado
+  selected: {},    // txKey -> true/false
+  resumo: null
+};
+
+window.vektorEnvioPendenciasAbrirModal = function () {
+  const m = document.getElementById("envPendModal");
+  if (m) m.classList.remove("hidden");
+};
+
+window.vektorEnvioPendenciasFecharModal = function () {
+  const m = document.getElementById("envPendModal");
+  if (m) m.classList.add("hidden");
+};
+
+window.vektorEnvPendSelectAll = function (on) {
+  (window.__envPend.rows || []).forEach(r => {
+    if (r.jaEnviado) return; // não deixa marcar linhas já enviadas
+    window.__envPend.selected[r.txKey] = !!on;
+  });
+  window.__renderEnvPendTbody();
+};
+
+window.__renderEnvPendTbody = function () {
+  const tb = document.getElementById("envPend_tbody");
+  if (!tb) return;
+  const rows = window.__envPend.rows || [];
+  tb.innerHTML = "";
+
+  rows.forEach(r => {
+    const tr = document.createElement("tr");
+    tr.style.borderBottom = "1px solid rgba(148,163,184,0.15)";
+
+    const checked = !!window.__envPend.selected[r.txKey];
+    const disabled = !!r.jaEnviado;
+
+    tr.innerHTML =
+      `<td style="padding:8px;">
+        <input type="checkbox" ${checked ? "checked" : ""} ${disabled ? "disabled" : ""}
+          onchange="window.__envPend.selected['${r.txKey}']=this.checked" />
+      </td>
+      <td style="padding:8px; white-space:nowrap;">${r.lojaKey || ""}</td>
+      <td style="padding:8px; white-space:nowrap;">${r.dataTransBR || ""}</td>
+      <td style="padding:8px;">${(r.estabelecimento || "").replace(/</g,"&lt;")}</td>
+      <td style="padding:8px; white-space:nowrap;">${r.valorOriginalTxt || ""}</td>
+      <td style="padding:8px; white-space:nowrap;">${r.cartao || ""}</td>
+      <td style="padding:8px;"><b>${r.pendenciasTxt || ""}</b></td>
+      <td style="padding:8px; white-space:nowrap; color:${r.jaEnviado ? "rgba(34,197,94,0.95)" : "rgba(226,232,240,0.7)"};">
+        ${r.jaEnviado ? "SIM" : "NÃO"}
+      </td>`;
+
+    tb.appendChild(tr);
+  });
+};
+
+window.vektorEnvioPendenciasPreview = function () {
+  try {
+    const ini = document.getElementById("envPend_ini")?.value || "";
+    const fim = document.getElementById("envPend_fim")?.value || "";
+    const st = document.getElementById("envPend_status");
+    const resumoEl = document.getElementById("envPend_resumo");
+    const falhasEl = document.getElementById("envPend_falhas");
+
+    if (falhasEl) falhasEl.innerHTML = "";
+    if (!ini || !fim) {
+      if (st) st.textContent = "Informe data inicial e final.";
+      return;
+    }
+
+    // ISO
+    const iniIso = new Date(ini + "T00:00:00").toISOString();
+    const fimIso = new Date(fim + "T00:00:00").toISOString();
+    window.__envPend.periodo = { iniIso, fimIso };
+
+    if (st) st.textContent = "Gerando prévia…";
+
+    google.script.run
+      .withSuccessHandler(function(res){
+        if (!res || !res.ok) {
+  if (st) st.textContent = "Falha ao gerar prévia.";
+
+  const errTxt =
+    (res && (res.error || res.erro || res.message)) ?
+      String(res.error || res.erro || res.message) :
+      ("Erro desconhecido. Resposta do backend: " + JSON.stringify(res || {}, null, 2));
+
+  if (resumoEl) resumoEl.textContent = errTxt;
+  return;
+}
+
+        window.__envPend.rows = res.rows || [];
+        window.__envPend.resumo = res.resumo || null;
+
+        // default: marca tudo que NÃO foi enviado ainda
+        window.__envPend.selected = {};
+        window.__envPend.rows.forEach(r => {
+          if (!r.jaEnviado) window.__envPend.selected[r.txKey] = true;
+        });
+
+        // resumo
+        const R = res.resumo || {};
+        const money = (Number(R.totalValor || 0)).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+        const pct = (x)=> ((x||0)*100).toFixed(1).replace(".",",") + "%";
+
+        if (resumoEl) {
+          resumoEl.innerHTML =
+            `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
+              <div>Transações elegíveis: <b>${R.totalTransacoes||0}</b></div>
+              <div>Lojas: <b>${R.totalLojas||0}</b></div>
+              <div>NF/Recibo: <b>${R.pendRecibo||0}</b> (${pct(R.pctRecibo)})</div>
+              <div>Etiqueta: <b>${R.pendEtiqueta||0}</b> (${pct(R.pctEtiqueta)})</div>
+              <div>Descrição: <b>${R.pendDescricao||0}</b> (${pct(R.pctDescricao)})</div>
+              <div>NF divergente: <b>${R.pendDivergNF||0}</b> (${pct(R.pctDivergNF)})</div>
+              <div>Valor total: <b>${money}</b></div>
+              <div>Já enviadas (bloqueadas): <b>${R.totalJaEnviadas||0}</b></div>
+            </div>`;
+        }
+
+        window.__renderEnvPendTbody();
+        if (st) st.textContent = `Prévia pronta: ${window.__envPend.rows.length} linha(s).`;
+
+        // abre modal automaticamente se tiver muita linha
+        if ((window.__envPend.rows || []).length > 0) {
+          window.vektorEnvioPendenciasAbrirModal();
+        }
+      })
+      .withFailureHandler(function(err){
+        if (st) st.textContent = "Erro ao gerar prévia.";
+        if (resumoEl) resumoEl.textContent = (err && err.message) ? err.message : String(err||"Erro");
+      })
+      .previewEnvioPendenciasClaraRecusadasDetalhado(iniIso, fimIso);
+
+  } catch(e) {
+    const st = document.getElementById("envPend_status");
+    if (st) st.textContent = "Erro inesperado na prévia.";
+  }
+};
+
+window.vektorEnvioPendenciasEnviarSelecionadas = function () {
+  const falhasEl = document.getElementById("envPend_falhas");
+  const st = document.getElementById("envPend_status");
+  if (falhasEl) falhasEl.innerHTML = "";
+
+  const iniIso = window.__envPend.periodo?.iniIso || "";
+  const fimIso = window.__envPend.periodo?.fimIso || "";
+  if (!iniIso || !fimIso) {
+    if (st) st.textContent = "Rode a prévia antes de enviar.";
+    return;
+  }
+
+  const keys = Object.keys(window.__envPend.selected || {}).filter(k => window.__envPend.selected[k]);
+  if (!keys.length) {
+    if (st) st.textContent = "Nenhuma linha selecionada para enviar.";
+    return;
+  }
+
+  if (st) st.textContent = "Enviando e-mails…";
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.ok) {
+        if (st) st.textContent = "Falha no envio.";
+        if (falhasEl) falhasEl.innerHTML = `<div style="color:rgba(248,113,113,0.95); font-weight:900;">${res && res.error ? res.error : "Erro desconhecido"}</div>`;
+        return;
+      }
+
+      if (st) st.textContent = `Envio concluído: e-mails=${res.emailsEnviados||0}, transações registradas=${res.txRegistradas||0}.`;
+
+      const falhas = Array.isArray(res.falhasPorLoja) ? res.falhasPorLoja : [];
+      const sucessos = Array.isArray(res.sucessoPorLoja) ? res.sucessoPorLoja : [];
+
+      let html = "";
+      if (sucessos.length) {
+        html += `<div style="margin-top:8px; color:rgba(34,197,94,0.95); font-weight:900;">Enviados (${sucessos.length} loja(s))</div>`;
+        html += "<ul style='margin-left:18px; color:rgba(226,232,240,0.85); font-size:12px;'>";
+        sucessos.slice(0, 12).forEach(s => {
+          html += `<li>${s.lojaKey}: ${s.qtdTx} transação(ões)</li>`;
+        });
+        html += "</ul>";
+      }
+
+      if (falhas.length) {
+        html += `<div style="margin-top:12px; color:rgba(248,113,113,0.95); font-weight:900;">Não enviados (${falhas.length} loja(s))</div>`;
+        html += "<ul style='margin-left:18px; color:rgba(226,232,240,0.85); font-size:12px;'>";
+        falhas.slice(0, 12).forEach(f => {
+          html += `<li>${f.lojaKey}: ${f.error}</li>`;
+        });
+        html += "</ul>";
+      }
+
+      if (falhasEl) falhasEl.innerHTML = html;
+
+      // Atualiza prévia (recalcula jaEnviado) para refletir envios
+      window.vektorEnvioPendenciasFecharModal();
+      window.vektorEnvioPendenciasPreview();
+    })
+    .withFailureHandler(function(err){
+      if (st) st.textContent = "Erro no envio.";
+      if (falhasEl) falhasEl.innerHTML = `<div style="color:rgba(248,113,113,0.95); font-weight:900;">${(err && err.message) ? err.message : String(err||"Erro")}</div>`;
+    })
+    .dispararEnvioPendenciasClaraRecusadasSelecionadas(iniIso, fimIso, keys);
+};
 
 window.vektorOpenFluxograma = function () {
   vektorShowFluxogramaView_();
@@ -4214,8 +4594,6 @@ setTimeout(function () {
     let ultimaIntencao = null;
     let origemPendenciasBloqueio = false;
     let pendenciasTimeoutId = null; // 🆕 timeout pra mensagem de outro assunto
-
-
 
     /* ========= ELEMENTOS UI ========= */
     const chatWindow = document.getElementById("chatWindow");
