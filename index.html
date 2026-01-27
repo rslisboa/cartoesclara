@@ -896,7 +896,7 @@ input[type="date"]::-webkit-clear-button {
           Desmarcar tudo
         </button>
         <button type="button" onclick="window.vektorEnvioPendenciasFecharModal()"
-          style="height:32px; padding:0 12px; border-radius:10px; border:1px solid rgba(248,113,113,0.35); background:rgba(248,113,113,0.12); color:#fff; font-weight:900;">
+          style="height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(248,113,113,0.35); background:rgba(248,113,113,0.12); color:#fff; font-weight:900;">
           Fechar
         </button>
       </div>
@@ -908,7 +908,7 @@ input[type="date"]::-webkit-clear-button {
           <tr>
             <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Enviar</th>
             <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Loja</th>
-            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Data</th>
+            <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Data Transação</th>
             <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Estabelecimento</th>
             <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Valor</th>
             <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Cartão</th>
@@ -2741,7 +2741,6 @@ window.vektorEnvioPendenciasPreview = function () {
       return;
     }
 
-    // ISO
     const iniIso = new Date(ini + "T00:00:00").toISOString();
     const fimIso = new Date(fim + "T00:00:00").toISOString();
     window.__envPend.periodo = { iniIso, fimIso };
@@ -2749,18 +2748,18 @@ window.vektorEnvioPendenciasPreview = function () {
     if (st) st.textContent = "Gerando prévia…";
 
     google.script.run
-      .withSuccessHandler(function(res){
+      .withSuccessHandler(function (res) {
         if (!res || !res.ok) {
-  if (st) st.textContent = "Falha ao gerar prévia.";
+          if (st) st.textContent = "Falha ao gerar prévia.";
 
-  const errTxt =
-    (res && (res.error || res.erro || res.message)) ?
-      String(res.error || res.erro || res.message) :
-      ("Erro desconhecido. Resposta do backend: " + JSON.stringify(res || {}, null, 2));
+          const errTxt =
+            (res && (res.error || res.erro || res.message)) ?
+              String(res.error || res.erro || res.message) :
+              ("Erro desconhecido. Resposta do backend: " + JSON.stringify(res || {}, null, 2));
 
-  if (resumoEl) resumoEl.textContent = errTxt;
-  return;
-}
+          if (resumoEl) resumoEl.textContent = errTxt;
+          return;
+        }
 
         window.__envPend.rows = res.rows || [];
         window.__envPend.resumo = res.resumo || null;
@@ -2773,38 +2772,259 @@ window.vektorEnvioPendenciasPreview = function () {
 
         // resumo
         const R = res.resumo || {};
-        const money = (Number(R.totalValor || 0)).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
-        const pct = (x)=> ((x||0)*100).toFixed(1).replace(".",",") + "%";
+        const money = (Number(R.totalValor || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+        const pct = (x) => ((x || 0) * 100).toFixed(1).replace(".", ",") + "%";
 
         if (resumoEl) {
-          resumoEl.innerHTML =
-            `<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:12px;">
-              <div>Transações elegíveis: <b>${R.totalTransacoes||0}</b></div>
-              <div>Lojas: <b>${R.totalLojas||0}</b></div>
-              <div>NF/Recibo: <b>${R.pendRecibo||0}</b> (${pct(R.pctRecibo)})</div>
-              <div>Etiqueta: <b>${R.pendEtiqueta||0}</b> (${pct(R.pctEtiqueta)})</div>
-              <div>Descrição: <b>${R.pendDescricao||0}</b> (${pct(R.pctDescricao)})</div>
-              <div>NF divergente: <b>${R.pendDivergNF||0}</b> (${pct(R.pctDivergNF)})</div>
-              <div>Valor total: <b>${money}</b></div>
-              <div>Já enviadas (bloqueadas): <b>${R.totalJaEnviadas||0}</b></div>
-            </div>`;
+          const itens = [
+            { key: "NF/Recibo", v: R.pendRecibo || 0, p: R.pctRecibo || 0 },
+            { key: "Etiqueta", v: R.pendEtiqueta || 0, p: R.pctEtiqueta || 0 },
+            { key: "Descrição", v: R.pendDescricao || 0, p: R.pctDescricao || 0 },
+            { key: "NF divergente", v: R.pendDivergNF || 0, p: R.pctDivergNF || 0 },
+          ];
+
+          const sumTipos = itens.reduce((a, x) => a + (Number(x.v) || 0), 0) || 1;
+
+          function donutSegs() {
+            const r = 54;
+            const c = 2 * Math.PI * r;
+            let acc = 0;
+
+            return itens.map((it, idx) => {
+              const frac = (Number(it.v) || 0) / sumTipos;
+              const len = c * frac;
+              const dash = `${len} ${c - len}`;
+              const offset = -acc;
+              acc += len;
+
+              const cor = ["#60a5fa", "#34d399", "#fbbf24", "#f87171"][idx] || "#94a3b8";
+
+              return `
+                <circle cx="64" cy="64" r="${r}"
+                  fill="transparent"
+                  stroke="${cor}"
+                  stroke-width="14"
+                  stroke-linecap="round"
+                  stroke-dasharray="${dash}"
+                  stroke-dashoffset="${offset}"
+                />`;
+            }).join("");
+          }
+
+          function bars() {
+            return itens.map((it, idx) => {
+              const cor = ["#60a5fa", "#34d399", "#fbbf24", "#f87171"][idx] || "#94a3b8";
+              const w = Math.min(100, Math.max(0, (Number(it.p) || 0) * 100));
+              return `
+                <div style="margin-top:10px;">
+                  <div style="display:flex; justify-content:space-between; gap:12px; font-size:12px; color:rgba(226,232,240,0.88);">
+                    <div style="font-weight:900;">${it.key}</div>
+                    <div style="font-weight:900;">${it.v} (${pct(it.p)})</div>
+                  </div>
+                  <div style="margin-top:6px; height:10px; background:rgba(148,163,184,0.14); border-radius:999px; overflow:hidden;">
+                    <div style="height:100%; width:${w}%; background:${cor}; border-radius:999px;"></div>
+                  </div>
+                </div>`;
+            }).join("");
+          }
+
+          // ✅ adicionamos um container do gráfico de linha logo abaixo
+          resumoEl.innerHTML = `
+            <div style="display:grid; grid-template-columns: 1.1fr 1fr; gap:14px; align-items:stretch;">
+
+              <!-- Coluna esquerda: KPIs -->
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Transações elegíveis</div>
+                  <div style="color:#fff; font-size:26px; font-weight:1000; margin-top:6px;">${R.totalTransacoes || 0}</div>
+                </div>
+
+                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Lojas</div>
+                  <div style="color:#fff; font-size:26px; font-weight:1000; margin-top:6px;">${R.totalLojas || 0}</div>
+                </div>
+
+                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Valor total</div>
+                  <div style="color:#fff; font-size:20px; font-weight:1000; margin-top:6px;">${money}</div>
+                </div>
+
+                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Já enviadas (bloqueadas)</div>
+                  <div style="color:#fff; font-size:26px; font-weight:1000; margin-top:6px;">${R.totalJaEnviadas || 0}</div>
+                </div>
+              </div>
+
+              <!-- Coluna direita: donut + barras -->
+              <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px; display:flex; gap:14px; align-items:center;">
+                <div style="width:160px; min-width:160px; display:flex; align-items:center; justify-content:center;">
+                  <svg width="128" height="128" viewBox="0 0 128 128">
+                    <circle cx="64" cy="64" r="54" fill="transparent" stroke="rgba(148,163,184,0.12)" stroke-width="14" />
+                    ${donutSegs()}
+                  </svg>
+                </div>
+                <div style="flex:1;">
+                  <div style="color:#fff; font-weight:1000; margin-bottom:4px;">Distribuição de pendências</div>
+                  <div style="color:rgba(226,232,240,0.7); font-size:12px;">Percentuais por tipo (observação: uma transação pode ter múltiplas pendências).</div>
+                  ${bars()}
+                </div>
+              </div>
+
+            </div>
+
+            <!-- ✅ Gráfico de linha: pendências por data -->
+            <div style="margin-top:14px; background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
+              <div style="color:#fff; font-weight:1000; margin-bottom:4px;">Evolução de pendências no período</div>
+              <div style="color:rgba(226,232,240,0.7); font-size:12px; margin-bottom:10px;">
+                Quantidade total de transações pendentes por data
+              </div>
+
+              <svg id="envPend_svgLine" width="100%" height="220" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+            </div>
+          `;
+
+          // ===== desenha o gráfico de linha (SVG) =====
+          (function renderLineChart() {
+            const svg = document.getElementById("envPend_svgLine");
+            const serie = Array.isArray(res.seriePorData) ? res.seriePorData : [];
+            if (!svg || !serie.length) {
+              if (svg) svg.innerHTML = `<text x="10" y="20" fill="rgba(226,232,240,0.75)" font-size="12">Sem dados no período.</text>`;
+              return;
+            }
+
+            const W = 800, H = 220;
+            const PAD_X = 56, PAD_Y = 26; // PAD_X maior para caber labels do eixo Y
+
+            const maxY = Math.max(...serie.map(p => Number(p.total) || 0), 1);
+            const stepX = (W - PAD_X * 2) / Math.max(1, serie.length - 1);
+
+            const yOf = (v) => H - PAD_Y - (v / maxY) * (H - PAD_Y * 2);
+
+            // path da linha
+            let dPath = "";
+            serie.forEach((p, i) => {
+              const x = PAD_X + i * stepX;
+              const y = yOf(Number(p.total) || 0);
+              dPath += (i === 0 ? "M" : " L") + x + " " + y;
+            });
+
+            // grid + eixo Y labels
+            const ticks = 4;
+            const grid = [];
+            for (let t = 0; t <= ticks; t++) {
+              const frac = t / ticks;
+              const y = PAD_Y + frac * (H - PAD_Y * 2);
+              const val = Math.round(maxY * (1 - frac));
+
+              grid.push(`<line x1="${PAD_X}" y1="${y}" x2="${W - PAD_X}" y2="${y}" stroke="rgba(148,163,184,0.12)" stroke-width="1" />`);
+              grid.push(`
+                <text x="${PAD_X - 10}" y="${y}"
+                      text-anchor="end"
+                      dominant-baseline="middle"
+                      font-size="11"
+                      fill="rgba(226,232,240,0.55)">${val}</text>
+              `);
+            }
+
+            svg.innerHTML = `
+              ${grid.join("")}
+
+              <!-- linha base (vai ser animada via getTotalLength) -->
+              <path id="envPend_lineBase"
+                    d="${dPath}"
+                    fill="none"
+                    stroke="#ffffff"
+                    stroke-width="2.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round" />
+
+              <!-- highlight “vivo” (animação infinita) -->
+              <path id="envPend_lineHighlight"
+                    d="${dPath}"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.45)"
+                    stroke-width="4.0"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-dasharray="10 18" />
+
+              ${serie.map((p, i) => {
+                const x = PAD_X + i * stepX;
+                const y = yOf(Number(p.total) || 0);
+                const val = Number(p.total) || 0;
+                const labelY = Math.max(PAD_Y + 10, y - 16); // sobe mais pra não encostar no marcador
+
+                // ✅ ordem: CÍRCULO primeiro, TEXTO depois (texto não fica coberto)
+                return `
+                  <circle cx="${x}" cy="${y}" r="4.2" fill="#ffffff" opacity="0.95" />
+                  <text x="${x}" y="${labelY}"
+                        text-anchor="middle"
+                        dominant-baseline="middle"
+                        font-size="12"
+                        font-weight="900"
+                        fill="#ffffff">${val}</text>
+
+                  <text x="${x}" y="${H - 6}"
+                        text-anchor="middle"
+                        font-size="10"
+                        fill="rgba(226,232,240,0.65)">${p.data}</text>
+                `;
+              }).join("")}
+            `;
+
+            // ✅ animações com velocidade ajustável
+            try {
+              const base = svg.querySelector("#envPend_lineBase");
+              const hi = svg.querySelector("#envPend_lineHighlight");
+              if (base && base.getTotalLength) {
+                const len = base.getTotalLength();
+
+                // --- velocidade (ajuste aqui) ---
+                const DUR_DRAW = "2.2s";     // desenhar linha
+                const DUR_RUN  = "3.5s";     // highlight correndo (mais lento = mais premium)
+
+                base.style.strokeDasharray = String(len);
+                base.style.strokeDashoffset = String(len);
+
+                base.innerHTML = `
+                  <animate attributeName="stroke-dashoffset"
+                          from="${len}"
+                          to="0"
+                          dur="${DUR_DRAW}"
+                          fill="freeze" />`;
+
+                if (hi) {
+                  hi.style.opacity = "0";
+                  hi.innerHTML = `
+                    <animate attributeName="opacity" from="0" to="1" dur="0.35s" begin="${DUR_DRAW}" fill="freeze" />
+                    <animate attributeName="stroke-dashoffset"
+                            from="0" to="-220"
+                            dur="${DUR_RUN}"
+                            begin="${DUR_DRAW}"
+                            repeatCount="indefinite" />
+                  `;
+                }
+              }
+            } catch (e) {
+              // fallback: sem getTotalLength, ainda renderiza estático
+            }
+})();
         }
 
         window.__renderEnvPendTbody();
         if (st) st.textContent = `Prévia pronta: ${window.__envPend.rows.length} linha(s).`;
 
-        // abre modal automaticamente se tiver muita linha
         if ((window.__envPend.rows || []).length > 0) {
           window.vektorEnvioPendenciasAbrirModal();
         }
       })
-      .withFailureHandler(function(err){
+      .withFailureHandler(function (err) {
         if (st) st.textContent = "Erro ao gerar prévia.";
-        if (resumoEl) resumoEl.textContent = (err && err.message) ? err.message : String(err||"Erro");
+        if (resumoEl) resumoEl.textContent = (err && err.message) ? err.message : String(err || "Erro");
       })
       .previewEnvioPendenciasClaraRecusadasDetalhado(iniIso, fimIso);
 
-  } catch(e) {
+  } catch (e) {
     const st = document.getElementById("envPend_status");
     if (st) st.textContent = "Erro inesperado na prévia.";
   }
