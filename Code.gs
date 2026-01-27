@@ -3712,6 +3712,75 @@ function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
   };
 }
 
+function vektorCalcularStatusMixPeriodo_(ini, fim) {
+  var base = carregarLinhasBaseClara_();
+  if (base.error) throw new Error(base.error);
+
+  var header = base.header || [];
+  var linhas = base.linhas || [];
+
+  var iDataTrans = encontrarIndiceColuna_(header, ["Data da Transação"]);
+  var iStatusAp  = encontrarIndiceColuna_(header, ["Status de aprovação"]);
+
+  if (iDataTrans < 0) throw new Error("Não encontrei a coluna 'Data da Transação' no cabeçalho da BaseClara.");
+  if (iStatusAp < 0) throw new Error("Não encontrei a coluna 'Status de aprovação' no cabeçalho da BaseClara.");
+
+  var total = 0;
+  var aprovada = 0;
+  var recusada = 0;
+  var necessita = 0;
+
+  for (var i = 0; i < linhas.length; i++) {
+    var row = linhas[i];
+
+    var dt = parseDateClara_(row[iDataTrans]);
+    if (!dt) continue;
+
+    // filtro período (inclusivo)
+    if (ini && dt < ini) continue;
+    if (fim) {
+      var fim23 = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59);
+      if (dt > fim23) continue;
+    }
+
+    var status = String(row[iStatusAp] || "").trim().toLowerCase();
+    if (!status) continue; // ignora em branco (estorno)
+
+    // normaliza variações
+    if (status === "aprovada" || status === "aprovado") {
+      total++;
+      aprovada++;
+      continue;
+    }
+
+    if (status === "recusada" || status === "recusado") {
+      total++;
+      recusada++;
+      continue;
+    }
+
+    if (status === "necessita aprovação" || status === "necessita aprovacao") {
+      total++;
+      necessita++;
+      continue;
+    }
+
+    // se aparecer outro status, ignore (ou inclua em "outros" se quiser)
+  }
+
+  var pct = function(x) { return total ? (x / total) : 0; };
+
+  return {
+    total: total,
+    aprovada: aprovada,
+    recusada: recusada,
+    necessita: necessita,
+    pctAprovada: pct(aprovada),
+    pctRecusada: pct(recusada),
+    pctNecessita: pct(necessita)
+  };
+}
+
 function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso) {
   vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadasDetalhado");
 
@@ -3721,6 +3790,9 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
     if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
 
     var rows = vektorQueryPendenciasRecusadas_(ini, fim);
+
+    // ✅ NOVO: Status mix do período (Aprovada / Recusada / Necessita aprovação)
+    var statusMix = vektorCalcularStatusMixPeriodo_(ini, fim); // { total, aprovada, recusada, necessita, pct... }
 
     var sentMap = vektorCarregarTxKeysJaEnviadas_() || {};
     if (typeof sentMap !== "object") sentMap = {};
@@ -3792,7 +3864,8 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         pctDescricao: total ? (cDesc / total) : 0,
         pctDivergNF: total ? (cDiv / total) : 0,
         totalValor: totalValor,
-        totalJaEnviadas: jaEnviadas
+        totalJaEnviadas: jaEnviadas,
+        statusMix: statusMix,
       },
       seriePorData: seriePorData, // ✅ NOVO
       rows: rows
