@@ -839,6 +839,122 @@ input[type="date"]::-webkit-clear-button {
           </div>
         </div>
 
+        <!-- Modal: Como funciona a análise? (Envio de Pendências) -->
+<div id="envPendAnaliseModal"
+     class="fixed inset-0 bg-black/60 z-[70] hidden items-center justify-center">
+  <div class="bg-white rounded-2xl shadow-2xl w-[95%] max-w-[920px] overflow-hidden border border-slate-200">
+
+    <!-- Header -->
+    <div class="px-5 py-4 text-white flex items-center justify-between"
+         style="background:#005E27;">
+      <div>
+        <div class="text-base font-extrabold">Como funciona a análise (Envio de Pendências)</div>
+        <div class="text-xs opacity-90">
+          Tutorial rápido do fluxo: prévia → seleção → envio → rastreabilidade
+        </div>
+      </div>
+
+      <button type="button"
+              onclick="closeEnvPendAnaliseModal()"
+              class="transition rounded-lg px-3 py-2 text-sm font-semibold"
+              style="background:rgba(255,255,255,0.18);">
+        Fechar
+      </button>
+    </div>
+
+    <!-- Faixa destaque -->
+    <div style="height:6px; background:#B5FF20;"></div>
+
+    <!-- Body -->
+    <div class="p-5 text-sm text-slate-800 space-y-4 max-h-[72vh] overflow-y-auto">
+
+      <div class="rounded-xl border border-slate-200 p-4">
+        <div class="font-extrabold text-slate-900">1) O que a página analisa</div>
+        <div class="mt-2">
+          O Vektor lê a <b>base de transações da Clara</b> no período selecionado (Data inicial / Data final) e identifica transações com:
+          <ul class="list-disc ml-5 mt-2 space-y-1">
+            <li><b>Status de aprovação = Recusada</b></li>
+            <li>Pendências de justificativa: <b>NF/Recibo</b>, <b>Etiqueta</b>, <b>Descrição</b> e/ou <b>NF/Recibo divergente</b> - Para essa pendencia de divergêcnia na nota fiscal, será identificado sempre que houver no momento da recusa da transação a informação de: <i>NF/Recibo divergente</i>, ou seja, é necessário colocar essa chave de texto para identificação da pendência.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 p-4">
+        <div class="font-extrabold text-slate-900">2) Botão “Gerar prévia”</div>
+        <div class="mt-2">
+          Monta a lista de transações elegíveis, calcula métricas (quantidade, lojas, valor total, distribuição por tipo),
+          e prepara a tabela de revisão.
+        </div>
+        <div class="mt-3 rounded-lg p-3" style="background:rgba(0,94,39,0.06); border:1px solid rgba(0,94,39,0.15);">
+          <div class="font-extrabold" style="color:#005E27;">Dica</div>
+          <div class="mt-1">
+            Se o período for grande, a prévia pode demorar mais. Prefira rodar por semana/datas focadas quando possível.
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 p-4">
+        <div class="font-extrabold text-slate-900">3) Botão “Revisar linhas” (checkbox)</div>
+        <div class="mt-2">
+          Abre o modal com a lista detalhada e permite <b>desmarcar</b> transações específicas para não enviar naquele disparo.
+        </div>
+        <ul class="list-disc ml-5 mt-2 space-y-1">
+          <li>Por padrão, o sistema marca o que <b>ainda não foi enviado</b>.</li>
+          <li>Transações já enviadas aparecem como <b>bloqueadas</b> (não devem ser reenviadas).</li>
+        </ul>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 p-4">
+        <div class="font-extrabold text-slate-900">4) Botão “Enviar selecionadas”</div>
+        <div class="mt-2">
+          Envia e-mails agrupados por <b>Loja</b> (e data, quando aplicável) apenas para as linhas selecionadas.
+          Após o envio, as transações são registradas no histórico de rastreabilidade para <b>não serem reenviadas</b>.
+        </div>
+        <div class="mt-3 rounded-lg p-3"
+             style="background:rgba(181,255,32,0.22); border:1px solid rgba(0,94,39,0.18);">
+          <div class="font-extrabold" style="color:#0b1220;">Regra crítica</div>
+          <div class="mt-1">
+            <b>Cada transação deve ser enviada uma única vez.</b> O controle é feito por chave/hash da transação.
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 p-4">
+        <div class="font-extrabold text-slate-900">5) Feedback de envio</div>
+        <div class="mt-2">
+          A página exibe o status do disparo e lista:
+          <ul class="list-disc ml-5 mt-2 space-y-1">
+            <li><b>Enviados</b>: lojas que receberam e-mail e quantidade de transações</li>
+            <li><b>Falhas</b>: lojas que não foi possível enviar (ex.: e-mail ausente, erro de serviço)</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Botão central: Como funciona a análise? -->
+        <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 10px;">
+          <button
+            type="button"
+            onclick="openEnvPendAnaliseModal()"
+            style="
+              height:36px;
+              padding:0 14px;
+              border-radius:10px;
+              border:1px solid rgba(255,255,255,0.22);
+              background:rgba(255,255,255,0.86);
+              color:#0b1220;
+              font-weight:900;
+              font-size:12px;
+              cursor:pointer;
+              box-shadow:0 10px 22px rgba(0,0,0,0.18);
+            ">
+            Como funciona a análise?
+          </button>
+        </div>
+
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button type="button" onclick="window.vektorEnvioPendenciasPreview()"
             style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
@@ -1443,6 +1559,7 @@ input[type="date"]::-webkit-clear-button {
       • <b>Chat</b>: consultas, tabelas, rankings e resumos com explicação de “como foi calculado”<br/>
       • <b>Alertas Programados</b>: Transações e Pendências (histórico + execução programada por e-mail)<br/>
       • <b>Alertas Operacionais</b>: limites de cartões, lojas ofensoras, irregularidades e monitoramentos (quando aplicável)<br/>
+      • <b>Disparo de Pendências</b>: Envio de e-mails alertando sobre pendencias, procedimento automtizado via Script<br/>
       • <b>Radar</b>: indicadores e ranking de risco (admin, quando aplicável)<br/>
       • <b>Exportações</b>: CSV/XLSX e evidências conforme necessidade do processo
     </div>
@@ -2352,6 +2469,22 @@ function closeRadarAnaliseModal() {
   }
 }
 
+function openEnvPendAnaliseModal() {
+  const modal = document.getElementById("envPendAnaliseModal");
+  if (modal) {
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+}
+
+function closeEnvPendAnaliseModal() {
+  const modal = document.getElementById("envPendAnaliseModal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+}
+
 function closeStatusVektorModal() {
   const modal = document.getElementById("statusVektorModal");
   if (modal) {
@@ -3040,8 +3173,8 @@ window.vektorEnvioPendenciasPreview = function () {
 
                 box.innerHTML = `
                   <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-                    <path d="${d}" fill="none" stroke="rgba(181,255,32,0.25)" stroke-width="3" stroke-linecap="round" />
-                    <path d="${d}" fill="none" stroke="#B5FF20" stroke-width="2" stroke-linecap="round" />
+                    <path d="${d}" fill="none" stroke="rgba(181,255,32,0.25)" stroke-width="1.8" stroke-linecap="round" />
+                    <path d="${d}" fill="none" stroke="#B5FF20" stroke-width="1.2" stroke-dasharray="4 6" stroke-linecap="round" />
                     <circle cx="${lastX}" cy="${lastY}" r="2.8" fill="#B5FF20" />
                   </svg>
                 `;
