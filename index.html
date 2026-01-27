@@ -325,6 +325,19 @@
   animation: vektor-spin 0.7s linear infinite;
 }
 
+/* ===== Overlay Envio de Pendências (spinner) ===== */
+.envPend_spinner{
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 4px solid rgba(226,232,240,0.18);
+  border-top-color: #B5FF20;
+  animation: envPendSpin 0.9s linear infinite;
+}
+@keyframes envPendSpin{
+  to { transform: rotate(360deg); }
+}
+
 @keyframes vektor-spin {
   to {
     transform: rotate(360deg);
@@ -894,6 +907,19 @@ input[type="date"]::-webkit-clear-button {
 
     </div>
   </main>
+</div>
+
+<!-- OVERLAY (bloqueia tela) - Envio de Pendências -->
+<div id="envPend_overlay" style="display:none; position:absolute; inset:0; z-index:90; background:rgba(0,0,0,0.65);">
+  <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:18px;">
+    <div style="width:min(520px, 92vw); background:#0b1220; border:1px solid rgba(148,163,184,0.22); border-radius:16px; padding:18px; box-shadow:0 18px 46px rgba(0,0,0,0.55); text-align:center;">
+      <div style="display:flex; justify-content:center; margin-bottom:12px;">
+        <div class="envPend_spinner"></div>
+      </div>
+      <div id="envPend_overlayTitle" style="color:#fff; font-weight:1000; font-size:16px;">Carregando…</div>
+      <div id="envPend_overlaySub" style="color:rgba(226,232,240,0.75); font-size:12px; margin-top:6px;">Aguarde um instante.</div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL: Revisar pré-listagem (checkbox) -->
@@ -2742,6 +2768,20 @@ window.__renderEnvPendTbody = function () {
   });
 };
 
+window.vektorEnvPendOverlayShow_ = function(title, sub){
+  const ov = document.getElementById("envPend_overlay");
+  const t  = document.getElementById("envPend_overlayTitle");
+  const s  = document.getElementById("envPend_overlaySub");
+  if (t) t.textContent = String(title || "Carregando…");
+  if (s) s.textContent = String(sub || "Aguarde um instante.");
+  if (ov) ov.style.display = "block";
+};
+
+window.vektorEnvPendOverlayHide_ = function(){
+  const ov = document.getElementById("envPend_overlay");
+  if (ov) ov.style.display = "none";
+};
+
 window.vektorEnvioPendenciasPreview = function () {
   try {
     const ini = document.getElementById("envPend_ini")?.value || "";
@@ -2760,7 +2800,7 @@ window.vektorEnvioPendenciasPreview = function () {
     const fimIso = new Date(fim + "T00:00:00").toISOString();
     window.__envPend.periodo = { iniIso, fimIso };
 
-    if (st) st.textContent = "Gerando prévia…";
+    window.vektorEnvPendOverlayShow_("Gerando prévia, aguarde…", "Consultando Transações e preparando os dados.");
 
     google.script.run
       .withSuccessHandler(function (res) {
@@ -2775,6 +2815,8 @@ window.vektorEnvioPendenciasPreview = function () {
           if (resumoEl) resumoEl.textContent = errTxt;
           const bx = document.getElementById("envPend_statusCards");
             if (bx) bx.innerHTML = "";
+
+            window.vektorEnvPendOverlayHide_();
 
           return;
         }
@@ -3177,7 +3219,19 @@ window.vektorEnvioPendenciasPreview = function () {
                   </div>
                 </div>
               `;
-})();
+              })();
+
+          // ✅ NOVO: overlay de sucesso no centro + fecha automaticamente
+            const linhasOk = (window.__envPend.rows || []).length;
+
+            window.vektorEnvPendOverlayShow_(
+              `Prévia pronta: ${linhasOk} linha(s).`,
+              "Você já pode revisar as linhas e enviar."
+            );
+
+            setTimeout(function () {
+              window.vektorEnvPendOverlayHide_();
+            }, 1200);
 
         window.__renderEnvPendTbody();
         if (st) st.textContent = `Prévia pronta: ${window.__envPend.rows.length} linha(s).`;
@@ -3187,12 +3241,14 @@ window.vektorEnvioPendenciasPreview = function () {
         }
       })
       .withFailureHandler(function (err) {
+        window.vektorEnvPendOverlayHide_();
         if (st) st.textContent = "Erro ao gerar prévia.";
         if (resumoEl) resumoEl.textContent = (err && err.message) ? err.message : String(err || "Erro");
       })
       .previewEnvioPendenciasClaraRecusadasDetalhado(iniIso, fimIso);
 
   } catch (e) {
+    try { window.vektorEnvPendOverlayHide_(); } catch (_) {}
     const st = document.getElementById("envPend_statusText");
     if (st) st.textContent = "Erro inesperado na prévia.";
   }
