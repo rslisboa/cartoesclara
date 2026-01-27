@@ -3273,38 +3273,708 @@ function carregarLinhasBaseClara_() {
   return { header: header, linhas: linhas, error: null };
 }
 
-// Procura o índice de uma coluna no cabeçalho da BaseClara
-// usando uma lista de possíveis nomes (variações de texto).
-function encontrarIndiceColuna_(header, possiveisNomes) {
-  if (!header || !header.length) return -1;
+// =======================
+// NOVO: ENVIO DE PENDÊNCIAS CLARA (RECUSADAS) VIA BASECLARA
+// =======================
 
-  if (!Array.isArray(possiveisNomes)) {
-    possiveisNomes = [possiveisNomes];
+var SHEET_NOME_EMAILS_LOJAS = "Emails"; // aba Emails na mesma planilha da BaseClara
+var VEKTOR_SLACK_GRUPO_CONTAS_A_RECEBER = "contas_a_receber-aaaaiglscd4gbv3eod7ao65qsy@gruposbf.slack.com";
+var VEKTOR_CC_CONTAS_A_RECEBER = "contasareceber@gruposbf.com.br";
+
+// =======================
+// LOG de envios (envio único por transação)
+// =======================
+var VEKTOR_ENV_PEND_LOG_TAB = "HIST_ENVIO_PEND_RECUSADAS";
+
+function vektorSha256Hex_(s) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s || ""), Utilities.Charset.UTF_8);
+  var out = [];
+  for (var i = 0; i < bytes.length; i++) {
+    var v = (bytes[i] + 256) % 256;
+    var h = v.toString(16);
+    if (h.length === 1) h = "0" + h;
+    out.push(h);
+  }
+  return out.join("");
+}
+
+function vektorTxKey_(r) {
+  // hash de: lojaKey + dataTrans + valor + cartao + estabelecimento
+  var base = [
+    String(r.lojaKey || "").trim(),
+    String(r.dataTransBR || "").trim(),
+    String(r.valorOriginalTxt || "").trim(),
+    String(r.cartao || "").trim(),
+    String(r.estabelecimento || "").trim(),
+    String(r.codigoAutorizacao || "").trim()
+  ].join("||");
+  return vektorSha256Hex_(base);
+}
+
+function vektorGetOrCreateEnvPendLogSheet_() {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName(VEKTOR_ENV_PEND_LOG_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(VEKTOR_ENV_PEND_LOG_TAB);
+    sh.appendRow(["sentAt", "txKey", "lojaKey", "dataTransBR", "valorOriginalTxt", "cartao", "codigoAutorizacao", "estabelecimento", "pendenciasTxt", "to", "cc", "status", "error"]);
+    sh.getRange(1, 1, 1, 12).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function vektorCarregarTxKeysJaEnviadas_() {
+  var sh = vektorGetOrCreateEnvPendLogSheet_();
+  var values = sh.getDataRange().getValues();
+  var map = {};
+
+  if (!values || values.length < 2) return map;
+
+  // Descobre índices pelo header (linha 0)
+  var hdr = values[0] || [];
+  function idx_(name) {
+    var n = String(name || "").trim().toLowerCase();
+    for (var i = 0; i < hdr.length; i++) {
+      if (String(hdr[i] || "").trim().toLowerCase() === n) return i;
+    }
+    return -1;
   }
 
-  // normaliza os nomes que queremos achar
-  var nomesNorm = possiveisNomes.map(function (nome) {
-    return normalizarTexto_(nome);
+  var iTx = idx_("txkey");     // coluna "txKey"
+  var iSt = idx_("status");    // coluna "status"
+
+  // fallback caso header não bata
+  if (iTx < 0) iTx = 1;
+  if (iSt < 0) iSt = hdr.length - 2; // normalmente penúltima
+
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (!row || !row.length) continue;
+
+    var tx = String(row[iTx] || "").trim();
+    var st = String(row[iSt] || "").trim().toUpperCase();
+
+    if (tx && st === "SENT") map[tx] = true;
+  }
+
+  return map;
+}
+
+function vektorLogEnvioPendencia_(payload) {
+  try {
+    var sh = vektorGetOrCreateEnvPendLogSheet_();
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var ts = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss");
+
+    sh.appendRow([
+      ts,
+      payload.txKey || "",
+      payload.lojaKey || "",
+      payload.dataTransBR || "",
+      payload.valorOriginalTxt || "",
+      payload.cartao || "",
+      payload.codigoAutorizacao || "", // ✅ NOVO
+      payload.estabelecimento || "",
+      payload.pendenciasTxt || "",
+      payload.to || "",
+      payload.cc || "",
+      payload.status || "",
+      payload.error || ""
+]);
+  } catch (e) {
+    Logger.log("Falha ao logar envio pendência: " + (e && e.message ? e.message : e));
+  }
+}
+
+function vektorNormLojaKey_(v) {
+  // Aceita "CE0062", "0062", 62 etc -> retorna "CE0062"
+  var s = String(v || "").trim().toUpperCase();
+  if (!s) return "";
+  var m = s.match(/CE\s*(\d{1,6})/i);
+  var digits = "";
+  if (m && m[1]) digits = m[1];
+  else digits = s.replace(/\D/g, "");
+  if (!digits) return "";
+  var cod4 = ("0000" + digits).slice(-4);
+  return "CE" + cod4;
+}
+
+function vektorCarregarMapaEmailsLojas_() {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName(SHEET_NOME_EMAILS_LOJAS);
+  if (!sh) throw new Error("Aba '" + SHEET_NOME_EMAILS_LOJAS + "' não encontrada na planilha BaseClara.");
+
+  var lr = sh.getLastRow();
+  if (lr < 2) return {};
+
+  // A..G
+  var values = sh.getRange(1, 1, lr, 7).getValues();
+  // Cabeçalho esperado (mas vamos por posição, como você definiu):
+  // A Loja, B LojaNorm, C Shopping, D Time, E Email Gerente, F Nome Gerente Regional, G Email Gerente Regional
+
+  var map = {}; // "CE0001" -> { time, emailGerente, emailRegional }
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    var lojaKey = vektorNormLojaKey_(row[0]); // A
+    if (!lojaKey) continue;
+
+    map[lojaKey] = {
+      lojaKey: lojaKey,
+      time: String(row[3] || "").trim(),              // D
+      emailGerente: String(row[4] || "").trim(),      // E
+      emailRegional: String(row[6] || "").trim()      // G
+    };
+  }
+  return map;
+}
+
+function vektorIsBlank_(v) {
+  if (v === null || v === undefined) return true;
+  if (v === false) return true;
+  var s = String(v).trim();
+  if (!s) return true;
+  var low = s.toLowerCase();
+  return (low === "null" || low === "-" || low === "n/a");
+}
+
+function vektorIsReciboPendente_(v) {
+  // Você pediu: pendência tudo que estiver como "Não" na coluna O
+  var s = String(v || "").trim().toLowerCase();
+  return s === "não" || s === "nao";
+}
+
+function vektorSaudacaoPorHora_() {
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var agora = new Date();
+  var hora = parseInt(Utilities.formatDate(agora, tz, "HH"), 10);
+  if (hora < 12) return "Bom dia!";
+  if (hora >= 18) return "Boa noite!";
+  return "Boa tarde!";
+}
+
+function vektorFormatDateBR_(d) {
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  try {
+    if (d instanceof Date) return Utilities.formatDate(d, tz, "dd/MM/yyyy");
+  } catch (_) {}
+  return String(d || "").trim();
+}
+
+function vektorQueryPendenciasRecusadas_(ini, fim) {
+  var base = carregarLinhasBaseClara_();
+  if (base.error) throw new Error(base.error);
+
+  var header = base.header || [];
+  var linhas = base.linhas || [];
+
+  // Use header lookup para reduzir risco de coluna trocada.
+  var iDataTrans = encontrarIndiceColuna_(header, ["Data da Transação"]);
+  var iEstab     = encontrarIndiceColuna_(header, ["Transação"]);          // (você está usando "Transação" como estabelecimento)
+  var iValor     = encontrarIndiceColuna_(header, ["Valor original"]);
+  var iCartao    = encontrarIndiceColuna_(header, ["Cartão"]);
+  var iAlias     = encontrarIndiceColuna_(header, ["Alias Do Cartão"]);
+  var iStatusAp  = encontrarIndiceColuna_(header, ["Status de aprovação"]);
+  var iRecibo    = encontrarIndiceColuna_(header, ["Recibo"]);
+  var iEtiqueta  = encontrarIndiceColuna_(header, ["Etiquetas"]);
+  var iDesc      = encontrarIndiceColuna_(header, ["Descrição"]);
+  var iNotaAprov = encontrarIndiceColuna_(header, ["Nota do aprovador"]);  // ✅ NOVO
+  var iCodAut    = encontrarIndiceColuna_(header, ["Código de autorização"]);
+
+  // Falhas críticas
+    var req = [
+      ["Data da Transação", iDataTrans],
+      ["Estabelecimento", iEstab],
+      ["Valor original", iValor],
+      ["Cartão", iCartao],
+      ["Alias Do Cartão", iAlias],
+      ["Status de aprovação", iStatusAp],
+      ["Recibo", iRecibo],
+      ["Etiquetas", iEtiqueta],
+      ["Descrição", iDesc],
+      ["Nota do aprovador", iNotaAprov],     // ✅ vírgula aqui
+      ["Código de autorização", iCodAut]     // ✅ sem vírgula no último (opcional)
+    ];
+
+    req.forEach(function (p) {
+      if (!p || p.length < 2) throw new Error("Erro interno: item inválido em req (pendências).");
+      if (p[1] < 0) throw new Error("Não encontrei a coluna '" + p[0] + "' no cabeçalho da BaseClara.");
+    });
+
+  var emailsMap = vektorCarregarMapaEmailsLojas_();
+
+  var out = []; // registros “linha a linha”
+  for (var i = 0; i < linhas.length; i++) {
+    var row = linhas[i];
+
+    var dt = parseDateClara_(row[iDataTrans]);
+    if (!dt) continue;
+
+    // filtro período (inclusivo)
+    if (ini && dt < ini) continue;
+    if (fim) {
+      var fim23 = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59);
+      if (dt > fim23) continue;
+    }
+
+    var status = String(row[iStatusAp] || "").trim().toLowerCase();
+    if (status !== "recusada") continue;
+
+    var pendRecibo = vektorIsReciboPendente_(row[iRecibo]);
+    var pendEtq    = vektorIsBlank_(row[iEtiqueta]);
+    var pendDesc   = vektorIsBlank_(row[iDesc]);
+
+    // ✅ NOVO: divergência NF/recibo (coluna L - Nota do aprovador)
+    var notaAprov = String(row[iNotaAprov] || "");
+    var pendDivergNF = /nf\/?recibo\s+divergente/i.test(notaAprov);
+
+    // Se não tiver nenhuma pendência, ignora
+    if (!pendRecibo && !pendEtq && !pendDesc && !pendDivergNF) continue;
+
+    var pendList = [];
+    if (pendRecibo)   pendList.push("Nota fiscal/Recibo");
+    if (pendEtq)      pendList.push("Etiqueta");
+    if (pendDesc)     pendList.push("Descrição");
+    if (pendDivergNF) pendList.push("NF/Recibo divergente"); // ✅ NOVO
+
+    var lojaKey = vektorNormLojaKey_(row[iAlias]);
+    if (!lojaKey) continue;
+
+    var contato = emailsMap[lojaKey] || { emailGerente: "", emailRegional: "", time: "" };
+
+    var obj = {
+      lojaKey: lojaKey,
+
+      // ⛔ NÃO retorne Date pro front
+      // dataTrans: dt,
+
+      // ✅ retorne string serializável
+      dataTransISO: (dt instanceof Date) ? dt.toISOString() : "",
+      dataTransBR: vektorFormatDateBR_(dt),
+
+      estabelecimento: String(row[iEstab] || "").trim(),
+      valorOriginal: row[iValor],
+      valorOriginalTxt: String(row[iValor] || "").trim(),
+      cartao: String(row[iCartao] || "").trim(),
+      codigoAutorizacao: String(row[iCodAut] || "").trim(),   // se já existe aí no teu obj
+      pendenciasTxt: pendList.join(", "),
+      pendRecibo: pendRecibo,
+      pendEtq: pendEtq,
+      pendDesc: pendDesc,
+      pendDivergNF: pendDivergNF,
+      emailGerente: String(contato.emailGerente || "").trim(),
+      emailRegional: String(contato.emailRegional || "").trim()
+    };
+
+    obj.txKey = vektorTxKey_(obj);
+    out.push(obj);   
+      }
+
+  return out;
+}
+
+function vektorMontarTabelaPendenciasEmail_(rows) {
+  function esc_(x){
+    return String(x===null||x===undefined?"":x)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+  }
+
+  var thBase = "background:#0b1f3a;color:#fff;border:1px solid #0f172a;padding:7px;font-size:12px;white-space:nowrap;text-align:left;";
+  var thPend = "background:#ef4444;color:#fff;border:1px solid #0f172a;padding:7px;font-size:12px;white-space:nowrap;text-align:left;"; // vermelho claro
+  var tdBase = "border:1px solid #0f172a;padding:7px;font-size:12px;vertical-align:top;white-space:nowrap;color:#0f172a;";
+
+  var html = "";
+  html += "<table style='border-collapse:collapse;width:100%;font-family:Arial,sans-serif;'>";
+  html += "<thead><tr>";
+  html += "<th style='" + thBase + "'>Data da Transação</th>";
+  html += "<th style='" + thBase + "'>Estabelecimento</th>";
+  html += "<th style='" + thBase + "'>Valor original</th>";
+  html += "<th style='" + thBase + "'>Cartão</th>";
+  html += "<th style='" + thPend + "'>Pendências</th>";
+  html += "</tr></thead><tbody>";
+
+  (rows || []).forEach(function(r){
+    html += "<tr>";
+    html += "<td style='" + tdBase + "'>" + esc_(r.dataTransBR || "") + "</td>";
+    html += "<td style='" + tdBase + "'>" + esc_(r.estabelecimento || "") + "</td>";
+    html += "<td style='" + tdBase + "'>" + esc_(r.valorOriginalTxt || "") + "</td>";
+    html += "<td style='" + tdBase + "'>" + esc_(r.cartao || "") + "</td>";
+    html += "<td style='" + tdBase + "'><b>" + esc_(r.pendenciasTxt || "") + "</b></td>";
+    html += "</tr>";
   });
 
-  for (var i = 0; i < header.length; i++) {
-    var hNorm = normalizarTexto_(header[i]);
-    if (!hNorm) continue;
+  html += "</tbody></table>";
+  return html;
+}
 
-    for (var j = 0; j < nomesNorm.length; j++) {
-      var alvo = nomesNorm[j];
-      if (!alvo) continue;
+function vektorTiposPendenciasDoGrupo_(rows) {
+  var set = {};
+  (rows || []).forEach(function (r) {
+    if (r.pendRecibo) set["Nota fiscal/Recibo"] = true;
+    if (r.pendEtq) set["Etiqueta"] = true;
+    if (r.pendDesc) set["Descrição"] = true;
+    if (r.pendDivergNF) set["NF/Recibo divergente"] = true;
+  });
+  return Object.keys(set);
+}
 
-      // bate se for igual ou se um contém o outro
-      if (hNorm === alvo ||
-          hNorm.indexOf(alvo) !== -1 ||
-          alvo.indexOf(hNorm) !== -1) {
-        return i;
+function vektorMontarCorpoEmailPendenciasClara_(saudacao, tabelaHtml, tiposPendencias) {
+  var tipos = (tiposPendencias && tiposPendencias.length) ? tiposPendencias : [];
+  var tiposTxt = tipos.length ? tipos.join(", ") : "justificativas";
+
+  var html = "";
+  html += "<div style='font-family:Arial,sans-serif;font-size:13px;color:#0f172a;line-height:1.45'>";
+  html += "<p>Pessoal, " + saudacao + "</p>";
+
+  // ✅ Texto variável conforme tipos
+  html += "<p>Seguem abaixo transações pendentes de <b>" + tiposTxt + "</b> dentro do prazo de 48 horas após a compra, precisamos que sejam corrigidas o mais rápido possível. Assim que as pendências forem regularizadas, solicitamos a gentileza de responder a este e-mail confirmando a correção.</p>";
+
+  html += "<p>O bloqueio do cartão já foi efetuado preventivamente, para que possamos seguir com o desbloqueio, encaminhe um chamado via Servicenow, caminho: Contas a Receber &gt; Cartão Clara &gt; Solicitação de Desbloqueio de Cartão.</p>";
+
+  // ❌ REMOVIDO: bloco "Lembrando que para todas as transações..."
+  html += tabelaHtml;
+
+  html += "<br/><br/>";
+  html += "<p><i>Caso tenha dúvidas ou precise de mais informações, entre em contato conosco.</i></p>";
+  html += "<br/><br/>";
+  html += "<p>Atenciosamente,<br/>Contas a Receber<br/>Grupo SBF<br/>contasareceber@gruposbf.com.br</p>";
+  html += "</div>";
+  return html;
+}
+
+// ✅ FIX DEFINITIVO: parser ISO robusto (evita TypeError m[1])
+function vektorParseIsoDateSafe_(iso) {
+  if (!iso) return null;
+
+  // aceita "2026-01-26T00:00:00.000Z" ou "2026-01-26"
+  var s = String(iso).trim();
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+
+  var y = Number(m[1]);
+  var mo = Number(m[2]) - 1;
+  var d = Number(m[3]);
+
+  var dt = new Date(y, mo, d);
+  dt.setHours(0, 0, 0, 0);
+  return isNaN(dt.getTime()) ? null : dt;
+}
+
+// 1) PREVIEW: devolve resumo pro chat
+function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
+  vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadas");
+
+  var ini = vektorParseIsoDateSafe_(dataInicioIso);
+  var fim = vektorParseIsoDateSafe_(dataFimIso);
+  if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
+
+  var rows = vektorQueryPendenciasRecusadas_(ini, fim);
+
+  var total = rows.length;
+  var cRec = 0, cEtq = 0, cDesc = 0, cDiv = 0; // ✅ NOVO
+  var totalValor = 0;
+
+  rows.forEach(function (r) {
+    if (r.pendRecibo) cRec++;
+    if (r.pendEtq) cEtq++;
+    if (r.pendDesc) cDesc++;
+    if (r.pendDivergNF) cDiv++; // ✅ NOVO
+
+    // soma “valor original” de forma tolerante
+    var v = String(r.valorOriginal || r.valorOriginalTxt || "")
+      .replace(/[R$\s]/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".");
+    var n = Number(v);
+    if (!isNaN(n)) totalValor += n;
+  });
+
+  var lojasSet = {};
+  rows.forEach(function (r) { lojasSet[r.lojaKey] = true; });
+
+  return {
+    ok: true,
+    periodo: { inicio: vektorFormatDateBR_(ini), fim: vektorFormatDateBR_(fim) },
+    totalTransacoes: total,
+    totalLojas: Object.keys(lojasSet).length,
+
+    pendRecibo: cRec,
+    pendEtiqueta: cEtq,
+    pendDescricao: cDesc,
+    pendDivergNF: cDiv, // ✅ NOVO
+
+    pctRecibo: total ? (cRec / total) : 0,
+    pctEtiqueta: total ? (cEtq / total) : 0,
+    pctDescricao: total ? (cDesc / total) : 0,
+    pctDivergNF: total ? (cDiv / total) : 0, // ✅ NOVO
+
+    totalValor: totalValor
+  };
+}
+
+function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso) {
+  vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadasDetalhado");
+
+  try {
+    var ini = vektorParseIsoDateSafe_(dataInicioIso); // ou vektorParseIsoDate_ (o que existir no seu projeto)
+    var fim = vektorParseIsoDateSafe_(dataFimIso);
+    if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
+
+    var rows = vektorQueryPendenciasRecusadas_(ini, fim);
+
+    // ⚠️ IMPORTANTE: sentMap precisa ser objeto puro (plain object), não Map/Cache object
+    var sentMap = vektorCarregarTxKeysJaEnviadas_() || {};
+    if (typeof sentMap !== "object") sentMap = {};
+
+    var total = rows.length;
+    var cRec = 0, cEtq = 0, cDesc = 0, cDiv = 0;
+    var totalValor = 0;
+    var lojasSet = {};
+    var jaEnviadas = 0;
+
+    rows.forEach(function(r){
+      lojasSet[r.lojaKey] = true;
+
+      if (r.pendRecibo) cRec++;
+      if (r.pendEtq) cEtq++;
+      if (r.pendDesc) cDesc++;
+      if (r.pendDivergNF) cDiv++;
+
+      var tx = String(r.txKey || "").trim();
+      r.jaEnviado = !!(tx && sentMap[tx]);
+      if (r.jaEnviado) jaEnviadas++;
+
+      var v = String(r.valorOriginal || r.valorOriginalTxt || "")
+        .replace(/[R$\s]/g, "")
+        .replace(/\./g, "")
+        .replace(",", ".");
+      var n = Number(v);
+      if (!isNaN(n)) totalValor += n;
+
+      // ✅ GARANTIA: nada de Date crua no payload (devolve string)
+      if (r.dataTrans instanceof Date) r.dataTransISO = r.dataTrans.toISOString();
+      delete r.dataTrans;
+    });
+
+    rows.forEach(function(r){
+      // mata qualquer Date que sobrou por acidente
+      if (r && r.dataTrans instanceof Date) {
+        r.dataTransISO = r.dataTrans.toISOString();
+        delete r.dataTrans;
       }
+    });
+
+    return {
+      ok: true,
+      resumo: {
+        periodo: { inicio: vektorFormatDateBR_(ini), fim: vektorFormatDateBR_(fim) },
+        totalTransacoes: total,
+        totalLojas: Object.keys(lojasSet).length,
+        pendRecibo: cRec,
+        pendEtiqueta: cEtq,
+        pendDescricao: cDesc,
+        pendDivergNF: cDiv,
+        pctRecibo: total ? (cRec / total) : 0,
+        pctEtiqueta: total ? (cEtq / total) : 0,
+        pctDescricao: total ? (cDesc / total) : 0,
+        pctDivergNF: total ? (cDiv / total) : 0,
+        totalValor: totalValor,
+        totalJaEnviadas: jaEnviadas
+      },
+      rows: rows
+    };
+
+  } catch (e) {
+    // ✅ NUNCA retorne 'e' direto. Sempre string.
+    var msg = (e && e.message) ? e.message : String(e);
+    var st  = (e && e.stack) ? String(e.stack) : "";
+    return { ok: false, error: msg + (st ? ("\n" + st) : "") };
+  }
+}
+
+function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFimIso, txKeys) {
+  vektorAssertFunctionAllowed_("dispararEnvioPendenciasClaraRecusadasSelecionadas");
+
+  var ini = vektorParseIsoDateSafe_(dataInicioIso);
+  var fim = vektorParseIsoDateSafe_(dataFimIso);
+  if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
+
+  txKeys = Array.isArray(txKeys) ? txKeys : [];
+  var want = {};
+  txKeys.forEach(function(k){
+    k = String(k || "").trim();
+    if (k) want[k] = true;
+  });
+  if (!Object.keys(want).length) return { ok: false, error: "Nenhuma transação selecionada." };
+
+  var rowsAll = vektorQueryPendenciasRecusadas_(ini, fim);
+
+  // envio único
+  var sentMap = vektorCarregarTxKeysJaEnviadas_();
+
+  // filtra selecionadas e ainda não enviadas
+  var rows = [];
+  rowsAll.forEach(function(r){
+    var tx = String(r.txKey || "").trim();
+    if (!tx || !want[tx]) return;
+    if (sentMap[tx]) return; // já enviada uma vez -> nunca reenviar
+    rows.push(r);
+  });
+
+  if (!rows.length) return { ok: false, error: "Todas as selecionadas já foram enviadas anteriormente (envio único)." };
+
+  // agrupa por loja (assunto por data de cobrança = hoje)
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var dataCobrancaBR = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy");
+
+  var grupos = {}; // lojaKey -> rows[]
+  rows.forEach(function(r){
+    if (!grupos[r.lojaKey]) grupos[r.lojaKey] = [];
+    grupos[r.lojaKey].push(r);
+  });
+
+  var saudacao = vektorSaudacaoPorHora_();
+  var sucessoPorLoja = [];
+  var falhasPorLoja = [];
+
+  var emailsEnviados = 0;
+  var txRegistradas = 0;
+
+  Object.keys(grupos).forEach(function(lojaKey){
+    var itens = grupos[lojaKey];
+
+    // destinatários
+    var toSet = {};
+    function addTo_(em){
+      em = String(em || "").trim();
+      if (!em) return;
+      toSet[em.toLowerCase()] = em;
+    }
+    addTo_(itens[0].emailGerente);
+    addTo_(itens[0].emailRegional);
+    addTo_(VEKTOR_SLACK_GRUPO_CONTAS_A_RECEBER);
+
+    var toList = Object.keys(toSet).map(function(k){ return toSet[k]; }).join(",");
+    if (!toList) {
+      falhasPorLoja.push({ lojaKey: lojaKey, error: "Sem destinatários (gerente/regional/slack) na aba Emails." });
+      return;
+    }
+
+    var assunto = "CLARA | JUSTIFICATIVAS PENDENTES | " + lojaKey + " - " + dataCobrancaBR;
+
+    var tabela = vektorMontarTabelaPendenciasEmail_(itens);
+    var tipos = vektorTiposPendenciasDoGrupo_(itens);
+    var corpo = vektorMontarCorpoEmailPendenciasClara_(saudacao, tabela, tipos);
+
+    try {
+      MailApp.sendEmail({
+        name: "Vektor - Grupo SBF",
+        to: toList,
+        cc: VEKTOR_CC_CONTAS_A_RECEBER,
+        replyTo: VEKTOR_CC_CONTAS_A_RECEBER,
+        subject: assunto,
+        htmlBody: corpo
+      });
+
+      emailsEnviados++;
+
+      // log por transação (SENT)
+      itens.forEach(function(r){
+        vektorLogEnvioPendencia_({
+          txKey: r.txKey,
+          lojaKey: lojaKey,
+          dataTransBR: r.dataTransBR,
+          valorOriginalTxt: r.valorOriginalTxt,
+          cartao: r.cartao,
+          codigoAutorizacao: r.codigoAutorizacao,
+          estabelecimento: r.estabelecimento,
+          pendenciasTxt: r.pendenciasTxt,
+          to: toList,
+          cc: VEKTOR_CC_CONTAS_A_RECEBER,
+          status: "SENT",
+          error: ""
+        });
+        txRegistradas++;
+      });
+
+      sucessoPorLoja.push({ lojaKey: lojaKey, qtdTx: itens.length });
+
+    } catch(e) {
+      var msg = (e && e.message) ? e.message : String(e);
+
+      // log por transação (FAIL)
+      itens.forEach(function(r){
+        vektorLogEnvioPendencia_({
+          txKey: r.txKey,
+          lojaKey: lojaKey,
+          dataTransBR: r.dataTransBR,
+          valorOriginalTxt: r.valorOriginalTxt,
+          cartao: r.cartao,
+          codigoAutorizacao: r.codigoAutorizacao,
+          estabelecimento: r.estabelecimento,
+          pendenciasTxt: r.pendenciasTxt,
+          to: toList,
+          cc: VEKTOR_CC_CONTAS_A_RECEBER,
+          status: "FAIL",
+          error: msg
+        });
+      });
+
+      falhasPorLoja.push({ lojaKey: lojaKey, error: msg });
+    }
+  });
+
+  return {
+    ok: true,
+    emailsEnviados: emailsEnviados,
+    txRegistradas: txRegistradas,
+    sucessoPorLoja: sucessoPorLoja,
+    falhasPorLoja: falhasPorLoja
+  };
+}
+
+// Procura o índice de uma coluna no cabeçalho da BaseClara
+// usando uma lista de possíveis nomes (variações de texto).
+function encontrarIndiceColuna_(header, nomesPossiveis) {
+  // header: array de strings
+  // nomesPossiveis: string OU array de strings
+
+  if (!header || !header.length) return -1;
+
+  // aceita string direta também
+  var arr = Array.isArray(nomesPossiveis) ? nomesPossiveis : [nomesPossiveis];
+
+  // normalizador defensivo (não depende de outras funcs)
+  function norm_(s) {
+    return String(s || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
+  }
+
+  var headerNorm = header.map(norm_);
+
+  // 1) match EXATO (melhor)
+  for (var a = 0; a < arr.length; a++) {
+    var alvo = norm_(arr[a]);
+    if (!alvo) continue;
+    for (var i = 0; i < headerNorm.length; i++) {
+      if (headerNorm[i] === alvo) return i;
     }
   }
 
-  return -1; // não encontrou
+  // 2) match "contém" (fallback controlado)
+  for (var b = 0; b < arr.length; b++) {
+    var alvo2 = norm_(arr[b]);
+    if (!alvo2) continue;
+    for (var j = 0; j < headerNorm.length; j++) {
+      if (headerNorm[j].indexOf(alvo2) !== -1) return j;
+    }
+  }
+
+  return -1;
 }
 
 // Filtra linhas pelo período [dataInicioStr, dataFimStr].
@@ -7737,7 +8407,7 @@ function getResumoPendenciasPorLoja(grupo, dataInicioStr, dataFimStr) {
     };
 
   } catch (e) {
-    return { ok: false, error: e && e.message ? e.message : e };
+    return { ok: false, error: String((e && e.message) ? e.message : e) };
   }
 }
 
@@ -7933,7 +8603,7 @@ function getResumoPendenciasPorTime(dataInicioStr, dataFimStr, grupoFiltro) {
     };
 
   } catch (e) {
-    return { ok: false, error: e && e.message ? e.message : e };
+    return { ok: false, error: String((e && e.message) ? e.message : e) };
   }
 }
 
@@ -9114,7 +9784,7 @@ function getResumoTransacoesPorCategoriaTime(dataInicioStr, dataFimStr, criterio
     };
 
   } catch (e) {
-    return { ok: false, error: e && e.message ? e.message : e };
+    return { ok: false, error: String((e && e.message) ? e.message : e) };
   }
 }
 
@@ -9511,7 +10181,7 @@ function getTransacoesIndividuaisPorEstabelecimento(dataInicioStr, dataFimStr, e
     };
 
   } catch (e) {
-    return { ok: false, error: e && e.message ? e.message : e };
+    return { ok: false, error: String((e && e.message) ? e.message : e) };
   }
 }
 
@@ -11482,4 +12152,34 @@ try {
     usuariosAtivosHoje: vektorGetActiveUsersTodayCount_(Session.getScriptTimeZone()),
     geral: "Em operação"
   };
+}
+
+// ===============================
+// FIX DEFINITIVO: parser ISO seguro (evita TypeError m[1])
+// ===============================
+function vektorParseIsoDate_(iso) {
+  if (!iso) return null;
+
+  // já é Date
+  if (Object.prototype.toString.call(iso) === "[object Date]") {
+    var d0 = iso;
+    return isNaN(d0.getTime()) ? null : d0;
+  }
+
+  var s = String(iso || "").trim();
+
+  // aceita: "2026-01-26T00:00:00.000Z" ou "2026-01-26"
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+
+  var y = Number(m[1]);
+  var mo = Number(m[2]) - 1;
+  var d = Number(m[3]);
+
+  var dt = new Date(y, mo, d);
+  if (isNaN(dt.getTime())) return null;
+
+  // padroniza para 00:00:00
+  dt.setHours(0, 0, 0, 0);
+  return dt;
 }
