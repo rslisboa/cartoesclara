@@ -3716,13 +3716,12 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
   vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadasDetalhado");
 
   try {
-    var ini = vektorParseIsoDateSafe_(dataInicioIso); // ou vektorParseIsoDate_ (o que existir no seu projeto)
+    var ini = vektorParseIsoDateSafe_(dataInicioIso);
     var fim = vektorParseIsoDateSafe_(dataFimIso);
     if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
 
     var rows = vektorQueryPendenciasRecusadas_(ini, fim);
 
-    // ⚠️ IMPORTANTE: sentMap precisa ser objeto puro (plain object), não Map/Cache object
     var sentMap = vektorCarregarTxKeysJaEnviadas_() || {};
     if (typeof sentMap !== "object") sentMap = {};
 
@@ -3732,7 +3731,10 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
     var lojasSet = {};
     var jaEnviadas = 0;
 
-    rows.forEach(function(r){
+    // ✅ série por data (para gráfico)
+    var porData = {}; // { 'dd/MM/yyyy': qtd }
+
+    rows.forEach(function (r) {
       lojasSet[r.lojaKey] = true;
 
       if (r.pendRecibo) cRec++;
@@ -3744,6 +3746,7 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
       r.jaEnviado = !!(tx && sentMap[tx]);
       if (r.jaEnviado) jaEnviadas++;
 
+      // soma valor
       var v = String(r.valorOriginal || r.valorOriginalTxt || "")
         .replace(/[R$\s]/g, "")
         .replace(/\./g, "")
@@ -3751,18 +3754,28 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
       var n = Number(v);
       if (!isNaN(n)) totalValor += n;
 
-      // ✅ GARANTIA: nada de Date crua no payload (devolve string)
+      // ✅ GARANTIA: nada de Date crua no payload
       if (r.dataTrans instanceof Date) r.dataTransISO = r.dataTrans.toISOString();
       delete r.dataTrans;
-    });
 
-    rows.forEach(function(r){
-      // mata qualquer Date que sobrou por acidente
-      if (r && r.dataTrans instanceof Date) {
-        r.dataTransISO = r.dataTrans.toISOString();
-        delete r.dataTrans;
+      // ✅ agrega por data (1 por transação)
+      var d = String(r.dataTransBR || "").trim();
+      if (d) {
+        if (!porData[d]) porData[d] = 0;
+        porData[d]++;
       }
     });
+
+    // ordena datas (dd/MM/yyyy -> yyyy-MM-dd)
+    var seriePorData = Object.keys(porData)
+      .sort(function (a, b) {
+        var pa = a.split("/").reverse().join("-");
+        var pb = b.split("/").reverse().join("-");
+        return pa.localeCompare(pb);
+      })
+      .map(function (d) {
+        return { data: d, total: porData[d] };
+      });
 
     return {
       ok: true,
@@ -3781,13 +3794,13 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         totalValor: totalValor,
         totalJaEnviadas: jaEnviadas
       },
+      seriePorData: seriePorData, // ✅ NOVO
       rows: rows
     };
 
   } catch (e) {
-    // ✅ NUNCA retorne 'e' direto. Sempre string.
     var msg = (e && e.message) ? e.message : String(e);
-    var st  = (e && e.stack) ? String(e.stack) : "";
+    var st = (e && e.stack) ? String(e.stack) : "";
     return { ok: false, error: msg + (st ? ("\n" + st) : "") };
   }
 }
