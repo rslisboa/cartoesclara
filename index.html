@@ -872,9 +872,13 @@ input[type="date"]::-webkit-clear-button {
                 style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
             </div>
 
-            <div id="envPend_status" style="color:rgba(226,232,240,0.75); font-size:12px; font-weight:800;">
-              —
-            </div>
+           <div id="envPend_statusText"
+              style="color:rgba(226,232,240,0.75); font-size:12px; font-weight:800; white-space:nowrap;">
+          </div>
+
+          <div id="envPend_statusCards"
+              style="margin-left:auto; display:flex; gap:10px; flex-wrap:wrap; align-items:stretch; justify-content:flex-end;">
+          </div>
           </div>
         </div>
 
@@ -2742,7 +2746,7 @@ window.vektorEnvioPendenciasPreview = function () {
   try {
     const ini = document.getElementById("envPend_ini")?.value || "";
     const fim = document.getElementById("envPend_fim")?.value || "";
-    const st = document.getElementById("envPend_status");
+    const st = document.getElementById("envPend_statusText");
     const resumoEl = document.getElementById("envPend_resumo");
     const falhasEl = document.getElementById("envPend_falhas");
 
@@ -2769,6 +2773,9 @@ window.vektorEnvioPendenciasPreview = function () {
               ("Erro desconhecido. Resposta do backend: " + JSON.stringify(res || {}, null, 2));
 
           if (resumoEl) resumoEl.textContent = errTxt;
+          const bx = document.getElementById("envPend_statusCards");
+            if (bx) bx.innerHTML = "";
+
           return;
         }
 
@@ -3022,6 +3029,46 @@ window.vektorEnvioPendenciasPreview = function () {
 })();
         }
 
+        // ✅ NOVO: cards de status mix do período
+            (function renderStatusCards() {
+              const box = document.getElementById("envPend_statusCards");
+              const M = (res && res.statusMix) ? res.statusMix : (res && res.resumo ? res.resumo.statusMix : null);
+              if (!box) return;
+
+              if (!M || !M.total) {
+                box.innerHTML = "";
+                return;
+              }
+
+              const pct = (x) => ((x || 0) * 100).toFixed(1).replace(".", ",") + "%";
+
+              box.innerHTML = `
+                <div style="min-width:160px; background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:10px 12px;">
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Aprovadas</div>
+                  <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:6px;">
+                    <div style="color:#fff; font-size:22px; font-weight:1000;">${M.aprovada}</div>
+                    <div style="color:rgba(226,232,240,0.75); font-size:12px; font-weight:900;">${pct(M.pctAprovada)}</div>
+                  </div>
+                </div>
+
+                <div style="min-width:160px; background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:10px 12px;">
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Recusadas</div>
+                  <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:6px;">
+                    <div style="color:#fff; font-size:22px; font-weight:1000;">${M.recusada}</div>
+                    <div style="color:rgba(226,232,240,0.75); font-size:12px; font-weight:900;">${pct(M.pctRecusada)}</div>
+                  </div>
+                </div>
+
+                <div style="min-width:190px; background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:10px 12px;">
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Necessita aprovação</div>
+                  <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-top:6px;">
+                    <div style="color:#fff; font-size:22px; font-weight:1000;">${M.necessita}</div>
+                    <div style="color:rgba(226,232,240,0.75); font-size:12px; font-weight:900;">${pct(M.pctNecessita)}</div>
+                  </div>
+                </div>
+              `;
+})();
+
         window.__renderEnvPendTbody();
         if (st) st.textContent = `Prévia pronta: ${window.__envPend.rows.length} linha(s).`;
 
@@ -3036,14 +3083,14 @@ window.vektorEnvioPendenciasPreview = function () {
       .previewEnvioPendenciasClaraRecusadasDetalhado(iniIso, fimIso);
 
   } catch (e) {
-    const st = document.getElementById("envPend_status");
+    const st = document.getElementById("envPend_statusText");
     if (st) st.textContent = "Erro inesperado na prévia.";
   }
 };
 
 window.vektorEnvioPendenciasEnviarSelecionadas = function () {
   const falhasEl = document.getElementById("envPend_falhas");
-  const st = document.getElementById("envPend_status");
+  const st = document.getElementById("envPend_statusText");
   if (falhasEl) falhasEl.innerHTML = "";
 
   const iniIso = window.__envPend.periodo?.iniIso || "";
