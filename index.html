@@ -974,6 +974,49 @@ input[type="date"]::-webkit-clear-button {
   </div>
 </div>
 
+<div id="envPend_distOverlay"
+     style="position:fixed; inset:0; display:none; z-index:99998;">
+  <div id="envPend_distOverlayBg"
+       style="position:absolute; inset:0; background:rgba(15,23,42,0.55);"></div>
+
+  <div id="envPend_distOverlayCard"
+       style="
+         position:absolute;
+         left:50%; top:50%;
+         transform:translate(-50%,-50%);
+         width:min(980px, 92vw);
+         max-height:min(640px, 82vh);
+         background:#ffffff;
+         border-radius:18px;
+         border:1px solid rgba(15,23,42,0.18);
+         box-shadow:0 18px 50px rgba(0,0,0,0.35);
+         padding:14px 14px 12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
+      <div style="font-weight:1000; color:#0f172a;">Distribuição de pendências por loja</div>
+      <button type="button"
+              id="envPend_distOverlayClose"
+              style="height:32px; padding:0 12px; border-radius:10px; border:1px solid rgba(0,94,39,0.35); background:#005E27; color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+        Fechar
+      </button>
+    </div>
+
+    <div style="margin-top:6px; color:#334155; font-size:12px;">
+      Cada barra soma 100% (composição por tipo de pendência dentro da loja).
+    </div>
+
+    <div id="envPend_distOverlayBody"
+         style="margin-top:10px; overflow:auto; max-height:calc(82vh - 120px); padding-right:6px;">
+    </div>
+
+    <div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:#334155;">
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#005E27;margin-right:6px;"></span>NF/Recibo</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#0ea5e9;margin-right:6px;"></span>Etiqueta</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#a855f7;margin-right:6px;"></span>Descrição</div>
+      <div><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#f59e0b;margin-right:6px;"></span>NF divergente</div>
+    </div>
+  </div>
+</div>
+
 <!-- Botão central: Como funciona a análise? -->
         <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 10px;">
           <button
@@ -3231,7 +3274,9 @@ window.vektorEnvioPendenciasPreview = function () {
               </div>
 
               <!-- Coluna direita: donut + barras -->
-              <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px; display:flex; gap:14px; align-items:center;">
+              <div id="envPend_card_dist"
+                title="Passe o mouse para ver distribuição por loja"
+                style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px; display:flex; gap:14px; align-items:center;">
                 <div style="width:160px; min-width:160px; display:flex; align-items:center; justify-content:center;">
                   <svg width="128" height="128" viewBox="0 0 128 128">
                     <circle cx="64" cy="64" r="54" fill="transparent" stroke="rgba(148,163,184,0.12)" stroke-width="14" />
@@ -3255,6 +3300,7 @@ window.vektorEnvioPendenciasPreview = function () {
               </div>
 
               <svg id="envPend_svgLine" width="100%" height="220" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
+
             </div>
           `;
 
@@ -3274,6 +3320,96 @@ window.vektorEnvioPendenciasPreview = function () {
             } catch (e) {
               console.error("Erro bind card lojas:", e);
             }
+
+            // === bind hover no donut "Distribuição de pendências" (abre overlay stacked) ===
+              try {
+                const dist = document.getElementById("envPend_card_dist");
+                const overlay = document.getElementById("envPend_distOverlay");
+                const overlayBg = document.getElementById("envPend_distOverlayBg");
+                const overlayClose = document.getElementById("envPend_distOverlayClose");
+
+                function pctTxt(x){ return ((Number(x)||0)*100).toFixed(1).replace(".", ",") + "%"; }
+
+                function renderDistOverlay_() {
+                  const body = document.getElementById("envPend_distOverlayBody");
+                  if (!body) return;
+
+                  const arr = window.__envPend?.resumo?.lojasPendStack;
+                  if (!Array.isArray(arr) || !arr.length) {
+                    body.innerHTML = `<div style="color:#64748b;font-size:12px;">Sem dados por loja.</div>`;
+                    return;
+                  }
+
+                  const top = arr.slice(0, 60); // evita overlay infinito (scroll já existe)
+                  body.innerHTML = top.map(it => {
+                    const r = Math.max(0, Math.min(100, (it.pctRecibo||0)*100));
+                    const e = Math.max(0, Math.min(100, (it.pctEtiqueta||0)*100));
+                    const d = Math.max(0, Math.min(100, (it.pctDescricao||0)*100));
+                    const n = Math.max(0, Math.min(100, (it.pctDivergNF||0)*100));
+
+                    return `
+                      <div style="padding:10px 10px; border:1px solid rgba(15,23,42,0.08); border-radius:14px; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; gap:12px; align-items:center;">
+                          <div style="font-weight:1000; color:#0f172a;">Loja ${it.lojaKey}</div>
+                          <div style="font-size:12px; color:#334155;">(base: ${it.totalFlags||0} flags)</div>
+                        </div>
+
+                        <div style="margin-top:8px; height:14px; background:#e2e8f0; border-radius:999px; overflow:hidden; display:flex;">
+                          <div style="width:${r}%; background:#005E27;"></div>
+                          <div style="width:${e}%; background:#0ea5e9;"></div>
+                          <div style="width:${d}%; background:#a855f7;"></div>
+                          <div style="width:${n}%; background:#f59e0b;"></div>
+                        </div>
+
+                        <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:#334155;">
+                          <div><b>Recibo:</b> ${pctTxt(it.pctRecibo)}</div>
+                          <div><b>Etiqueta:</b> ${pctTxt(it.pctEtiqueta)}</div>
+                          <div><b>Descrição:</b> ${pctTxt(it.pctDescricao)}</div>
+                          <div><b>NF div.:</b> ${pctTxt(it.pctDivergNF)}</div>
+                        </div>
+                      </div>
+                    `;
+                  }).join("");
+                }
+
+                function openDist_() {
+                  if (!overlay) return;
+                  renderDistOverlay_();
+                  overlay.style.display = "block";
+                }
+                function closeDist_() {
+                  if (!overlay) return;
+                  overlay.style.display = "none";
+                }
+
+                if (overlayBg) overlayBg.onclick = closeDist_;
+                if (overlayClose) overlayClose.onclick = closeDist_;
+
+                if (dist && !dist.__bindHoverDist) {
+                    dist.__bindHoverDist = true;
+                    dist.style.cursor = "help";
+
+                    let t = null;
+
+                    dist.addEventListener("mouseenter", function () {
+                      if (t) clearTimeout(t);
+
+                      // só abre se o mouse ficar parado por 350ms
+                      t = setTimeout(function () {
+                        // não abre de novo se já está aberto
+                        if (overlay && overlay.style.display === "block") return;
+                        openDist_();
+                      }, 2200);
+                    });
+
+                    dist.addEventListener("mouseleave", function () {
+                      if (t) clearTimeout(t);
+                      t = null;
+                    });
+                  }
+              } catch (e) {
+                console.error("Erro bind dist donut:", e);
+              }
 
           // ===== mini-sparklines (cards KPI) =====
             (function renderKpiSparklines() {
@@ -3367,12 +3503,32 @@ window.vektorEnvioPendenciasPreview = function () {
                 const lastY = yOf(values[values.length - 1] || 0);
 
                 box.innerHTML = `
-                  <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-                    <path d="${d}" fill="none" stroke="rgba(181,255,32,0.25)" stroke-width="1.8" stroke-linecap="round" />
-                    <path d="${d}" fill="none" stroke="#B5FF20" stroke-width="1.2" stroke-dasharray="4 6" stroke-linecap="round" />
-                    <circle cx="${lastX}" cy="${lastY}" r="2.8" fill="#B5FF20" />
-                  </svg>
-                `;
+                <svg width="100%" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+                  <!-- linha base (fundo) -->
+                  <path d="${d}" fill="none" stroke="rgba(181,255,32,0.25)" stroke-width="1.8" stroke-linecap="round" />
+
+                  <!-- linha tracejada “viva” (anima dashoffset) -->
+                  <path d="${d}" fill="none" stroke="#B5FF20" stroke-width="1.2" stroke-dasharray="4 6" stroke-linecap="round">
+                    <animate attributeName="stroke-dashoffset"
+                            from="0"
+                            to="-20"
+                            dur="1.8s"
+                            repeatCount="indefinite" />
+                  </path>
+
+                  <!-- último ponto com pulso leve -->
+                  <circle cx="${lastX}" cy="${lastY}" r="2.8" fill="#B5FF20">
+                    <animate attributeName="r"
+                            values="2.6;3.2;2.6"
+                            dur="1.6s"
+                            repeatCount="indefinite" />
+                    <animate attributeName="opacity"
+                            values="0.85;1;0.85"
+                            dur="1.6s"
+                            repeatCount="indefinite" />
+                  </circle>
+                </svg>
+              `;
               }
 
               renderSpark("envPend_sp_tx", seriesTx);
@@ -3458,8 +3614,9 @@ window.vektorEnvioPendenciasPreview = function () {
                   <text x="${x}" y="${labelY}"
                         text-anchor="middle"
                         dominant-baseline="middle"
-                        font-size="12"
-                        font-weight="900"
+                        font-size="10"
+                        font-weight="800"
+                        style="paint-order:stroke; stroke:#0b1220; stroke-width:2px;"
                         fill="#ffffff">${val}</text>
 
                   <text x="${x}" y="${H - 6}"
