@@ -329,7 +329,7 @@ function vektorAssertFunctionAllowed_(fnName) {
 // =======================
 // VEKTOR - SESSAO, TEMPO DE LOGIN
 // =======================
-var VEKTOR_SESSION_TTL_SECONDS = 30 * 60; // 3 horas ou 5 minutos
+var VEKTOR_SESSION_TTL_SECONDS = 3 * 60 * 60; // 3 horas ou 5 minutos
 
 function vektorCreateSessionToken_(email) {
   // token aleatório + carimbo
@@ -3473,6 +3473,7 @@ function vektorQueryPendenciasRecusadas_(ini, fim) {
   var iValor     = encontrarIndiceColuna_(header, ["Valor original"]);
   var iCartao    = encontrarIndiceColuna_(header, ["Cartão"]);
   var iAlias     = encontrarIndiceColuna_(header, ["Alias Do Cartão"]);
+  var iLojaNum   = encontrarIndiceColuna_(header, ["LojaNum"]);
   var iStatusAp  = encontrarIndiceColuna_(header, ["Status de aprovação"]);
   var iRecibo    = encontrarIndiceColuna_(header, ["Recibo"]);
   var iEtiqueta  = encontrarIndiceColuna_(header, ["Etiquetas"]);
@@ -3536,7 +3537,7 @@ function vektorQueryPendenciasRecusadas_(ini, fim) {
     if (pendDesc)     pendList.push("Descrição");
     if (pendDivergNF) pendList.push("NF/Recibo divergente"); // ✅ NOVO
 
-    var lojaKey = vektorNormLojaKey_(row[iAlias]);
+    var lojaKey = vektorNormLojaKey_(row[iAlias] || row[iLojaNum]);
     if (!lojaKey) continue;
 
     var contato = emailsMap[lojaKey] || { emailGerente: "", emailRegional: "", time: "" };
@@ -3555,6 +3556,7 @@ function vektorQueryPendenciasRecusadas_(ini, fim) {
       valorOriginal: row[iValor],
       valorOriginalTxt: String(row[iValor] || "").trim(),
       cartao: String(row[iCartao] || "").trim(),
+      statusAprovacao: String(row[iStatusAp] || "").trim(),
       codigoAutorizacao: String(row[iCodAut] || "").trim(),   // se já existe aí no teu obj
       pendenciasTxt: pendList.join(", "),
       pendRecibo: pendRecibo,
@@ -3660,6 +3662,31 @@ function vektorParseIsoDateSafe_(iso) {
   return isNaN(dt.getTime()) ? null : dt;
 }
 
+// ✅ parser de valor robusto (aceita number OU string pt-BR)
+function vektorParseValorBR_(x) {
+  if (x === null || x === undefined) return NaN;
+
+  // se já é número, não destrói decimal
+  if (typeof x === "number") return isNaN(x) ? NaN : x;
+
+  var s = String(x).trim();
+  if (!s) return NaN;
+
+  // remove "R$" e espaços
+  s = s.replace(/[R$\s]/g, "");
+
+  // Se tem vírgula, assume pt-BR: "." milhar e "," decimal
+  if (s.indexOf(",") >= 0) {
+    s = s.replace(/\./g, "").replace(",", ".");
+    return Number(s);
+  }
+
+  // Se não tem vírgula:
+  // - se tem ponto, assume que ponto é decimal (vindo como 722.46)
+  // - se não tem ponto, é inteiro
+  return Number(s);
+}
+
 // 1) PREVIEW: devolve resumo pro chat
 function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
   vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadas");
@@ -3672,25 +3699,41 @@ function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
 
   var total = rows.length;
   var cRec = 0, cEtq = 0, cDesc = 0, cDiv = 0; // ✅ NOVO
-  var totalValor = 0;
+  var totalValorRecusadas = 0;
+  var mapaValorPorLoja = {}; // { "0062": 1234.56, ... }
 
   rows.forEach(function (r) {
+    // ✅ GARANTIA: só conta RECUSADA (protege contra qualquer mudança no query)
+    var st = String(r.statusAprovacao || r.statusAprovacaoTxt || r.status || "").toUpperCase().trim();
+    if (st && st !== "RECUSADA" && st !== "RECUSADO") return;
+
     if (r.pendRecibo) cRec++;
     if (r.pendEtq) cEtq++;
     if (r.pendDesc) cDesc++;
     if (r.pendDivergNF) cDiv++; // ✅ NOVO
 
     // soma “valor original” de forma tolerante
+
     var v = String(r.valorOriginal || r.valorOriginalTxt || "")
-      .replace(/[R$\s]/g, "")
-      .replace(/\./g, "")
-      .replace(",", ".");
-    var n = Number(v);
-    if (!isNaN(n)) totalValor += n;
-  });
+    .replace(/[R$\s]/g, "")
+    .replace(/\./g, "")
+    .replace(",", ".");
+      var n = Number(v);
+
+      if (!isNaN(n)) totalValorRecusadas += n;
+    });
 
   var lojasSet = {};
   rows.forEach(function (r) { lojasSet[r.lojaKey] = true; });
+
+  var lojasValorArr = Object.keys(mapaValorPorLoja).map(function(k){
+  return { lojaKey: k, valor: mapaValorPorLoja[k] || 0 };
+    });
+
+    // maior valor primeiro
+    lojasValorArr.sort(function(a,b){
+      return (b.valor || 0) - (a.valor || 0);
+    });
 
   return {
     ok: true,
@@ -3708,7 +3751,8 @@ function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
     pctDescricao: total ? (cDesc / total) : 0,
     pctDivergNF: total ? (cDiv / total) : 0, // ✅ NOVO
 
-    totalValor: totalValor
+    totalValor: totalValorRecusadas,
+    lojasValor: lojasValorArr,
   };
 }
 
@@ -3781,6 +3825,66 @@ function vektorCalcularStatusMixPeriodo_(ini, fim) {
   };
 }
 
+function vektorCalcularValorRecusadasPorLojaPeriodo_(ini, fim) {
+  var base = carregarLinhasBaseClara_();
+  if (base.error) throw new Error(base.error);
+
+  var header = base.header || [];
+  var linhas = base.linhas || [];
+
+  var iDataTrans = encontrarIndiceColuna_(header, ["Data da Transação"]);
+  var iStatusAp  = encontrarIndiceColuna_(header, ["Status de aprovação"]);
+  var iValor     = encontrarIndiceColuna_(header, ["Valor original"]);
+  var iAlias     = encontrarIndiceColuna_(header, ["Alias Do Cartão"]);
+  var iLojaNum   = encontrarIndiceColuna_(header, ["LojaNum"]);
+
+  if (iDataTrans < 0) throw new Error("Não encontrei 'Data da Transação' na BaseClara.");
+  if (iStatusAp  < 0) throw new Error("Não encontrei 'Status de aprovação' na BaseClara.");
+  if (iValor     < 0) throw new Error("Não encontrei 'Valor original' na BaseClara.");
+  if (iAlias < 0 && iLojaNum < 0) throw new Error("Não encontrei 'Alias Do Cartão' nem 'LojaNum' na BaseClara.");
+
+  var totalValor = 0;
+  var mapa = {}; // lojaKey -> soma
+
+  for (var i = 0; i < linhas.length; i++) {
+    var row = linhas[i];
+
+    var dt = parseDateClara_(row[iDataTrans]);
+    if (!dt) continue;
+
+    // período inclusivo
+    if (ini && dt < ini) continue;
+    if (fim) {
+      var fim23 = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59);
+      if (dt > fim23) continue;
+    }
+
+    var st = String(row[iStatusAp] || "").trim().toLowerCase();
+    if (st !== "recusada" && st !== "recusado") continue;
+
+    var n = vektorParseValorBR_(row[iValor]);
+    if (!isFinite(n)) n = 0;
+
+    var lojaKey = vektorNormLojaKey_(row[iAlias] || row[iLojaNum]);
+    if (!lojaKey) continue;
+
+    totalValor += n;
+    mapa[lojaKey] = (mapa[lojaKey] || 0) + n;
+  }
+
+  var lojasValorArr = Object.keys(mapa).map(function(k){
+    return { lojaKey: k, valor: mapa[k] || 0 };
+  }).sort(function(a,b){
+    return (b.valor || 0) - (a.valor || 0);
+  });
+
+  return {
+    totalValor: totalValor,
+    mapaValorPorLoja: mapa,
+    lojasValorArr: lojasValorArr
+  };
+}
+
 function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso) {
   vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadasDetalhado");
 
@@ -3799,12 +3903,38 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
 
     var total = rows.length;
     var cRec = 0, cEtq = 0, cDesc = 0, cDiv = 0;
-    var totalValor = 0;
+    var totalValorRecusadas = 0;
+    var mapaValorPorLoja = {}; // lojaKey -> valor
     var lojasSet = {};
     var jaEnviadas = 0;
 
     // ✅ série por data (para gráfico)
     var porData = {}; // { 'dd/MM/yyyy': qtd }
+
+          function vektorParseValorBRL_(valorOriginal, valorTxt) {
+        // 1) Se já veio número, é a fonte de verdade
+        if (typeof valorOriginal === "number" && isFinite(valorOriginal)) {
+          return valorOriginal;
+        }
+
+        // 2) Se veio texto
+        var s = String(valorTxt || valorOriginal || "").trim();
+        if (!s) return 0;
+
+        // remove moeda/espaços
+        s = s.replace(/[R$\s]/g, "");
+
+        // caso comum PT-BR: 1.234,56
+        if (s.indexOf(",") >= 0) {
+          s = s.replace(/\./g, "").replace(",", ".");
+          var n1 = Number(s);
+          return isNaN(n1) ? 0 : n1;
+        }
+
+        // caso comum EN/numérico: 1234.56  (NÃO remove ponto)
+        var n2 = Number(s);
+        return isNaN(n2) ? 0 : n2;
+      }
 
     rows.forEach(function (r) {
       lojasSet[r.lojaKey] = true;
@@ -3818,13 +3948,19 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
       r.jaEnviado = !!(tx && sentMap[tx]);
       if (r.jaEnviado) jaEnviadas++;
 
-      // soma valor
-      var v = String(r.valorOriginal || r.valorOriginalTxt || "")
-        .replace(/[R$\s]/g, "")
-        .replace(/\./g, "")
-        .replace(",", ".");
-      var n = Number(v);
-      if (!isNaN(n)) totalValor += n;
+        // ===== VALOR TOTAL (RECUSADAS COM PENDÊNCIA) =====
+      var n = vektorParseValorBRL_(r.valorOriginal, r.valorOriginalTxt);
+      var st = String(r.statusAprovacao || "").toLowerCase().trim();
+      if (
+        (st === "recusada" || st === "recusado") &&
+        (r.pendRecibo || r.pendEtq || r.pendDesc || r.pendDivergNF)
+      ) {
+        totalValorRecusadas += n;
+        var lk = String(r.lojaKey || "").trim().toUpperCase();
+        if (lk) {
+          mapaValorPorLoja[lk] = (mapaValorPorLoja[lk] || 0) + n;
+        }
+      }
 
       // ✅ GARANTIA: nada de Date crua no payload
       if (r.dataTrans instanceof Date) r.dataTransISO = r.dataTrans.toISOString();
@@ -3837,6 +3973,12 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         porData[d]++;
       }
     });
+
+        var lojasValorArr = Object.keys(mapaValorPorLoja).map(function(k){
+          return { lojaKey: k, valor: mapaValorPorLoja[k] || 0 };
+        }).sort(function(a,b){
+          return (b.valor || 0) - (a.valor || 0);
+        });
 
     // ordena datas (dd/MM/yyyy -> yyyy-MM-dd)
     var seriePorData = Object.keys(porData)
@@ -3863,7 +4005,8 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         pctEtiqueta: total ? (cEtq / total) : 0,
         pctDescricao: total ? (cDesc / total) : 0,
         pctDivergNF: total ? (cDiv / total) : 0,
-        totalValor: totalValor,
+        totalValor: totalValorRecusadas,
+        lojasValor: lojasValorArr,
         totalJaEnviadas: jaEnviadas,
         statusMix: statusMix,
       },
