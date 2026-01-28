@@ -452,6 +452,8 @@ input[type="date"]::-webkit-clear-button {
   #vektorAppRoot.hidden { display: none !important; }
 </style>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 </head>
  <body class="text-slate-800">
 
@@ -930,6 +932,44 @@ input[type="date"]::-webkit-clear-button {
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+<!-- Popup central: gráfico de valores por loja (Envio de Pendências) -->
+<div id="envPendLojasPopup"
+     style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,0.72);">
+  <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:18px;">
+    <div style="
+      width:min(980px, 96vw);
+      max-height:min(78vh, 820px);
+      background:#f8fafc;
+      border:1px solid rgba(148,163,184,0.22);
+      border-radius:16px;
+      box-shadow:0 18px 45px rgba(0,0,0,0.55);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    ">
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid rgba(148,163,184,0.18);">
+        <div>
+          <div style="color:#0b1220; font-weight:1000; font-size:14px;">Pendências recusadas — Valor por loja</div>
+          <div id="envPendLojasPopupSub" style="color:rgba(15,23,42,0.75); font-size:12px; margin-top:2px;"></div>
+        </div>
+            <button type="button"
+              onclick="window.vektorEnvPendLojasPopupClose_()"
+              style="height:32px; padding:0 12px; border-radius:10px;
+                    border:1px solid rgba(0,94,39,0.35);
+                    background:#005E27; color:#fff;
+                    font-weight:900; font-size:12px; cursor:pointer;">
+                Fechar
+              </button>
+      </div>
+
+      <!-- Scroll vertical quando tiver muitas lojas -->
+      <div style="padding:12px 14px; overflow:auto;">
+        <canvas id="envPendLojasChart"></canvas>
+      </div>
     </div>
   </div>
 </div>
@@ -2915,6 +2955,144 @@ window.vektorEnvPendOverlayHide_ = function(){
   if (ov) ov.style.display = "none";
 };
 
+window.vektorEnvPendLojasPopupClose_ = function(){
+  const pop = document.getElementById("envPendLojasPopup");
+  if (pop) pop.style.display = "none";
+
+  // destrói chart anterior (evita “duplicar” canvas / memory leak)
+  try {
+    if (window.__envPend && window.__envPend.__lojasChart) {
+      window.__envPend.__lojasChart.destroy();
+      window.__envPend.__lojasChart = null;
+    }
+  } catch(_) {}
+};
+
+window.vektorEnvPendRenderLojasChart_ = function(){
+  const canvas = document.getElementById("envPendLojasChart");
+  if (!canvas) return;
+
+  const resumo = (window.__envPend && window.__envPend.resumo) ? window.__envPend.resumo : {};
+  const arr = Array.isArray(resumo.lojasValor) ? resumo.lojasValor : [];
+
+  // labels e valores
+  const labels = arr.map(x => String(x.lojaKey || ""));
+  const values = arr.map(x => Number(x.valor || 0));
+  const maxV = values.reduce((m, v) => Math.max(m, Number(v) || 0), 0);
+  const suggestedMaxX = maxV ? (maxV * 1.12) : 0; // 12% de folga pro rótulo caber
+
+
+  // altura dinâmica (para permitir MUITAS lojas com scroll)
+  const rowH = 22;          // “grossura” por barra
+  const topPad = 14;
+  const minH = 260;
+  const desiredH = topPad + labels.length * rowH;
+  canvas.height = Math.max(minH, desiredH);
+
+  // formata BRL
+  const fmtBRL = (n) => (Number(n)||0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+
+  // destroy antigo
+  try {
+    if (window.__envPend && window.__envPend.__lojasChart) {
+      window.__envPend.__lojasChart.destroy();
+      window.__envPend.__lojasChart = null;
+    }
+  } catch(_) {}
+
+  const ctx = canvas.getContext("2d");
+
+  // Chart.js horizontal bar
+try {
+  if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
+    Chart.register(ChartDataLabels);
+  }
+} catch (_) {}
+
+window.__envPend.__lojasChart = new Chart(ctx, {
+  type: "bar",
+  data: {
+    labels: labels,
+    datasets: [{
+      label: "Valor pendente (R$)",
+      data: values,
+      backgroundColor: "#005E27",
+      borderRadius: 10,
+      categoryPercentage: 0.75,
+      barPercentage: 0.85
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    indexAxis: "y",
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            return " " + fmtBRL(context.parsed.x);
+          }
+        }
+      },
+      datalabels: {
+          color: "#0f172a",
+          anchor: "end",
+          align: "right",
+          clamp: true,
+          clip: false,
+          formatter: function(v){ return fmtBRL(v); },
+          font: { weight: "700", size: 11 }
+        }
+      },
+
+    layout: { padding: { right: 120, left: 10, top: 10, bottom: 10 } },
+
+    scales: {
+      x: {
+          suggestedMax: suggestedMaxX,
+          ticks: {
+            callback: function(v){ return fmtBRL(v); }
+          }
+        },
+      y: {
+        ticks: {
+          autoSkip: false
+        }
+      }
+    }
+  }
+});
+};
+
+window.vektorEnvPendLojasPopupOpen_ = function(){
+  const pop = document.getElementById("envPendLojasPopup");
+  if (!pop) return;
+
+  const sub = document.getElementById("envPendLojasPopupSub");
+  const periodo = (window.__envPend && window.__envPend.resumo && window.__envPend.resumo.periodo) ? window.__envPend.resumo.periodo : null;
+  if (sub) {
+    sub.textContent = periodo ? (`Período: ${periodo.inicio || ""} → ${periodo.fim || ""}`) : "";
+  }
+
+  pop.style.display = "block";
+  window.vektorEnvPendRenderLojasChart_();
+};
+
+// fecha clicando no “fundo” escuro
+document.addEventListener("click", function(ev){
+  const pop = document.getElementById("envPendLojasPopup");
+  if (!pop || pop.style.display !== "block") return;
+  if (ev.target === pop) window.vektorEnvPendLojasPopupClose_();
+});
+
+// fecha com ESC
+document.addEventListener("keydown", function(ev){
+  if (ev.key === "Escape") {
+    window.vektorEnvPendLojasPopupClose_();
+  }
+});
+
 window.vektorEnvioPendenciasPreview = function () {
   try {
     const ini = document.getElementById("envPend_ini")?.value || "";
@@ -3028,19 +3206,19 @@ window.vektorEnvioPendenciasPreview = function () {
               <!-- Coluna esquerda: KPIs -->
               <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                 <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
-                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Transações elegíveis</div>
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Transações elegíveis (Com pendências)</div>
                   <div style="color:#fff; font-size:26px; font-weight:1000; margin-top:6px;">${R.totalTransacoes || 0}</div>
                   <div id="envPend_sp_tx" style="margin-top:10px; height:26px;"></div>
                 </div>
 
-                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
+                <div id="envPend_card_lojas" style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
                   <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Lojas</div>
                   <div style="color:#fff; font-size:26px; font-weight:1000; margin-top:6px;">${R.totalLojas || 0}</div>
                   <div id="envPend_sp_lojas" style="margin-top:10px; height:26px;"></div>
                 </div>
 
                 <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(148,163,184,0.18); border-radius:16px; padding:14px;">
-                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Valor total</div>
+                  <div style="color:rgba(226,232,240,0.7); font-size:11px; font-weight:900;">Valor total (Elegíveis)</div>
                   <div style="color:#fff; font-size:20px; font-weight:1000; margin-top:6px;">${money}</div>
                   <div id="envPend_sp_valor" style="margin-top:10px; height:26px;"></div>
                 </div>
@@ -3079,6 +3257,23 @@ window.vektorEnvioPendenciasPreview = function () {
               <svg id="envPend_svgLine" width="100%" height="220" viewBox="0 0 800 220" preserveAspectRatio="none"></svg>
             </div>
           `;
+
+            // === bind popup do gráfico no card "Lojas" ===
+            try {
+              const cardLojas = document.getElementById("envPend_card_lojas");
+              if (cardLojas && !cardLojas.__bindGrafico) {
+                cardLojas.__bindGrafico = true;
+                cardLojas.style.cursor = "pointer";
+                cardLojas.title = "Clique para visualizar detalhamento";
+
+                cardLojas.onclick = function () {
+                  window.vektorEnvPendLojasPopupOpen_();
+                };
+
+              }
+            } catch (e) {
+              console.error("Erro bind card lojas:", e);
+            }
 
           // ===== mini-sparklines (cards KPI) =====
             (function renderKpiSparklines() {
