@@ -3936,6 +3936,9 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         return isNaN(n2) ? 0 : n2;
       }
 
+      // ✅ pendências por loja (para tooltip do donut)
+      var pendPorLoja = {}; // lojaKey -> {rec, etq, desc, div, totalFlags}
+
     rows.forEach(function (r) {
       lojasSet[r.lojaKey] = true;
 
@@ -3943,6 +3946,20 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
       if (r.pendEtq) cEtq++;
       if (r.pendDesc) cDesc++;
       if (r.pendDivergNF) cDiv++;
+
+      // ✅ agrega por loja + tipo (stacked)
+        var lk = String(r.lojaKey || "").trim().toUpperCase();
+        if (lk) {
+          var hasAny = !!(r.pendRecibo || r.pendEtq || r.pendDesc || r.pendDivergNF);
+          if (hasAny) {
+            if (!pendPorLoja[lk]) pendPorLoja[lk] = { rec: 0, etq: 0, desc: 0, div: 0, totalFlags: 0 };
+
+            if (r.pendRecibo) { pendPorLoja[lk].rec++;  pendPorLoja[lk].totalFlags++; }
+            if (r.pendEtq)    { pendPorLoja[lk].etq++;  pendPorLoja[lk].totalFlags++; }
+            if (r.pendDesc)   { pendPorLoja[lk].desc++; pendPorLoja[lk].totalFlags++; }
+            if (r.pendDivergNF){pendPorLoja[lk].div++;  pendPorLoja[lk].totalFlags++; }
+          }
+        }
 
       var tx = String(r.txKey || "").trim();
       r.jaEnviado = !!(tx && sentMap[tx]);
@@ -3991,6 +4008,22 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         return { data: d, total: porData[d] };
       });
 
+      // ✅ array ordenado para o tooltip (maior volume de pendências primeiro)
+        var lojasPendStack = Object.keys(pendPorLoja).map(function(k){
+          var o = pendPorLoja[k];
+          var den = o.totalFlags || 1;
+          return {
+            lojaKey: k,
+            totalFlags: o.totalFlags || 0,
+            pctRecibo:  (o.rec  || 0) / den,
+            pctEtiqueta:(o.etq  || 0) / den,
+            pctDescricao:(o.desc|| 0) / den,
+            pctDivergNF:(o.div  || 0) / den
+          };
+        }).sort(function(a,b){
+          return (b.totalFlags||0) - (a.totalFlags||0);
+        });
+
     return {
       ok: true,
       resumo: {
@@ -4001,6 +4034,7 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         pendEtiqueta: cEtq,
         pendDescricao: cDesc,
         pendDivergNF: cDiv,
+        lojasPendStack: lojasPendStack,
         pctRecibo: total ? (cRec / total) : 0,
         pctEtiqueta: total ? (cEtq / total) : 0,
         pctDescricao: total ? (cDesc / total) : 0,
