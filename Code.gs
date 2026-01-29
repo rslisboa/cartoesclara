@@ -5634,6 +5634,8 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
     tipoFiltro = (tipoFiltro || "geral").toString().toLowerCase().trim();
     valorFiltro = (valorFiltro || "").toString().trim();
 
+    var LIMITE_TETO = 3500; // teto hard do recomendado/ações
+
     // ✅ Loja desabilitada (você pediu só time e geral)
     if (tipoFiltro === "loja") {
       return { ok: false, error: "Consulta por loja não está habilitada. Use 'Relação de saldos geral' ou 'Relação de saldos do time X'." };
@@ -5699,48 +5701,59 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
     var projPorLoja = (projInfo && projInfo.proj) ? projInfo.proj : {};
 
     // --- 4) Agregação ---
-    var agg = {}; // key -> { cartaoKey, nomeCartao, loja, time, usado }
+    // ✅ INCLUIR NOVO: gastosPorDia para média móvel (por chave agregada)
+    var agg = {}; // key -> { cartaoKey, nomeCartao, loja, time, usado, gastosPorDia: { 'YYYY-MM-DD': valor } }
 
     // --- 4.1) Mapa de vínculo (histórico completo): última loja/time por cartão ---
-var vinculoPorCartao = {}; // cartaoKey -> { loja, time, nomeCartao, dt }
+    var vinculoPorCartao = {}; // cartaoKey -> { loja, time, nomeCartao, dt }
 
-for (var h = 0; h < linhas.length; h++) {
-  var r0 = linhas[h];
+    for (var h = 0; h < linhas.length; h++) {
+      var r0 = linhas[h];
 
-  var alias0 = (r0[idxAlias] || "").toString().trim();
-  if (!alias0) continue;
+      var alias0 = (r0[idxAlias] || "").toString().trim();
+      if (!alias0) continue;
 
-  var dt0 = r0[idxData];
-  var data0 = (dt0 instanceof Date) ? dt0 : new Date(dt0);
-  if (!(data0 instanceof Date) || isNaN(data0.getTime())) continue;
+      var dt0 = r0[idxData];
+      var data0 = (dt0 instanceof Date) ? dt0 : new Date(dt0);
+      if (!(data0 instanceof Date) || isNaN(data0.getTime())) continue;
 
-  // Loja (mesma lógica que você já usa)
-  var lojaRaw0 = (r0[idxLoja] || "").toString().trim();
-  var lojaDigits0 = lojaRaw0.replace(/\D/g, "");
-  var lojaKey0 = lojaDigits0 ? String(Number(lojaDigits0)).padStart(4, "0") : "";
+      // Loja (mesma lógica que você já usa)
+      var lojaRaw0 = (r0[idxLoja] || "").toString().trim();
+      var lojaDigits0 = lojaRaw0.replace(/\D/g, "");
+      var lojaKey0 = lojaDigits0 ? String(Number(lojaDigits0)).padStart(4, "0") : "";
 
-  // Time (Grupos)
-  var gruposRaw0 = (r0[idxGrupos] || "").toString().trim();
+      // Time (Grupos)
+      var gruposRaw0 = (r0[idxGrupos] || "").toString().trim();
 
-  // Cartão (chave padronizada)
-  var cartaoKey0 = cartaoKeyCE_(alias0);
-  if (!cartaoKey0) continue;
+      // Cartão (chave padronizada)
+      var cartaoKey0 = cartaoKeyCE_(alias0);
+      if (!cartaoKey0) continue;
 
-  // Regra do Rodrigo: sem vínculo => não registrar (fica oculto até ter 1ª transação com vínculo)
-  // Se você considera que "time vazio" OU "loja vazia" é "sem vínculo", mantenha assim:
-  if (!lojaKey0 || !gruposRaw0) continue;
+      // Regra do Rodrigo: sem vínculo => não registrar (fica oculto até ter 1ª transação com vínculo)
+      // Se você considera que "time vazio" OU "loja vazia" é "sem vínculo", mantenha assim:
+      if (!lojaKey0 || !gruposRaw0) continue;
 
-  var cur = vinculoPorCartao[cartaoKey0];
-  if (!cur || data0 > cur.dt) {
-    vinculoPorCartao[cartaoKey0] = { loja: lojaKey0, time: gruposRaw0, nomeCartao: alias0, dt: data0 };
-  }
-}
+      var cur = vinculoPorCartao[cartaoKey0];
+      if (!cur || data0 > cur.dt) {
+        vinculoPorCartao[cartaoKey0] = { loja: lojaKey0, time: gruposRaw0, nomeCartao: alias0, dt: data0 };
+      }
+    }
 
     // Filtro por time (somente quando tipoFiltro="time")
     var filtroTimeNorm = "";
     if (tipoFiltro === "time") {
       filtroTimeNorm = normalizarTexto_(valorFiltro);
       if (!filtroTimeNorm) return { ok: true, rows: [], aviso: "Time inválido." };
+    }
+
+    // ✅ Helper local: chave de data para gastosPorDia
+    function vektorDateKey_(d) {
+      // normaliza para meia-noite
+      var dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      var y = dd.getFullYear();
+      var m = String(dd.getMonth() + 1).padStart(2, "0");
+      var day = String(dd.getDate()).padStart(2, "0");
+      return y + "-" + m + "-" + day;
     }
 
     for (var j = 0; j < linhas.length; j++) {
@@ -5789,45 +5802,93 @@ for (var h = 0; h < linhas.length; h++) {
           nomeCartao: alias, // fallback
           loja: lojaKey,
           time: gruposRaw,
-          usado: 0
+          usado: 0,
+          gastosPorDia: {} // ✅ NOVO
         };
       }
+
       agg[key].usado += v;
+
+      // ✅ NOVO: acumula gasto por dia (para média móvel)
+      var dk = vektorDateKey_(data);
+      if (!agg[key].gastosPorDia[dk]) agg[key].gastosPorDia[dk] = 0;
+      agg[key].gastosPorDia[dk] += v;
     }
 
     // --- 4.2) Se não houve transação no ciclo, ainda assim queremos mostrar saldos (usado=0)
-// para cartões que já têm vínculo loja/time (histórico).
-Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
-  var v = vinculoPorCartao[cartaoKey];
-  if (!v) return;
+    // para cartões que já têm vínculo loja/time (histórico).
+    Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
+      var v = vinculoPorCartao[cartaoKey];
+      if (!v) return;
 
-  // Se for filtro por time, respeita
-  if (tipoFiltro === "time") {
-    var filtroTimeNorm = normalizarTexto_(valorFiltro);
-    var vNorm = normalizarTexto_(v.time);
-    if (!filtroTimeNorm || !vNorm || vNorm.indexOf(filtroTimeNorm) === -1) return;
-  }
+      // Se for filtro por time, respeita
+      if (tipoFiltro === "time") {
+        var filtroTimeNorm2 = normalizarTexto_(valorFiltro);
+        var vNorm = normalizarTexto_(v.time);
+        if (!filtroTimeNorm2 || !vNorm || vNorm.indexOf(filtroTimeNorm2) === -1) return;
+      }
 
-  // mesma “chave” da sua agregação:
-  // - geral inclui time no key (para não colapsar times diferentes)
-  // - time (ou loja, se existir) usa key menor
-  var key;
-  if (tipoFiltro === "geral") {
-    key = cartaoKey + "||" + v.loja + "||" + normalizarTexto_(v.time);
-  } else {
-    key = cartaoKey + "||" + v.loja;
-  }
+      var key;
+      if (tipoFiltro === "geral") {
+        key = cartaoKey + "||" + v.loja + "||" + normalizarTexto_(v.time);
+      } else {
+        key = cartaoKey + "||" + v.loja;
+      }
 
-  if (!agg[key]) {
-    agg[key] = {
-      cartaoKey: cartaoKey,
-      nomeCartao: v.nomeCartao || "",
-      loja: v.loja || "",
-      time: v.time || "",
-      usado: 0
-    };
-  }
-});
+      if (!agg[key]) {
+        agg[key] = {
+          cartaoKey: cartaoKey,
+          nomeCartao: v.nomeCartao || "",
+          loja: v.loja || "",
+          time: v.time || "",
+          usado: 0,
+          gastosPorDia: {} // ✅ NOVO (vazio)
+        };
+      }
+    });
+
+    // ✅ Helper local: média simples
+    function mediaSimples_(arr) {
+      if (!arr || !arr.length) return 0;
+      var s = 0;
+      for (var i = 0; i < arr.length; i++) s += (Number(arr[i]) || 0);
+      return arr.length ? (s / arr.length) : 0;
+    }
+
+    // ✅ Helper local: média aparada (remove 1 maior e 1 menor) somente se houver sinal suficiente
+    function mediaAparada_(arrPositivos) {
+      var a = (arrPositivos || []).slice().filter(function(x){ return (Number(x) || 0) > 0; });
+      if (a.length < 5) return mediaSimples_(a); // regra: <5 dias com uso => não aparar
+      a.sort(function(x, y){ return x - y; });
+      // remove 1 menor e 1 maior
+      a.shift();
+      a.pop();
+      return mediaSimples_(a);
+    }
+
+    // ✅ Helper local: obter últimos N dias (calendário) do ciclo, até hoje0 (inclusive)
+    function obterJanelaUltimosDias_(gastosPorDia, inicioCiclo, hoje0, janelaDias) {
+      var out = [];
+      var msDia = 24 * 60 * 60 * 1000;
+
+      // começa no máximo N-1 dias atrás, mas nunca antes do início do ciclo
+      var start = new Date(hoje0.getFullYear(), hoje0.getMonth(), hoje0.getDate());
+      start = new Date(start.getTime() - (Math.max(0, (janelaDias - 1)) * msDia));
+
+      var ini0 = new Date(inicioCiclo.getFullYear(), inicioCiclo.getMonth(), inicioCiclo.getDate());
+      if (start < ini0) start = ini0;
+
+      var d = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      var end = new Date(hoje0.getFullYear(), hoje0.getMonth(), hoje0.getDate());
+
+      while (d.getTime() <= end.getTime()) {
+        var dk = vektorDateKey_(d);
+        var val = (gastosPorDia && gastosPorDia[dk]) ? Number(gastosPorDia[dk]) : 0;
+        out.push(val);
+        d = new Date(d.getTime() + msDia);
+      }
+      return out;
+    }
 
     // --- 5) Monta rows com limites + recomendação ---
     var rows = [];
@@ -5870,10 +5931,8 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
       // --- Tempo do ciclo + ritmo atual (run-rate) ---
       var pc = getPeriodoCicloClara_();
       var ini = pc.inicio;
-      var hoje = new Date();
 
       // normaliza datas para evitar erro por horário
-      var hoje0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
       var ini0  = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate());
 
       // fim do ciclo é sempre dia 05 (mês corrente se hoje<=05; senão próximo mês)
@@ -5885,6 +5944,9 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
       var msDia = 24*60*60*1000;
       var diasDecorridos = Math.max(1, Math.floor((hoje0.getTime() - ini0.getTime()) / msDia) + 1);
       var diasRestantes  = Math.max(0, Math.ceil((fimCiclo.getTime() - hoje0.getTime()) / msDia));
+
+      // ✅ GARANTIA: diasTotal (evita variável não definida em trechos abaixo)
+      var diasTotal = Math.max(1, diasDecorridos + diasRestantes);
 
       // Projeção por ritmo do ciclo atual
       var usado = (a.usado || 0);
@@ -5905,8 +5967,12 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
 
       // Classificação de ritmo (mesma lógica que você já usa para a coluna "Ritmo de consumo")
       var pctCiclo = (diasTotal > 0) ? (diasDecorridos / diasTotal) : 0;
-      var pctUsoLim = (limiteAtual > 0) ? (usado / limiteAtual) : null;
-      var ritmoRatio = (pctUsoLim !== null && pctCiclo > 0) ? (pctUsoLim / pctCiclo) : null;
+
+      // (evita "undefined" aqui; limiteAtual ainda não foi redeclarado neste trecho)
+      var limiteAtualTmp = (limite || 0);
+      var pctUsoLimTmp = (limiteAtualTmp > 0) ? (usado / limiteAtualTmp) : null;
+
+      var ritmoRatio = (pctUsoLimTmp !== null && pctCiclo > 0) ? (pctUsoLimTmp / pctCiclo) : null;
 
       var ritmo = "—";
       if (ritmoRatio !== null && isFinite(ritmoRatio)) {
@@ -5943,23 +6009,26 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
       // limite recomendado: utilizado + folga para o restante
       var limiteRec = usado + Math.max(restante * (1 + margem), bufferMin);
 
+      // ✅ TETO: não recomendar acima de 3.500
+        limiteRec = Math.min(limiteRec, LIMITE_TETO);
 
+        // segurança: nunca recomendar abaixo do já utilizado
+        limiteRec = Math.max(limiteRec, usado);
 
       // --- trava de redução por tempo do ciclo ---
-      var hoje = new Date();
-      var pc = getPeriodoCicloClara_();
-      var ini = pc.inicio, fim = pc.fim;
-      var msDia = 24 * 60 * 60 * 1000;
+      var hojeT = new Date();
+      var pcT = getPeriodoCicloClara_();
+      var iniT = pcT.inicio, fimT = pcT.fim;
+      var msDiaT = 24 * 60 * 60 * 1000;
 
-      var diasTot = Math.max(1, Math.round((fim.getTime() - ini.getTime()) / msDia) + 1);
-      var diasDec = Math.max(1, Math.floor((hoje.getTime() - ini.getTime()) / msDia) + 1);
+      var diasTot = Math.max(1, Math.round((fimT.getTime() - iniT.getTime()) / msDiaT) + 1);
+      var diasDec = Math.max(1, Math.floor((hojeT.getTime() - iniT.getTime()) / msDiaT) + 1);
       var passouMetade = diasDec >= Math.ceil(diasTot / 2);
 
       var pctProj = (projLoja > 0) ? ((a.usado || 0) / projLoja) : null;
 
       // Se passou metade e já consumiu >50% da projeção, não reduzir
       var travaReducaoTempo = (passouMetade && pctProj !== null && pctProj > 0.50);
-
 
       // Ação
       var acao = "Manter";
@@ -5977,6 +6046,39 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
       // Se apertado + tempo suficiente: sugerir aumento mesmo com delta pequeno
       var forcarAumentoPorRisco = (saldoBaixo && faltamMuitosDias && jaPassouMetadeLimite);
 
+      // ==========================================================
+      // ✅ NOVO OVERRIDE (SEM MUDAR O RESTO): dias restantes + média móvel
+      // ==========================================================
+      // Regra:
+      // - considera últimos 7 dias do ciclo (até hoje)
+      // - usa média simples dos dias com uso e, se dias com uso >= 5, usa média aparada (remove maior e menor)
+      // - mediaRef = max(média simples, média aparada) para não "maquiar" escalada real
+      // - se saldo_restante / dias_restantes < mediaRef * fatorSeg => forçar aumento
+      var janela = 7;
+      var fatorSeg = 1.15;
+
+      var janelaVals = obterJanelaUltimosDias_(a.gastosPorDia || {}, inicio, hoje0, janela);
+      var valsPos = (janelaVals || []).filter(function(x){ return (Number(x) || 0) > 0; });
+
+      var diasComUso = valsPos.length; // dentro da janela
+      var media7Simples = mediaSimples_(valsPos);
+      var media7Aparada = mediaAparada_(valsPos); // já respeita <5 => simples
+      var mediaRef = Math.max(media7Simples, media7Aparada);
+
+      var saldoRestante = (limiteAtual || 0) - (utilizado || 0);
+      var saldoPorDiaRestante = (Math.max(diasRestantes, 1) > 0) ? (saldoRestante / Math.max(diasRestantes, 1)) : saldoRestante;
+
+      // Travas (evitar ruído e decisões ruins):
+      // - não aplicar quando faltam pouquíssimos dias (<=2) porque qualquer variação explode
+      // - precisa ter algum sinal de uso (>=3 dias com uso na janela)
+      // - precisa ter limite e dias restantes > 0
+      var forcarAumentoPorMediaDias =
+        (diasRestantes > 2) &&
+        (limiteAtual > 0) &&
+        (diasComUso >= 3) &&
+        (mediaRef > 0) &&
+        (saldoPorDiaRestante < (mediaRef * fatorSeg));
+
       var tol = 0.05;
       var minDelta = 200;
       var limiteAtual = (limite || 0);
@@ -5985,7 +6087,6 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
       var bloqueiaReducao = nomeNorm.indexOf("temporario") !== -1
                          || nomeNorm.indexOf("virtual") !== -1
                          || nomeNorm.indexOf("virual") !== -1;
-      
 
       // TRAVAS PARA "REDUZIR" (coerência com projeção e risco operacional)
 
@@ -6003,24 +6104,52 @@ Object.keys(vinculoPorCartao).forEach(function(cartaoKey) {
       var travaReducao = travaReducaoPorProj || travaReducaoPorSaldoApertado;
 
       if (limiteAtual <= 0) {
-      acao = "Definir " + Utilities.formatString("R$ %.0f", limiteRec);
+        acao = "Definir " + Utilities.formatString("R$ %.0f", limiteRec);
 
-    } else if (forcarAumentoPorRisco) {
-      // Override: saldo baixo + muitos dias restantes + já consumiu metade do limite
-      // alvo mínimo: pelo menos +200 ou até o limiteRec (o que for maior)
-      var alvo = Math.max(limiteRec, limiteAtual + 200);
+      } else if (forcarAumentoPorRisco) {
+        // Override: saldo baixo + muitos dias restantes + já consumiu metade do limite
+        // alvo mínimo: pelo menos +200 ou até o limiteRec (o que for maior)
+        var alvo = Math.max(limiteRec, limiteAtual + 200);
 
-      // arredonda para múltiplos de 100
-      alvo = Math.ceil(alvo / 100) * 100;
+        // arredonda para múltiplos de 100
+        alvo = Math.ceil(alvo / 100) * 100;
 
-      var deltaRisco = alvo - limiteAtual;
-      if (deltaRisco > 0) {
-        acao = "Aumentar +" + moneyBR_(deltaRisco);
+        alvo = Math.min(alvo, LIMITE_TETO);
 
-        // opcional (mas recomendado): alinhar o limiteRec com o alvo para consistência
-        limiteRec = alvo;
-        delta = limiteRec - limiteAtual;
-      }
+        var deltaRisco = alvo - limiteAtual;
+        if (deltaRisco > 0) {
+          acao = "Aumentar +" + moneyBR_(deltaRisco);
+
+          // opcional (mas recomendado): alinhar o limiteRec com o alvo para consistência
+          limiteRec = alvo;
+          delta = limiteRec - limiteAtual;
+        }
+
+      } else if (forcarAumentoPorMediaDias) {
+        // ✅ NOVO: Override por capacidade diária vs ritmo real (média móvel)
+        // Objetivo: garantir saldo suficiente para sustentar o ritmo até o fechamento
+        // alvoNecessario = utilizado + (mediaRef*fatorSeg*diasRestantes)
+        var alvoNecessario = (utilizado || 0) + (mediaRef * fatorSeg * Math.max(diasRestantes, 1));
+
+        // respeita pelo menos o limiteRec (não "briga" com o cálculo atual)
+        var alvo2 = Math.max(limiteRec, alvoNecessario);
+
+        // garante aumento mínimo coerente (>= +200) quando forçar
+        alvo2 = Math.max(alvo2, limiteAtual + 200);
+
+        // arredonda para múltiplos de 100
+        alvo2 = Math.ceil(alvo2 / 100) * 100;
+
+        alvo2 = Math.min(alvo2, LIMITE_TETO);
+
+        var deltaMedia = alvo2 - limiteAtual;
+        if (deltaMedia > 0) {
+          acao = "Aumentar +" + moneyBR_(deltaMedia);
+
+          // mantém consistência com o que será exibido como "limite recomendado"
+          limiteRec = Math.max(limiteRec, alvo2);
+          delta = limiteRec - limiteAtual;
+        }
 
       } else if (limiteAtual < (limiteRec * (1 - tol)) && delta >= minDelta) {
         acao = "Aumentar +" + moneyBR_(delta);
