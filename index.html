@@ -465,6 +465,7 @@ display: none;
   <div class="shrink-0">
     <div id="vektor-user-info" class="font-semibold"></div>
     <div id="vektor-clock" class="mt-0.5 font-normal"></div>
+    <div id="vektor-bu" class="mt-0.5 font-normal"></div>
   </div>
 
   <!-- CENTRO: banner (somente quando tiver feriado na regra) -->
@@ -2351,6 +2352,19 @@ function bindLoginHandlers_() {
   });
 }
 
+function vektorSetBUFromEmail_(email) {
+  try {
+    var el = document.getElementById("vektor-bu");
+    if (!el) return;
+
+    var em = String(email || "").toLowerCase().replace(/^\s+|\s+$/g, "");
+    if (!em) { el.textContent = "BU: —"; return; }
+
+    var isCentauro = (em.indexOf("@gruposbf.com.br") !== -1) || (em.indexOf("@centauro.com.br") !== -1);
+    el.textContent = "BU: " + (isCentauro ? "Centauro" : "Nike");
+  } catch (_) {}
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   bindLoginHandlers_(); // ✅ garante listeners sempre
 
@@ -2402,6 +2416,8 @@ document.addEventListener("DOMContentLoaded", function () {
     google.script.run
       .withSuccessHandler(function (res) {
         if (res && res.ok) {
+          // ✅ BU vem do back-end (email da sessão validada)
+    vektorSetBUFromEmail_(res.email);
           // sessão válida: libera sem modal
           showApp_();
           closeModal_();
@@ -5320,6 +5336,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // >>> NOVO: preencher barra de usuário
     const topUserEl = document.getElementById("vektor-user-info");
     const topClockEl = document.getElementById("vektor-clock");
+    const topBuEl = document.getElementById("vektor-bu");
 
     const nomeParaMostrar = displayName || USER_EMAIL_REPLACED || "Usuário";
     const roleParaMostrar = USER_ROLE_CLEAN || "Acesso padrão";
@@ -5327,6 +5344,30 @@ document.addEventListener("DOMContentLoaded", () => {
     if (topUserEl) {
       topUserEl.textContent = `Login: ${nomeParaMostrar} (${roleParaMostrar})`;
     }
+
+          if (topBuEl) {
+        try {
+          // não deixa ReferenceError/qualquer erro aqui derrubar o DOMContentLoaded
+          var em = "";
+          if (typeof USER_EMAIL_REPLACED !== "undefined" && USER_EMAIL_REPLACED != null) {
+            em = "" + USER_EMAIL_REPLACED;
+          }
+
+          em = em.toLowerCase();
+          em = em.replace(/^\s+|\s+$/g, "");
+
+          if (!em) {
+            topBuEl.textContent = "BU: —";
+          } else if (em.indexOf("@gruposbf.com.br") !== -1 || em.indexOf("@centauro.com.br") !== -1) {
+            topBuEl.textContent = "BU: Centauro";
+          } else {
+            topBuEl.textContent = "BU: Nike";
+          }
+        } catch (e) {
+          // fallback silencioso: não quebra a tela
+          topBuEl.textContent = "BU: —";
+        }
+      }
 
     function atualizarRelogio() {
       const agora = new Date();
