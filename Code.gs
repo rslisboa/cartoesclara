@@ -6982,7 +6982,7 @@ function montarEmailOfensorasPendencias_(rel) {
   if (periodo.inicio || periodo.fim) {
     html += "<b>Período:</b> " + esc(periodo.inicio||"") + " a " + esc(periodo.fim||"") + " | ";
   }
-  html += "<b>Janela:</b> últimos " + esc(meta.diasJanela || "") + " dias";
+  html += "<b>Janela:</b> Ciclo atual";
   html += "</p>";
 
   html += "<p style='margin:0 0 12px 0;color:#334155'>";
@@ -7034,8 +7034,8 @@ function enviarEmailOfensorasPendenciasClara(diasJanela) {
     var destinatarios = getAdminEmails_();
     if (!destinatarios.length) return { ok: false, error: "Lista de admins vazia." };
 
-    var assunto = "📌 [ALERTA CLARA | JUSTIFICATIVAS] Lojas ofensoras (" +
-  ((rel && rel.meta && rel.meta.diasJanela) ? rel.meta.diasJanela : (diasJanela||60)) + "d)";
+    // --- ASSUNTO: trocar "60d" por "Ciclo atual" ---
+    var assunto = "📌 [ALERTA CLARA | JUSTIFICATIVAS] Lojas ofensoras (Ciclo atual)";
 
     if (rel && rel.periodo && rel.periodo.inicio && rel.periodo.fim) {
       assunto += " | " + rel.periodo.inicio + " a " + rel.periodo.fim;
@@ -7714,6 +7714,7 @@ function calcularAssinaturaBaseClara_() {
 // ================================
 var HIST_PEND_CLARA_RAW = "HIST_PEND_CLARA_RAW";
 var PROP_LAST_SNAPSHOT_SIG = "VEKTOR_HISTPEND_LAST_SIG";
+var PROP_HISTPEND_CICLO_KEY = "VEKTOR_HISTPEND_CICLO_KEY";
 
 /**
  * Faz snapshot das pendências atuais da BaseClara e grava em HIST_PEND_CLARA_RAW.
@@ -7806,6 +7807,39 @@ function REGISTRAR_SNAPSHOT() {
   return false;
 }
 
+// ==============================
+// RESET AUTOMÁTICO POR CICLO (06→05)
+// ==============================
+var props = PropertiesService.getScriptProperties();
+
+var cicloKey = getCicloKey06a05_();  // já existe no projeto :contentReference[oaicite:10]{index=10}
+var cicloLast = props.getProperty(PROP_HISTPEND_CICLO_KEY) || "";
+
+// se mudou o ciclo, limpa a HIST_PEND_CLARA_RAW (mantém header)
+if (cicloKey !== cicloLast) {
+  var ssHist = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var histSh = ssHist.getSheetByName(HIST_PEND_CLARA_RAW);
+  if (!histSh) throw new Error("Aba " + HIST_PEND_CLARA_RAW + " não encontrada.");
+
+  var lr = histSh.getLastRow();
+  if (lr >= 2) {
+    histSh.getRange(2, 1, lr - 1, histSh.getLastColumn()).clearContent();
+  }
+
+  // reseta travas do snapshot
+  props.deleteProperty(PROP_LAST_SNAPSHOT_SIG);
+
+  // grava novo ciclo ativo
+  props.setProperty(PROP_HISTPEND_CICLO_KEY, cicloKey);
+
+  Logger.log("HIST_PEND_CLARA_RAW resetada para novo ciclo: " + cicloKey);
+}
+
+    var ciclo = getPeriodoCicloClaraCompleto_();
+    var cicloIni = ciclo.inicio;
+    var cicloFim = ciclo.fim;
+
+
     for (var r = 0; r < rows.length; r++) {
       var row = rows[r];
 
@@ -7827,6 +7861,10 @@ function REGISTRAR_SNAPSHOT() {
 
       // Guarda data transação como Date se vier string
       var dt2 = (dt instanceof Date) ? dt : new Date(dt);
+
+      // ✅ filtro do ciclo: só grava transações dentro do 06→05
+      if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
+      if (dt2 < cicloIni || dt2 > cicloFim) continue;
 
       out.push([
         snapshotDate,
@@ -8334,6 +8372,21 @@ function getPeriodoCicloClara_() {
   else inicio = new Date(y, m - 1, 6, 0, 0, 0);
 
   var fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59);
+  return { inicio: inicio, fim: fim };
+}
+
+function getPeriodoCicloClaraCompleto_() {
+  var hoje = new Date();
+  var y = hoje.getFullYear();
+  var m = hoje.getMonth();
+  var d = hoje.getDate();
+
+  // início do ciclo: dia 06 (mês atual se hoje>=6, senão mês anterior)
+  var inicio = (d >= 6) ? new Date(y, m, 6, 0, 0, 0) : new Date(y, m - 1, 6, 0, 0, 0);
+
+  // fim do ciclo: dia 05 (mês corrente se hoje<=5, senão próximo mês) às 23:59:59
+  var fim = (d >= 6) ? new Date(y, m + 1, 5, 23, 59, 59) : new Date(y, m, 5, 23, 59, 59);
+
   return { inicio: inicio, fim: fim };
 }
 
@@ -11801,27 +11854,37 @@ function registrarMetricaVektor(payload) {
 
 function getLojasOfensorasParaChat(diasJanela) {
   vektorAssertFunctionAllowed_("getLojasOfensorasParaChat");
-  diasJanela = Number(diasJanela) || 60;
+
+  // ✅ Janela agora é o ciclo atual (06 → hoje). "diasJanela" vira apenas o tamanho do ciclo até hoje.
+  const tz = "America/Sao_Paulo";
+  const ciclo = getPeriodoCicloClara_(); // já existe no projeto (inicio=dia 06 do ciclo, fim=hoje 23:59:59)
+  const hoje = new Date();
+  const inicioCiclo = ciclo.inicio;
+
+  diasJanela = Math.max(
+    1,
+    Math.ceil((hoje.getTime() - inicioCiclo.getTime()) / (24 * 60 * 60 * 1000))
+  );
 
   const rel = gerarRelatorioOfensorasPendencias_(diasJanela);
   if (!rel || !rel.ok) {
     return { ok: false, error: "Falha ao gerar relatório." };
   }
 
-  // período
-  var hoje = new Date();
-  var inicio = new Date(hoje.getTime() - diasJanela * 24 * 60 * 60 * 1000);
-  var tz = "America/Sao_Paulo";
-
+  // período (ciclo atual: 06 → hoje)
   var periodo = {
-    inicio: Utilities.formatDate(inicio, tz, "dd/MM/yyyy"),
+    inicio: Utilities.formatDate(inicioCiclo, tz, "dd/MM/yyyy"),
     fim: Utilities.formatDate(hoje, tz, "dd/MM/yyyy")
   };
 
   return {
     ok: true,
     periodo: periodo,
-    meta: { diasJanela: diasJanela, totalLojas: (rel.rows || []).length },
+    meta: {
+      janela: "Ciclo atual",
+      diasJanela: diasJanela,
+      totalLojas: (rel.rows || []).length
+    },
     rows: (rel.rows || []).map(r => {
       const t14 = r.trend14 || {};
 
@@ -12422,7 +12485,7 @@ function DISPARAR_EMAIL_OFENSORAS_SEMANA() {
   }
 
   // Envia o e-mail (admins)
-  var res = enviarEmailOfensorasPendenciasClara(60);
+  var res = enviarEmailOfensorasPendenciasClara(0);
   if (!res || !res.ok) {
     Logger.log("Falha ao enviar e-mail de ofensoras");
     return;
