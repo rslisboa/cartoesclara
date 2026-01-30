@@ -3702,6 +3702,14 @@ function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
   var totalValorRecusadas = 0;
   var mapaValorPorLoja = {}; // { "0062": 1234.56, ... }
 
+  // ✅ mapa Loja -> Time (vem da aba Emails/Lojas)
+      var lojaInfoMap = {};
+      try {
+        lojaInfoMap = vektorCarregarMapaEmailsLojas_(); // { "CE0062": { time, ... }, ... }
+      } catch (eMap) {
+        lojaInfoMap = {};
+      }
+
   rows.forEach(function (r) {
     // ✅ GARANTIA: só conta RECUSADA (protege contra qualquer mudança no query)
     var st = String(r.statusAprovacao || r.statusAprovacaoTxt || r.status || "").toUpperCase().trim();
@@ -3727,7 +3735,11 @@ function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
   rows.forEach(function (r) { lojasSet[r.lojaKey] = true; });
 
   var lojasValorArr = Object.keys(mapaValorPorLoja).map(function(k){
-  return { lojaKey: k, valor: mapaValorPorLoja[k] || 0 };
+
+  var lk = vektorNormLojaKey_(k); // garante "CE0000"
+  var t = (lojaInfoMap[lk] && lojaInfoMap[lk].time) ? String(lojaInfoMap[lk].time) : "—";
+  return { lojaKey: lk, valor: mapaValorPorLoja[k] || 0, time: t };
+
     });
 
     // maior valor primeiro
@@ -3995,6 +4007,27 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
           return { lojaKey: k, valor: mapaValorPorLoja[k] || 0 };
         }).sort(function(a,b){
           return (b.valor || 0) - (a.valor || 0);
+        });
+
+        // ===== ENRIQUECE lojasValorArr com TIME (para filtro no popup) =====
+        var mapEmailsLojas = {};
+        try {
+          mapEmailsLojas = vektorCarregarMapaEmailsLojas_() || {};
+        } catch (eMap) {
+          mapEmailsLojas = {};
+        }
+
+        lojasValorArr = (lojasValorArr || []).map(function (it) {
+          var lk = String(it && it.lojaKey ? it.lojaKey : "").trim().toUpperCase();
+          var time = "";
+          if (lk && mapEmailsLojas[lk] && mapEmailsLojas[lk].time) {
+            time = String(mapEmailsLojas[lk].time || "").trim();
+          }
+          return {
+            lojaKey: lk,
+            valor: Number(it && it.valor ? it.valor : 0) || 0,
+            time: time || "—"
+          };
         });
 
     // ordena datas (dd/MM/yyyy -> yyyy-MM-dd)
