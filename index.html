@@ -951,20 +951,39 @@ display: none;
       display:flex;
       flex-direction:column;
     ">
-      <div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid rgba(148,163,184,0.18);">
-        <div>
-          <div style="color:#0b1220; font-weight:1000; font-size:14px;">Pendências recusadas — Valor por loja</div>
-          <div id="envPendLojasPopupSub" style="color:rgba(15,23,42,0.75); font-size:12px; margin-top:2px;"></div>
-        </div>
-            <button type="button"
-              onclick="window.vektorEnvPendLojasPopupClose_()"
-              style="height:32px; padding:0 12px; border-radius:10px;
-                    border:1px solid rgba(0,94,39,0.35);
-                    background:#005E27; color:#fff;
-                    font-weight:900; font-size:12px; cursor:pointer;">
-                Fechar
-              </button>
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; padding:12px 14px; border-bottom:1px solid rgba(148,163,184,0.18);">
+  <!-- Esquerda -->
+  <div style="min-width:0;">
+    <!-- Linha 1: título + filtro -->
+    <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+      <div style="color:#0b1220; font-weight:1000; font-size:14px; white-space:nowrap;">
+        Pendências recusadas — Valor por loja
       </div>
+
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="color:rgba(15,23,42,0.75); font-size:12px; font-weight:900; white-space:nowrap;">
+          Filtrar por Time
+        </div>
+
+        <select id="envPendLojasTimeFilter"
+          style="height:34px; border-radius:10px; background:#ffffff; color:#0b1220;
+                 border:1px solid rgba(15,23,42,0.18); padding:0 10px; font-weight:900; font-size:12px; min-width:180px;">
+          <option value="">Todos</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Linha 2: período -->
+    <div id="envPendLojasPopupSub" style="color:rgba(15,23,42,0.75); font-size:12px; margin-top:2px;"></div>
+  </div>
+
+  <!-- Direita: botão fechar -->
+  <button type="button"
+    onclick="window.vektorEnvPendLojasPopupClose_()"
+    style="background:#005E27;color:#fff;border:none;padding:8px 14px;border-radius:12px;font-weight:900;cursor:pointer;">
+    Fechar
+  </button>
+</div>
 
       <!-- Scroll vertical quando tiver muitas lojas -->
       <div style="padding:12px 14px; overflow:auto;">
@@ -3154,9 +3173,31 @@ window.vektorEnvPendRenderLojasChart_ = function(){
   const resumo = (window.__envPend && window.__envPend.resumo) ? window.__envPend.resumo : {};
   const arr = Array.isArray(resumo.lojasValor) ? resumo.lojasValor : [];
 
+    // ✅ filtro por Time (usa arr com {lojaKey, valor, time})
+  const sel = document.getElementById("envPendLojasTimeFilter");
+
+  // popula opções 1x (ou quando mudar o conjunto)
+  try {
+    if (sel && !sel.__filled) {
+      const times = Array.from(new Set(arr.map(x => String(x.time || "—").trim()).filter(Boolean)))
+        .sort((a,b) => a.localeCompare(b));
+      // mantém primeira opção "Todos" e repopula
+      sel.innerHTML = "<option value=''>Todos</option>" + times.map(t => `<option value="${t.replace(/"/g,"&quot;")}">${t}</option>`).join("");
+      sel.__filled = true;
+
+      // onchange -> redesenha
+      sel.onchange = function() {
+        window.vektorEnvPendRenderLojasChart_();
+      };
+    }
+  } catch(_) {}
+
+  const timeSel = (sel && typeof sel.value === "string") ? sel.value : "";
+  const arrFiltrado = timeSel ? arr.filter(x => String(x.time || "—").trim() === timeSel) : arr;
+
   // labels e valores
-  const labels = arr.map(x => String(x.lojaKey || ""));
-  const values = arr.map(x => Number(x.valor || 0));
+  const labels = arrFiltrado.map(x => String(x.lojaKey || ""));
+  const values = arrFiltrado.map(x => Number(x.valor || 0));
   const maxV = values.reduce((m, v) => Math.max(m, Number(v) || 0), 0);
   const suggestedMaxX = maxV ? (maxV * 1.12) : 0; // 12% de folga pro rótulo caber
 
@@ -3255,6 +3296,12 @@ window.vektorEnvPendLojasPopupOpen_ = function(){
   }
 
   pop.style.display = "block";
+    // ✅ reset do filtro a cada abertura (evita ficar “preso” em times antigos)
+  const sel = document.getElementById("envPendLojasTimeFilter");
+  if (sel) {
+    sel.__filled = false; // força repopular
+    sel.value = "";
+  }
   window.vektorEnvPendRenderLojasChart_();
 };
 
