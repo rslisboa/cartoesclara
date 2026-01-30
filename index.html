@@ -3698,6 +3698,13 @@ window.vektorEnvioPendenciasPreview = function () {
               dPath += (i === 0 ? "M" : " L") + x + " " + y;
             });
 
+            // ✅ NOVO: área preenchida sob a linha (fecha até a base do gráfico)
+            const baseY = H - PAD_Y; // linha do "chão" do gráfico
+            const lastX = PAD_X + (serie.length - 1) * stepX;
+            const firstX = PAD_X;
+
+            const dArea = dPath + " L " + lastX + " " + baseY + " L " + firstX + " " + baseY + " Z";
+
             // grid + eixo Y labels
             const ticks = 4;
             const grid = [];
@@ -3718,6 +3725,12 @@ window.vektorEnvioPendenciasPreview = function () {
 
             svg.innerHTML = `
               ${grid.join("")}
+
+              <!-- ✅ NOVO: área (vermelho claro) sob a linha -->
+              <path id="envPend_areaFill"
+              d="${dArea}"
+              fill="rgba(248,113,113,0.18)"
+              stroke="none" />
 
               <!-- linha base (vai ser animada via getTotalLength) -->
               <path id="envPend_lineBase"
