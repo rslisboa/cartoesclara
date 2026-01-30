@@ -465,7 +465,6 @@ display: none;
   <div class="shrink-0">
     <div id="vektor-user-info" class="font-semibold"></div>
     <div id="vektor-clock" class="mt-0.5 font-normal"></div>
-    <div id="vektor-bu" class="mt-0.5 font-normal"></div>
   </div>
 
   <!-- CENTRO: banner (somente quando tiver feriado na regra) -->
@@ -1128,6 +1127,10 @@ display: none;
     <div style="padding:12px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(148,163,184,0.18);">
       <div style="color:#fff; font-weight:900;">Revisar linhas (desmarque o que não deve ir)</div>
       <div style="display:flex; gap:8px;">
+          <button type="button" onclick="window.vektorEnvPendExportCsv()"
+          style="height:32px; padding:0 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+          Exportar CSV
+        </button>
         <button type="button" onclick="window.vektorEnvPendSelectAll(true)"
           style="height:32px; padding:0 10px; border-radius:999px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
           Marcar tudo
@@ -1263,6 +1266,46 @@ display: none;
  <!-- VIEW: MEUS ALERTAS (sobrepõe SOMENTE a área do chat) -->
 <div id="myAlertsView" class="hidden" style="position:absolute; inset:0; z-index:20;">
 
+  <!-- MODAL: Tutorial (Alertas Programados) -->
+<div id="myAlTutorialModal"
+     class="fixed inset-0 bg-black/60 z-[80] hidden items-center justify-center"
+     style="display:none;">
+  <div class="bg-white rounded-2xl shadow-2xl w-[95%] max-w-[980px] overflow-hidden border border-slate-200">
+    <!-- Header -->
+    <div class="px-5 py-4 text-white flex items-center justify-between"
+         style="background:#005E27;">
+      <div>
+        <div class="text-base font-extrabold">Tutorial — Alertas Programados</div>
+        <div class="text-xs opacity-90">Vídeo rápido de uso da página</div>
+      </div>
+
+      <button type="button"
+              onclick="closeMyAlTutorialModal()"
+              class="transition rounded-lg px-3 py-2 text-sm font-semibold"
+              style="background:rgba(255,255,255,0.18);">
+        Fechar
+      </button>
+    </div>
+
+    <!-- Faixa destaque -->
+    <div style="height:6px; background:#B5FF20;"></div>
+
+    <!-- Body -->
+    <div class="p-4" style="background:#f8fafc;">
+      <div style="position:relative; padding-bottom:56.25%; height:0; border-radius:12px; overflow:hidden; border:1px solid rgba(15,23,42,0.12); background:#000;">
+        <iframe
+          src="https://www.loom.com/embed/e1bc5df534d44fdd90002e096c2b2c50"
+          frameborder="0"
+          webkitallowfullscreen
+          mozallowfullscreen
+          allowfullscreen
+          style="position:absolute; top:0; left:0; width:100%; height:100%;">
+        </iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
   <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
     <div style="height:100%; width:100%; display:flex; flex-direction:column;">
 
@@ -1282,6 +1325,26 @@ display: none;
             </div>
           </div>
         </div>
+
+                    <button
+              type="button"
+              onclick="openMyAlTutorialModal()"
+              style="
+                height:36px;
+                padding:0 14px;
+                border-radius:10px;
+                border:1px solid rgba(0,0,0,0.25);
+                background:#00FFFF;
+                color:#000;
+                font-weight:900;
+                font-size:12px;
+                display:flex;
+                align-items:center;
+                gap:6px;
+                transform: translateY(13px);
+              ">
+              ▶ Tutorial (vídeo)
+            </button>
 
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
           <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
@@ -2352,19 +2415,6 @@ function bindLoginHandlers_() {
   });
 }
 
-function vektorSetBUFromEmail_(email) {
-  try {
-    var el = document.getElementById("vektor-bu");
-    if (!el) return;
-
-    var em = String(email || "").toLowerCase().replace(/^\s+|\s+$/g, "");
-    if (!em) { el.textContent = "BU: —"; return; }
-
-    var isCentauro = (em.indexOf("@gruposbf.com.br") !== -1) || (em.indexOf("@centauro.com.br") !== -1);
-    el.textContent = "BU: " + (isCentauro ? "Centauro" : "Nike");
-  } catch (_) {}
-}
-
 document.addEventListener("DOMContentLoaded", function () {
   bindLoginHandlers_(); // ✅ garante listeners sempre
 
@@ -2416,8 +2466,6 @@ document.addEventListener("DOMContentLoaded", function () {
     google.script.run
       .withSuccessHandler(function (res) {
         if (res && res.ok) {
-          // ✅ BU vem do back-end (email da sessão validada)
-    vektorSetBUFromEmail_(res.email);
           // sessão válida: libera sem modal
           showApp_();
           closeModal_();
@@ -2578,6 +2626,22 @@ function openEnvPendAnaliseModal() {
 
 function closeEnvPendAnaliseModal() {
   const modal = document.getElementById("envPendAnaliseModal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+}
+
+function openMyAlTutorialModal() {
+  const modal = document.getElementById("myAlTutorialModal");
+  if (modal) {
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+}
+
+function closeMyAlTutorialModal() {
+  const modal = document.getElementById("myAlTutorialModal");
   if (modal) {
     modal.style.display = "none";
     modal.classList.add("hidden");
@@ -2966,6 +3030,62 @@ window.vektorEnvPendSelectAll = function (on) {
     window.__envPend.selected[r.txKey] = !!on;
   });
   window.__renderEnvPendTbody();
+};
+
+window.vektorEnvPendExportCsv = function () {
+  try {
+    var rows = (window.__envPend && Array.isArray(window.__envPend.rows)) ? window.__envPend.rows : [];
+
+    // CSV pt-BR: separador ;
+    function esc(v) {
+      var s = (v === null || v === undefined) ? "" : String(v);
+      s = s.replace(/"/g, '""');
+      return '"' + s + '"';
+    }
+
+    var header = ["Loja", "Data Transação", "Estabelecimento", "Valor", "Cartão", "Pendências", "Já enviado?"];
+    var lines = [];
+    lines.push(header.map(esc).join(";"));
+
+    rows.forEach(function (r) {
+      lines.push([
+        r.lojaKey || "",
+        r.dataTransBR || "",
+        r.estabelecimento || "",
+        r.valorOriginalTxt || "",
+        r.cartao || "",
+        r.pendenciasTxt || "",
+        (r.jaEnviado ? "SIM" : "NÃO")
+      ].map(esc).join(";"));
+    });
+
+    var csv = lines.join("\n");
+
+    // nome do arquivo com período (quando existir)
+    var ini = (window.__envPend && window.__envPend.periodo && window.__envPend.periodo.iniIso) ? String(window.__envPend.periodo.iniIso).slice(0, 10) : "ini";
+    var fim = (window.__envPend && window.__envPend.periodo && window.__envPend.periodo.fimIso) ? String(window.__envPend.periodo.fimIso).slice(0, 10) : "fim";
+    var filename = "Vektor_Pendencias_" + ini + "_" + fim + ".csv";
+
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(function () {
+      try { URL.revokeObjectURL(url); } catch (_) {}
+      try { document.body.removeChild(a); } catch (_) {}
+    }, 0);
+
+  } catch (e) {
+    console.error("Falha ao exportar CSV (Envio de Pendências):", e);
+    if (window.vektorEnvPendToast_) {
+      window.vektorEnvPendToast_("Falha ao exportar CSV.", "error");
+    }
+  }
 };
 
 window.__renderEnvPendTbody = function () {
