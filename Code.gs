@@ -7429,8 +7429,9 @@ function montarEmailUsoIrregular_(rel) {
   var html = "";
   html += "<p>Identificamos <b>padrões atípicos</b> que requerem validação (modelo conservador; 2+ critérios).</p>";
   html += "<p style='font-size:12px;color:#475569;'>" +
-          "Critérios podem incluir fracionamento, pendência + valor alto, recorrência anormal por estabelecimento/cartão." +
-          "</p>";
+        "Critérios fortes: fracionamento, pendência + valor alto, recorrência anormal por estabelecimento/cartão. " +
+        "Critérios auxiliares (quando já houver 2+ fortes): etiqueta rara por loja e novo estabelecimento." +
+        "</p>";
 
   html += "<table style='border-collapse:collapse;width:100%;font-family:Arial,sans-serif;'>";
   html += "<thead><tr>";
@@ -7548,6 +7549,38 @@ function detectarUsoIrregularBaseClara_(opts) {
   var valoresJanela = [];     // percentil 95 dentro da janela (7d/ciclo/full)
   var byCartaoEstab = {};     // cartao||estab -> count + pend
 
+    // ------------------------------
+  // NOVO: estatísticas por loja (janela atual)
+  // - para "Etiqueta rara por loja"
+  // - para "Novo estabelecimento por loja"
+  // ------------------------------
+  var byLojaTotal = {};     // loja -> total trans na janela
+  var byLojaEtiq  = {};     // loja -> { etiquetaNorm: count }
+  var byLojaEstab = {};     // loja -> { estabNorm: count }
+
+  function normKey_(s) {
+    // normalização conservadora (evita estourar falso-positivo por variações pequenas)
+    return String(s || "")
+      .toUpperCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function splitEtiqs_(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return [];
+    // separadores comuns: vírgula, ponto e vírgula, barra vertical
+    var parts = s.split(/[;,|]/g).map(function(x){ return normKey_(x); }).filter(Boolean);
+
+    // fallback: se vier uma etiqueta única sem separador
+    if (!parts.length) {
+      var one = normKey_(s);
+      return one ? [one] : [];
+    }
+    return parts;
+  }
+
   for (var i=0;i<values.length;i++){
     var r = values[i];
     if (!r) continue;
@@ -7567,6 +7600,22 @@ function detectarUsoIrregularBaseClara_(opts) {
     var cartao = String(r[IDX_CARTAO]||"").trim();
     var estab = String(r[IDX_TRANS]||"").trim();
 
+        // NOVO: captura etiqueta(s) e atualiza estatísticas por loja
+    var etiqRaw = String(r[IDX_ETIQ] || "").trim();
+    var etiqs = splitEtiqs_(etiqRaw);
+
+    var lojaK = loja;
+    if (!byLojaTotal[lojaK]) { byLojaTotal[lojaK] = 0; byLojaEtiq[lojaK] = {}; byLojaEstab[lojaK] = {}; }
+    byLojaTotal[lojaK]++;
+
+    var estabK2 = normKey_(estab);
+    if (estabK2) byLojaEstab[lojaK][estabK2] = (byLojaEstab[lojaK][estabK2] || 0) + 1;
+
+    etiqs.forEach(function(t){
+      if (!t) return;
+      byLojaEtiq[lojaK][t] = (byLojaEtiq[lojaK][t] || 0) + 1;
+    });
+
     var v = parseNumberSafe_(r[IDX_VALOR]);
     if (!isFinite(v) || v <= 0) continue;
 
@@ -7579,8 +7628,17 @@ function detectarUsoIrregularBaseClara_(opts) {
     if (!gruposDia[kDia]) {
       gruposDia[kDia] = {
         loja: loja, time: time, dataKey: dataKey, cartao: cartao, estab: estab,
-        qtd: 0, soma: 0, maxValor: 0, pendCount: 0
+        qtd: 0, soma: 0, maxValor: 0, pendCount: 0,
+        etiqSet: {}
       };
+    }
+
+        // NOVO: agrega etiquetas por agrupamento
+    if (etiqs && etiqs.length) {
+      var gTmp = gruposDia[kDia];
+      etiqs.forEach(function(t){
+        if (t) gTmp.etiqSet[t] = true;
+      });
     }
 
     gruposDia[kDia].qtd++;
@@ -7624,6 +7682,58 @@ function detectarUsoIrregularBaseClara_(opts) {
     if (ce && ce.count >= 8 && ce.pend >= 2) {
       regras.push("Recorrência cartão/estab");
       score += 15;
+    }
+
+        // ------------------------------
+    // ✅ NOVOS CRITÉRIOS (AUXILIARES)
+    // Só entram se JÁ houver 2+ critérios fortes (A/B/C)
+    // ------------------------------
+    var criteriosFortes = regras.length;
+
+    if (criteriosFortes >= 2) {
+      // D) Etiqueta rara por loja (na janela)
+      // Regras conservadoras:
+      // - exige histórico mínimo na janela (>= 30 trans) para não “inventar rareza”
+      // - etiqueta precisa ser MUITO rara: count <= 1 e share <= 2%
+      try {
+        var totalLoja = byLojaTotal[loja] || 0;
+        if (totalLoja >= 30) {
+          var etiqCounts = byLojaEtiq[loja] || {};
+          var tagsGrupo = g.etiqSet ? Object.keys(g.etiqSet) : [];
+          var raras = [];
+
+          tagsGrupo.forEach(function(tag){
+            var c = etiqCounts[tag] || 0;
+            var share = totalLoja ? (c / totalLoja) : 0;
+            if (c > 0 && c <= 1 && share <= 0.02) {
+              raras.push(tag);
+            }
+          });
+
+          if (raras.length) {
+            // limita para não poluir regrasTxt
+            var show = raras.slice(0, 2).join(", ");
+            regras.push("Etiqueta rara (" + show + ")");
+            score += 5;
+          }
+        }
+      } catch (_) {}
+
+      // E) Novo estabelecimento por loja (na janela)
+      // Regras conservadoras:
+      // - exige histórico mínimo na janela (>= 30 trans)
+      // - estabelecimento do grupo só aparece 1 vez no período para essa loja
+      try {
+        var totalLoja2 = byLojaTotal[loja] || 0;
+        if (totalLoja2 >= 30) {
+          var estabNorm = normKey_(estabelecimento);
+          var cEst = (byLojaEstab[loja] && estabNorm) ? (byLojaEstab[loja][estabNorm] || 0) : 0;
+          if (cEst === 1) {
+            regras.push("Novo estabelecimento");
+            score += 5;
+          }
+        }
+      } catch (_) {}
     }
 
     // Conservador: exige 2 critérios
