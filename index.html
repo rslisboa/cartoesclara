@@ -1271,7 +1271,7 @@ display: none;
           <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
             <div style="color:#fff; font-weight:900; font-size:14px;">Lojas mais próximas</div>
             <div style="color:rgba(226,232,240,0.7); font-size:12px; margin-top:2px;">
-              Score composto (MAX_SCORE + CASOS + PEND_RATE)
+              Ranking de proximidade (baseado em MAX_SCORE, CASOS e PENDÊNCIA)
             </div>
             <div id="radarRanking" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;"></div>
           </div>
@@ -4359,6 +4359,9 @@ function renderRadarInsights_(lojas) {
 
     el.innerHTML =
     "<div style='font-weight:900;color:#fff;margin-bottom:6px;'>Leitura automática do Radar</div>" +
+    "<div style='opacity:0.85; margin:-2px 0 8px 0; line-height:1.35;'>" +
+        "Base da análise: <b>" + nLojas + "</b> loja(s)" +
+      "</div>" +
 
     "<div style='opacity:0.9; line-height:1.45; margin-bottom:6px;'>" +
       "Este quadro mostra <b>como as métricas se comportaram juntas</b> no período. " +
@@ -15033,7 +15036,7 @@ function vektorRenderTabelaUsoIrregular(res) {
 
   const dataset = Array.isArray(res.rows) ? res.rows : [];
   if (!dataset.length) {
-    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Nenhum caso atingiu o gatilho conservador (2+ critérios) no ciclo atual.</p>");
+    renderBotMessage("HTML:<p class='text-sm text-slate-700'>Nenhum caso atingiu o gatilho conservador (2+ critérios fortes) no ciclo atual.</p>");
     return;
   }
 
@@ -15118,7 +15121,7 @@ function vektorRenderTabelaUsoIrregular(res) {
         <!-- Linha 1: texto -->
         <div class="text-sm text-slate-700"
             style="margin:0;padding:0;line-height:1.2;white-space:nowrap;">
-          <b>Possível uso irregular</b> (modelo conservador: 2+ critérios). Período:
+          <b>Possível uso irregular</b> (modelo conservador: 2+ critérios fortes). Período:
           <b>${esc((res.meta && res.meta.periodo) || "")}</b>.
           <br><br> 
 
