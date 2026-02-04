@@ -5673,147 +5673,232 @@ function vektorFmtBR_(d) {
   return Utilities.formatDate(d, tz, "dd/MM/yyyy");
 }
 
-function getItensIrregularesRadarVisao(dtIniIso, dtFimIso, qItem, conformidade) {
+/**
+ * Radar - Visão Itens Irregulares (usa o MESMO motor do chat: getListaItensCompradosClara)
+ * params: { dtIniIso, dtFimIso, itemContains, conformidade, groupBy, limit }
+ */
+function getItensIrregularesRadarVisao(params) {
+  vektorAssertFunctionAllowed_("getItensIrregularesRadarVisao");
   try {
-    // --- parse datas (aceita yyyy-mm-dd e yyyy-mm-ddTHH:mm:ss(.sss)Z / com hora) ---
-    function parseIsoDate_(s, endOfDay) {
-      s = String(s || "").trim();
-      // aceita "YYYY-MM-DD" e também "YYYY-MM-DDT..." / "YYYY-MM-DD ..."
-      var m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
-      if (!m) return null;
+    // ============================
+    // ✅ BLINDAGEM: aceita objeto (novo) e posicional (legado)
+    // ============================
+    var p = params;
 
-      var y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
-
-      // cria como Date local (evita drift de timezone do Date.parse)
-      if (endOfDay) return new Date(y, mo, d, 23, 59, 59, 999);
-      return new Date(y, mo, d, 0, 0, 0, 0);
+    // se vier posicional: getItensIrregularesRadarVisao(dtIniIso, dtFimIso, itemContains, conformidade, groupBy, limit)
+    if (p && typeof p !== "object") {
+      p = {
+        dtIniIso: arguments[0],
+        dtFimIso: arguments[1],
+        itemContains: arguments[2],
+        conformidade: arguments[3],
+        groupBy: arguments[4],
+        limit: arguments[5]
+      };
+    } else {
+      p = p || {};
     }
 
-    var dIni = parseIsoDate_(dtIniIso, false);
-    var dFim = parseIsoDate_(dtFimIso, true);
+    // ============================
+    // ✅ Leitura tolerante de chaves
+    // ============================
+    var dtIniIso = String(p.dtIniIso || p.dataIniIso || p.dtIni || p.ini || "").trim();
+    var dtFimIso = String(p.dtFimIso || p.dataFimIso || p.dtFim || p.fim || "").trim();
+    var itemContains = String(p.itemContains || p.qItem || p.itemQ || "").trim();
+    var conformidade = String(p.conformidade || p.conf || "").trim().toUpperCase();
+    var groupBy = String(p.groupBy || "loja").trim().toLowerCase();
+    var limit = Number(p.limit) || 2500;
 
+    // Debug de entrada (pra não ficar cego depois)
+    var debugIn = {
+      paramsType: (params === null ? "null" : typeof params),
+      keys: (p && typeof p === "object") ? Object.keys(p) : [],
+      dtIniIso: dtIniIso,
+      dtFimIso: dtFimIso,
+      itemContains: itemContains,
+      conformidade: conformidade,
+      groupBy: groupBy,
+      limit: limit
+    };
+
+    // ============================
+    // Datas
+    // ============================
+    var dIni = vektorParseDateAny_(dtIniIso);
+    var dFim = vektorParseDateAny_(dtFimIso);
     if (!dIni || !dFim) {
-      return { ok: false, error: "Período inválido (use o calendário para selecionar as datas)." };
+      return {
+        ok: false,
+        error: "Período inválido (use o calendário para selecionar as datas).",
+        debug: { in: debugIn }
+      };
     }
 
-    if (dIni.getTime() > dFim.getTime()) {
-      return { ok: false, error: "Período inválido: data inicial maior que a data final." };
-    }
+    // normaliza intervalo
+    dIni.setHours(0, 0, 0, 0);
+    dFim.setHours(23, 59, 59, 999);
 
-    // Normaliza filtros
-    qItem = String(qItem || "").trim();
-    conformidade = String(conformidade || "").trim().toUpperCase(); // OK / REVISAR / ALERTA / ""
+    // normaliza BR pro motor do chat
+    var dtIniBR = vektorFmtBR_(dIni);
+    var dtFimBR = vektorFmtBR_(dFim);
 
-    // ✅ formata BR pq o motor trabalha com BR/Date internamente
-    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
-    var dtIniBR = Utilities.formatDate(dIni, tz, "dd/MM/yyyy");
-    var dtFimBR = Utilities.formatDate(dFim, tz, "dd/MM/yyyy");
-
-    // ✅ CORREÇÃO CRÍTICA:
-    // getListaItensCompradosClara só entende: "geral" | "loja" | "time".
-    // "" faz cair no else->continue e zera tudo.
-    var res = getListaItensCompradosClara("geral", "", dtIniBR, dtFimBR, 2500);
-
+    // ============================
+    // Motor (geral)
+    // ⚠️ Se o seu motor NÃO exigir "geral", ele ignora; se exigir, isso evita retorno 0.
+    // ============================
+    var res = getListaItensCompradosClara("geral", "", dtIniBR, dtFimBR, limit);
     if (!res || !res.ok) {
-      return { ok: false, error: (res && res.error) ? res.error : "Falha ao carregar itens comprados." };
+      return {
+        ok: false,
+        error: (res && res.error) ? res.error : "Falha ao ler itens.",
+        debug: { in: debugIn, dtIniBR: dtIniBR, dtFimBR: dtFimBR }
+      };
     }
 
     var rows = Array.isArray(res.rows) ? res.rows : [];
-    var baseRows = rows.slice(); // para debug
 
-    // Filtro por item (contém)
-    if (qItem) {
-      var q = qItem.toUpperCase();
+    // ============================
+    // filtros adicionais
+    // ============================
+    var itemNormQ = normalizarTexto_(itemContains || "");
+    if (itemNormQ) {
       rows = rows.filter(function (r) {
-        var it = String(r.item || r.itemComprado || r.descricao || "").toUpperCase();
-        return it.indexOf(q) >= 0;
+        var it = normalizarTexto_(r.item || r.descricao || r.itemComprado || "");
+        return it.indexOf(itemNormQ) !== -1;
       });
     }
 
-    // Filtro por conformidade
     if (conformidade) {
       rows = rows.filter(function (r) {
-        var c = String(r.conformidade || r.status || "").toUpperCase();
-        return c === conformidade;
+        return String(r.conformidade || r.status || "").toUpperCase() === conformidade;
       });
     }
 
-    // Agregações (por loja e por time)
-    var aggLoja = {};
-    var aggTime = {};
-    var alertaByLoja = {};
-    var alertaByTime = {};
-    var totalValor = 0;
+    if (rows.length > limit) rows = rows.slice(0, limit);
 
-    rows.forEach(function (r) {
-      var loja = String(r.loja || "").trim() || "—";
-      var time = String(r.time || r.grupo || "").trim() || "—";
-      var val = Number(r.valor || r.vlr || 0) || 0;
-      var conf = String(r.conformidade || r.status || "").toUpperCase();
+    // ============================
+    // ✅ NORMALIZAÇÃO FORTE de LOJA/TIME + DATA
+    // ============================
+    function normLoja_(x) {
+      var s = String(x || "").trim();
+      if (!s) return "";
+      var m = s.match(/(\d{1,4})/);
+      if (!m) return s;
+      return String(Number(m[1])).padStart(4, "0");
+    }
+    function normTime_(x) {
+      var s = String(x || "").trim();
+      return s;
+    }
+    function normDataTxt_(x) {
+      if (x instanceof Date && !isNaN(x.getTime())) return vektorFmtBR_(x);
+      var s = String(x || "").trim();
+      if (!s) return "";
+      // se vier ISO, tenta converter
+      var d = vektorParseDateAny_(s);
+      if (d) return vektorFmtBR_(d);
+      return s;
+    }
 
-      totalValor += val;
+    // transforma pro front
+    var outRows = rows.map(function (r) {
+      var lojaRaw =
+        r.lojaKey || r.lojaNum || r.lojaNumero || r.codLoja || r.cod_estbl ||
+        r.loja || r.estabelecimento || "";
 
-      if (!aggLoja[loja]) aggLoja[loja] = { loja: loja, qtd: 0, valor: 0, alerta: 0 };
-      aggLoja[loja].qtd += 1;
-      aggLoja[loja].valor += val;
-      if (conf === "ALERTA") aggLoja[loja].alerta += 1;
+      var timeRaw =
+        r.time || r.grupo || r.grupos || r.gruposRaw || r.area || "";
 
-      if (!aggTime[time]) aggTime[time] = { time: time, qtd: 0, valor: 0, alerta: 0 };
-      aggTime[time].qtd += 1;
-      aggTime[time].valor += val;
-      if (conf === "ALERTA") aggTime[time].alerta += 1;
-
-      if (conf === "ALERTA") {
-        alertaByLoja[loja] = (alertaByLoja[loja] || 0) + 1;
-        alertaByTime[time] = (alertaByTime[time] || 0) + 1;
-      }
+      return {
+        dataTxt: normDataTxt_(r.dataTxt || r.data || r.dt || r.dataTransacao || ""),
+        valor: Number(r.valor || r.vlr || 0) || 0,
+        loja: normLoja_(lojaRaw),
+        time: normTime_(timeRaw),
+        item: String(r.item || r.descricao || r.itemComprado || ""),
+        conformidade: String(r.conformidade || r.status || ""),
+        motivo: String(r.motivo || r.justificativa || "")
+      };
     });
 
-    function toSortedArray_(obj) {
-      var arr = Object.keys(obj).map(function (k) { return obj[k]; });
-      arr.sort(function (a, b) {
-        if ((b.alerta || 0) !== (a.alerta || 0)) return (b.alerta || 0) - (a.alerta || 0);
-        if ((b.valor || 0) !== (a.valor || 0)) return (b.valor || 0) - (a.valor || 0);
-        return (b.qtd || 0) - (a.qtd || 0);
-      });
+    // ============================
+    // KPIs no schema que o FRONT espera
+    // ============================
+    var totalItens = outRows.length;
+    var totalValor = 0;
+    var alertaQtd = 0;
+    var alertaValor = 0;
+
+    for (var i = 0; i < outRows.length; i++) {
+      var v = Number(outRows[i].valor || 0);
+      totalValor += v;
+      if (String(outRows[i].conformidade || "").toUpperCase() === "ALERTA") {
+        alertaQtd++;
+        alertaValor += v;
+      }
+    }
+
+    var alertaPctValor = (totalValor > 0) ? (alertaValor / totalValor) : 0;
+    var alertaPctValorTxt = (alertaPctValor * 100).toFixed(1).replace(".", ",") + "%";
+
+    function aggByKey_(keyName) {
+      var map = {};
+      for (var j = 0; j < outRows.length; j++) {
+        var k = String(outRows[j][keyName] || "").trim() || "—";
+        if (!map[k]) map[k] = { key: k, valor: 0, qtd: 0 };
+        map[k].valor += Number(outRows[j].valor || 0);
+        map[k].qtd += 1;
+      }
+      var arr = Object.keys(map).map(function (k) { return map[k]; });
+      arr.sort(function (a, b) { return (b.valor || 0) - (a.valor || 0); });
+
+      for (var z = 0; z < arr.length; z++) {
+        var pct = (totalValor > 0) ? (arr[z].valor / totalValor) : 0;
+        arr[z].pctTxt = (pct * 100).toFixed(1).replace(".", ",") + "%";
+      }
       return arr;
     }
 
-    var lojas = toSortedArray_(aggLoja);
-    var times = toSortedArray_(aggTime);
-
-    // KPIs
-    var qtdTotal = rows.length;
-    var qtdAlerta = rows.filter(function (r) {
-      return String(r.conformidade || r.status || "").toUpperCase() === "ALERTA";
-    }).length;
+    function alertaSeries_(keyName) {
+      var map = {};
+      for (var k2 = 0; k2 < outRows.length; k2++) {
+        if (String(outRows[k2].conformidade || "").toUpperCase() !== "ALERTA") continue;
+        var kk = String(outRows[k2][keyName] || "").trim() || "—";
+        if (!map[kk]) map[kk] = { key: kk, qtd: 0, valor: 0 };
+        map[kk].qtd += 1;
+        map[kk].valor += Number(outRows[k2].valor || 0);
+      }
+      var arr2 = Object.keys(map).map(function (x) { return map[x]; });
+      arr2.sort(function (a, b) { return (b.valor || 0) - (a.valor || 0); });
+      return arr2;
+    }
 
     return {
       ok: true,
-      periodo: (res.periodo || null),
       debug: {
+        in: debugIn,
         dtIniRaw: dtIniIso,
         dtFimRaw: dtFimIso,
         dtIniBR: dtIniBR,
         dtFimBR: dtFimBR,
-        totalMotor: baseRows.length,
-        totalAposFiltros: rows.length
+        totalMotor: rows.length,
+        totalAposFiltros: outRows.length
       },
       kpis: {
-        qtdTotal: qtdTotal,
-        valorTotal: totalValor,
-        qtdAlerta: qtdAlerta,
-        pctAlerta: qtdTotal ? (qtdAlerta / qtdTotal) : 0
+        totalItens: totalItens,
+        totalValor: totalValor,
+        alertaQtd: alertaQtd,
+        alertaValor: alertaValor,
+        alertaPctValorTxt: alertaPctValorTxt
       },
-      rows: rows,
-      aggLoja: lojas,
-      aggTime: times,
-      alertaByLoja: alertaByLoja,
-      alertaByTime: alertaByTime
+      rows: outRows,
+      aggLoja: aggByKey_("loja"),
+      aggTime: aggByKey_("time"),
+      alertaByLoja: alertaSeries_("loja"),
+      alertaByTime: alertaSeries_("time")
     };
 
   } catch (e) {
-    return { ok: false, error: "Erro em getItensIrregularesRadarVisao: " + (e && e.message ? e.message : String(e)) };
+    return { ok: false, error: "Erro em getItensIrregularesRadarVisao: " + (e && e.message ? e.message : e) };
   }
 }
 
