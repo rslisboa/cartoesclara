@@ -5647,6 +5647,176 @@ for (var i = 0; i < linhasFiltradas.length; i++) {
   }
 }
 
+function vektorParseDateAny_(s) {
+  if (s instanceof Date && !isNaN(s.getTime())) return s;
+
+  s = String(s || "").trim();
+  if (!s) return null;
+
+  // yyyy-mm-dd (ou yyyy-mm-ddTHH...)
+  var mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (mIso) return new Date(Number(mIso[1]), Number(mIso[2]) - 1, Number(mIso[3]));
+
+  // yyyy/MM/dd (ou yyyy/MM/dd HH:mm:ss)
+  var mIso2 = s.match(/^(\d{4})\/(\d{2})\/(\d{2})(?:\s.*)?$/);
+  if (mIso2) return new Date(Number(mIso2[1]), Number(mIso2[2]) - 1, Number(mIso2[3]));
+
+  // dd/MM/yyyy (ou dd/MM/yyyy HH:mm:ss)
+  var mBr = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s.*)?$/);
+  if (mBr) return new Date(Number(mBr[3]), Number(mBr[2]) - 1, Number(mBr[1]));
+
+  return null;
+}
+
+function vektorFmtBR_(d) {
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  return Utilities.formatDate(d, tz, "dd/MM/yyyy");
+}
+
+function getItensIrregularesRadarVisao(dtIniIso, dtFimIso, qItem, conformidade) {
+  try {
+    // --- parse datas (aceita yyyy-mm-dd e yyyy-mm-ddTHH:mm:ss(.sss)Z / com hora) ---
+    function parseIsoDate_(s, endOfDay) {
+      s = String(s || "").trim();
+      // aceita "YYYY-MM-DD" e também "YYYY-MM-DDT..." / "YYYY-MM-DD ..."
+      var m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+      if (!m) return null;
+
+      var y = Number(m[1]), mo = Number(m[2]) - 1, d = Number(m[3]);
+
+      // cria como Date local (evita drift de timezone do Date.parse)
+      if (endOfDay) return new Date(y, mo, d, 23, 59, 59, 999);
+      return new Date(y, mo, d, 0, 0, 0, 0);
+    }
+
+    var dIni = parseIsoDate_(dtIniIso, false);
+    var dFim = parseIsoDate_(dtFimIso, true);
+
+    if (!dIni || !dFim) {
+      return { ok: false, error: "Período inválido (use o calendário para selecionar as datas)." };
+    }
+
+    if (dIni.getTime() > dFim.getTime()) {
+      return { ok: false, error: "Período inválido: data inicial maior que a data final." };
+    }
+
+    // Normaliza filtros
+    qItem = String(qItem || "").trim();
+    conformidade = String(conformidade || "").trim().toUpperCase(); // OK / REVISAR / ALERTA / ""
+
+    // ✅ formata BR pq o motor trabalha com BR/Date internamente
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var dtIniBR = Utilities.formatDate(dIni, tz, "dd/MM/yyyy");
+    var dtFimBR = Utilities.formatDate(dFim, tz, "dd/MM/yyyy");
+
+    // ✅ CORREÇÃO CRÍTICA:
+    // getListaItensCompradosClara só entende: "geral" | "loja" | "time".
+    // "" faz cair no else->continue e zera tudo.
+    var res = getListaItensCompradosClara("geral", "", dtIniBR, dtFimBR, 2500);
+
+    if (!res || !res.ok) {
+      return { ok: false, error: (res && res.error) ? res.error : "Falha ao carregar itens comprados." };
+    }
+
+    var rows = Array.isArray(res.rows) ? res.rows : [];
+    var baseRows = rows.slice(); // para debug
+
+    // Filtro por item (contém)
+    if (qItem) {
+      var q = qItem.toUpperCase();
+      rows = rows.filter(function (r) {
+        var it = String(r.item || r.itemComprado || r.descricao || "").toUpperCase();
+        return it.indexOf(q) >= 0;
+      });
+    }
+
+    // Filtro por conformidade
+    if (conformidade) {
+      rows = rows.filter(function (r) {
+        var c = String(r.conformidade || r.status || "").toUpperCase();
+        return c === conformidade;
+      });
+    }
+
+    // Agregações (por loja e por time)
+    var aggLoja = {};
+    var aggTime = {};
+    var alertaByLoja = {};
+    var alertaByTime = {};
+    var totalValor = 0;
+
+    rows.forEach(function (r) {
+      var loja = String(r.loja || "").trim() || "—";
+      var time = String(r.time || r.grupo || "").trim() || "—";
+      var val = Number(r.valor || r.vlr || 0) || 0;
+      var conf = String(r.conformidade || r.status || "").toUpperCase();
+
+      totalValor += val;
+
+      if (!aggLoja[loja]) aggLoja[loja] = { loja: loja, qtd: 0, valor: 0, alerta: 0 };
+      aggLoja[loja].qtd += 1;
+      aggLoja[loja].valor += val;
+      if (conf === "ALERTA") aggLoja[loja].alerta += 1;
+
+      if (!aggTime[time]) aggTime[time] = { time: time, qtd: 0, valor: 0, alerta: 0 };
+      aggTime[time].qtd += 1;
+      aggTime[time].valor += val;
+      if (conf === "ALERTA") aggTime[time].alerta += 1;
+
+      if (conf === "ALERTA") {
+        alertaByLoja[loja] = (alertaByLoja[loja] || 0) + 1;
+        alertaByTime[time] = (alertaByTime[time] || 0) + 1;
+      }
+    });
+
+    function toSortedArray_(obj) {
+      var arr = Object.keys(obj).map(function (k) { return obj[k]; });
+      arr.sort(function (a, b) {
+        if ((b.alerta || 0) !== (a.alerta || 0)) return (b.alerta || 0) - (a.alerta || 0);
+        if ((b.valor || 0) !== (a.valor || 0)) return (b.valor || 0) - (a.valor || 0);
+        return (b.qtd || 0) - (a.qtd || 0);
+      });
+      return arr;
+    }
+
+    var lojas = toSortedArray_(aggLoja);
+    var times = toSortedArray_(aggTime);
+
+    // KPIs
+    var qtdTotal = rows.length;
+    var qtdAlerta = rows.filter(function (r) {
+      return String(r.conformidade || r.status || "").toUpperCase() === "ALERTA";
+    }).length;
+
+    return {
+      ok: true,
+      periodo: (res.periodo || null),
+      debug: {
+        dtIniRaw: dtIniIso,
+        dtFimRaw: dtFimIso,
+        dtIniBR: dtIniBR,
+        dtFimBR: dtFimBR,
+        totalMotor: baseRows.length,
+        totalAposFiltros: rows.length
+      },
+      kpis: {
+        qtdTotal: qtdTotal,
+        valorTotal: totalValor,
+        qtdAlerta: qtdAlerta,
+        pctAlerta: qtdTotal ? (qtdAlerta / qtdTotal) : 0
+      },
+      rows: rows,
+      aggLoja: lojas,
+      aggTime: times,
+      alertaByLoja: alertaByLoja,
+      alertaByTime: alertaByTime
+    };
+
+  } catch (e) {
+    return { ok: false, error: "Erro em getItensIrregularesRadarVisao: " + (e && e.message ? e.message : String(e)) };
+  }
+}
+
 // =====================================================
 // ✅ RELAÇÃO DE SALDOS (ADM) — ciclo 06 -> hoje (volátil)
 // Aceita filtro: geral | loja | time
@@ -12638,6 +12808,149 @@ function DISPARAR_EMAIL_OFENSORAS_SEMANA() {
   props.setProperty(KEY_ULT_ENVIO, sigAtual.sig);
 
   Logger.log("E-mail semanal de lojas ofensoras enviado com sucesso.");
+}
+
+function DISPARAR_EMAIL_ITENS_IRREGULARES_SEMANA() {
+  var props = PropertiesService.getScriptProperties();
+
+  // assinatura atual da BaseClara
+  var sigAtual = calcularAssinaturaBaseClara_();
+  if (!sigAtual || sigAtual.error) {
+    Logger.log("Falha ao calcular assinatura BaseClara (itens irregulares)");
+    return;
+  }
+
+  var KEY_ULT_ENVIO = "VEKTOR_ITENS_IRREG_SIG_ULT_ENVIO";
+  var sigUltEnvio = props.getProperty(KEY_ULT_ENVIO) || "";
+
+  // Se BaseClara NÃO mudou desde o último envio semanal → não envia
+  if (sigAtual.sig === sigUltEnvio) {
+    Logger.log("BaseClara não mudou desde o último e-mail semanal (itens irregulares). Não envia.");
+    return;
+  }
+
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var hoje = new Date();
+  var fim = new Date(hoje); fim.setHours(23,59,59,999);
+  var ini = new Date(hoje); ini.setDate(ini.getDate() - 6); ini.setHours(0,0,0,0);
+
+  // usa o mesmo motor de conformidade do chat e filtra ALERTA
+  var res = getListaItensCompradosClara("", "", ini, fim, 2500);
+  if (!res || !res.ok) {
+    Logger.log("Falha ao listar itens comprados para e-mail semanal: " + (res && res.error ? res.error : ""));
+    return;
+  }
+
+  var rows = Array.isArray(res.rows) ? res.rows : [];
+  rows = rows.filter(function(r){
+    return String(r.conformidade || r.status || "").toUpperCase() === "ALERTA";
+  });
+
+  // limita para não explodir email/quota
+  if (rows.length > 500) rows = rows.slice(0, 500);
+
+  // se não tem alerta, ainda registra o gate para evitar spam repetido
+  var admins = vektorGetAdminEmails_();
+  var to = (admins && admins.join) ? admins.join(",") : "";
+  if (!to) {
+    Logger.log("Sem e-mails de admin para envio (itens irregulares).");
+    return;
+  }
+
+  var periodoTxt = Utilities.formatDate(ini, tz, "dd/MM/yyyy") + " → " + Utilities.formatDate(fim, tz, "dd/MM/yyyy");
+  var html = buildEmailItensIrregulares_(rows, periodoTxt);
+
+  MailApp.sendEmail({
+    to: to,
+    subject: "Vektor — Possíveis itens irregulares (ALERTA) — " + periodoTxt,
+    htmlBody: html
+  });
+
+  // ✅ registra no log para aparecer no modal “Disparo de Ocorrências”
+  try {
+    registrarAlertaEnviado_(
+      "ITENS_IRREGULARES",
+      "", // loja (agregado)
+      "", // time (agregado)
+      "Semanal | ALERTA | período " + periodoTxt + " | linhas=" + rows.length,
+      to,
+      "AUTO_SEMANAL"
+    );
+  } catch (eLog) {}
+
+  // Marca assinatura como já enviada
+  props.setProperty(KEY_ULT_ENVIO, sigAtual.sig);
+
+  Logger.log("E-mail semanal de itens irregulares enviado com sucesso.");
+}
+
+function RESETAR_GATE_EMAIL_ITENS_IRREGULARES_SEMANA() {
+  PropertiesService.getScriptProperties().deleteProperty("VEKTOR_ITENS_IRREG_SIG_ULT_ENVIO");
+  Logger.log("Gate resetado: VEKTOR_ITENS_IRREG_SIG_ULT_ENVIO removida. Próximo disparo enviará novamente.");
+}
+
+function buildEmailItensIrregulares_(rows, periodoTxt) {
+  rows = Array.isArray(rows) ? rows : [];
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+  function esc_(s){
+    return String(s || "")
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
+  }
+
+  function fmtBRL_(v){
+    var n = Number(v || 0);
+    return n.toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+  }
+
+  var h = "";
+  h += '<div style="font-family:Arial,Helvetica,sans-serif; color:#0f172a;">';
+  h += '<div style="font-size:16px; font-weight:900;">Possíveis itens irregulares (Conformidade: <span style="color:#b91c1c;">ALERTA</span>)</div>';
+  h += '<div style="margin-top:6px; font-size:13px; color:#334155;">Período analisado: <b>' + esc_(periodoTxt) + '</b></div>';
+  h += '<div style="margin-top:10px; font-size:13px; color:#334155; line-height:1.4;">';
+  h += 'Este e-mail é um <b>relatório de triagem</b> baseado em regras do Vektor (mesma lógica usada no chat). ';
+  h += 'Recomendação: revisar os itens marcados como <b>ALERTA</b> e validar aderência à política.';
+  h += '</div>';
+
+  if (!rows.length) {
+    h += '<div style="margin-top:14px; padding:12px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc;">';
+    h += 'Nenhum item em <b>ALERTA</b> encontrado no período.';
+    h += '</div></div>';
+    return h;
+  }
+
+  h += '<div style="margin-top:14px; font-size:13px; color:#334155;"><b>Total de linhas:</b> ' + rows.length + '</div>';
+
+  h += '<div style="margin-top:10px; overflow:auto; border:1px solid #e2e8f0; border-radius:12px;">';
+  h += '<table style="width:100%; border-collapse:collapse; min-width:980px;">';
+  h += '<thead><tr style="background:#0b1220; color:#fff;">';
+  h += '<th style="text-align:left; padding:10px; font-size:12px;">Data</th>';
+  h += '<th style="text-align:right; padding:10px; font-size:12px;">Valor (R$)</th>';
+  h += '<th style="text-align:left; padding:10px; font-size:12px;">Loja</th>';
+  h += '<th style="text-align:left; padding:10px; font-size:12px;">Time</th>';
+  h += '<th style="text-align:left; padding:10px; font-size:12px;">Item Comprado</th>';
+  h += '<th style="text-align:left; padding:10px; font-size:12px;">Conformidade</th>';
+  h += '<th style="text-align:left; padding:10px; font-size:12px;">Motivo</th>';
+  h += '</tr></thead><tbody>';
+
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i] || {};
+    h += '<tr style="border-top:1px solid #e2e8f0;">';
+    h += '<td style="padding:10px; font-size:12px;">' + esc_(r.dataTxt || r.data || "") + '</td>';
+    h += '<td style="padding:10px; font-size:12px; text-align:right; font-weight:800;">' + esc_(fmtBRL_(r.valor || 0)) + '</td>';
+    h += '<td style="padding:10px; font-size:12px;">' + esc_(r.loja || r.alias || "") + '</td>';
+    h += '<td style="padding:10px; font-size:12px;">' + esc_(r.time || "") + '</td>';
+    h += '<td style="padding:10px; font-size:12px;">' + esc_(r.item || r.descricao || "") + '</td>';
+    h += '<td style="padding:10px; font-size:12px; font-weight:900; color:#b91c1c;">ALERTA</td>';
+    h += '<td style="padding:10px; font-size:12px;">' + esc_(r.motivo || "") + '</td>';
+    h += '</tr>';
+  }
+
+  h += '</tbody></table></div></div>';
+  return h;
 }
 
 function RESETAR_GATE_EMAIL_OFENSORAS_SEMANA() {
