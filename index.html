@@ -4458,7 +4458,9 @@ window.vektorLoadRadarItensIrregulares = function() {
           const pct = x.pctTxt || "—";
           h += `
             <div style="display:flex; justify-content:space-between; gap:10px; padding:10px; border-radius:12px;
-                        border:1px solid rgba(148,163,184,0.18); background:rgba(255,255,255,0.03);">
+            border:1px solid rgba(181,255,32,0.28);
+            background:rgba(181,255,32,0.06);
+            box-shadow:0 8px 18px rgba(0,0,0,0.22);">
               <div style="color:#fff; font-weight:1000; font-size:12px;">${nome}</div>
               <div style="display:flex; gap:10px; align-items:center;">
                 <div style="color:rgba(226,232,240,0.8); font-weight:900; font-size:12px;">${pct}</div>
@@ -4472,6 +4474,33 @@ window.vektorLoadRadarItensIrregulares = function() {
 
       renderAgg(aggLoja, res.aggLoja);
       renderAgg(aggTime, res.aggTime);
+
+      // Gráfico ALERTA (dinâmico por Loja/Time)
+        const serie = (groupBy === "time") ? (res.alertaByTime || []) : (res.alertaByLoja || []);
+        if (chart) {
+          if (!Array.isArray(serie) || !serie.length) {
+            chart.innerHTML = `<div style="color:rgba(226,232,240,0.7); font-size:12px; font-weight:800;">Sem ALERTA no período.</div>`;
+          } else {
+            const top = serie.slice(0, 12);
+            const max = Math.max.apply(null, top.map(x => Number(x.qtd || 0)));
+            let h = `<div style="display:flex; flex-direction:column; gap:8px;">`;
+            top.forEach(x => {
+              const nome = x.key || "—";
+              const qtd = Number(x.qtd || 0);
+              const w = (max > 0 ? Math.round((qtd / max) * 100) : 0);
+              h += `
+                <div style="display:flex; gap:10px; align-items:center;">
+                  <div style="width:140px; color:#fff; font-weight:1000; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${nome}</div>
+                  <div style="flex:1; height:10px; border-radius:999px; background:rgba(148,163,184,0.16); overflow:hidden;">
+                    <div style="height:10px; width:${w}%; background:#B5FF20;"></div>
+                  </div>
+                  <div style="width:32px; text-align:right; color:rgba(226,232,240,0.92); font-weight:1000; font-size:12px;">${qtd}</div>
+                </div>`;
+            });
+            h += `</div>`;
+            chart.innerHTML = h;
+          }
+        }
 
       // Chart (somente ALERTA)
       const series = (groupBy === "time") ? (res.alertaByTime || []) : (res.alertaByLoja || []);
@@ -4562,25 +4591,12 @@ window.vektorLoadRadarItensIrregulares = function() {
       }
 
       if (tbody) {
-        tbody.innerHTML = rows.map(r => {
-          const dt = r.dataTxt || "";
-          const valor = fmtBRL(r.valor || 0);
-          const loja = r.loja || "";
-          const time = r.time || "";
-          const item = (r.item || "").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-          const conf = badge(r.conformidade);
-          const motivo = (r.motivo || "").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-          return `
-            <tr style="border-top:1px solid rgba(148,163,184,0.14);">
-              <td style="padding:10px; color:rgba(226,232,240,0.92); font-weight:900; font-size:12px;">${dt}</td>
-              <td style="padding:10px; text-align:right; color:#fff; font-weight:1000; font-size:12px;">${valor}</td>
-              <td style="padding:10px; color:rgba(226,232,240,0.92); font-weight:900; font-size:12px;">${loja}</td>
-              <td style="padding:10px; color:rgba(226,232,240,0.92); font-weight:900; font-size:12px;">${time}</td>
-              <td style="padding:10px; color:rgba(226,232,240,0.92); font-weight:900; font-size:12px;">${item}</td>
-              <td style="padding:10px;">${conf}</td>
-              <td style="padding:10px; color:rgba(226,232,240,0.85); font-weight:800; font-size:12px;">${motivo}</td>
-            </tr>`;
-        }).join("");
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="padding:12px; color:rgba(226,232,240,0.80); font-weight:900; font-size:12px;">
+              Detalhamento removido desta visão para manter a página limpa. Use “Exportar CSV” quando precisar da lista completa.
+            </td>
+          </tr>`;
       }
 
       // cache para export CSV
@@ -4591,12 +4607,15 @@ window.vektorLoadRadarItensIrregulares = function() {
       const msg = (err && err.message) ? err.message : String(err || "Erro");
       if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; color:rgba(248,113,113,0.95); font-weight:1000; font-size:12px;">Falha: ${msg}</td></tr>`;
     })
-    .getItensIrregularesRadarVisao(
-      ini,
-      fim,
-      itemQ,
-      conf,
-    );
+    .getItensIrregularesRadarVisao({
+        dtIniIso: ini,
+        dtFimIso: fim,
+        itemContains: itemQ,
+        conformidade: conf,
+        groupBy: groupBy,
+        limit: 2500
+        });
+
 };
 
 window.vektorExportRadarItensIrregularesCSV = function() {
