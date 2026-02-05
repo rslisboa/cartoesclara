@@ -418,6 +418,19 @@
   background: rgba(22,163,74,0.35);
 }
 
+/* === FIX: opções de SELECT visíveis no tema escuro (Modal Itens Irregulares) === */
+#itensIrregDetalhamentoModal select,
+#itensIrregDetalhamentoModal option {
+  color: #ffffff;
+}
+#itensIrregDetalhamentoModal option {
+  background: #0b1220;
+}
+#itensIrregDetalhamentoModal option:checked,
+#itensIrregDetalhamentoModal option:hover {
+  background: rgba(22,163,74,0.35);
+}
+
 /* Ícone do calendário (Chrome/Edge) */
 #envioPendView input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1) brightness(1.6);
@@ -1392,6 +1405,7 @@ display: none;
               border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,0.55);
               display:flex; flex-direction:column; overflow:hidden;">
 
+    <!-- Header -->
     <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px;
                 border-bottom:1px solid rgba(148,163,184,0.18);
                 background:rgba(255,255,255,0.04);">
@@ -1404,26 +1418,83 @@ display: none;
 
       <button type="button" onclick="window.vektorCloseItensIrregDetalhamentoModal()"
         style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-               background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px;">
+               background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
         Fechar
       </button>
     </div>
 
-    <div style="padding:12px; overflow:auto;">
-      <div style="border-radius:12px; border:1px solid rgba(148,163,184,0.18); overflow:auto;">
-        <table style="width:100%; border-collapse:collapse; min-width:980px;">
-          <thead style="position:sticky; top:0; z-index:2;">
-            <tr style="background:rgba(255,255,255,0.10);">
-              <th style="text-align:left; padding:10px; color:#fff; font-size:12px; font-weight:1000;">Data</th>
-              <th style="text-align:right; padding:10px; color:#fff; font-size:12px; font-weight:1000;">Valor (R$)</th>
-              <th style="text-align:left; padding:10px; color:#fff; font-size:12px; font-weight:1000;">Loja</th>
-              <th style="text-align:left; padding:10px; color:#fff; font-size:12px; font-weight:1000;">Time</th>
-              <th style="text-align:left; padding:10px; color:#fff; font-size:12px; font-weight:1000;">Item Comprado</th>
-              <th style="text-align:left; padding:10px; color:#fff; font-size:12px; font-weight:1000;">Conformidade</th>
-              <th style="text-align:left; padding:10px; color:#fff; font-size:12px; font-weight:1000;">Motivo</th>
+    <!-- Filtros (LOCAL, sem recarregar backend) -->
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; padding:12px 14px;
+                border-bottom:1px solid rgba(148,163,184,0.18);">
+
+      <div style="display:flex; flex-direction:column; gap:6px; min-width:160px;">
+        <div style="font-size:12px; color:rgba(226,232,240,0.75); font-weight:900;">Loja</div>
+        <select id="itensIrregDetFiltroLoja"
+          style="height:34px; border-radius:10px; padding:0 10px;
+                 background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.18);
+                 color:#fff; font-weight:900; font-size:12px;">
+          <option value="">Todas</option>
+        </select>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:6px; min-width:220px;">
+        <div style="font-size:12px; color:rgba(226,232,240,0.75); font-weight:900;">Time</div>
+        <select id="itensIrregDetFiltroTime"
+          style="height:34px; border-radius:10px; padding:0 10px;
+                 background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.18);
+                 color:#fff; font-weight:900; font-size:12px;">
+          <option value="">Todos</option>
+        </select>
+      </div>
+
+      <button type="button" onclick="window.vektorClearItensIrregDetFilters_()"
+        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(181,255,32,0.30);
+               background:rgba(181,255,32,0.10); color:#B5FF20;
+               font-weight:1000; font-size:12px; cursor:pointer;">
+        Limpar filtros
+      </button>
+    </div>
+
+    <!-- Table (scroll) -->
+    <div style="padding:12px;">
+      <div style="border-radius:12px; border:1px solid rgba(148,163,184,0.18);
+            overflow:auto; max-height:65vh; background:rgba(226,232,240,0.92);">
+
+        <table style="width:100%; border-collapse:separate; border-spacing:0; min-width:980px;">
+          <thead>
+            <tr>
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Data
+              </th>
+              <th style="position:sticky; top:0; z-index:5; text-align:right; padding:10px;
+                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Valor (R$)
+              </th>
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Loja
+              </th>
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Time
+              </th>
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Item Comprado
+              </th>
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Conformidade
+              </th>
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Motivo
+              </th>
             </tr>
           </thead>
-          <tbody id="itensIrregTbody">
+
+          <tbody id="itensIrregDetTbody">
             <tr>
               <td colspan="7" style="padding:12px; color:rgba(226,232,240,0.75); font-weight:800; font-size:12px;">
                 Clique em “Atualizar” para carregar e depois use “Ver detalhamento”.
@@ -1431,6 +1502,7 @@ display: none;
             </tr>
           </tbody>
         </table>
+
       </div>
     </div>
 
@@ -3335,6 +3407,20 @@ window.__renderEnvPendTbody = function () {
   });
 };
 
+window.vektorGlobalLoadingShow_ = function(titulo, subtitulo) {
+  const ov = document.getElementById("envPend_overlay");
+  const t = document.getElementById("envPend_overlay_title");
+  const s = document.getElementById("envPend_overlay_sub");
+  if (t) t.textContent = titulo || "Carregando…";
+  if (s) s.textContent = subtitulo || "Aguarde.";
+  if (ov) ov.style.display = "flex";
+};
+
+window.vektorGlobalLoadingHide_ = function() {
+  const ov = document.getElementById("envPend_overlay");
+  if (ov) ov.style.display = "none";
+};
+
 window.vektorEnvPendOverlayShow_ = function(title, sub){
   const ov = document.getElementById("envPend_overlay");
   const t  = document.getElementById("envPend_overlayTitle");
@@ -4405,11 +4491,34 @@ window.vektorToggleRadarItensIrregulares = function() {
   const irParaItens = (window.__radarViewMode !== "ITENS");
   window.vektorSetRadarViewMode_(irParaItens ? "ITENS" : "RADAR");
 
-  // ✅ só carrega dados quando ENTRA em ITENS
-  if (irParaItens) {
-    window.vektorInitRadarItensIrregularesDefaults_();
-    window.vektorLoadRadarItensIrregulares();
-  }
+  // ✅ ao entrar em ITENS: apenas prepara defaults e zera a tela.
+// ❌ NÃO carregar automaticamente.
+if (irParaItens) {
+  window.vektorInitRadarItensIrregularesDefaults_();
+
+  // limpa KPIs/visuais até clicar em "Atualizar"
+  const k1 = document.getElementById("itensIrregKpiTotal");
+  const k2 = document.getElementById("itensIrregKpiValor");
+  const k3 = document.getElementById("itensIrregKpiAlertas");
+  const k4 = document.getElementById("itensIrregKpiPctAlertas");
+  if (k1) k1.textContent = "—";
+  if (k2) k2.textContent = "—";
+  if (k3) k3.textContent = "—";
+  if (k4) k4.textContent = "—";
+
+  const a1 = document.getElementById("itensIrregAggLoja");
+  const a2 = document.getElementById("itensIrregAggTime");
+  const ch = document.getElementById("itensIrregChart");
+  if (a1) a1.innerHTML = "";
+  if (a2) a2.innerHTML = "";
+  if (ch) ch.innerHTML = "";
+
+  window.__itensIrregLastRows = [];
+  window.__itensIrregLastRes = null;
+
+  const msg = document.getElementById("itensIrregMsg");
+  if (msg) msg.innerHTML = `<div style="color:rgba(226,232,240,0.75); font-weight:900; font-size:12px;">Selecione um período e clique em “Atualizar”.</div>`;
+}
 };
 
 window.vektorInitRadarItensIrregularesDefaults_ = function() {
@@ -4481,6 +4590,7 @@ window.vektorLoadRadarItensIrregulares = function() {
 
   google.script.run
     .withSuccessHandler(function(res) {
+      window.vektorGlobalLoadingHide_();
       if (!res || !res.ok) {
         const msg = (res && res.error) ? res.error : "Falha ao carregar itens irregulares.";
         if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; color:rgba(248,113,113,0.95); font-weight:1000; font-size:12px;">${msg}</td></tr>`;
@@ -4550,29 +4660,6 @@ window.vektorLoadRadarItensIrregulares = function() {
             chart.innerHTML = h;
           }
         }
-
-      // Chart (somente ALERTA)
-      const series = (groupBy === "time") ? (res.alertaByTime || []) : (res.alertaByLoja || []);
-      if (chart) {
-        if (!Array.isArray(series) || !series.length) {
-          chart.innerHTML = `<div style="color:rgba(226,232,240,0.7); font-size:12px; font-weight:800;">Sem ALERTA no período.</div>`;
-        } else {
-          const maxV = Math.max.apply(null, series.map(s => Number(s.valor || 0)).concat([1]));
-          chart.innerHTML = series.slice(0, 12).map(s => {
-            const key = s.key || "—";
-            const qtd = Number(s.qtd || 0);
-            const w = Math.max(3, Math.round((Number(s.valor || 0) / maxV) * 100));
-            return `
-              <div style="display:flex; gap:10px; align-items:center;">
-                <div style="width:220px; color:#fff; font-weight:900; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${key}</div>
-                <div style="flex:1; height:12px; border-radius:999px; border:1px solid rgba(148,163,184,0.18); background:rgba(255,255,255,0.04); overflow:hidden;">
-                  <div style="width:${w}%; height:100%; background:rgba(248,113,113,0.65);"></div>
-                </div>
-                <div style="min-width:56px; text-align:right; color:rgba(226,232,240,0.9); font-weight:1000; font-size:12px;">${qtd}</div>
-              </div>`;
-          }).join("");
-        }
-      }
 
       // Table
       const rows = Array.isArray(res.rows) ? res.rows : [];
@@ -4650,6 +4737,7 @@ window.vektorLoadRadarItensIrregulares = function() {
 
     })
     .withFailureHandler(function(err) {
+      window.vektorGlobalLoadingHide_();
       const msg = (err && err.message) ? err.message : String(err || "Erro");
       if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; color:rgba(248,113,113,0.95); font-weight:1000; font-size:12px;">Falha: ${msg}</td></tr>`;
     })
@@ -4662,26 +4750,44 @@ window.vektorLoadRadarItensIrregulares = function() {
         limit: 2500
         });
 
+        window.vektorGlobalLoadingShow_(
+  "Carregando Itens Irregulares…",
+  "Buscando e agregando dados. Isso pode levar alguns segundos."
+);
+
 };
 
+// =====================================================
+// MODAL — Detalhamento Itens Irregulares (Radar)
+// =====================================================
 window.vektorOpenItensIrregDetalhamentoModal = function () {
   const m = document.getElementById("itensIrregDetalhamentoModal");
   if (!m) return;
+
+  const rows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
+
+  // abre modal
   m.style.display = "block";
 
-  // se ainda não carregou, mostra aviso
-  if (!Array.isArray(window.__itensIrregLastRows) || !window.__itensIrregLastRows.length) {
+  // se ainda não carregou nada, só mostra aviso
+  if (!rows.length) {
     const tbody = document.getElementById("itensIrregTbody");
     if (tbody) {
       tbody.innerHTML = `
         <tr>
           <td colspan="7" style="padding:12px; color:rgba(226,232,240,0.80); font-weight:900; font-size:12px;">
-            Sem dados para detalhar. Clique em “Atualizar” primeiro.
+            Sem dados para detalhar. Selecione o período e clique em <b>Atualizar</b> primeiro.
           </td>
         </tr>`;
     }
-  } else {
-    // re-render do tbody com cache
+    return;
+  }
+
+  // popula filtros e renderiza (local, sem backend)
+  if (typeof window.vektorItensIrregDetBuildFilters_ === "function") {
+    window.vektorItensIrregDetBuildFilters_();
+  }
+  if (typeof window.vektorRenderItensIrregDetalhamentoFromCache_ === "function") {
     window.vektorRenderItensIrregDetalhamentoFromCache_();
   }
 };
@@ -4692,9 +4798,45 @@ window.vektorCloseItensIrregDetalhamentoModal = function () {
   m.style.display = "none";
 };
 
+// ✅ alias (caso alguma parte antiga chame o nome “sem Detalhamento”)
+window.vektorOpenItensIrregDetalhamentoModal = window.vektorOpenItensIrregDetalhamentoModal;
+window.vektorCloseItensIrregDetalhamentoModal = window.vektorCloseItensIrregDetalhamentoModal;
+
+window.vektorItensIrregDetBuildFilters_ = function () {
+  const rows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
+  const selLoja = document.getElementById("itensIrregDetFiltroLoja");
+  const selTime = document.getElementById("itensIrregDetFiltroTime");
+  if (!selLoja || !selTime) return;
+
+  const uniq = (arr) => Array.from(new Set(arr)).filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b), "pt-BR"));
+
+  const lojas = uniq(rows.map(r => String(r.loja || "").trim()).filter(x => x && x !== "—"));
+  const times = uniq(rows.map(r => String(r.time || "").trim()).filter(x => x && x !== "—"));
+
+  const curLoja = selLoja.value || "";
+  const curTime = selTime.value || "";
+
+  selLoja.innerHTML = `<option value="">Todas</option>` + lojas.map(x => `<option value="${String(x).replace(/"/g,'&quot;')}">${x}</option>`).join("");
+  selTime.innerHTML = `<option value="">Todos</option>` + times.map(x => `<option value="${String(x).replace(/"/g,'&quot;')}">${x}</option>`).join("");
+
+  selLoja.value = curLoja;
+  selTime.value = curTime;
+
+  selLoja.onchange = window.vektorRenderItensIrregDetalhamentoFromCache_;
+  selTime.onchange = window.vektorRenderItensIrregDetalhamentoFromCache_;
+};
+
+window.vektorClearItensIrregDetFilters_ = function() {
+  const selLoja = document.getElementById("itensIrregDetFiltroLoja");
+  const selTime = document.getElementById("itensIrregDetFiltroTime");
+  if (selLoja) selLoja.value = "";
+  if (selTime) selTime.value = "";
+  window.vektorRenderItensIrregDetalhamentoFromCache_();
+};
+
 // renderiza tabela do modal a partir do cache
 window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
-  const tbody = document.getElementById("itensIrregTbody");
+  const tbody = document.getElementById("itensIrregDetTbody");
   if (!tbody) return;
 
   const rows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
@@ -4711,17 +4853,18 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
       border:1px solid ${bd}; background:${bg}; color:${tx}; font-weight:1000; font-size:11px;">${x || "—"}</span>`;
   };
 
-  tbody.innerHTML = rows.map(r => `
-    <tr style="border-top:1px solid rgba(148,163,184,0.14);">
-      <td style="padding:10px; color:rgba(226,232,240,0.92); font-weight:800; font-size:12px;">${r.dataTxt || "—"}</td>
-      <td style="padding:10px; text-align:right; color:#fff; font-weight:1000; font-size:12px;">${fmtBRL(r.valor)}</td>
-      <td style="padding:10px; color:#fff; font-weight:1000; font-size:12px;">${r.loja || "—"}</td>
-      <td style="padding:10px; color:#fff; font-weight:1000; font-size:12px;">${r.time || "—"}</td>
-      <td style="padding:10px; color:rgba(226,232,240,0.92); font-weight:800; font-size:12px;">${r.item || "—"}</td>
-      <td style="padding:10px;">${badge(r.conformidade)}</td>
-      <td style="padding:10px; color:rgba(226,232,240,0.85); font-weight:800; font-size:12px;">${r.motivo || "—"}</td>
-    </tr>
-  `).join("");
+      tbody.innerHTML = rows.map(r => `
+      <tr style="border-bottom:1px solid rgba(15,23,42,0.22);">
+        <td style="padding:10px; color:rgba(15,23,42,0.92); font-weight:900; font-size:12px;">${r.dataTxt || "—"}</td>
+        <td style="padding:10px; text-align:right; color:rgba(15,23,42,0.92); font-weight:1000; font-size:12px;">${fmtBRL(r.valor)}</td>
+        <td style="padding:10px; color:rgba(15,23,42,0.92); font-weight:1000; font-size:12px;">${r.loja || "—"}</td>
+        <td style="padding:10px; color:rgba(15,23,42,0.88); font-weight:900; font-size:12px;">${r.time || "—"}</td>
+        <td style="padding:10px; color:rgba(15,23,42,0.88); font-weight:900; font-size:12px;">${r.item || "—"}</td>
+        <td style="padding:10px; color:rgba(15,23,42,0.92); font-weight:1000; font-size:12px;">${r.conformidade || "—"}</td>
+        <td style="padding:10px; color:rgba(15,23,42,0.82); font-weight:900; font-size:12px;">${r.motivo || "—"}</td>
+      </tr>
+    `).join("");
+
 };
 
 window.vektorExportRadarItensIrregularesCSV = function() {
@@ -4754,6 +4897,46 @@ window.vektorExportRadarItensIrregularesCSV = function() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 500);
+};
+
+window.vektorRenderItensIrregDetalhamentoModal_ = function() {
+  const tbody = document.getElementById("itensIrregDetTbody");
+  if (!tbody) return;
+
+  const base = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
+  const selLoja = (document.getElementById("itensIrregDetFilterLoja") || {}).value || "";
+  const selTime = (document.getElementById("itensIrregDetFilterTime") || {}).value || "";
+
+  let rows = base.slice();
+  if (selLoja) rows = rows.filter(r => String(r.loja || "").trim() === selLoja);
+  if (selTime) rows = rows.filter(r => String(r.time || "").trim() === selTime);
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; color:rgba(226,232,240,0.75); font-weight:900; font-size:12px;">Sem itens para os filtros selecionados.</td></tr>`;
+    return;
+  }
+
+  const fmtBRL = (v) => Number(v||0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+
+  tbody.innerHTML = rows.map(r => {
+    const conf = String(r.conformidade || "");
+    const confBg =
+      (conf.toUpperCase() === "ALERTA") ? "rgba(239,68,68,0.20)" :
+      (conf.toUpperCase() === "REVISAR") ? "rgba(251,191,36,0.18)" :
+      "rgba(34,197,94,0.16)";
+
+    return `
+      <tr style="border-bottom:1px solid rgba(148,163,184,0.10);">
+        <td style="padding:10px; color:rgba(226,232,240,0.90); font-size:12px; font-weight:800;">${r.dataTxt || ""}</td>
+        <td style="padding:10px; color:#fff; font-size:12px; font-weight:900; text-align:right;">${fmtBRL(r.valor)}</td>
+        <td style="padding:10px; color:#fff; font-size:12px; font-weight:900;">${r.loja || "—"}</td>
+        <td style="padding:10px; color:rgba(226,232,240,0.92); font-size:12px; font-weight:800;">${r.time || "—"}</td>
+        <td style="padding:10px; color:rgba(226,232,240,0.92); font-size:12px; font-weight:800;">${(r.item || "")}</td>
+        <td style="padding:10px; color:#fff; font-size:12px; font-weight:1000; background:${confBg}; border-radius:8px;">${conf}</td>
+        <td style="padding:10px; color:rgba(226,232,240,0.86); font-size:12px; font-weight:800;">${(r.motivo || "")}</td>
+      </tr>
+    `;
+  }).join("");
 };
 
 // ===============================
