@@ -1785,8 +1785,16 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
   }
 
   // Converte para datas comparáveis
-  var iniMs = (ini instanceof Date) ? ini.getTime() : new Date(ini).getTime();
-  var fimMs = (fim instanceof Date) ? fim.getTime() : new Date(fim).getTime();
+    // ✅ evita drift quando ini/fim chegam como "YYYY-MM-DD"
+  var iniD = (ini instanceof Date) ? ini : (vektorParseDateAny_(ini) || new Date(ini));
+  var fimD = (fim instanceof Date) ? fim : (vektorParseDateAny_(fim) || new Date(fim));
+
+  if (!(iniD instanceof Date) || isNaN(iniD.getTime()) || !(fimD instanceof Date) || isNaN(fimD.getTime())) {
+    return [];
+  }
+
+  var iniMs = iniD.getTime();
+  var fimMs = fimD.getTime();
 
   var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
 
@@ -1796,8 +1804,8 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
     var row = values[i];
 
     var dt = row[IDX_DATA];
-    var dt2 = (dt instanceof Date) ? dt : new Date(dt);
-    if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
+    var dt2 = (dt instanceof Date) ? dt : (vektorParseDateAny_(dt) || new Date(dt));
+      if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
 
     var tms = dt2.getTime();
     if (tms < iniMs || tms > fimMs) continue;
@@ -2752,12 +2760,29 @@ function _obterPendenciasLoja(lojaCodigo) {
       ? Utilities.formatDate(dataLinhaObj, tz, "dd/MM/yyyy")
       : (linha[COL_DATA_COBR] || "");
 
-    var dataTransFormat = "";
+        var dataTransFormat = "";
     var dataTransBruta = linha[COL_DATA_TRANS];
+
     if (dataTransBruta instanceof Date) {
-      dataTransFormat = Utilities.formatDate(dataTransBruta, tz, "dd/MM/yyyy");
+      // ✅ evita “voltar 1 dia” quando o Date veio como UTC midnight (date-only)
+      var isUtcMidnight =
+        dataTransBruta.getUTCHours() === 0 &&
+        dataTransBruta.getUTCMinutes() === 0 &&
+        dataTransBruta.getUTCSeconds() === 0;
+
+      dataTransFormat = Utilities.formatDate(
+        dataTransBruta,
+        isUtcMidnight ? "GMT" : tz,
+        "dd/MM/yyyy"
+      );
+
     } else {
-      dataTransFormat = dataTransBruta;
+      var s = String(dataTransBruta || "").trim();
+
+      // ✅ ISO yyyy-mm-dd (não passa por new Date)
+      var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) dataTransFormat = m[3] + "/" + m[2] + "/" + m[1];
+      else dataTransFormat = s;
     }
 
     linhasFiltradas.push([
@@ -3105,13 +3130,30 @@ function getPendenciasParaBloqueio(lojaCodigo) {
         ? Utilities.formatDate(dataLinhaObj, tz, "dd/MM/yyyy")
         : (linha[COL_DATA_COBR] || "");
 
-      var dataTransFormat = "";
-      var dataTransBruta = linha[COL_DATA_TRANS];
-      if (dataTransBruta instanceof Date) {
-        dataTransFormat = Utilities.formatDate(dataTransBruta, tz, "dd/MM/yyyy");
-      } else {
-        dataTransFormat = dataTransBruta;
-      }
+          var dataTransFormat = "";
+    var dataTransBruta = linha[COL_DATA_TRANS];
+
+    if (dataTransBruta instanceof Date) {
+      // ✅ evita “voltar 1 dia” quando o Date veio como UTC midnight (date-only)
+      var isUtcMidnight =
+        dataTransBruta.getUTCHours() === 0 &&
+        dataTransBruta.getUTCMinutes() === 0 &&
+        dataTransBruta.getUTCSeconds() === 0;
+
+      dataTransFormat = Utilities.formatDate(
+        dataTransBruta,
+        isUtcMidnight ? "GMT" : tz,
+        "dd/MM/yyyy"
+      );
+
+    } else {
+      var s = String(dataTransBruta || "").trim();
+
+      // ✅ ISO yyyy-mm-dd (não passa por new Date)
+      var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) dataTransFormat = m[3] + "/" + m[2] + "/" + m[1];
+      else dataTransFormat = s;
+    }
 
       linhasFiltradas.push([
         dataCobrFormat,
@@ -3224,7 +3266,6 @@ function getBaseClaraSheet_() {
   return ss.getSheetByName(SHEET_NOME_BASE_CLARA);
 }
 
-// Converte o valor da coluna "Data da Transação" para Date
 function parseDateClara_(value) {
   if (value === null || value === undefined || value === "") return null;
 
@@ -3235,8 +3276,8 @@ function parseDateClara_(value) {
 
   // Número (data serial do Sheets/Excel)
   if (typeof value === "number") {
-    // Google Sheets usa base 1899-12-30
-    var d0 = new Date(Date.UTC(1899, 11, 30));
+    // ✅ usa base LOCAL (evita UTC drift)
+    var d0 = new Date(1899, 11, 30, 12, 0, 0); // meio-dia
     var d = new Date(d0.getTime() + value * 24 * 60 * 60 * 1000);
     return isNaN(d.getTime()) ? null : d;
   }
@@ -3248,12 +3289,20 @@ function parseDateClara_(value) {
   var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/);
   if (m1) {
     var dd = Number(m1[1]), mm = Number(m1[2]) - 1, yy = Number(m1[3]);
-    var hh = Number(m1[4] || 0), mi = Number(m1[5] || 0), ss = Number(m1[6] || 0);
+    var hh = Number(m1[4] || 12), mi = Number(m1[5] || 0), ss = Number(m1[6] || 0);
     var d1 = new Date(yy, mm, dd, hh, mi, ss);
     return isNaN(d1.getTime()) ? null : d1;
   }
 
-  // ISO yyyy-MM-dd (com ou sem hora)
+  // ✅ ISO yyyy-MM-dd (com ou sem hora/Z) — NÃO usar new Date("yyyy-mm-dd") puro
+  var mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (mIso) {
+    var y = Number(mIso[1]), mo = Number(mIso[2]) - 1, d0 = Number(mIso[3]);
+    var dIso = new Date(y, mo, d0, 12, 0, 0); // meio-dia local
+    return isNaN(dIso.getTime()) ? null : dIso;
+  }
+
+  // fallback
   var d2 = new Date(s);
   return isNaN(d2.getTime()) ? null : d2;
 }
@@ -3453,11 +3502,17 @@ function vektorSaudacaoPorHora_() {
 }
 
 function vektorFormatDateBR_(d) {
-  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
   try {
-    if (d instanceof Date) return Utilities.formatDate(d, tz, "dd/MM/yyyy");
-  } catch (_) {}
-  return String(d || "").trim();
+    // Se vier string, tenta converter (blindagem)
+    if (!(d instanceof Date)) d = parseDateClara_(d);
+
+    if (!(d instanceof Date) || isNaN(d.getTime())) return String(d || "").trim();
+
+    // ✅ Como o Vektor exibe só DATA (sem hora), formate sempre em GMT e elimina -1 dia
+    return Utilities.formatDate(d, "GMT", "dd/MM/yyyy");
+  } catch (e) {
+    return String(d || "").trim();
+  }
 }
 
 function vektorQueryPendenciasRecusadas_(ini, fim) {
@@ -3469,7 +3524,7 @@ function vektorQueryPendenciasRecusadas_(ini, fim) {
 
   // Use header lookup para reduzir risco de coluna trocada.
   var iDataTrans = encontrarIndiceColuna_(header, ["Data da Transação"]);
-  var iEstab     = encontrarIndiceColuna_(header, ["Transação"]);          // (você está usando "Transação" como estabelecimento)
+  var iEstab     = encontrarIndiceColuna_(header, ["Transação"]); 
   var iValor     = encontrarIndiceColuna_(header, ["Valor original"]);
   var iCartao    = encontrarIndiceColuna_(header, ["Cartão"]);
   var iAlias     = encontrarIndiceColuna_(header, ["Alias Do Cartão"]);
@@ -3901,9 +3956,20 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
   vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadasDetalhado");
 
   try {
-    var ini = vektorParseIsoDateSafe_(dataInicioIso);
-    var fim = vektorParseIsoDateSafe_(dataFimIso);
+    // ✅ 1) Parse robusto (não confia só no vektorParseIsoDateSafe_)
+    // Aceita "YYYY-MM-DD" e também ISO com hora.
+    var ini0 = vektorParseIsoDateSafe_(dataInicioIso) || vektorParseDateAny_(dataInicioIso) || parseDateClara_(dataInicioIso);
+    var fim0 = vektorParseIsoDateSafe_(dataFimIso)   || vektorParseDateAny_(dataFimIso)   || parseDateClara_(dataFimIso);
+
+    // Re-normaliza via parseDateClara_ (corrige “date-only contaminado”)
+    var ini = parseDateClara_(ini0);
+    var fim = parseDateClara_(fim0);
+
     if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
+
+    // ✅ 2) Janela inclusiva (dia inteiro)
+    ini = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0, 0, 0, 0);
+    fim = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59, 999);
 
     var rows = vektorQueryPendenciasRecusadas_(ini, fim);
 
@@ -3923,33 +3989,24 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
     // ✅ série por data (para gráfico)
     var porData = {}; // { 'dd/MM/yyyy': qtd }
 
-          function vektorParseValorBRL_(valorOriginal, valorTxt) {
-        // 1) Se já veio número, é a fonte de verdade
-        if (typeof valorOriginal === "number" && isFinite(valorOriginal)) {
-          return valorOriginal;
-        }
-
-        // 2) Se veio texto
-        var s = String(valorTxt || valorOriginal || "").trim();
-        if (!s) return 0;
-
-        // remove moeda/espaços
-        s = s.replace(/[R$\s]/g, "");
-
-        // caso comum PT-BR: 1.234,56
-        if (s.indexOf(",") >= 0) {
-          s = s.replace(/\./g, "").replace(",", ".");
-          var n1 = Number(s);
-          return isNaN(n1) ? 0 : n1;
-        }
-
-        // caso comum EN/numérico: 1234.56  (NÃO remove ponto)
-        var n2 = Number(s);
-        return isNaN(n2) ? 0 : n2;
+    function vektorParseValorBRL_(valorOriginal, valorTxt) {
+      if (typeof valorOriginal === "number" && isFinite(valorOriginal)) {
+        return valorOriginal;
       }
+      var s = String(valorTxt || valorOriginal || "").trim();
+      if (!s) return 0;
+      s = s.replace(/[R$\s]/g, "");
+      if (s.indexOf(",") >= 0) {
+        s = s.replace(/\./g, "").replace(",", ".");
+        var n1 = Number(s);
+        return isNaN(n1) ? 0 : n1;
+      }
+      var n2 = Number(s);
+      return isNaN(n2) ? 0 : n2;
+    }
 
-      // ✅ pendências por loja (para tooltip do donut)
-      var pendPorLoja = {}; // lojaKey -> {rec, etq, desc, div, totalFlags}
+    // ✅ pendências por loja (para tooltip do donut)
+    var pendPorLoja = {}; // lojaKey -> {rec, etq, desc, div, totalFlags}
 
     rows.forEach(function (r) {
       lojasSet[r.lojaKey] = true;
@@ -3960,24 +4017,24 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
       if (r.pendDivergNF) cDiv++;
 
       // ✅ agrega por loja + tipo (stacked)
-        var lk = String(r.lojaKey || "").trim().toUpperCase();
-        if (lk) {
-          var hasAny = !!(r.pendRecibo || r.pendEtq || r.pendDesc || r.pendDivergNF);
-          if (hasAny) {
-            if (!pendPorLoja[lk]) pendPorLoja[lk] = { rec: 0, etq: 0, desc: 0, div: 0, totalFlags: 0 };
+      var lk = String(r.lojaKey || "").trim().toUpperCase();
+      if (lk) {
+        var hasAny = !!(r.pendRecibo || r.pendEtq || r.pendDesc || r.pendDivergNF);
+        if (hasAny) {
+          if (!pendPorLoja[lk]) pendPorLoja[lk] = { rec: 0, etq: 0, desc: 0, div: 0, totalFlags: 0 };
 
-            if (r.pendRecibo) { pendPorLoja[lk].rec++;  pendPorLoja[lk].totalFlags++; }
-            if (r.pendEtq)    { pendPorLoja[lk].etq++;  pendPorLoja[lk].totalFlags++; }
-            if (r.pendDesc)   { pendPorLoja[lk].desc++; pendPorLoja[lk].totalFlags++; }
-            if (r.pendDivergNF){pendPorLoja[lk].div++;  pendPorLoja[lk].totalFlags++; }
-          }
+          if (r.pendRecibo) { pendPorLoja[lk].rec++;  pendPorLoja[lk].totalFlags++; }
+          if (r.pendEtq)    { pendPorLoja[lk].etq++;  pendPorLoja[lk].totalFlags++; }
+          if (r.pendDesc)   { pendPorLoja[lk].desc++; pendPorLoja[lk].totalFlags++; }
+          if (r.pendDivergNF){pendPorLoja[lk].div++;  pendPorLoja[lk].totalFlags++; }
         }
+      }
 
       var tx = String(r.txKey || "").trim();
       r.jaEnviado = !!(tx && sentMap[tx]);
       if (r.jaEnviado) jaEnviadas++;
 
-        // ===== VALOR TOTAL (RECUSADAS COM PENDÊNCIA) =====
+      // ===== VALOR TOTAL (RECUSADAS COM PENDÊNCIA) =====
       var n = vektorParseValorBRL_(r.valorOriginal, r.valorOriginalTxt);
       var st = String(r.statusAprovacao || "").toLowerCase().trim();
       if (
@@ -3985,9 +4042,9 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         (r.pendRecibo || r.pendEtq || r.pendDesc || r.pendDivergNF)
       ) {
         totalValorRecusadas += n;
-        var lk = String(r.lojaKey || "").trim().toUpperCase();
-        if (lk) {
-          mapaValorPorLoja[lk] = (mapaValorPorLoja[lk] || 0) + n;
+        var lk2 = String(r.lojaKey || "").trim().toUpperCase();
+        if (lk2) {
+          mapaValorPorLoja[lk2] = (mapaValorPorLoja[lk2] || 0) + n;
         }
       }
 
@@ -4003,32 +4060,32 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
       }
     });
 
-        var lojasValorArr = Object.keys(mapaValorPorLoja).map(function(k){
-          return { lojaKey: k, valor: mapaValorPorLoja[k] || 0 };
-        }).sort(function(a,b){
-          return (b.valor || 0) - (a.valor || 0);
-        });
+    var lojasValorArr = Object.keys(mapaValorPorLoja).map(function(k){
+      return { lojaKey: k, valor: mapaValorPorLoja[k] || 0 };
+    }).sort(function(a,b){
+      return (b.valor || 0) - (a.valor || 0);
+    });
 
-        // ===== ENRIQUECE lojasValorArr com TIME (para filtro no popup) =====
-        var mapEmailsLojas = {};
-        try {
-          mapEmailsLojas = vektorCarregarMapaEmailsLojas_() || {};
-        } catch (eMap) {
-          mapEmailsLojas = {};
-        }
+    // ===== ENRIQUECE lojasValorArr com TIME (para filtro no popup) =====
+    var mapEmailsLojas = {};
+    try {
+      mapEmailsLojas = vektorCarregarMapaEmailsLojas_() || {};
+    } catch (eMap) {
+      mapEmailsLojas = {};
+    }
 
-        lojasValorArr = (lojasValorArr || []).map(function (it) {
-          var lk = String(it && it.lojaKey ? it.lojaKey : "").trim().toUpperCase();
-          var time = "";
-          if (lk && mapEmailsLojas[lk] && mapEmailsLojas[lk].time) {
-            time = String(mapEmailsLojas[lk].time || "").trim();
-          }
-          return {
-            lojaKey: lk,
-            valor: Number(it && it.valor ? it.valor : 0) || 0,
-            time: time || "—"
-          };
-        });
+    lojasValorArr = (lojasValorArr || []).map(function (it) {
+      var lk3 = String(it && it.lojaKey ? it.lojaKey : "").trim().toUpperCase();
+      var time = "";
+      if (lk3 && mapEmailsLojas[lk3] && mapEmailsLojas[lk3].time) {
+        time = String(mapEmailsLojas[lk3].time || "").trim();
+      }
+      return {
+        lojaKey: lk3,
+        valor: Number(it && it.valor ? it.valor : 0) || 0,
+        time: time || "—"
+      };
+    });
 
     // ordena datas (dd/MM/yyyy -> yyyy-MM-dd)
     var seriePorData = Object.keys(porData)
@@ -4041,21 +4098,21 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         return { data: d, total: porData[d] };
       });
 
-      // ✅ array ordenado para o tooltip (maior volume de pendências primeiro)
-        var lojasPendStack = Object.keys(pendPorLoja).map(function(k){
-          var o = pendPorLoja[k];
-          var den = o.totalFlags || 1;
-          return {
-            lojaKey: k,
-            totalFlags: o.totalFlags || 0,
-            pctRecibo:  (o.rec  || 0) / den,
-            pctEtiqueta:(o.etq  || 0) / den,
-            pctDescricao:(o.desc|| 0) / den,
-            pctDivergNF:(o.div  || 0) / den
-          };
-        }).sort(function(a,b){
-          return (b.totalFlags||0) - (a.totalFlags||0);
-        });
+    // ✅ array ordenado para o tooltip (maior volume de pendências primeiro)
+    var lojasPendStack = Object.keys(pendPorLoja).map(function(k){
+      var o = pendPorLoja[k];
+      var den = o.totalFlags || 1;
+      return {
+        lojaKey: k,
+        totalFlags: o.totalFlags || 0,
+        pctRecibo:  (o.rec  || 0) / den,
+        pctEtiqueta:(o.etq  || 0) / den,
+        pctDescricao:(o.desc|| 0) / den,
+        pctDivergNF:(o.div  || 0) / den
+      };
+    }).sort(function(a,b){
+      return (b.totalFlags||0) - (a.totalFlags||0);
+    });
 
     return {
       ok: true,
@@ -4075,9 +4132,9 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
         totalValor: totalValorRecusadas,
         lojasValor: lojasValorArr,
         totalJaEnviadas: jaEnviadas,
-        statusMix: statusMix,
+        statusMix: statusMix
       },
-      seriePorData: seriePorData, // ✅ NOVO
+      seriePorData: seriePorData,
       rows: rows
     };
 
@@ -6979,14 +7036,15 @@ function gerarRelatorioOfensorasPendencias_(diasJanela) {
   function getLojaKey(loja){ return String(loja || "").trim() || "(N/D)"; }
 
   data.forEach(function(r){
-    var dtSnap = (r[0] instanceof Date) ? r[0] : new Date(r[0]);
+    var dtSnap = (r[0] instanceof Date) ? r[0] : (vektorParseDateAny_(r[0]) || new Date(r[0]));
     if (!(dtSnap instanceof Date) || isNaN(dtSnap.getTime())) return;
     if (dtSnap < inicio) return;
 
     var lojaKey = getLojaKey(r[1]);
     var lojaNum = normalizarLojaNumero_(lojaKey);
 
-    var dtTx = (r[2] instanceof Date) ? r[2] : new Date(r[2]);
+    var dtTx = (r[2] instanceof Date) ? r[2] : (vektorParseDateAny_(r[2]) || new Date(r[2]));
+
 
     var valor = Number(r[3]) || 0;
     var pe = Number(r[4]) || 0;
@@ -8258,7 +8316,7 @@ if (cicloKey !== cicloLast) {
       if (qtde <= 0) continue; // só grava se houver pendência
 
       // Guarda data transação como Date se vier string
-      var dt2 = (dt instanceof Date) ? dt : new Date(dt);
+      var dt2 = (dt instanceof Date) ? dt : (vektorParseDateAny_(dt) || new Date(dt));
 
       // ✅ filtro do ciclo: só grava transações dentro do 06→05
       if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
