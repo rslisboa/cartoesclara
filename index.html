@@ -3631,9 +3631,11 @@ window.vektorEnvioPendenciasPreview = function () {
       return;
     }
 
-    const iniIso = new Date(ini + "T00:00:00").toISOString();
-    const fimIso = new Date(fim + "T00:00:00").toISOString();
+    // ✅ envie "YYYY-MM-DD" puro (sem ISO/UTC)
+    const iniIso = String(ini || "").trim();
+    const fimIso = String(fim || "").trim();
     window.__envPend.periodo = { iniIso, fimIso };
+
 
     window.vektorEnvPendOverlayShow_("Gerando prévia, aguarde…", "Consultando Transações e preparando os dados.");
 
