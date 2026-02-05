@@ -4808,22 +4808,58 @@ window.vektorItensIrregDetBuildFilters_ = function () {
   const selTime = document.getElementById("itensIrregDetFiltroTime");
   if (!selLoja || !selTime) return;
 
-  const uniq = (arr) => Array.from(new Set(arr)).filter(Boolean).sort((a,b)=>String(a).localeCompare(String(b), "pt-BR"));
+  const curLoja = String(selLoja.value || "").trim();
+  const curTime = String(selTime.value || "").trim();
 
-  const lojas = uniq(rows.map(r => String(r.loja || "").trim()).filter(x => x && x !== "—"));
-  const times = uniq(rows.map(r => String(r.time || "").trim()).filter(x => x && x !== "—"));
+  const norm = (x) => String(x || "").trim();
+  const uniq = (arr) => Array.from(new Set(arr)).filter(Boolean).sort((a, b) => String(a).localeCompare(String(b), "pt-BR"));
 
-  const curLoja = selLoja.value || "";
-  const curTime = selTime.value || "";
+  // 1) calcula lojas possíveis respeitando o TIME selecionado
+  const lojasPossiveis = uniq(
+    rows
+      .filter(r => !curTime || norm(r.time) === curTime)
+      .map(r => norm(r.loja))
+      .filter(x => x && x !== "—")
+  );
 
-  selLoja.innerHTML = `<option value="">Todas</option>` + lojas.map(x => `<option value="${String(x).replace(/"/g,'&quot;')}">${x}</option>`).join("");
-  selTime.innerHTML = `<option value="">Todos</option>` + times.map(x => `<option value="${String(x).replace(/"/g,'&quot;')}">${x}</option>`).join("");
+  // 2) calcula times possíveis respeitando a LOJA selecionada
+  const timesPossiveis = uniq(
+    rows
+      .filter(r => !curLoja || norm(r.loja) === curLoja)
+      .map(r => norm(r.time))
+      .filter(x => x && x !== "—")
+  );
 
-  selLoja.value = curLoja;
-  selTime.value = curTime;
+  // helper para montar options
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-  selLoja.onchange = window.vektorRenderItensIrregDetalhamentoFromCache_;
-  selTime.onchange = window.vektorRenderItensIrregDetalhamentoFromCache_;
+  // atualiza select Loja
+  selLoja.innerHTML =
+    `<option value="">Todas</option>` +
+    lojasPossiveis.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+
+  // atualiza select Time
+  selTime.innerHTML =
+    `<option value="">Todos</option>` +
+    timesPossiveis.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+
+    // ✅ cascata: ao mudar um, refaz opções do outro e re-renderiza a tabela
+    selLoja.onchange = function () {
+      window.vektorItensIrregDetBuildFilters_();             // refaz opções respeitando a Loja
+      window.vektorRenderItensIrregDetalhamentoFromCache_(); // re-renderiza tabela
+    };
+
+    selTime.onchange = function () {
+      window.vektorItensIrregDetBuildFilters_();             // refaz opções respeitando o Time
+      window.vektorRenderItensIrregDetalhamentoFromCache_(); // re-renderiza tabela
+    };
+
+  // 3) tenta manter seleção atual, mas se não existir mais, zera
+  if (curLoja && lojasPossiveis.indexOf(curLoja) === -1) selLoja.value = "";
+  else selLoja.value = curLoja;
+
+  if (curTime && timesPossiveis.indexOf(curTime) === -1) selTime.value = "";
+  else selTime.value = curTime;
 };
 
 window.vektorClearItensIrregDetFilters_ = function() {
@@ -4831,6 +4867,7 @@ window.vektorClearItensIrregDetFilters_ = function() {
   const selTime = document.getElementById("itensIrregDetFiltroTime");
   if (selLoja) selLoja.value = "";
   if (selTime) selTime.value = "";
+  window.vektorItensIrregDetBuildFilters_();
   window.vektorRenderItensIrregDetalhamentoFromCache_();
 };
 
