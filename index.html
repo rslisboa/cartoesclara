@@ -1254,27 +1254,28 @@ display: none;
           </button>
          <button id="radarBtn7d" type="button" onclick="window.vektorOpenRadar('7d')"
             style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; display:inline-flex; align-items:center;justify-content:center;">
             7 dias
           </button>
 
           <button id="radarBtnCiclo" type="button" onclick="window.vektorOpenRadar('ciclo')"
             style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; display:inline-flex; align-items:center;justify-content:center;">
             Ciclo
           </button>
 
           <button id="radarBtnFull" type="button" onclick="window.vektorOpenRadar('full')"
             style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; display:inline-flex; align-items:center;justify-content:center;">
             Base toda
           </button>
 
           <button
+          id="radarBtnComoAnalise"
             type="button"
             onclick="openRadarAnaliseModal()"
             style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; display:inline-flex; align-items:center;justify-content:center;">
             Como acontece a análise?
           </button>
 
@@ -1311,10 +1312,22 @@ display: none;
           style="height:36px; width:100%; padding:0 10px; border-radius:10px; border:1px solid rgba(148,163,184,0.22); background:rgba(255,255,255,0.06); color:#fff; font-weight:800; font-size:12px;">
       </div>
 
+            <div>
+        <div style="color:rgba(226,232,240,0.8); font-size:11px; font-weight:900;">&nbsp;</div>
+        <button type="button" onclick="window.vektorLoadRadarItensIrregulares()"
+          style="height:36px; padding:0 14px; border-radius:10px;
+                display:inline-flex; align-items:center; justify-content:center;
+                border:1px solid rgba(0,0,0,0.25);
+                background:#7CFC00; color:#111827; font-weight:1000; font-size:12px;">
+          Atualizar
+        </button>
+      </div>
+
       <div>
         <div style="color:rgba(226,232,240,0.8); font-size:11px; font-weight:900;">Conformidade</div>
         <select id="itensIrregConf" onchange="window.vektorLoadRadarItensIrregulares()"
-          style="height:36px; padding:0 10px; border-radius:10px; border:1px solid rgba(148,163,184,0.22); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+          style="height:36px; padding:0 10px; border-radius:10px; border:1px solid rgba(148,163,184,0.22);
+                background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
           <option value="" selected>Todos</option>
           <option value="OK">OK</option>
           <option value="REVISAR">REVISAR</option>
@@ -1325,31 +1338,34 @@ display: none;
       <div>
         <div style="color:rgba(226,232,240,0.8); font-size:11px; font-weight:900;">Gráfico por</div>
         <select id="itensIrregGroupBy" onchange="window.vektorLoadRadarItensIrregulares()"
-          style="height:36px; padding:0 10px; border-radius:10px; border:1px solid rgba(148,163,184,0.22); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+          style="height:36px; padding:0 10px; border-radius:10px; border:1px solid rgba(148,163,184,0.22);
+                background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
           <option value="loja" selected>Loja</option>
           <option value="time">Time</option>
         </select>
       </div>
 
       <div style="display:flex; gap:8px; margin-left:auto; flex-wrap:wrap;">
-        <button type="button" onclick="window.vektorLoadRadarItensIrregulares()"
-          style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                 background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px;">
-          Atualizar
-        </button>
+
         <button type="button" onclick="window.vektorExportRadarItensIrregularesCSV()"
-          style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                 background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px;">
+          style="height:36px; padding:0 14px; border-radius:10px;
+                display:inline-flex; align-items:center; justify-content:center;
+                border:1px solid rgba(255,255,255,0.18);
+                background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px;">
           Exportar CSV
         </button>
+
         <button type="button" onclick="window.vektorOpenItensIrregDetalhamentoModal()"
-        style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(181,255,32,0.30);
-              background:rgba(181,255,32,0.10); color:#B5FF20; font-weight:1000; font-size:12px;">
-        Ver detalhamento
-      </button>
+          style="height:36px; padding:0 14px; border-radius:10px;
+                display:inline-flex; align-items:center; justify-content:center;
+                border:1px solid rgba(181,255,32,0.30);
+                background:rgba(181,255,32,0.10); color:#B5FF20; font-weight:1000; font-size:12px;">
+          Ver detalhamento
+        </button>
+
       </div>
-    </div>
-  </div>
+      </div>
+      </div>
 
   <!-- KPIs -->
   <div style="display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:10px; margin-top:12px;">
@@ -4475,15 +4491,27 @@ window.vektorSetRadarViewMode_ = function(mode) {
   const itensView = document.getElementById("radarItensView");
   const btnItens = document.getElementById("radarBtnItens");
 
+    // ✅ botões que só fazem sentido no RADAR (devem sumir no modo ITENS)
+  const btn7d = document.getElementById("radarBtn7d");
+  const btnCiclo = document.getElementById("radarBtnCiclo");
+  const btnFull = document.getElementById("radarBtnFull");
+  const btnComo = document.getElementById("radarBtnComoAnalise");
+
+  const showRadarButtons = (window.__radarViewMode === "RADAR");
+  [btn7d, btnCiclo, btnFull, btnComo].forEach(function(b){
+    if (!b) return;
+    b.style.display = showRadarButtons ? "inline-flex" : "none";
+  });
+
   if (radarContent) radarContent.style.display = (window.__radarViewMode === "RADAR") ? "grid" : "none";
   if (itensView) itensView.style.display = (window.__radarViewMode === "ITENS") ? "block" : "none";
 
   if (btnItens) {
     btnItens.textContent = (window.__radarViewMode === "ITENS") ? "Radar" : "Itens Irregulares";
-    btnItens.style.background = (window.__radarViewMode === "ITENS") ? "rgba(255,255,255,0.06)" : "#fde68a";
-    btnItens.style.color = (window.__radarViewMode === "ITENS") ? "#ffffff" : "#111827";
-    btnItens.style.borderColor = (window.__radarViewMode === "ITENS") ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.25)";
-    btnItens.style.fontWeight = (window.__radarViewMode === "ITENS") ? "900" : "1000";
+    btnItens.style.background = (window.__radarViewMode === "ITENS") ? "rgba(226,232,240,0.90)" : "#fde68a"; // cinza claro
+    btnItens.style.color = (window.__radarViewMode === "ITENS") ? "#111827" : "#111827"; // texto preto
+    btnItens.style.borderColor = (window.__radarViewMode === "ITENS") ? "rgba(15,23,42,0.25)" : "rgba(0,0,0,0.25)";
+    btnItens.style.fontWeight = (window.__radarViewMode === "ITENS") ? "1000" : "1000";
   }
 };
 
