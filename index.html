@@ -4834,37 +4834,68 @@ window.vektorClearItensIrregDetFilters_ = function() {
   window.vektorRenderItensIrregDetalhamentoFromCache_();
 };
 
-// renderiza tabela do modal a partir do cache
 window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
   const tbody = document.getElementById("itensIrregDetTbody");
   if (!tbody) return;
 
-  const rows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
+  const baseRows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
 
-  const fmtBRL = (v) => Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  // ✅ lê filtros do modal
+  const selLojaEl = document.getElementById("itensIrregDetFiltroLoja");
+  const selTimeEl = document.getElementById("itensIrregDetFiltroTime");
+  const selLoja = selLojaEl ? String(selLojaEl.value || "").trim() : "";
+  const selTime = selTimeEl ? String(selTimeEl.value || "").trim() : "";
+
+  // ✅ aplica filtros (local, sem backend)
+  let rows = baseRows.slice();
+  if (selLoja) rows = rows.filter(r => String(r.loja || "").trim() === selLoja);
+  if (selTime) rows = rows.filter(r => String(r.time || "").trim() === selTime);
+
+  const fmtBRL = (v) =>
+    Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const badge = (c) => {
     const x = String(c || "").toUpperCase();
     let bg = "rgba(255,255,255,0.06)", bd = "rgba(148,163,184,0.25)", tx = "rgba(226,232,240,0.95)";
-    if (x === "OK") { bg = "rgba(34,197,94,0.18)"; bd = "rgba(34,197,94,0.35)"; tx = "#bbf7d0"; }
-    if (x === "REVISAR") { bg = "rgba(245,158,11,0.18)"; bd = "rgba(245,158,11,0.35)"; tx = "#fde68a"; }
-    if (x === "ALERTA") { bg = "rgba(248,113,113,0.18)"; bd = "rgba(248,113,113,0.35)"; tx = "#fecaca"; }
+    if (x === "OK") { bg = "rgba(34,197,94,0.18)"; bd = "rgba(34,197,94,0.35)"; tx = "#14532d"; }
+    if (x === "REVISAR") { bg = "rgba(245,158,11,0.20)"; bd = "rgba(245,158,11,0.40)"; tx = "#713f12"; }
+    if (x === "ALERTA") { bg = "rgba(248,113,113,0.20)"; bd = "rgba(248,113,113,0.40)"; tx = "#7f1d1d"; }
     return `<span style="display:inline-flex; align-items:center; height:22px; padding:0 10px; border-radius:999px;
       border:1px solid ${bd}; background:${bg}; color:${tx}; font-weight:1000; font-size:11px;">${x || "—"}</span>`;
   };
 
-      tbody.innerHTML = rows.map(r => `
-      <tr style="border-bottom:1px solid rgba(15,23,42,0.22);">
-        <td style="padding:10px; color:rgba(15,23,42,0.92); font-weight:900; font-size:12px;">${r.dataTxt || "—"}</td>
-        <td style="padding:10px; text-align:right; color:rgba(15,23,42,0.92); font-weight:1000; font-size:12px;">${fmtBRL(r.valor)}</td>
-        <td style="padding:10px; color:rgba(15,23,42,0.92); font-weight:1000; font-size:12px;">${r.loja || "—"}</td>
-        <td style="padding:10px; color:rgba(15,23,42,0.88); font-weight:900; font-size:12px;">${r.time || "—"}</td>
-        <td style="padding:10px; color:rgba(15,23,42,0.88); font-weight:900; font-size:12px;">${r.item || "—"}</td>
-        <td style="padding:10px; color:rgba(15,23,42,0.92); font-weight:1000; font-size:12px;">${r.conformidade || "—"}</td>
-        <td style="padding:10px; color:rgba(15,23,42,0.82); font-weight:900; font-size:12px;">${r.motivo || "—"}</td>
-      </tr>
-    `).join("");
+  // ✅ empty state quando filtros “zerarem” a lista
+  if (!rows.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="padding:12px; color:rgba(15,23,42,0.75); font-weight:900; font-size:12px;">
+          Sem itens para os filtros selecionados.
+        </td>
+      </tr>`;
+    return;
+  }
 
+  // ✅ GRID real (vertical + horizontal) + zebra pra ficar visível
+  const grid = "1px solid rgba(2,6,23,0.22)"; // preto suave
+  const tdBase = `padding:10px; border-bottom:${grid}; border-right:${grid};
+                  color:rgba(15,23,42,0.92); font-weight:900; font-size:12px;`;
+
+  tbody.innerHTML = rows.map((r, idx) => {
+    const bg = (idx % 2 === 0) ? "rgba(226,232,240,0.92)" : "rgba(226,232,240,0.82)";
+    const td = (extra) => `${tdBase} background:${bg}; ${extra || ""}`;
+
+    return `
+      <tr>
+        <td style="${td()}">${r.dataTxt || "—"}</td>
+        <td style="${td("text-align:right; font-weight:1000;")}">${fmtBRL(r.valor)}</td>
+        <td style="${td("font-weight:1000;")}">${r.loja || "—"}</td>
+        <td style="${td("font-weight:900;")}">${r.time || "—"}</td>
+        <td style="${td("font-weight:900;")}">${r.item || "—"}</td>
+        <td style="${td("font-weight:1000;")}">${badge(r.conformidade || r.status || "")}</td>
+        <td style="${td("border-right:none; font-weight:900; color:rgba(15,23,42,0.82);")}">${r.motivo || "—"}</td>
+      </tr>
+    `;
+  }).join("");
 };
 
 window.vektorExportRadarItensIrregularesCSV = function() {
