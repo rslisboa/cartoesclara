@@ -455,41 +455,6 @@ display: none;
   display: none;
 }
 
-/* ============================
-   HOME - Seta animada (overlay)
-   ============================ */
-/* wrapper continua só posicionado/centralizado */
-#homeNavArrowWrap{
-  position:absolute;
-  left:50%;
-  transform:translateX(-50%);
-  width:min(580px, 74%);
-  height:64px;
-  z-index:60;
-  pointer-events:none;
-  opacity:1;               /* deixa visível; quem anima é o SVG */
-  filter: drop-shadow(0 10px 22px rgba(0,0,0,0.35));
-}
-
-#homeNavArrowSvg{
-  width:100%;
-  height:100%;
-  display:block;
-  opacity:0;               /* começa invisível */
-}
-
-/* entra da direita, para, segura, e some */
-@keyframes vektorArrowInHoldOut {
-  0%   { transform: translateX(120%); opacity:0; }
-  18%  { transform: translateX(0%);   opacity:1; } /* chegou na posição final */
-  82%  { transform: translateX(0%);   opacity:1; } /* segura parado */
-  100% { transform: translateX(0%);   opacity:0; } /* some (sem mover) */
-}
-
-.vektor-arrow-run #homeNavArrowSvg{
-  animation: vektorArrowInHoldOut 6000ms cubic-bezier(.16,1,.3,1) both;
-}
-
 </style>
 
 <style>
@@ -796,14 +761,14 @@ display: none;
 
 <? } ?>
 
-  <!-- Botão: Feedback -->
+  <!-- Botão: Feedbacks
   <button
     type="button"
     onclick="window.vektorOpenFeedback()"
     class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
     📝 Feedback
-  </button>
+  </button> -->
 
   </div> <!-- fim do conteúdo rolável -->
 
@@ -842,31 +807,6 @@ display: none;
     alt="Vektor"
     style="width:100%; height:100%; object-fit:cover; display:block;"
   />
-
-  <!-- ✅ NOVO: seta animada de instrução (aparece ao carregar a Home) -->
-  <div id="homeNavArrowWrap" aria-hidden="true">
-    <svg id="homeNavArrowSvg" viewBox="0 0 820 84" preserveAspectRatio="none">
-      <!-- seta para a ESQUERDA -->
-      <polygon
-        points="820,8 120,8 120,0 0,32 120,64 120,56 820,56"
-        fill="#000000"
-        stroke="#B5FF20"
-        stroke-width="2"
-        stroke-linejoin="round"
-      />
-      <text
-        x="470"
-        y="38"
-        text-anchor="middle"
-        font-size="21"
-        font-weight="800"
-        fill="#FFFFFF"
-        style="font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;"
-      >
-        Clique nos botões ao lado para navegar no sistema.
-      </text>
-    </svg>
-  </div>
 </div>
 
 <!-- BODY -->
@@ -22387,79 +22327,9 @@ window.addEventListener("load", function () {
   const home = document.getElementById("homeView");
   if (!home) return;
 
-  // mantém animação atual do home
   requestAnimationFrame(() => {
     home.style.opacity = "1";
     home.style.filter = "blur(0px)";
-  });
-
-  // ✅ Delay: só dispara a seta 2s DEPOIS que a imagem já carregou/apareceu
-  const ARROW_DELAY_MS = 2000;
-
-  // ✅ NOVO: seta após a imagem carregar + alinhada com o botão Chat
-  function posicionarSeta_() {
-    try {
-      const wrap = document.getElementById("homeNavArrowWrap");
-      const chatBtn = document.getElementById("navChatBtn");
-      if (!wrap || !chatBtn) return;
-
-      const rHome = home.getBoundingClientRect();
-      const rBtn = chatBtn.getBoundingClientRect();
-
-      // --- TOP: alinha no meio do botão Chat ---
-      const yCentroBtn = rBtn.top + rBtn.height / 2;
-      const topNoHome = (yCentroBtn - rHome.top) - (wrap.offsetHeight / 2);
-      const topClamp = Math.max(16, Math.min(topNoHome, rHome.height - wrap.offsetHeight - 16));
-      wrap.style.top = `${topClamp}px`;
-
-      // --- LEFT: garante que a seta comece depois do menu ---
-      const GAP = 18; // folga entre menu e seta
-      const leftEdgeDesejado = (rBtn.right - rHome.left) + GAP;
-
-      // como o wrap usa transform: translateX(-50%), o style.left deve ser o "centro" do wrap
-      const wrapW = wrap.offsetWidth || 820;
-      const centroDesejado = leftEdgeDesejado + (wrapW / 2);
-
-      // clamp horizontal para não estourar do lado direito
-      const centroMin = (wrapW / 2) + 8;
-      const centroMax = rHome.width - (wrapW / 2) - 8;
-
-      const centroClamp = Math.max(centroMin, Math.min(centroDesejado, centroMax));
-      wrap.style.left = `${centroClamp}px`; // ✅ sobrescreve o left:50% na prática
-    } catch (e) {}
-  }
-
-  function mostrarSeta_() {
-    const wrap = document.getElementById("homeNavArrowWrap");
-    if (!wrap) return;
-
-    posicionarSeta_();
-
-    // reinicia a animação SEM bug
-    wrap.classList.remove("vektor-arrow-run");
-    void wrap.offsetWidth; // força reflow para reiniciar
-    wrap.classList.add("vektor-arrow-run");
-  }
-
-  function agendarSeta_() {
-    setTimeout(mostrarSeta_, ARROW_DELAY_MS);
-  }
-
-  const img = document.getElementById("homeHeroImg");
-  if (img) {
-    if (img.complete) {
-      agendarSeta_();
-    } else {
-      img.addEventListener("load", agendarSeta_, { once: true });
-    }
-  } else {
-    // fallback: se não achar img por algum motivo, tenta mesmo assim
-    setTimeout(mostrarSeta_, ARROW_DELAY_MS);
-  }
-
-  // se a tela redimensionar, recalcula posição (sem re-exibir a animação)
-  window.addEventListener("resize", () => {
-    posicionarSeta_();
   });
 });
 
