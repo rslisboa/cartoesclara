@@ -6587,22 +6587,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderSaudacaoVektor_();
     
-// 🔹 Mensagem inicial: exemplos do que o Vektor faz
+// 🔹 Mensagem inicial: CTA para abrir o guia "Como usar o Vektor"
 renderBotMessage(
   "HTML:" +
-  "<p class='text-sm text-slate-700' style='margin-top:8px;'>" +
-    "Aqui estão alguns exemplos do que o Vektor pode fazer por você:" +
-  "</p>" +
-  "<ul class='text-sm text-slate-700' style='margin-left:14px;margin-top:4px;line-height:1.45;'>" +
-    "<li>• Consultar <b>pendências</b> e <b>justificativas</b> das lojas.</li>" +
-    "<li>• Enviar <b>alertas</b> por email sobre os principais procedimentos do cartão Clara.</li>" +
-    "<li>• Exibir <b>tabelas detalhadas</b> com pendências ou justificativas completas.</li>" +
-    "<li>• Mostrar <b>valor da fatura atual</b>, do mês passado ou das últimas faturas.</li>" +
-    "<li>• Gerar <b>ranking</b> por loja, por time, por categoria ou por estabelecimento.</li>" +
-    "<li>• Explicar regras da <b>Política de Uso dos Cartões Clara</b>.</li>" +
-    "<li>• Ajudar com informações de <b>desbloqueio</b>, <b>perda</b>, <b>regras de compra</b>, NF/Recibo e uso correto do cartão.</li>" +
-    "<li>• Enviar <b>pendências por e-mail</b>, e muito mais!</li>" +
-  "</ul>"
+  "<div class='text-sm text-slate-700' style='margin-top:8px'>" +
+    "<div style='margin-bottom:8px; font-weight:800; color:#0f172a;'>Quer ver o guia rápido do Vektor?</div>" +
+    "<button type='button' onclick='openAjudaVektorModal()' " +
+      "style='width:100%; display:flex; align-items:center; justify-content:center; gap:8px;" +
+      "padding:10px 12px; border-radius:12px; border:1px solid rgba(181,255,32,0.9);" +
+      "background:#0b1220; color:#fff; font-weight:900; cursor:pointer;'>" +
+      "❓ Como usar o Vektor" +
+    "</button>" +
+    "<div style='margin-top:8px; font-size:12px; color:#475569;'>Clique para abrir exemplos e procedimentos.</div>" +
+  "</div>"
 );
 
 // 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
@@ -22323,14 +22320,24 @@ userInput.addEventListener("keydown", (e) => {
 
 <script>
   
-window.addEventListener("load", function () {
+document.addEventListener("DOMContentLoaded", function () {
   const home = document.getElementById("homeView");
+  const img  = document.getElementById("homeHeroImg");
   if (!home) return;
 
-  requestAnimationFrame(() => {
-    home.style.opacity = "1";
-    home.style.filter = "blur(0px)";
-  });
+  function showHome() {
+    requestAnimationFrame(() => {
+      home.style.opacity = "1";
+      home.style.filter = "blur(0px)";
+    });
+  }
+
+  if (img) {
+    if (img.complete) showHome();
+    else img.addEventListener("load", showHome, { once: true });
+  } else {
+    showHome();
+  }
 });
 
 </script>
