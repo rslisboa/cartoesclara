@@ -3502,11 +3502,16 @@ window.__renderEnvPendTbody = function () {
 
 window.vektorGlobalLoadingShow_ = function(titulo, subtitulo) {
   const ov = document.getElementById("envPend_overlay");
-  const t = document.getElementById("envPend_overlay_title");
-  const s = document.getElementById("envPend_overlay_sub");
+
+  // ✅ IDs corretos do overlay existente (os mesmos do Envio de Pendências)
+  const t = document.getElementById("envPend_overlayTitle") || document.getElementById("envPend_overlay_title");
+  const s = document.getElementById("envPend_overlaySub")   || document.getElementById("envPend_overlay_sub");
+
   if (t) t.textContent = titulo || "Carregando…";
   if (s) s.textContent = subtitulo || "Aguarde.";
-  if (ov) ov.style.display = "flex";
+
+  // ✅ o overlay do HTML foi criado com display:block (não flex)
+  if (ov) ov.style.display = "block";
 };
 
 window.vektorGlobalLoadingHide_ = function() {
