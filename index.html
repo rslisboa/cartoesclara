@@ -707,6 +707,14 @@ display: none;
   🟢 Estado Operacional
 </button>
 
+<button
+  type="button"
+  onclick="window.vektorOpenResumoCiclo()"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+>
+  📌 Resumo do ciclo
+</button>
+
   <!--<button
   type="button"
   onclick="window.open(POLITICA_CARTOES_CLARA_LINK,'_blank')"
@@ -869,6 +877,79 @@ display: none;
     </form>
   </footer>
 </div> <!-- fecha #chatView -->
+
+<!-- VIEW: RESUMO DO CICLO -->
+<div id="cicloResumoView" class="hidden" style="position:absolute; inset:0; z-index:20;">
+  <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+
+      <!-- Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
+        <div>
+          <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Resumo do ciclo (Clara)</div>
+          <div id="cicloResumoSubTitle" style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+            Consolidado das pendências no ciclo atual (06 → hoje)
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button type="button" onclick="window.vektorLoadResumoCiclo(true)"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+            Atualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div style="flex:1; overflow:auto; background:#070b14; padding:14px 16px;">
+        <div id="cicloResumoLoading" style="display:none; color:rgba(226,232,240,0.9); font-size:13px; font-weight:800;">
+          Carregando resumo do ciclo…
+        </div>
+
+        <div id="cicloResumoContent" style="display:none;">
+          <!-- Cards -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+              <div style="color:rgba(226,232,240,0.75); font-size:11px; font-weight:900;">Lojas com pendências</div>
+              <div id="cicloResumo_totalLojas" style="margin-top:6px; color:#fff; font-size:22px; font-weight:1000;">—</div>
+            </div>
+
+            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+              <div style="color:rgba(226,232,240,0.75); font-size:11px; font-weight:900;">Qtde de pendências</div>
+              <div id="cicloResumo_totalPend" style="margin-top:6px; color:#fff; font-size:22px; font-weight:1000;">—</div>
+            </div>
+
+            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+              <div style="color:rgba(226,232,240,0.75); font-size:11px; font-weight:900;">Valor pendente</div>
+              <div id="cicloResumo_totalValor" style="margin-top:6px; color:#fff; font-size:22px; font-weight:1000;">—</div>
+            </div>
+          </div>
+
+          <!-- Top lojas -->
+          <div style="margin-top:14px; background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+            <div style="color:#fff; font-weight:1000; font-size:13px;">Top lojas (por valor pendente)</div>
+            <div style="margin-top:10px; overflow:auto; border-radius:12px; border:1px solid rgba(148,163,184,0.18);">
+              <table style="width:100%; border-collapse:collapse; font-size:12px; color:rgba(226,232,240,0.92);">
+                <thead>
+                  <tr>
+                    <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Loja</th>
+                    <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Time</th>
+                    <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:right;">Qtde</th>
+                    <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:right;">Valor</th>
+                  </tr>
+                </thead>
+                <tbody id="cicloResumo_tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
 
 <!-- VIEW: ENVIO DE PENDÊNCIAS (sobrepõe SOMENTE a área do chat) -->
 <div id="envioPendView" class="hidden" style="position:absolute; inset:0; z-index:20;">
@@ -3198,6 +3279,7 @@ window.vektorShowChatView = function () {
   const envioPendView = document.getElementById("envioPendView");
   const envPendModal = document.getElementById("envPendModal");
   const homeView = document.getElementById("homeView");
+  const cicloResumoView = document.getElementById("cicloResumoView");
 
   if (radarView) radarView.classList.add("hidden");
   if (feedbackView) feedbackView.classList.add("hidden");
@@ -3212,6 +3294,8 @@ window.vektorShowChatView = function () {
   if (homeView) { homeView.classList.add("hidden"); homeView.style.display = "none"; }
 
   if (chatView) chatView.classList.remove("hidden");
+
+  if (cicloResumoView) cicloResumoView.classList.add("hidden");
 
   if (radarView) radarView.classList.remove("is-open");
 
@@ -3291,6 +3375,7 @@ function vektorShowFluxogramaView_() {
   const feedbackView = document.getElementById("feedbackView");
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
+  const cicloResumoView = document.getElementById("cicloResumoView");
 
   if (chatView) chatView.classList.add("hidden");
   if (radarView) radarView.classList.add("hidden");
@@ -3298,6 +3383,7 @@ function vektorShowFluxogramaView_() {
   if (myAlertsView) myAlertsView.classList.add("hidden");
 
   if (fluxView) fluxView.classList.remove("hidden");
+  if (cicloResumoView) cicloResumoView.classList.add("hidden");
 }
 
 // ===============================
@@ -3310,6 +3396,7 @@ function vektorShowEnvioPendenciasView_() {
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
   const envView = document.getElementById("envioPendView");
+  const cicloView = document.getElementById("cicloResumoView");
 
   if (chatView) chatView.classList.add("hidden");
   if (radarView) radarView.classList.add("hidden");
@@ -3320,10 +3407,86 @@ function vektorShowEnvioPendenciasView_() {
   if (envView) envView.classList.remove("hidden");
 
   if (radarView) radarView.classList.remove("is-open");
+
+  if (cicloView) cicloView.classList.add("hidden");
 }
 
 window.vektorOpenEnvioPendencias = function () {
   vektorShowEnvioPendenciasView_();
+};
+
+window.vektorOpenResumoCiclo = function () {
+  vektorShowResumoCicloView_();
+  window.vektorLoadResumoCiclo(false);
+};
+
+window.vektorLoadResumoCiclo = function (force) {
+  const loading = document.getElementById("cicloResumoLoading");
+  const content = document.getElementById("cicloResumoContent");
+  const tbody = document.getElementById("cicloResumo_tbody");
+
+  if (loading) loading.style.display = "block";
+  if (content) content.style.display = "none";
+  if (tbody) tbody.innerHTML = "";
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (loading) loading.style.display = "none";
+
+      if (!res || !res.ok) {
+        // fallback simples (não quebra layout)
+        if (content) content.style.display = "block";
+        if (tbody) tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:#fff;'>Falha ao carregar resumo.</td></tr>";
+        return;
+      }
+
+      // cabeçalho (período)
+      const sub = document.getElementById("cicloResumoSubTitle");
+      if (sub && res.periodo && res.periodo.inicio && res.periodo.fim) {
+        sub.textContent = `Consolidado das pendências no ciclo atual (${res.periodo.inicio} → ${res.periodo.fim})`;
+      }
+
+      // cards
+      const fmtBRL = (v) => {
+        try { return (Number(v||0)).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
+        catch(e){ return String(v||0); }
+      };
+
+      const elL = document.getElementById("cicloResumo_totalLojas");
+      const elP = document.getElementById("cicloResumo_totalPend");
+      const elV = document.getElementById("cicloResumo_totalValor");
+
+      if (elL) elL.textContent = String((res.meta && res.meta.totalLojas) || 0);
+      if (elP) elP.textContent = String((res.meta && res.meta.totalPendencias) || 0);
+      if (elV) elV.textContent = fmtBRL((res.meta && res.meta.totalValor) || 0);
+
+      // tabela top
+      const top = Array.isArray(res.topLojas) ? res.topLojas : [];
+      if (!top.length) {
+        if (tbody) tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:rgba(226,232,240,0.9);'>Nenhuma pendência no ciclo.</td></tr>";
+      } else {
+        if (tbody) {
+          tbody.innerHTML = top.map(r => {
+            return `
+              <tr>
+                <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.loja || ""}</td>
+                <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.time || ""}</td>
+                <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${Number(r.qtde||0)}</td>
+                <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${fmtBRL(r.valor||0)}</td>
+              </tr>
+            `;
+          }).join("");
+        }
+      }
+
+      if (content) content.style.display = "block";
+    })
+    .withFailureHandler(function (err) {
+      if (loading) loading.style.display = "none";
+      if (content) content.style.display = "block";
+      if (tbody) tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:#fff;'>Erro no backend.</td></tr>";
+    })
+    .getResumoCicloPendencias();
 };
 
 // estado local da página
@@ -6248,6 +6411,27 @@ window.vektorMyAlertsRefresh = function () {
       adminFilterEmail: adminFilterEmail,
       adminFilterRole: adminFilterRole
     });
+};
+
+window.vektorShowResumoCicloView_ = function () {
+  const chatView = document.getElementById("chatView");
+  const radarView = document.getElementById("radarView");
+  const feedbackView = document.getElementById("feedbackView");
+  const myAlertsView = document.getElementById("myAlertsView");
+  const fluxView = document.getElementById("fluxogramaView");
+  const envView = document.getElementById("envioPendView");
+  const cicloView = document.getElementById("cicloResumoView");
+
+  if (chatView) chatView.classList.add("hidden");
+  if (radarView) radarView.classList.add("hidden");
+  if (feedbackView) feedbackView.classList.add("hidden");
+  if (myAlertsView) myAlertsView.classList.add("hidden");
+  if (fluxView) fluxView.classList.add("hidden");
+  if (envView) envView.classList.add("hidden");
+
+  if (cicloView) cicloView.classList.remove("hidden");
+
+  if (radarView) radarView.classList.remove("is-open");
 };
 
 // Render “bonito” do alerta no chat (reaproveita o padrão da sua tabela já existente)
