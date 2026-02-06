@@ -12375,6 +12375,61 @@ function getLojasOfensorasParaChat(diasJanela) {
   };
 }
 
+function getResumoCicloPendencias() {
+  vektorAssertFunctionAllowed_("getResumoCicloPendencias");
+
+  try {
+    // Reaproveita a função já “ciclo-aware”
+    var base = getLojasOfensorasParaChat(0);
+    if (!base || !base.ok) return base;
+
+    var rows = base.rows || [];
+
+    var totalQtde = 0;
+    var totalValor = 0;
+    var pendNF = 0;
+    var pendDesc = 0;
+    var pendEtiqueta = 0;
+
+    rows.forEach(function (r) {
+      totalQtde += Number(r.qtde || 0);
+      totalValor += Number(r.valor || 0);
+      pendNF += Number(r.pendNF || 0);
+      pendDesc += Number(r.pendDesc || 0);
+      pendEtiqueta += Number(r.pendEtiqueta || 0);
+    });
+
+    // Ordena por valor (desc) para Top lojas
+    var top = rows.slice().sort(function (a, b) {
+      return Number(b.valor || 0) - Number(a.valor || 0);
+    }).slice(0, 10);
+
+    return {
+      ok: true,
+      periodo: base.periodo || {},
+      meta: {
+        totalLojas: rows.length,
+        totalPendencias: totalQtde,
+        totalValor: totalValor,
+        pendNF: pendNF,
+        pendDesc: pendDesc,
+        pendEtiqueta: pendEtiqueta
+      },
+      topLojas: top.map(function (r) {
+        return {
+          loja: r.loja || "",
+          time: r.time || "N/D",
+          qtde: Number(r.qtde || 0),
+          valor: Number(r.valor || 0)
+        };
+      })
+    };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 function getComparativoFaturasClaraParaChat() {
   vektorAssertFunctionAllowed_("getComparativoFaturasClaraParaChat");
   try {
