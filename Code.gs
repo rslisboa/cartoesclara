@@ -12375,6 +12375,10 @@ function getLojasOfensorasParaChat(diasJanela) {
   };
 }
 
+// ===============================
+// RESUMO DO CICLO (BACKEND)
+// - agora retorna rows (todas as lojas) para o front filtrar e renderizar tabela completa
+// ===============================
 function getResumoCicloPendencias() {
   vektorAssertFunctionAllowed_("getResumoCicloPendencias");
 
@@ -12383,7 +12387,7 @@ function getResumoCicloPendencias() {
     var base = getLojasOfensorasParaChat(0);
     if (!base || !base.ok) return base;
 
-    var rows = base.rows || [];
+    var rows = Array.isArray(base.rows) ? base.rows : [];
 
     var totalQtde = 0;
     var totalValor = 0;
@@ -12399,30 +12403,29 @@ function getResumoCicloPendencias() {
       pendEtiqueta += Number(r.pendEtiqueta || 0);
     });
 
-    // Ordena por valor (desc) para Top lojas
-    var top = rows.slice().sort(function (a, b) {
-      return Number(b.valor || 0) - Number(a.valor || 0);
-    }).slice(0, 10);
+    // ✅ rows normalizadas (todas) — o front ordena/filtra e monta a tabela completa
+    var normRows = rows.map(function (r) {
+      return {
+        loja: r.loja || "",
+        time: r.time || "N/D",
+        qtde: Number(r.qtde || 0),
+        valor: Number(r.valor || 0)
+      };
+    });
 
     return {
       ok: true,
       periodo: base.periodo || {},
       meta: {
-        totalLojas: rows.length,
+        totalLojas: normRows.length,
         totalPendencias: totalQtde,
         totalValor: totalValor,
         pendNF: pendNF,
         pendDesc: pendDesc,
         pendEtiqueta: pendEtiqueta
       },
-      topLojas: top.map(function (r) {
-        return {
-          loja: r.loja || "",
-          time: r.time || "N/D",
-          qtde: Number(r.qtde || 0),
-          valor: Number(r.valor || 0)
-        };
-      })
+      // ✅ dataset completo para filtros (time/loja)
+      rows: normRows
     };
 
   } catch (e) {
