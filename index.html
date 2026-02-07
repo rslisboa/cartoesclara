@@ -879,30 +879,62 @@ display: none;
 </div> <!-- fecha #chatView -->
 
 <!-- VIEW: RESUMO DO CICLO -->
-<div id="cicloResumoView" class="hidden" style="position:absolute; inset:0; z-index:20;">
+<div id="cicloResumoView"
+     class="hidden"
+     style="position:absolute; inset:0; z-index:20; display:none;">
+
   <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
-    <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column; min-height:0;">
 
-      <!-- Header -->
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
-        <div>
-          <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Resumo do ciclo (Clara)</div>
-          <div id="cicloResumoSubTitle" style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
-            Consolidado das pendências no ciclo atual (06 → hoje)
+      <!-- Header (título/sub + filtros) -->
+      <div style="padding:14px 16px; background:#0b1220; border-bottom:1px solid rgba(148,163,184,0.18);">
+        <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+
+          <!-- Esquerda: título + subtítulo -->
+          <div style="min-width:240px;">
+            <div style="font-size:18px;font-weight:1000;color:#fff;line-height:1.1;">Resumo do ciclo</div>
+            <div id="cicloResumoSubTitle"
+                 style="margin-top:5px;font-size:12px;font-weight:800;color:rgba(226,232,240,0.8);">
+              Consolidado das pendências no ciclo atual
+            </div>
           </div>
-        </div>
 
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button type="button" onclick="window.vektorLoadResumoCiclo(true)"
-            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
-            Atualizar
-          </button>
+          <!-- Direita: filtros -->
+          <div style="display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;">
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Time</div>
+              <select id="cicloResumo_selTime"
+                      style="height:34px;border-radius:12px;background:#0f172a;color:#fff;border:1px solid rgba(181,255,32,0.35);padding:0 10px;font-weight:900;font-size:12px;min-width:180px;">
+                <option value="">Todos</option>
+              </select>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Loja</div>
+              <select id="cicloResumo_selLoja"
+                      style="height:34px;border-radius:12px;background:#0f172a;color:#fff;border:1px solid rgba(181,255,32,0.35);padding:0 10px;font-weight:900;font-size:12px;min-width:180px;">
+                <option value="">Todas</option>
+              </select>
+            </div>
+
+            <button type="button"
+                    onclick="window.vektorResumoCicloLimparFiltros && window.vektorResumoCicloLimparFiltros()"
+                    style="height:34px;border-radius:12px;padding:0 14px;background:transparent;color:#B5FF20;border:1px solid rgba(181,255,32,0.45);font-weight:1000;cursor:pointer;">
+              Limpar
+            </button>
+
+            <button type="button"
+                    onclick="window.vektorLoadResumoCiclo && window.vektorLoadResumoCiclo(true)"
+                    style="height:34px;border-radius:12px;padding:0 14px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.18);font-weight:1000;cursor:pointer;">
+              Atualizar
+            </button>
+          </div>
+
         </div>
       </div>
 
       <!-- Conteúdo -->
-      <div style="flex:1; overflow:auto; background:#070b14; padding:14px 16px;">
+      <div style="flex:1; min-height:0; overflow:auto; background:#070b14; padding:14px 16px;">
         <div id="cicloResumoLoading" style="display:none; color:rgba(226,232,240,0.9); font-size:13px; font-weight:800;">
           Carregando resumo do ciclo…
         </div>
@@ -926,9 +958,9 @@ display: none;
             </div>
           </div>
 
-          <!-- Top lojas -->
+          <!-- Tabela (todas as lojas / filtradas) -->
           <div style="margin-top:14px; background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-            <div style="color:#fff; font-weight:1000; font-size:13px;">Top lojas (por valor pendente)</div>
+            <div style="color:#fff; font-weight:1000; font-size:13px;">Lojas (por valor pendente)</div>
             <div style="margin-top:10px; overflow:auto; border-radius:12px; border:1px solid rgba(148,163,184,0.18);">
               <table style="width:100%; border-collapse:collapse; font-size:12px; color:rgba(226,232,240,0.92);">
                 <thead>
@@ -3416,10 +3448,15 @@ window.vektorOpenEnvioPendencias = function () {
 };
 
 window.vektorOpenResumoCiclo = function () {
-  vektorShowResumoCicloView_();
+  window.vektorShowResumoCicloView_();
   window.vektorLoadResumoCiclo(false);
 };
 
+// ===============================
+// RESUMO DO CICLO (FRONT)
+// - agora: guarda dataset, cria/binda filtros (time/loja), aplica filtros,
+//   e renderiza a TABELA com TODAS as linhas filtradas (não top 10)
+// ===============================
 window.vektorLoadResumoCiclo = function (force) {
   const loading = document.getElementById("cicloResumoLoading");
   const content = document.getElementById("cicloResumoContent");
@@ -3429,16 +3466,115 @@ window.vektorLoadResumoCiclo = function (force) {
   if (content) content.style.display = "none";
   if (tbody) tbody.innerHTML = "";
 
+  const fmtBRL = (v) => {
+    try { return (Number(v || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+    catch (e) { return String(v || 0); }
+  };
+
+  // helpers locais (não dependem de nada externo)
+  function getRows_(res) {
+    const arr = (res && Array.isArray(res.rows)) ? res.rows : [];
+    return arr.map(r => ({
+      loja: String(r.loja || ""),
+      time: String(r.time || "N/D"),
+      qtde: Number(r.qtde || 0),
+      valor: Number(r.valor || 0)
+    }));
+  }
+
+  function buildOptions_(selectEl, values, allLabel) {
+    if (!selectEl) return;
+    const current = selectEl.value || "";
+    selectEl.innerHTML =
+      `<option value="">${allLabel}</option>` +
+      values.map(v => `<option value="${String(v).replace(/"/g, "&quot;")}">${v}</option>`).join("");
+
+    // mantém seleção se ainda existe
+    if (current && values.indexOf(current) >= 0) selectEl.value = current;
+  }
+
+  function applyFiltros_() {
+    const res = window.__cicloResumoData;
+    if (!res || !res.ok) return;
+
+    const selTime = document.getElementById("cicloResumo_selTime");
+    const selLoja = document.getElementById("cicloResumo_selLoja");
+
+    const timeSel = selTime ? (selTime.value || "") : "";
+    const lojaSel = selLoja ? (selLoja.value || "") : "";
+
+    const allRows = getRows_(res);
+
+    // 1) popula TIME com base no dataset total
+    const times = Array.from(new Set(allRows.map(r => r.time))).sort((a, b) => a.localeCompare(b, "pt-BR"));
+    buildOptions_(selTime, times, "Todos");
+
+    // 2) lojas dependem do time
+    const rowsByTime = timeSel ? allRows.filter(r => r.time === timeSel) : allRows;
+    const lojas = Array.from(new Set(rowsByTime.map(r => r.loja))).sort((a, b) => a.localeCompare(b, "pt-BR"));
+    buildOptions_(selLoja, lojas, "Todas");
+
+    // 3) aplica filtros finais
+    let filtered = rowsByTime;
+    if (lojaSel) filtered = filtered.filter(r => r.loja === lojaSel);
+
+    // 4) recalcula cards (com o filtrado)
+    const totalLojas = new Set(filtered.map(r => r.loja)).size;
+    const totalPend = filtered.reduce((acc, r) => acc + (r.qtde || 0), 0);
+    const totalValor = filtered.reduce((acc, r) => acc + (r.valor || 0), 0);
+
+    const elL = document.getElementById("cicloResumo_totalLojas");
+    const elP = document.getElementById("cicloResumo_totalPend");
+    const elV = document.getElementById("cicloResumo_totalValor");
+
+    if (elL) elL.textContent = String(totalLojas || 0);
+    if (elP) elP.textContent = String(totalPend || 0);
+    if (elV) elV.textContent = fmtBRL(totalValor || 0);
+
+    // 5) tabela: TODAS as linhas (ordenadas por valor desc)
+    const ordered = filtered.slice().sort((a, b) => (b.valor || 0) - (a.valor || 0));
+
+    if (tbody) {
+      if (!ordered.length) {
+        tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:rgba(226,232,240,0.9);'>Nenhum resultado para o filtro.</td></tr>";
+      } else {
+        tbody.innerHTML = ordered.map(r => {
+          return `
+            <tr>
+              <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.loja}</td>
+              <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.time}</td>
+              <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${Number(r.qtde || 0)}</td>
+              <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${fmtBRL(r.valor || 0)}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+    }
+
+    if (content) content.style.display = "block";
+  }
+
+  // expõe limpar filtros (usado pelo botão)
+  window.vektorResumoCicloLimparFiltros = function () {
+    const selTime = document.getElementById("cicloResumo_selTime");
+    const selLoja = document.getElementById("cicloResumo_selLoja");
+    if (selTime) selTime.value = "";
+    if (selLoja) selLoja.value = "";
+    applyFiltros_();
+  };
+
   google.script.run
     .withSuccessHandler(function (res) {
       if (loading) loading.style.display = "none";
 
       if (!res || !res.ok) {
-        // fallback simples (não quebra layout)
         if (content) content.style.display = "block";
         if (tbody) tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:#fff;'>Falha ao carregar resumo.</td></tr>";
         return;
       }
+
+      // ✅ guarda dataset inteiro para filtros
+      window.__cicloResumoData = res;
 
       // cabeçalho (período)
       const sub = document.getElementById("cicloResumoSubTitle");
@@ -3446,40 +3582,30 @@ window.vektorLoadResumoCiclo = function (force) {
         sub.textContent = `Consolidado das pendências no ciclo atual (${res.periodo.inicio} → ${res.periodo.fim})`;
       }
 
-      // cards
-      const fmtBRL = (v) => {
-        try { return (Number(v||0)).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
-        catch(e){ return String(v||0); }
-      };
+      // ✅ bind dos filtros (uma vez só)
+      try {
+        const selTime = document.getElementById("cicloResumo_selTime");
+        const selLoja = document.getElementById("cicloResumo_selLoja");
 
-      const elL = document.getElementById("cicloResumo_totalLojas");
-      const elP = document.getElementById("cicloResumo_totalPend");
-      const elV = document.getElementById("cicloResumo_totalValor");
-
-      if (elL) elL.textContent = String((res.meta && res.meta.totalLojas) || 0);
-      if (elP) elP.textContent = String((res.meta && res.meta.totalPendencias) || 0);
-      if (elV) elV.textContent = fmtBRL((res.meta && res.meta.totalValor) || 0);
-
-      // tabela top
-      const top = Array.isArray(res.topLojas) ? res.topLojas : [];
-      if (!top.length) {
-        if (tbody) tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:rgba(226,232,240,0.9);'>Nenhuma pendência no ciclo.</td></tr>";
-      } else {
-        if (tbody) {
-          tbody.innerHTML = top.map(r => {
-            return `
-              <tr>
-                <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.loja || ""}</td>
-                <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.time || ""}</td>
-                <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${Number(r.qtde||0)}</td>
-                <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${fmtBRL(r.valor||0)}</td>
-              </tr>
-            `;
-          }).join("");
+        if (selTime && !selTime.__bindResumo) {
+          selTime.__bindResumo = true;
+          selTime.addEventListener("change", function () {
+            // quando muda time, reseta loja
+            if (selLoja) selLoja.value = "";
+            applyFiltros_();
+          });
         }
-      }
 
-      if (content) content.style.display = "block";
+        if (selLoja && !selLoja.__bindResumo) {
+          selLoja.__bindResumo = true;
+          selLoja.addEventListener("change", function () {
+            applyFiltros_();
+          });
+        }
+      } catch (e) {}
+
+      // ✅ aplica filtros + render inicial
+      applyFiltros_();
     })
     .withFailureHandler(function (err) {
       if (loading) loading.style.display = "none";
@@ -6422,16 +6548,121 @@ window.vektorShowResumoCicloView_ = function () {
   const envView = document.getElementById("envioPendView");
   const cicloView = document.getElementById("cicloResumoView");
 
-  if (chatView) chatView.classList.add("hidden");
+  // fecha outras views
+  if (chatView) {
+    chatView.classList.add("hidden");
+    chatView.style.display = "none"; // ✅ garante esconder (chat normalmente usa display)
+  }
+
   if (radarView) radarView.classList.add("hidden");
   if (feedbackView) feedbackView.classList.add("hidden");
   if (myAlertsView) myAlertsView.classList.add("hidden");
   if (fluxView) fluxView.classList.add("hidden");
   if (envView) envView.classList.add("hidden");
 
-  if (cicloView) cicloView.classList.remove("hidden");
+  // abre resumo do ciclo
+  if (cicloView) {
+    cicloView.classList.remove("hidden");
+    cicloView.style.display = "block"; // ✅ ESSENCIAL (senão fica invisível)
+  }
 
   if (radarView) radarView.classList.remove("is-open");
+};
+
+function vektorResumoCicloNorm_(s){
+  return String(s || "").trim().toLowerCase();
+}
+
+function vektorResumoCicloGetRows_(res){
+  const rows = (res && Array.isArray(res.rows)) ? res.rows : [];
+  // garante shape
+  return rows.map(r => ({
+    loja: String(r.loja || ""),
+    time: String(r.time || "N/D"),
+    qtde: Number(r.qtde || 0),
+    valor: Number(r.valor || 0)
+  }));
+}
+
+function vektorResumoCicloBuildOptions_(selectEl, values, allLabel){
+  if (!selectEl) return;
+  const vAtual = selectEl.value || "";
+  selectEl.innerHTML = `<option value="">${allLabel}</option>` + values
+    .map(v => `<option value="${String(v).replace(/"/g,'&quot;')}">${v}</option>`)
+    .join("");
+  // tenta manter seleção se ainda existir
+  if (vAtual && values.includes(vAtual)) selectEl.value = vAtual;
+}
+
+function vektorResumoCicloApply_(){
+  const res = window.__cicloResumoData;
+  if (!res || !res.ok) return;
+
+  const selTime = document.getElementById("cicloResumo_selTime");
+  const selLoja = document.getElementById("cicloResumo_selLoja");
+
+  const time = (selTime && selTime.value) ? selTime.value : "";
+  const loja = (selLoja && selLoja.value) ? selLoja.value : "";
+
+  const allRows = vektorResumoCicloGetRows_(res);
+
+  // 1) opções de TIME (sempre a partir do dataset total)
+  const times = Array.from(new Set(allRows.map(r => r.time))).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  vektorResumoCicloBuildOptions_(selTime, times, "Todos");
+
+  // 2) opções de LOJA dependem do time selecionado
+  const rowsByTime = time ? allRows.filter(r => r.time === time) : allRows;
+  const lojas = Array.from(new Set(rowsByTime.map(r => r.loja))).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  vektorResumoCicloBuildOptions_(selLoja, lojas, "Todas");
+
+  // 3) aplica filtros finais (time + loja)
+  let filtered = rowsByTime;
+  if (loja) filtered = filtered.filter(r => r.loja === loja);
+
+  // 4) recalcula cards + top
+  const totalLojas = new Set(filtered.map(r => r.loja)).size;
+  const totalPend = filtered.reduce((acc,r)=>acc + (r.qtde||0), 0);
+  const totalValor = filtered.reduce((acc,r)=>acc + (r.valor||0), 0);
+
+  const elL = document.getElementById("cicloResumo_totalLojas");
+  const elP = document.getElementById("cicloResumo_totalPend");
+  const elV = document.getElementById("cicloResumo_totalValor");
+
+  const fmtBRL = (v) => {
+    try { return Number(v||0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
+    catch(e){ return String(v||0); }
+  };
+
+  if (elL) elL.textContent = String(totalLojas || 0);
+  if (elP) elP.textContent = String(totalPend || 0);
+  if (elV) elV.textContent = fmtBRL(totalValor || 0);
+
+  // top 10 por valor
+  const top = filtered.slice().sort((a,b)=> (b.valor||0)-(a.valor||0)).slice(0,10);
+
+  const tbody = document.getElementById("cicloResumo_tbody");
+  if (tbody) {
+    if (!top.length) {
+      tbody.innerHTML = `<tr><td colspan="4" style="padding:10px;color:rgba(226,232,240,0.9);">Nenhum resultado para o filtro.</td></tr>`;
+    } else {
+      tbody.innerHTML = top.map(r => `
+        <tr>
+          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.loja}</td>
+          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.time}</td>
+          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${r.qtde}</td>
+          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${fmtBRL(r.valor)}</td>
+        </tr>
+      `).join("");
+    }
+  }
+}
+
+window.vektorResumoCicloLimparFiltros = function(){
+  const selTime = document.getElementById("cicloResumo_selTime");
+  const selLoja = document.getElementById("cicloResumo_selLoja");
+  if (selTime) selTime.value = "";
+  if (selLoja) selLoja.value = "";
+  vektorResumoCicloApply_();
 };
 
 // Render “bonito” do alerta no chat (reaproveita o padrão da sua tabela já existente)
