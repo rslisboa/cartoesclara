@@ -4148,142 +4148,155 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
 function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFimIso, txKeys) {
   vektorAssertFunctionAllowed_("dispararEnvioPendenciasClaraRecusadasSelecionadas");
 
-  var ini = vektorParseIsoDateSafe_(dataInicioIso);
-  var fim = vektorParseIsoDateSafe_(dataFimIso);
-  if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) {
+    return { ok: false, error: "Já existe um envio em andamento. Aguarde ~30s e tente novamente." };
+  }
 
-  txKeys = Array.isArray(txKeys) ? txKeys : [];
-  var want = {};
-  txKeys.forEach(function(k){
-    k = String(k || "").trim();
-    if (k) want[k] = true;
-  });
-  if (!Object.keys(want).length) return { ok: false, error: "Nenhuma transação selecionada." };
+  try {
+    var ini = vektorParseIsoDateSafe_(dataInicioIso);
+    var fim = vektorParseIsoDateSafe_(dataFimIso);
+    if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
 
-  var rowsAll = vektorQueryPendenciasRecusadas_(ini, fim);
+    txKeys = Array.isArray(txKeys) ? txKeys : [];
+    var want = {};
+    txKeys.forEach(function (k) {
+      k = String(k || "").trim();
+      if (k) want[k] = true;
+    });
+    if (!Object.keys(want).length) return { ok: false, error: "Nenhuma transação selecionada." };
 
-  // envio único
-  var sentMap = vektorCarregarTxKeysJaEnviadas_();
+    var rowsAll = vektorQueryPendenciasRecusadas_(ini, fim);
 
-  // filtra selecionadas e ainda não enviadas
-  var rows = [];
-  rowsAll.forEach(function(r){
-    var tx = String(r.txKey || "").trim();
-    if (!tx || !want[tx]) return;
-    if (sentMap[tx]) return; // já enviada uma vez -> nunca reenviar
-    rows.push(r);
-  });
+    // ✅ envio único (carrega APÓS pegar o lock, para evitar concorrência)
+    var sentMap = vektorCarregarTxKeysJaEnviadas_();
 
-  if (!rows.length) return { ok: false, error: "Todas as selecionadas já foram enviadas anteriormente (envio único)." };
+    // filtra selecionadas e ainda não enviadas
+    var rows = [];
+    rowsAll.forEach(function (r) {
+      var tx = String(r.txKey || "").trim();
+      if (!tx || !want[tx]) return;
+      if (sentMap[tx]) return; // já enviada uma vez -> nunca reenviar
+      rows.push(r);
+    });
 
-  // agrupa por loja (assunto por data de cobrança = hoje)
-  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
-  var dataCobrancaBR = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy");
-
-  var grupos = {}; // lojaKey -> rows[]
-  rows.forEach(function(r){
-    if (!grupos[r.lojaKey]) grupos[r.lojaKey] = [];
-    grupos[r.lojaKey].push(r);
-  });
-
-  var saudacao = vektorSaudacaoPorHora_();
-  var sucessoPorLoja = [];
-  var falhasPorLoja = [];
-
-  var emailsEnviados = 0;
-  var txRegistradas = 0;
-
-  Object.keys(grupos).forEach(function(lojaKey){
-    var itens = grupos[lojaKey];
-
-    // destinatários
-    var toSet = {};
-    function addTo_(em){
-      em = String(em || "").trim();
-      if (!em) return;
-      toSet[em.toLowerCase()] = em;
-    }
-    addTo_(itens[0].emailGerente);
-    addTo_(itens[0].emailRegional);
-    addTo_(VEKTOR_SLACK_GRUPO_CONTAS_A_RECEBER);
-
-    var toList = Object.keys(toSet).map(function(k){ return toSet[k]; }).join(",");
-    if (!toList) {
-      falhasPorLoja.push({ lojaKey: lojaKey, error: "Sem destinatários (gerente/regional/slack) na aba Emails." });
-      return;
+    if (!rows.length) {
+      return { ok: false, error: "Todas as selecionadas já foram enviadas anteriormente (envio único)." };
     }
 
-    var assunto = "CLARA | JUSTIFICATIVAS PENDENTES | " + lojaKey + " - " + dataCobrancaBR;
+    // agrupa por loja (assunto por data de cobrança = hoje)
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var dataCobrancaBR = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy");
 
-    var tabela = vektorMontarTabelaPendenciasEmail_(itens);
-    var tipos = vektorTiposPendenciasDoGrupo_(itens);
-    var corpo = vektorMontarCorpoEmailPendenciasClara_(saudacao, tabela, tipos);
+    var grupos = {}; // lojaKey -> rows[]
+    rows.forEach(function (r) {
+      if (!grupos[r.lojaKey]) grupos[r.lojaKey] = [];
+      grupos[r.lojaKey].push(r);
+    });
 
-    try {
-      MailApp.sendEmail({
-        name: "Vektor - Grupo SBF",
-        to: toList,
-        cc: VEKTOR_CC_CONTAS_A_RECEBER,
-        replyTo: VEKTOR_CC_CONTAS_A_RECEBER,
-        subject: assunto,
-        htmlBody: corpo
-      });
+    var saudacao = vektorSaudacaoPorHora_();
+    var sucessoPorLoja = [];
+    var falhasPorLoja = [];
 
-      emailsEnviados++;
+    var emailsEnviados = 0;
+    var txRegistradas = 0;
 
-      // log por transação (SENT)
-      itens.forEach(function(r){
-        vektorLogEnvioPendencia_({
-          txKey: r.txKey,
-          lojaKey: lojaKey,
-          dataTransBR: r.dataTransBR,
-          valorOriginalTxt: r.valorOriginalTxt,
-          cartao: r.cartao,
-          codigoAutorizacao: r.codigoAutorizacao,
-          estabelecimento: r.estabelecimento,
-          pendenciasTxt: r.pendenciasTxt,
+    Object.keys(grupos).forEach(function (lojaKey) {
+      var itens = grupos[lojaKey];
+
+      // destinatários
+      var toSet = {};
+      function addTo_(em) {
+        em = String(em || "").trim();
+        if (!em) return;
+        toSet[em.toLowerCase()] = em;
+      }
+      addTo_(itens[0].emailGerente);
+      addTo_(itens[0].emailRegional);
+      addTo_(VEKTOR_SLACK_GRUPO_CONTAS_A_RECEBER);
+
+      var toList = Object.keys(toSet).map(function (k) { return toSet[k]; }).join(",");
+      if (!toList) {
+        falhasPorLoja.push({ lojaKey: lojaKey, error: "Sem destinatários (gerente/regional/slack) na aba Emails." });
+        return;
+      }
+
+      var assunto = "CLARA | JUSTIFICATIVAS PENDENTES | " + lojaKey + " - " + dataCobrancaBR;
+
+      var tabela = vektorMontarTabelaPendenciasEmail_(itens);
+      var tipos = vektorTiposPendenciasDoGrupo_(itens);
+      var corpo = vektorMontarCorpoEmailPendenciasClara_(saudacao, tabela, tipos);
+
+      try {
+        MailApp.sendEmail({
+          name: "Vektor - Grupo SBF",
           to: toList,
           cc: VEKTOR_CC_CONTAS_A_RECEBER,
-          status: "SENT",
-          error: ""
+          replyTo: VEKTOR_CC_CONTAS_A_RECEBER,
+          subject: assunto,
+          htmlBody: corpo
         });
-        txRegistradas++;
-      });
 
-      sucessoPorLoja.push({ lojaKey: lojaKey, qtdTx: itens.length });
+        emailsEnviados++;
 
-    } catch(e) {
-      var msg = (e && e.message) ? e.message : String(e);
-
-      // log por transação (FAIL)
-      itens.forEach(function(r){
-        vektorLogEnvioPendencia_({
-          txKey: r.txKey,
-          lojaKey: lojaKey,
-          dataTransBR: r.dataTransBR,
-          valorOriginalTxt: r.valorOriginalTxt,
-          cartao: r.cartao,
-          codigoAutorizacao: r.codigoAutorizacao,
-          estabelecimento: r.estabelecimento,
-          pendenciasTxt: r.pendenciasTxt,
-          to: toList,
-          cc: VEKTOR_CC_CONTAS_A_RECEBER,
-          status: "FAIL",
-          error: msg
+        // log por transação (SENT)
+        itens.forEach(function (r) {
+          vektorLogEnvioPendencia_({
+            txKey: r.txKey,
+            lojaKey: lojaKey,
+            dataTransBR: r.dataTransBR,
+            valorOriginalTxt: r.valorOriginalTxt,
+            cartao: r.cartao,
+            codigoAutorizacao: r.codigoAutorizacao,
+            estabelecimento: r.estabelecimento,
+            pendenciasTxt: r.pendenciasTxt,
+            to: toList,
+            cc: VEKTOR_CC_CONTAS_A_RECEBER,
+            status: "SENT",
+            error: ""
+          });
+          txRegistradas++;
         });
-      });
 
-      falhasPorLoja.push({ lojaKey: lojaKey, error: msg });
-    }
-  });
+        sucessoPorLoja.push({ lojaKey: lojaKey, qtdTx: itens.length });
 
-  return {
-    ok: true,
-    emailsEnviados: emailsEnviados,
-    txRegistradas: txRegistradas,
-    sucessoPorLoja: sucessoPorLoja,
-    falhasPorLoja: falhasPorLoja
-  };
+      } catch (e) {
+        var msg = (e && e.message) ? e.message : String(e);
+
+        // log por transação (FAIL)
+        itens.forEach(function (r) {
+          vektorLogEnvioPendencia_({
+            txKey: r.txKey,
+            lojaKey: lojaKey,
+            dataTransBR: r.dataTransBR,
+            valorOriginalTxt: r.valorOriginalTxt,
+            cartao: r.cartao,
+            codigoAutorizacao: r.codigoAutorizacao,
+            estabelecimento: r.estabelecimento,
+            pendenciasTxt: r.pendenciasTxt,
+            to: toList,
+            cc: VEKTOR_CC_CONTAS_A_RECEBER,
+            status: "FAIL",
+            error: msg
+          });
+          txRegistradas++; // opcional: conta como "registrada no log" também
+        });
+
+        falhasPorLoja.push({ lojaKey: lojaKey, error: msg });
+      }
+    });
+
+    return {
+      ok: true,
+      emailsEnviados: emailsEnviados,
+      txRegistradas: txRegistradas,
+      sucessoPorLoja: sucessoPorLoja,
+      falhasPorLoja: falhasPorLoja
+    };
+
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
 }
 
 // Procura o índice de uma coluna no cabeçalho da BaseClara
@@ -7059,6 +7072,7 @@ function gerarRelatorioOfensorasPendencias_(diasJanela) {
         time: "N/D",
         qtde: 0,
         valor: 0,
+        txCount: 0,
         pendEtiqueta: 0,
         pendNF: 0,
         pendDesc: 0,
@@ -7078,6 +7092,7 @@ function gerarRelatorioOfensorasPendencias_(diasJanela) {
     m[lojaKey].pendEtiqueta += pe;
     m[lojaKey].pendNF += pn;
     m[lojaKey].pendDesc += pd;
+    m[lojaKey].txCount += 1;
 
     // snapshot day key
     var snapKey = Utilities.formatDate(dtSnap, "America/Sao_Paulo", "yyyy-MM-dd");
@@ -7133,7 +7148,8 @@ function gerarRelatorioOfensorasPendencias_(diasJanela) {
 
       trend14: r14, // {ult14, ant14, delta}
       score: score,
-      classificacao: classificacao
+      classificacao: classificacao,
+      txCount: (s.txCount || 0),
     };
   });
 
@@ -7439,7 +7455,7 @@ function ENVIAR_EMAIL_LIMITE_CLARA() {
 
   // 3) janela de segurança opcional (para evitar disparar enquanto carga ainda está em andamento)
   // Se você não quiser atraso, pode remover este bloco inteiro.
-  var AGUARDAR_MIN = 12; // ajuste aqui (10–20 costuma ser bom)
+  var AGUARDAR_MIN = 10; // ajuste aqui (10–20 costuma ser bom)
   var agora = new Date();
   var diffMin = (agora.getTime() - sigAtual.maxDataMs) / 60000;
 
@@ -8088,14 +8104,6 @@ function detectarUsoIrregularBaseClara_(opts) {
   };
 }
 
-/**
- * Calcula uma assinatura leve da BaseClara, suficiente para detectar atualização real da aba.
- * Estratégia:
- * - usa header para localizar colunas Data/Valor (robusto)
- * - usa Alias fixo (col H) se você quiser; aqui mantive robusto por nome também
- * - lê só as últimas N linhas das 3 colunas (Alias, Data, Valor) e faz hash
- * - inclui maxData e lastRow para reforçar detecção
- */
 function calcularAssinaturaBaseClara_() {
   try {
     var info = carregarLinhasBaseClara_(); // seu helper
@@ -8106,54 +8114,107 @@ function calcularAssinaturaBaseClara_() {
     var lastRow = linhas.length;
     if (lastRow <= 0) return { sig: "EMPTY", maxDataMs: 0, lastRow: 0 };
 
-    // Índices: Alias fixo e Data/Valor por nome (para não confundir com "Cartão")
-    // Alias Do Cartão = coluna H => índice 7 (0-based) (você já validou que isso é fixo)
-    var idxAlias = 7;
-
-    // Data/Valor: mantém por nome para suportar variações de header
+    // Índices
+    var idxAlias = 7; // Alias do Cartão (fixo)
     var idxValor = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor", "Total"]);
     var idxData  = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
 
     if (idxValor < 0) return { error: "Não encontrei a coluna de Valor na BaseClara para assinatura." };
     if (idxData < 0)  return { error: "Não encontrei a coluna de Data na BaseClara para assinatura." };
 
-    // lê só as últimas N linhas para a assinatura (evita custo alto)
-    var N = 250; // ajuste se quiser (200–500 geralmente ok)
-    var start = Math.max(0, lastRow - N);
-
-    // calcula maxData do conjunto total (não só das últimas N)
-    // (se preferir leve, pode calcular só em N; mas maxData total é mais “forte”)
+    // -------------------------------
+    // (A) Agregados robustos (varre tudo 1x)
+    // -------------------------------
     var maxDataMs = 0;
+    var minDataMs = 0;
+    var sumCents = 0;         // soma do valor em centavos (inteiro)
+    var cntValid = 0;         // qtde de linhas com data válida (para robustez)
+    var cntAlias = 0;         // qtde de linhas com alias preenchido (para robustez)
+
+    // Sample determinístico ao longo de toda a base
+    // Queremos ~400 pontos no máximo (barato e cobre o dataset)
+    var maxSamples = 400;
+    var step = Math.max(1, Math.floor(lastRow / maxSamples));
+    var samples = [];
+
+    function normDateKey_(dt) {
+      var d = (dt instanceof Date) ? dt : new Date(dt);
+      if (!(d instanceof Date) || isNaN(d.getTime())) return "";
+      // yyyy-MM-dd (estável)
+      return d.toISOString().slice(0, 10);
+    }
+
+    function normMoneyCents_(v) {
+      var n = (typeof v === "number") ? v : Number(String(v || "").replace(",", "."));
+      if (!isFinite(n)) return 0;
+      return Math.round(n * 100);
+    }
+
     for (var i = 0; i < lastRow; i++) {
-      var dt = linhas[i][idxData];
+      var r = linhas[i];
+
+      var dt = r[idxData];
       var d = (dt instanceof Date) ? dt : new Date(dt);
       if (d instanceof Date && !isNaN(d.getTime())) {
         var ms = d.getTime();
         if (ms > maxDataMs) maxDataMs = ms;
+        if (minDataMs === 0 || ms < minDataMs) minDataMs = ms;
+        cntValid++;
+      }
+
+      var alias = (r[idxAlias] || "").toString().trim();
+      if (alias) cntAlias++;
+
+      var cents = normMoneyCents_(r[idxValor]);
+      sumCents += cents;
+
+      // amostragem espalhada: pega linha 0, step, 2*step...
+      if (i % step === 0) {
+        var dKey = normDateKey_(r[idxData]);
+        // valor como cents é mais estável do que toFixed / string
+        samples.push(alias + "|" + dKey + "|" + cents);
       }
     }
 
-    // monta um payload determinístico das últimas N linhas usando só Alias/Data/Valor
-    var parts = [];
+    // -------------------------------
+    // (B) Tail (últimas N linhas)
+    // -------------------------------
+    var N = 250; // 200–500 ok
+    var start = Math.max(0, lastRow - N);
+
+    var tailParts = [];
     for (var j = start; j < lastRow; j++) {
-      var r = linhas[j];
+      var rr = linhas[j];
 
-      var alias = (r[idxAlias] || "").toString().trim();
-      var v = r[idxValor];
-      var dt2 = r[idxData];
+      var alias2 = (rr[idxAlias] || "").toString().trim();
+      var d2s = normDateKey_(rr[idxData]);
+      var cents2 = normMoneyCents_(rr[idxValor]);
 
-      var d2 = (dt2 instanceof Date) ? dt2 : new Date(dt2);
-      var d2s = (d2 instanceof Date && !isNaN(d2.getTime())) ? d2.toISOString().slice(0, 10) : "";
-
-      // valor como string estável
-      var vs = (typeof v === "number") ? v.toFixed(2) : (v || "").toString().trim();
-
-      parts.push(alias + "|" + d2s + "|" + vs);
+      tailParts.push(alias2 + "|" + d2s + "|" + cents2);
     }
 
-    var payload = "LR=" + lastRow + ";MAX=" + maxDataMs + ";DATA=" + parts.join("||");
-    var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, payload, Utilities.Charset.UTF_8);
-    var sig = digest.map(function(b) {
+    // -------------------------------
+    // (C) Payload final e MD5
+    // -------------------------------
+    // samples cobre o dataset; tail cobre o “fim”; agregados cobrem tendências gerais
+    var payload =
+      "LR=" + lastRow +
+      ";MAX=" + maxDataMs +
+      ";MIN=" + minDataMs +
+      ";SUM=" + sumCents +
+      ";CNTD=" + cntValid +
+      ";CNTA=" + cntAlias +
+      ";STEP=" + step +
+      ";SAMPLE=" + samples.join("||") +
+      ";TAIL=" + tailParts.join("||");
+
+    var digest = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.MD5,
+      payload,
+      Utilities.Charset.UTF_8
+    );
+
+    var sig = digest.map(function (b) {
       var v = (b < 0 ? b + 256 : b).toString(16);
       return v.length === 1 ? "0" + v : v;
     }).join("");
@@ -12353,6 +12414,7 @@ function getLojasOfensorasParaChat(diasJanela) {
 
         qtde: r.qtde,
         valor: r.valor,
+        txCount: (r.txCount != null ? r.txCount : 0),
         diasComPendencia: r.diasComPendencia,
         pendEtiqueta: r.pendEtiqueta,
         pendNF: r.pendNF,
@@ -12405,13 +12467,17 @@ function getResumoCicloPendencias() {
 
     // ✅ rows normalizadas (todas) — o front ordena/filtra e monta a tabela completa
     var normRows = rows.map(function (r) {
-      return {
-        loja: r.loja || "",
-        time: r.time || "N/D",
-        qtde: Number(r.qtde || 0),
-        valor: Number(r.valor || 0)
-      };
-    });
+        return {
+          loja: r.loja || "",
+          time: r.time || "N/D",
+          qtde: Number(r.qtde || 0),
+
+          // ✅ Qtde total de transações (1 por linha do HIST_PEND_CLARA_RAW no agregado)
+          txCount: Number(r.txCount || 0),
+
+          valor: Number(r.valor || 0)
+        };
+      });
 
     return {
       ok: true,
@@ -12430,6 +12496,384 @@ function getResumoCicloPendencias() {
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function getResumoCicloPendenciasDetalheLoja(loja) {
+  vektorAssertFunctionAllowed_("getResumoCicloPendenciasDetalheLoja");
+
+  try {
+    var lojaNum = normalizarLojaNumero_(String(loja || ""));
+    if (!lojaNum) return { ok:false, error:"Loja inválida." };
+    var loja4 = String(lojaNum).padStart(4, "0");
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error("Aba BaseClara não encontrada.");
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 2) return { ok:true, rows:[] };
+
+    var values = sh.getRange(1, 1, lastRow, lastCol).getValues();
+    var header = values[0].map(function(h){ return String(h || "").trim(); });
+    var rows = values.slice(1);
+
+    function idxOf(possiveis) {
+      for (var i = 0; i < possiveis.length; i++) {
+        var ix = header.indexOf(possiveis[i]);
+        if (ix >= 0) return ix;
+      }
+      return -1;
+    }
+
+    var idxDataTrans  = idxOf(["Data da Transação", "Data Transação", "Data"]);
+    var idxValorBRL   = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLojaNum    = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
+    var idxEtiquetas  = idxOf(["Etiquetas"]);
+    var idxRecibo     = idxOf(["Recibo"]);
+    var idxDescricao  = idxOf(["Descrição", "Descricao"]);
+    var idxCategoria  = idxOf(["Categoria da Compra", "Categoria", "Categoria Compra", "Categoria da Compra (Clara)"]);
+
+    if (idxDataTrans < 0) throw new Error("Não encontrei a coluna de Data na BaseClara.");
+    if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna de Valor na BaseClara.");
+    if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna de Loja na BaseClara.");
+    if (idxEtiquetas < 0) throw new Error("Não encontrei a coluna 'Etiquetas' na BaseClara.");
+    if (idxRecibo    < 0) throw new Error("Não encontrei a coluna 'Recibo' na BaseClara.");
+    if (idxDescricao < 0) throw new Error("Não encontrei a coluna 'Descrição' na BaseClara.");
+
+    function isVazio_(v) {
+      if (v === null || v === undefined) return true;
+      if (v === false) return true;
+      var s = String(v).trim().toLowerCase();
+      if (!s) return true;
+      if (s === "-" || s === "—" || s === "n/a" || s === "na") return true;
+      if (s === "false" || s === "0") return true;
+      if (s === "não" || s === "nao") return true;
+      if (s.indexOf("sem recibo") >= 0) return true;
+      if (s.indexOf("sem etiqueta") >= 0) return true;
+      return false;
+    }
+
+    var ciclo = getPeriodoCicloClaraCompleto_();
+    var ini = ciclo.inicio;
+    var fim = ciclo.fim;
+
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+
+    function fmtBRL_(v){
+      try { return Number(v || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
+      catch(e){ return String(v||""); }
+    }
+
+    var out = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+
+      var lojaRow = normalizarLojaNumero_(row[idxLojaNum]);
+      if (!lojaRow) continue;
+      var lojaRow4 = String(lojaRow).padStart(4, "0");
+      if (lojaRow4 !== loja4) continue;
+
+      var dt = row[idxDataTrans];
+      var dt2 = (dt instanceof Date) ? dt : (vektorParseDateAny_(dt) || new Date(dt));
+      if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
+      if (dt2 < ini || dt2 > fim) continue;
+
+      var valor = row[idxValorBRL];
+      var valorNum = parseNumberSafe_(valor);
+
+      var etiquetas = row[idxEtiquetas];
+      var recibo = row[idxRecibo];
+      var desc = row[idxDescricao];
+
+      var pendEtiqueta = isVazio_(etiquetas);
+      var pendNF = isVazio_(recibo);
+      var pendDesc = isVazio_(desc);
+
+      if (!(pendEtiqueta || pendNF || pendDesc)) continue;
+
+      var pendList = [];
+      if (pendEtiqueta) pendList.push("Etiqueta");
+      if (pendNF) pendList.push("NF/Recibo");
+      if (pendDesc) pendList.push("Descrição");
+
+      var categoria = (idxCategoria >= 0) ? String(row[idxCategoria] || "").trim() : "";
+
+      out.push({
+        dataTxt: Utilities.formatDate(dt2, tz, "dd/MM/yyyy"),
+        valorTxt: fmtBRL_(valorNum),
+        valor: valorNum,
+        categoria: categoria || "—",
+        pendencias: pendList.join(", ")
+      });
+    }
+
+    // ordena por valor desc (e depois por data desc)
+    out.sort(function(a,b){
+      if ((b.valor||0) !== (a.valor||0)) return (b.valor||0) - (a.valor||0);
+      return String(b.dataTxt||"").localeCompare(String(a.dataTxt||""));
+    });
+
+    return { ok:true, loja: loja4, rows: out };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+// =====================================================
+// RESUMO DO CICLO — Detalhe por LOJA (modo "resumo")
+// Regra: aceita Pendências (texto) OU Recibo/Etiqueta/Descrição
+// =====================================================
+function getResumoCicloPendenciasDetalheLojaResumo(loja) {
+  vektorAssertFunctionAllowed_("getResumoCicloPendenciasDetalheLojaResumo");
+
+  try {
+    var lojaIn = String(loja || "").trim();
+    if (!lojaIn) return { ok: false, error: "Loja inválida." };
+
+    // normaliza loja (remove não-dígitos)
+    var lojaDig = lojaIn.replace(/\D/g, "");
+    if (!lojaDig) return { ok: false, error: "Loja inválida." };
+    var lojaNum = String(Number(lojaDig));
+    var loja4 = lojaNum.padStart(4, "0");
+
+    // abre BaseClara
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) return { ok: false, error: "Aba BaseClara não encontrada." };
+
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return { ok: true, itens: [] };
+
+    // lê header + dados
+    var all = sh.getRange(1, 1, lastRow, sh.getLastColumn()).getValues();
+    var header = all[0].map(function (h) { return String(h || "").trim(); });
+    var linhas = all.slice(1);
+
+    function idxOf(possiveis) {
+      for (var i = 0; i < possiveis.length; i++) {
+        var ix = header.indexOf(possiveis[i]);
+        if (ix >= 0) return ix;
+      }
+      return -1;
+    }
+
+    // índices (mantém os mesmos nomes que você já usa no detalhe-loja)
+    var idxDataTrans = idxOf(["Data da Transação", "Data Transação", "Data"]);
+    var idxValorBRL  = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLojaNum   = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
+
+    var idxRecibo    = idxOf(["Recibo", "NF/Recibo"]);
+    var idxEtiquetas = idxOf(["Etiquetas", "Etiqueta"]);
+    var idxDescricao = idxOf(["Descrição", "Descricao"]);
+    var idxCategoria = idxOf(["Categoria da Compra", "Categoria", "Categoria Compra", "Categoria da Compra (Clara)"]);
+
+    // ✅ NOVO: texto agregado de pendências (quando existir)
+    var idxPendTxt   = idxOf(["Pendências", "Pendencias", "Pendência", "Pendencia"]);
+
+    if (idxDataTrans < 0) throw new Error("Não encontrei a coluna de Data na BaseClara.");
+    if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna de Valor na BaseClara.");
+    if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna de Loja na BaseClara.");
+
+    // período do ciclo atual
+    var pc = getPeriodoCicloClara_();
+    var ini = pc && pc.inicio ? pc.inicio : null;
+    var fim = new Date();
+    if (!ini) throw new Error("Não consegui identificar o início do ciclo atual.");
+
+    function parseDateClara_(v) {
+      if (v instanceof Date) return v;
+      var s = String(v || "").trim();
+      if (!s) return null;
+      // tenta dd/MM/yyyy
+      var m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+      var d = new Date(s);
+      return isNaN(d.getTime()) ? null : d;
+    }
+
+    function isVazioPend_(v) {
+      if (v === null || v === undefined) return true;
+      if (typeof v === "boolean") return (v === false);
+      var s = String(v).trim().toLowerCase();
+      if (!s) return true;
+      if (s === "-" || s === "—" || s === "n/a") return true;
+      if (s === "não" || s === "nao") return true;
+      if (s === "false" || s === "0") return true;
+      return false;
+    }
+
+    // monta itens
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var itens = [];
+
+    for (var i = 0; i < linhas.length; i++) {
+      var r = linhas[i];
+
+      // loja da linha
+      var lojaRaw = String(r[idxLojaNum] || "").trim();
+      var dig = lojaRaw.replace(/\D/g, "");
+      if (!dig) continue;
+      var ln = String(Number(dig));
+      var ln4 = ln.padStart(4, "0");
+
+      // filtra loja alvo
+      if (!(ln === lojaNum || ln4 === loja4)) continue;
+
+      // data no ciclo
+      var d = parseDateClara_(r[idxDataTrans]);
+      if (!d) continue;
+      if (d < ini || d > fim) continue;
+
+      // regras de pendência
+      var temPendRecibo    = isVazioPend_(idxRecibo >= 0 ? r[idxRecibo] : "");
+      var temPendEtiqueta  = isVazioPend_(idxEtiquetas >= 0 ? r[idxEtiquetas] : "");
+      var temPendDescricao = isVazioPend_(idxDescricao >= 0 ? r[idxDescricao] : "");
+
+      // ✅ NOVO: pendência por texto agregado (se coluna existir)
+      var pendTxt = (idxPendTxt >= 0) ? String(r[idxPendTxt] || "").trim() : "";
+      var temPendTxt = !!pendTxt;
+
+      // ✅ Regra do RESUMO: vale se tiver texto OU uma das 3 pendências clássicas
+      if (!(temPendTxt || temPendRecibo || temPendEtiqueta || temPendDescricao)) continue;
+
+      var v = Number(r[idxValorBRL] || 0);
+      var categoria = (idxCategoria >= 0 ? (r[idxCategoria] || "—") : "—");
+
+      var pendenciasTxt = temPendTxt
+        ? pendTxt
+        : [
+            temPendRecibo ? "NF/Recibo" : null,
+            temPendEtiqueta ? "Etiqueta" : null,
+            temPendDescricao ? "Descrição" : null
+          ].filter(Boolean).join(" • ");
+
+      itens.push({
+        loja: ln,
+        data: Utilities.formatDate(d, tz, "dd/MM/yyyy"),
+        valor: v,
+        valorFmt: v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        categoria: String(categoria || "—"),
+        pendenciasTxt: pendenciasTxt || "—"
+      });
+    }
+
+    return { ok: true, itens: itens };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function getResumoCicloPendenciasDetalheTime(time) {
+  vektorAssertFunctionAllowed_("getResumoCicloPendenciasDetalheTime");
+
+  try {
+    var t = String(time || "").trim();
+    if (!t) return { ok:false, error:"Time inválido." };
+
+    // Reaproveita BaseClara + mapa Loja->Time, igual a outras rotinas
+    var mapaTime = construirMapaLojaParaTime_();
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error("Aba BaseClara não encontrada.");
+
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return { ok:true, rows: [] };
+
+    var values = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
+
+        // 1) Lê cabeçalho+linhas igual ao detalhe loja
+    var all = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
+    var header = all[0].map(function(h){ return String(h || "").trim(); });
+    var linhas = all.slice(1);
+
+    function idxOf(possiveis) {
+      for (var i = 0; i < possiveis.length; i++) {
+        var ix = header.indexOf(possiveis[i]);
+        if (ix >= 0) return ix;
+      }
+      return -1;
+    }
+
+    var idxDataTrans  = idxOf(["Data da Transação", "Data Transação", "Data"]);
+    var idxValorBRL   = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLojaNum    = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
+    var idxEtiquetas  = idxOf(["Etiquetas"]);
+    var idxRecibo     = idxOf(["Recibo"]);
+    var idxDescricao  = idxOf(["Descrição", "Descricao"]);
+    var idxCategoria  = idxOf(["Categoria da Compra", "Categoria", "Categoria Compra", "Categoria da Compra (Clara)"]);
+
+    if (idxDataTrans < 0) throw new Error("Não encontrei a coluna de Data na BaseClara.");
+    if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna de Valor na BaseClara.");
+    if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna de Loja na BaseClara.");
+
+    // 2) Período do ciclo (mesma lógica do trecho de filtro por ciclo) :contentReference[oaicite:4]{index=4}
+    var pc = getPeriodoCicloClara_();
+    var ini = pc && pc.inicio ? pc.inicio : null;
+    var fim = new Date();
+    if (!ini) throw new Error("Não consegui identificar o início do ciclo atual.");
+
+    function isVazioPend_(v) {
+      if (v === null || v === undefined) return true;
+      if (typeof v === "boolean") return (v === false);
+      var s = String(v).trim().toLowerCase();
+      if (!s) return true;
+      if (s === "-" || s === "—" || s === "n/a") return true;
+      if (s === "não" || s === "nao") return true;
+      if (s === "false" || s === "0") return true;
+      return false;
+    }
+
+    // 3) Filtra: ciclo + time + tem pendência
+    var out = [];
+    for (var i = 0; i < linhas.length; i++) {
+      var r = linhas[i];
+
+      var lojaRaw = String(r[idxLojaNum] || "").trim();
+      var dig = lojaRaw.replace(/\D/g, "");
+      if (!dig) continue;
+      var lojaNum = String(Number(dig));              // normalizado
+      var loja4 = lojaNum.padStart(4, "0");
+
+      var timeDaLoja = (mapaTime && (mapaTime[loja4] || mapaTime[lojaNum])) ? (mapaTime[loja4] || mapaTime[lojaNum]) : "N/D";
+      if (String(timeDaLoja || "").trim() !== t) continue;
+
+      var d = parseDateClara_(r[idxDataTrans]);
+      if (!d) continue;
+      if (d < ini || d > fim) continue;
+
+      var recibo = r[idxRecibo];
+      var etiqueta = r[idxEtiquetas];
+      var desc = r[idxDescricao];
+
+      var temPendRecibo = isVazioPend_(recibo);
+      var temPendEtiqueta = isVazioPend_(etiqueta);
+      var temPendDescricao = isVazioPend_(desc);
+
+      if (!(temPendRecibo || temPendEtiqueta || temPendDescricao)) continue;
+
+      out.push({
+        dataTxt: Utilities.formatDate(d, Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy"),
+        valorTxt: (Number(r[idxValorBRL] || 0)).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }),
+        categoria: (idxCategoria >= 0 ? (r[idxCategoria] || "—") : "—"),
+        pendencias: [
+          temPendRecibo ? "NF/Recibo" : null,
+          temPendEtiqueta ? "Etiqueta" : null,
+          temPendDescricao ? "Descrição" : null
+        ].filter(Boolean).join(" • "),
+        loja: lojaNum
+      });
+    }
+
+    return { ok:true, rows: out };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
   }
 }
 
