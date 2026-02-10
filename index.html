@@ -455,6 +455,152 @@ display: none;
   display: none;
 }
 
+/* =========================
+   RESUMO DO CICLO - VISUAL
+   ========================= */
+.cicloResumoPage {
+  background:#ffffff !important;
+}
+
+.cicloCard {
+  background:#fff;
+  border:2px double #005E27;
+  border-radius:14px;
+  padding:12px;
+  box-shadow:0 10px 22px rgba(0,0,0,0.08);
+}
+
+.cicloCardLabel {
+  color:#0f172a;
+  font-size:13px;
+  font-weight:900;
+}
+
+.cicloCardValue {
+  margin-top:6px;
+  color:#0b1220;
+  font-size:26px;
+  font-weight:1000;
+}
+
+.cicloCardSub {
+  margin-top:2px;
+  color:#334155;
+  font-size:12px;
+  font-weight:800;
+}
+
+#cicloResumoTableBox {
+  background:#fff;
+  border:2px solid #000;
+  border-radius:12px;
+  overflow:auto;
+  max-height:45vh; /* ✅ necessário p/ o sticky “fazer sentido” */
+}
+
+/* ===== Resumo do ciclo | Tabela com grade + cabeçalho sticky ===== */
+#cicloResumoTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #ffffff;
+  color: #0b1220;
+}
+
+#cicloResumoTable thead th{
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #0b1f3a;
+  color: #ffffff;
+  font-size: 14px;               /* +1 ponto */
+  border-right: 2px double #005E27;
+  border-bottom: 2px double #005E27;
+  padding: 10px 10px;
+}
+
+#cicloResumoTable tbody td{
+  font-size: 14px;               /* +1 ponto */
+  border-right: 2px double #111;
+  border-bottom: 2px double #111;
+  padding: 10px 10px;
+  background: #ffffff;
+}
+
+#cicloResumoTable thead th:last-child,
+#cicloResumoTable tbody td:last-child{
+  border-right: none;
+}
+
+.cicloResumoRow {
+  cursor:pointer;
+}
+.cicloResumoRow:hover td {
+  background:#f8fafc;
+}
+
+/* Tooltip estilo “Disparo de Ocorrências” */
+#cicloResumoTooltip {
+  position:fixed;
+  z-index:90;
+  width:min(680px, 94vw);
+  display:none;
+  border-radius:16px;
+  overflow:hidden;
+  box-shadow:0 18px 44px rgba(0,0,0,0.25);
+  border:1px solid rgba(148,163,184,0.55);
+}
+#cicloResumoTooltipHeader {
+  background:#005E27;
+  color:#fff;
+  padding:12px 14px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+#cicloResumoTooltipBody {
+  background:#fff;
+  padding:12px 14px;
+  color:#0f172a;
+}
+
+/* Resumo do ciclo — linha de tipos de pendência no modal/tooltip */
+#cicloResumoTooltipContent .pend-types,
+#cicloResumoTooltipContent .pendencias-tipos,
+#cicloResumoTooltipContent [data-pend-types="1"]{
+  color: #000 !important;
+  opacity: 1 !important;
+}
+
+#cicloResumoPieCanvas {
+  display:block;
+  width:100%;
+}
+
+#cicloResumoPieBg * {
+  box-sizing: border-box;
+}
+
+#cicloResumoTooltipBody table {
+  width:100%;
+  border-collapse:collapse;
+  font-size:12px;
+}
+#cicloResumoTooltipBody th,
+#cicloResumoTooltipBody td {
+  padding:8px;
+  border-bottom:1px solid #e2e8f0;
+  vertical-align:top;
+}
+#cicloResumoTooltipBody th {
+  text-align:left;
+  color:#334155;
+  font-weight:900;
+  background:#f8fafc;
+  position:sticky;
+  top:0;
+}
+
 </style>
 
 <style>
@@ -934,47 +1080,136 @@ display: none;
       </div>
 
       <!-- Conteúdo -->
-      <div style="flex:1; min-height:0; overflow:auto; background:#070b14; padding:14px 16px;">
-        <div id="cicloResumoLoading" style="display:none; color:rgba(226,232,240,0.9); font-size:13px; font-weight:800;">
+      <div class="cicloResumoPage" style="flex:1; min-height:0; overflow:auto; background:#fff; padding:14px 16px;">
+        <div id="cicloResumoLoading" style="display:none; color:#0f172a; font-size:13px; font-weight:800;">
           Carregando resumo do ciclo…
         </div>
 
         <div id="cicloResumoContent" style="display:none;">
-          <!-- Cards -->
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-              <div style="color:rgba(226,232,240,0.75); font-size:11px; font-weight:900;">Lojas com pendências</div>
-              <div id="cicloResumo_totalLojas" style="margin-top:6px; color:#fff; font-size:22px; font-weight:1000;">—</div>
-            </div>
 
-            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-              <div style="color:rgba(226,232,240,0.75); font-size:11px; font-weight:900;">Qtde de pendências</div>
-              <div id="cicloResumo_totalPend" style="margin-top:6px; color:#fff; font-size:22px; font-weight:1000;">—</div>
-            </div>
+                    <!-- Cards -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
+                      <div class="cicloCard">
+                        <div class="cicloCardLabel">🏬 Lojas com pendências</div>
+                        <div id="cicloResumo_totalLojas" class="cicloCardValue">—</div>
+                      </div>
 
-            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-              <div style="color:rgba(226,232,240,0.75); font-size:11px; font-weight:900;">Valor pendente</div>
-              <div id="cicloResumo_totalValor" style="margin-top:6px; color:#fff; font-size:22px; font-weight:1000;">—</div>
-            </div>
-          </div>
+                      <div class="cicloCard" id="cicloResumo_cardTotalPend" style="cursor:pointer;">
+                        <div class="cicloCardLabel">🧾 Qtde de pendências</div>
+                        <div id="cicloResumo_totalPend" class="cicloCardValue">—</div>
+                      </div>
 
-          <!-- Tabela (todas as lojas / filtradas) -->
-          <div style="margin-top:14px; background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-            <div style="color:#fff; font-weight:1000; font-size:13px;">Lojas (por valor pendente)</div>
-            <div style="margin-top:10px; overflow:auto; border-radius:12px; border:1px solid rgba(148,163,184,0.18);">
-              <table style="width:100%; border-collapse:collapse; font-size:12px; color:rgba(226,232,240,0.92);">
-                <thead>
-                  <tr>
-                    <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Loja</th>
-                    <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:left;">Time</th>
-                    <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:right;">Qtde</th>
-                    <th style="position:sticky; top:0; background:#0b1f3a; color:#fff; padding:8px; text-align:right;">Valor</th>
-                  </tr>
-                </thead>
-                <tbody id="cicloResumo_tbody"></tbody>
-              </table>
+                      <div class="cicloCard">
+                        <div class="cicloCardLabel">💰 Valor pendente</div>
+                        <div id="cicloResumo_totalValor" class="cicloCardValue">—</div>
+                      </div>
+
+                      <div class="cicloCard" id="cicloResumo_cardTopTime" style="cursor:pointer;">
+                        <div class="cicloCardLabel">🏆 Top time (mais pendências)</div>
+                        <div id="cicloResumo_topTime" class="cicloCardValue">—</div>
+                        <div id="cicloResumo_topTimeSub" class="cicloCardSub">—</div>
+                      </div>
+
+                      <div class="cicloCard">
+                        <div class="cicloCardLabel">🔥 Top loja (mais pendências)</div>
+                        <div id="cicloResumo_topLoja" class="cicloCardValue">—</div>
+                        <div id="cicloResumo_topLojaSub" class="cicloCardSub">—</div>
+                      </div>
+                    </div> <!-- ✅ FECHA O GRID AQUI -->
+
+                    <!-- Tooltip: detalhes da loja (Resumo do ciclo) -->
+                    <div id="cicloResumoTooltip">
+                      <div id="cicloResumoTooltipHeader">
+                        <div>
+                          <div id="cicloResumoTooltipTitle" style="font-weight:1000;">—</div>
+                          <div id="cicloResumoTooltipSub" style="font-size:12px; opacity:0.9;">—</div>
+                        </div>
+
+                        <button type="button"
+                                onclick="window.vektorResumoCicloHideTooltip && window.vektorResumoCicloHideTooltip()"
+                                style="background:rgba(255,255,255,0.15); padding:8px 10px; border-radius:10px; font-weight:900;">
+                          Fechar
+                        </button>
+                      </div>
+
+                      <div id="cicloResumoTooltipBody">
+                        <div id="cicloResumoTooltipLoading" style="display:none; font-weight:900; color:#334155;">
+                          Carregando detalhes…
+                        </div>
+                        <div id="cicloResumoTooltipErr" style="display:none; font-weight:900; color:#b91c1c;">
+                          —
+                        </div>
+                        <div id="cicloResumoTooltipContent"></div>
+                      </div>
+                    </div>
+
+                    <!-- ✅ Modal: gráfico pizza (Resumo do ciclo) — fora do tooltip e fora do grid -->
+                    <div id="cicloResumoPieBg"
+     style="display:none; position:fixed; inset:0; z-index:95; background:rgba(0,0,0,0.55);">
+                      <div id="cicloResumoPieModal"
+     style="width:min(980px, 96vw); margin:6vh auto; border-radius:16px; overflow:hidden; box-shadow:0 18px 44px rgba(0,0,0,0.25); border:1px solid rgba  (148,163,184,0.55); background:#fff;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid rgba(181,255,32,0.35);">
+                          <div>
+                            <div style="font-weight:1000; font-size:14px;">Distribuição de pendências por time</div>
+                            <div id="cicloResumoPieSub" style="font-size:12px; opacity:0.9;">—</div>
+                          </div>
+                          <button type="button"
+                                  id="cicloResumoPieClose"
+                                  style="background:rgba(255,255,255,0.12); padding:8px 10px; border-radius:10px; font-weight:900;">
+                            Fechar
+                          </button>
+                        </div>
+
+                        <div style="padding:12px 14px;">
+                          <canvas id="cicloResumoPieCanvas" width="560" height="360"></canvas>
+                          <div id="cicloResumoPieLegend" style="margin-top:12px; background:#fff; border-radius:12px; padding:10px;"></div>
+                          <div style="margin-top:10px; font-size:12px; opacity:0.85;">
+                            Clique em um setor para filtrar no futuro (se você quiser evoluir).
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+         <!-- Tabela (todas as lojas / filtradas) -->
+            <div style="margin-top:14px; background:#ffffff; border:2px solid #000; border-radius:14px; padding:12px;">
+              <div style="color:#0f172a; font-weight:1000; font-size:14px;">
+                Lojas (por valor pendente)
+                <span style="font-weight:900; font-size:13px; color:#334155;">
+                  — clique na linha da loja para ver detalhes das transações pendentes
+                </span>
+              </div>
+
+              <div style="margin-top:10px; overflow:auto; max-height:520px; border-radius:12px; border:2px solid #000; background:#fff;">
+                <table id="cicloResumoTable" style="width:100%; border-collapse:separate; border-spacing:0; font-size:13px; color:#000; background:#fff;">
+                  <thead>
+                    <tr>
+                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27;">
+                        Loja
+                      </th>
+
+                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27;">
+                        Time
+                      </th>
+
+                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:right; border-right:2px double #005E27; border-bottom:2px double #005E27;">
+                        Qtde
+                      </th>
+
+                      <!-- ✅ NOVO -->
+                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:right; border-right:2px double #005E27; border-bottom:2px double #005E27;">
+                        Qtde transações
+                      </th>
+
+                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:right; border-bottom:2px double #005E27;">
+                        Valor
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody id="cicloResumo_tbody"></tbody>
+                </table>
+              </div>
             </div>
-          </div>
 
         </div>
       </div>
@@ -1227,21 +1462,24 @@ display: none;
             Revisar linhas
           </button>
 
-          <button type="button"
-                  onclick="window.vektorEnvioPendenciasEnviarSelecionadas()"
-                  style="
-                    height:36px;
-                    padding:0 14px;
-                    border-radius:10px;
-                    border:none;
-                    background:#B5FF20;
-                    color:#0b1f3a;
-                    font-weight:900;
-                    font-size:12px;
-                    cursor:pointer;
-                  ">
+          <button
+            id="envPend_btnEnviarSelecionadas"
+            type="button"
+            onclick="window.vektorEnvioPendenciasEnviarSelecionadas()"
+            style="
+              height:36px;
+              padding:0 14px;
+              border-radius:10px;
+              border:none;
+              background:#B5FF20;
+              color:#0b1f3a;
+              font-weight:900;
+              font-size:12px;
+              cursor:pointer;
+            ">
             Enviar selecionadas
           </button>
+
         </div>
       </div>
 
@@ -3307,37 +3545,44 @@ window.vektorShowChatView = function () {
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
 
-  // ✅ NOVO: Envio de Pendências
+  // ✅ Envio de Pendências
   const envioPendView = document.getElementById("envioPendView");
   const envPendModal = document.getElementById("envPendModal");
+
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
 
-  if (radarView) radarView.classList.add("hidden");
-  if (feedbackView) feedbackView.classList.add("hidden");
-  if (myAlertsView) myAlertsView.classList.add("hidden");
-  if (fluxView) fluxView.classList.add("hidden");
+  // fecha outras views
+  [
+    radarView,
+    feedbackView,
+    myAlertsView,
+    fluxView,
+    envioPendView,
+    cicloResumoView,
+    homeView
+  ].forEach(v => {
+    if (!v) return;
+    v.classList.add("hidden");
+    v.classList.remove("is-open");
+    v.style.display = "none";
+  });
 
-  // ✅ fecha página e modal
-  if (envioPendView) envioPendView.classList.add("hidden");
-  if (envPendModal) envPendModal.classList.add("hidden");
+  // fecha modal envio pendências (se estiver aberto)
+  if (envPendModal) {
+    envPendModal.classList.add("hidden");
+    envPendModal.style.display = "none";
+  }
 
-  // ✅ fecha HOME
-  if (homeView) { homeView.classList.add("hidden"); homeView.style.display = "none"; }
+  // ✅ abre chat de verdade
+  if (chatView) {
+    chatView.classList.remove("hidden");     // <-- ESSE era o bug
+    chatView.classList.add("is-open");
+    chatView.style.display = "flex";
+  }
 
-  if (chatView) chatView.classList.remove("hidden");
-
-  if (cicloResumoView) cicloResumoView.classList.add("hidden");
-
-  if (radarView) radarView.classList.remove("is-open");
-
-  if (chatView) chatView.style.display = "flex";
-
-    // ✅ NOVO: abrir modal "Como usar o Vektor?" apenas 1x por dia (por navegador)
+  // ✅ abrir modal "Como usar o Vektor?" apenas 1x por dia (por navegador)
   try {
-    const tz = "America/Sao_Paulo";
-
-    // data do dia no formato YYYY-MM-DD (robusto o suficiente pro seu caso)
     const now = new Date();
     const yyyy = String(now.getFullYear());
     const mm = String(now.getMonth() + 1).padStart(2, "0");
@@ -3348,7 +3593,6 @@ window.vektorShowChatView = function () {
     const last = localStorage.getItem(LS_KEY) || "";
 
     if (last !== hojeKey) {
-      // marca antes de abrir (evita abrir 2x em race conditions)
       localStorage.setItem(LS_KEY, hojeKey);
 
       setTimeout(function () {
@@ -3368,17 +3612,26 @@ function vektorShowRadarView_() {
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
 
-  // fecha as demais páginas
-  if (chatView) chatView.classList.add("hidden");
-  if (feedbackView) feedbackView.classList.add("hidden");
-  if (myAlertsView) myAlertsView.classList.add("hidden");
-  if (fluxView) fluxView.classList.add("hidden");
+  const envioPendView = document.getElementById("envioPendView");
+  const envPendModal = document.getElementById("envPendModal");
+  const homeView = document.getElementById("homeView");
+  const cicloResumoView = document.getElementById("cicloResumoView");
 
-  // abre o Radar
-  if (radarView) radarView.classList.remove("hidden");
+  // fecha TODAS
+  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView].forEach(v => {
+    if (!v) return;
+    v.classList.add("hidden");
+    v.style.display = "none";
+  });
+  if (envPendModal) { envPendModal.classList.add("hidden"); envPendModal.style.display = "none"; }
+  if (homeView) { homeView.classList.add("hidden"); homeView.style.display = "none"; }
 
-  // (opcional, mas recomendado: mantém comportamento visual do Radar)
-  if (radarView) radarView.classList.add("is-open");
+  // abre Radar
+  if (radarView) {
+    radarView.classList.remove("hidden");
+    radarView.style.display = "block";
+    radarView.classList.add("is-open");
+  }
 }
 
 function vektorShowFeedbackView_() {
@@ -3407,15 +3660,26 @@ function vektorShowFluxogramaView_() {
   const feedbackView = document.getElementById("feedbackView");
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
+
+  const envioPendView = document.getElementById("envioPendView");
+  const envPendModal = document.getElementById("envPendModal");
+  const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
 
-  if (chatView) chatView.classList.add("hidden");
-  if (radarView) radarView.classList.add("hidden");
-  if (feedbackView) feedbackView.classList.add("hidden");
-  if (myAlertsView) myAlertsView.classList.add("hidden");
+  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView].forEach(v => {
+    if (!v) return;
+    v.classList.add("hidden");
+    v.style.display = "none";
+  });
+  if (envPendModal) { envPendModal.classList.add("hidden"); envPendModal.style.display = "none"; }
+  if (homeView) { homeView.classList.add("hidden"); homeView.style.display = "none"; }
 
-  if (fluxView) fluxView.classList.remove("hidden");
-  if (cicloResumoView) cicloResumoView.classList.add("hidden");
+  if (fluxView) {
+    fluxView.classList.remove("hidden");
+    fluxView.style.display = "block";
+  }
+
+  if (radarView) radarView.classList.remove("is-open");
 }
 
 // ===============================
@@ -3427,20 +3691,31 @@ function vektorShowEnvioPendenciasView_() {
   const feedbackView = document.getElementById("feedbackView");
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
-  const envView = document.getElementById("envioPendView");
-  const cicloView = document.getElementById("cicloResumoView");
 
-  if (chatView) chatView.classList.add("hidden");
-  if (radarView) radarView.classList.add("hidden");
-  if (feedbackView) feedbackView.classList.add("hidden");
-  if (myAlertsView) myAlertsView.classList.add("hidden");
-  if (fluxView) fluxView.classList.add("hidden");
+  const envioPendView = document.getElementById("envioPendView");
+  const envPendModal = document.getElementById("envPendModal");
+  const homeView = document.getElementById("homeView");
+  const cicloResumoView = document.getElementById("cicloResumoView");
 
-  if (envView) envView.classList.remove("hidden");
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView].forEach(v => {
+    if (!v) return;
+    v.classList.add("hidden");
+    v.style.display = "none";
+  });
+  if (homeView) { homeView.classList.add("hidden"); homeView.style.display = "none"; }
+
+  if (envioPendView) {
+    envioPendView.classList.remove("hidden");
+    envioPendView.style.display = "block";
+  }
+
+  // fecha modal (não abre sozinho)
+  if (envPendModal) {
+    envPendModal.classList.add("hidden");
+    envPendModal.style.display = "none";
+  }
 
   if (radarView) radarView.classList.remove("is-open");
-
-  if (cicloView) cicloView.classList.add("hidden");
 }
 
 window.vektorOpenEnvioPendencias = function () {
@@ -3478,6 +3753,10 @@ window.vektorLoadResumoCiclo = function (force) {
       loja: String(r.loja || ""),
       time: String(r.time || "N/D"),
       qtde: Number(r.qtde || 0),
+
+      // ✅ Qtde de transações: aceita os dois nomes (back compat)
+      txCount: Number((r.txCount != null ? r.txCount : r.qtdeTransacoes) || 0),
+
       valor: Number(r.valor || 0)
     }));
   }
@@ -3505,6 +3784,18 @@ window.vektorLoadResumoCiclo = function (force) {
 
     const allRows = getRows_(res);
 
+    // ✅ bind card "Qtde de pendências" para abrir pizza (1x)
+        try {
+          const cardQtde = document.getElementById("cicloResumo_cardTotalPend");
+          if (cardQtde && !cardQtde.__bindPie) {
+            cardQtde.__bindPie = true;
+            cardQtde.style.cursor = "pointer";
+            cardQtde.addEventListener("click", function () {
+              window.vektorResumoCicloOpenPieTimes();
+            });
+          }
+        } catch(e){}
+
     // 1) popula TIME com base no dataset total
     const times = Array.from(new Set(allRows.map(r => r.time))).sort((a, b) => a.localeCompare(b, "pt-BR"));
     buildOptions_(selTime, times, "Todos");
@@ -3523,6 +3814,37 @@ window.vektorLoadResumoCiclo = function (force) {
     const totalPend = filtered.reduce((acc, r) => acc + (r.qtde || 0), 0);
     const totalValor = filtered.reduce((acc, r) => acc + (r.valor || 0), 0);
 
+    // 4.1) TOP TIME e TOP LOJA (por quantidade de pendências)
+const elTopTime = document.getElementById("cicloResumo_topTime");
+const elTopTimeSub = document.getElementById("cicloResumo_topTimeSub");
+const elTopLoja = document.getElementById("cicloResumo_topLoja");
+const elTopLojaSub = document.getElementById("cicloResumo_topLojaSub");
+
+let topTimeName = "—", topTimeQt = 0;
+let topLojaName = "—", topLojaQt = 0;
+
+// top loja
+filtered.forEach(r => {
+  const q = Number(r.qtde || 0);
+  if (q > topLojaQt) { topLojaQt = q; topLojaName = r.loja || "—"; }
+});
+
+// top time (soma qtde por time)
+const mapTime = {};
+filtered.forEach(r => {
+  const t = String(r.time || "N/D");
+  mapTime[t] = (mapTime[t] || 0) + Number(r.qtde || 0);
+});
+Object.keys(mapTime).forEach(t => {
+  if (mapTime[t] > topTimeQt) { topTimeQt = mapTime[t]; topTimeName = t; }
+});
+
+if (elTopTime) elTopTime.textContent = topTimeName;
+if (elTopTimeSub) elTopTimeSub.textContent = topTimeQt ? (topTimeQt + " pendências") : "—";
+
+if (elTopLoja) elTopLoja.textContent = topLojaName;
+if (elTopLojaSub) elTopLojaSub.textContent = topLojaQt ? (topLojaQt + " pendências") : "—";
+
     const elL = document.getElementById("cicloResumo_totalLojas");
     const elP = document.getElementById("cicloResumo_totalPend");
     const elV = document.getElementById("cicloResumo_totalValor");
@@ -3536,22 +3858,66 @@ window.vektorLoadResumoCiclo = function (force) {
 
     if (tbody) {
       if (!ordered.length) {
-        tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:rgba(226,232,240,0.9);'>Nenhum resultado para o filtro.</td></tr>";
+        tbody.innerHTML = "<tr><td colspan='5' style='padding:10px;color:rgba(226,232,240,0.9);'>Nenhum resultado para o filtro.</td></tr>";
       } else {
         tbody.innerHTML = ordered.map(r => {
-          return `
-            <tr>
-              <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.loja}</td>
-              <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.time}</td>
-              <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${Number(r.qtde || 0)}</td>
-              <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${fmtBRL(r.valor || 0)}</td>
-            </tr>
-          `;
-        }).join("");
+  return `
+    <tr class="cicloResumoRow" data-loja="${String(r.loja || "").replace(/"/g,'&quot;')}">
+      <td>${r.loja}</td>
+      <td>${r.time}</td>
+      <td style="text-align:right;">${Number(r.qtde || 0)}</td>
+      <td style="text-align:right;">${Number(r.txCount || 0)}</td>
+      <td style="text-align:right;">${fmtBRL(r.valor || 0)}</td>
+    </tr>
+  `;
+}).join("");
+
+// ✅ bind clique (tooltip)
+try {
+  Array.from(tbody.querySelectorAll("tr.cicloResumoRow")).forEach(tr => {
+    tr.addEventListener("click", function () {
+      const loja = this.getAttribute("data-loja") || "";
+      window.vektorResumoCicloShowTooltipForLoja && window.vektorResumoCicloShowTooltipForLoja(loja, this);
+    });
+  });
+} catch (e) {}
       }
     }
 
     if (content) content.style.display = "block";
+
+    // --- binds de clique (idempotente) ---
+try {
+  const cardTopTime = document.getElementById("cicloResumo_cardTopTime");
+  if (cardTopTime && !cardTopTime.__binded) {
+    cardTopTime.__binded = true;
+    cardTopTime.addEventListener("click", function(){
+      // pega o texto atual do card (já renderizado)
+      const t = (document.getElementById("cicloResumo_topTime") || {}).textContent || "";
+      const time = String(t || "").trim();
+      if (!time || time === "—") return;
+
+      // ⚠️ aqui você deve chamar a SUA função de abrir tooltip/modal por TIME
+      // Ex.: window.vektorCicloResumoOpenDetalheTime(time)
+      if (window.vektorResumoCicloShowTooltipForTime) {
+        window.vektorResumoCicloShowTooltipForTime(time, this);
+      }
+    });
+  }
+
+  const cardTotalPend = document.getElementById("cicloResumo_cardTotalPend");
+  if (cardTotalPend && !cardTotalPend.__binded) {
+    cardTotalPend.__binded = true;
+    cardTotalPend.addEventListener("click", function(){
+      // ⚠️ aqui você deve chamar a SUA função de abrir o gráfico
+      // Ex.: window.vektorCicloResumoOpenPizzaTimes()
+      if (window.vektorCicloResumoOpenPizzaTimes) {
+        window.vektorCicloResumoOpenPizzaTimes();
+      }
+    });
+  }
+} catch(e) {}
+
   }
 
   // expõe limpar filtros (usado pelo botão)
@@ -3615,6 +3981,321 @@ window.vektorLoadResumoCiclo = function (force) {
     .getResumoCicloPendencias();
 };
 
+window.vektorResumoCicloHideTooltip = function () {
+  const tp = document.getElementById("cicloResumoTooltip");
+  if (tp) tp.style.display = "none";
+};
+
+// ===============================
+// RESUMO DO CICLO — PIZZA por TIME (Qtde de pendências)
+// ===============================
+window.vektorResumoCicloClosePie = function () {
+  const bg = document.getElementById("cicloResumoPieBg");
+  if (bg) bg.style.display = "none";
+};
+
+window.vektorResumoCicloOpenPieTimes = function () {
+  const bg = document.getElementById("cicloResumoPieBg");
+  const errEl = document.getElementById("cicloResumoPieErr");
+  if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+
+  if (!bg) return;
+  bg.style.display = "flex";
+
+  // bind fechar (1x)
+  try {
+    const btn = document.getElementById("cicloResumoPieClose");
+    if (btn && !btn.__bind) {
+      btn.__bind = true;
+      btn.addEventListener("click", window.vektorResumoCicloClosePie);
+    }
+    if (!bg.__bindOutside) {
+      bg.__bindOutside = true;
+      bg.addEventListener("mousedown", function (ev) {
+        if (ev.target === bg) window.vektorResumoCicloClosePie();
+      });
+      document.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape") window.vektorResumoCicloClosePie();
+      });
+    }
+  } catch(e) {}
+
+  // monta dados
+  try {
+    const res = window.__cicloResumoData;
+    if (!res || !res.ok) throw new Error("Resumo do ciclo ainda não carregou.");
+
+    const rows = Array.isArray(res.rows) ? res.rows : [];
+    if (!rows.length) throw new Error("Sem dados para montar o gráfico.");
+
+    // agrega por time usando qtde (pendências)
+    const by = {};
+    rows.forEach(r => {
+      const t = String(r.time || "N/D");
+      const q = Number(r.qtde || 0);
+      by[t] = (by[t] || 0) + q;
+    });
+
+    const labels = Object.keys(by).sort((a,b) => by[b]-by[a]);
+    const values = labels.map(l => by[l]);
+
+    // render
+    vektorResumoCicloRenderPie_(labels, values);
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    if (errEl) { errEl.style.display = "block"; errEl.textContent = msg; }
+  }
+};
+
+// ✅ Render “dashboard” (bar horizontal) + legenda/% + escala adequada
+function vektorResumoCicloRenderPie_(labels, values) {
+  const canvas = document.getElementById("cicloResumoPieCanvas");
+  const legend = document.getElementById("cicloResumoPieLegend");
+  const errEl = document.getElementById("cicloResumoPieErr");
+  if (!canvas) return;
+
+  // limpa gráfico anterior
+  try {
+    if (window.__cicloResumoPieChart) {
+      window.__cicloResumoPieChart.destroy();
+      window.__cicloResumoPieChart = null;
+    }
+  } catch(e){}
+
+  const total = values.reduce((a,b)=>a+b,0) || 1;
+
+  // paleta fixa
+  const palette = ["#005E27","#0f172a","#22c55e","#16a34a","#64748b","#84cc16","#1f2937","#94a3b8","#10b981","#334155"];
+  const colors = labels.map((_,i)=> palette[i % palette.length]);
+
+  // garante tamanho estável (evita “sumir” quando abre modal)
+  canvas.style.width = "100%";
+  canvas.style.height = "320px";
+
+  const data = {
+    labels,
+    datasets: [{
+      label: "Pendências",
+      data: values,
+      backgroundColor: colors,
+      borderColor: "rgba(15,23,42,0.15)",
+      borderWidth: 1,
+      borderRadius: 10,
+      barThickness: 18,
+      maxBarThickness: 22,
+      categoryPercentage: 0.75,
+      barPercentage: 0.85
+    }]
+  };
+
+  window.__cicloResumoPieChart = new Chart(canvas.getContext("2d"), {
+    type: "bar",
+    data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 450 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const v = Number(ctx.raw || 0);
+              const pct = ((v/total)*100).toFixed(1).replace(".", ",");
+              return ` ${ctx.label}: ${v} pendências (${pct}%)`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { maxRotation: 0, autoSkip: true },
+          grid: { display: false }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          grid: { color: "rgba(15,23,42,0.06)" }
+        }
+      }
+    }
+  });
+
+  // legenda (percentual por time)
+  if (legend) {
+    legend.innerHTML = labels.map((l, i) => {
+      const v = values[i];
+      const pct = ((v/total)*100).toFixed(1).replace(".", ",");
+      return `
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:14px; height:14px; border-radius:4px; background:${colors[i]}; border:1px solid rgba(15,23,42,0.20)"></div>
+          <div style="flex:1; font-weight:900; color:#0f172a; font-size:12px;">${l}</div>
+          <div style="font-weight:1000; color:#0f172a; font-size:12px;">${pct}%</div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+}
+
+window.vektorResumoCicloShowTooltipForLoja = function (loja, anchorEl) {
+  const tp = document.getElementById("cicloResumoTooltip");
+  const title = document.getElementById("cicloResumoTooltipTitle");
+  const sub = document.getElementById("cicloResumoTooltipSub");
+  const loading = document.getElementById("cicloResumoTooltipLoading");
+  const err = document.getElementById("cicloResumoTooltipErr");
+  const content = document.getElementById("cicloResumoTooltipContent");
+
+  if (!tp) return;
+
+  if (title) title.textContent = "🏬 Loja " + (loja || "—") + " — transações pendentes";
+  if (sub) sub.textContent = "Detalhamento do ciclo atual (clique fora para fechar)";
+  if (content) content.innerHTML = "";
+  if (err) { err.style.display = "none"; err.textContent = ""; }
+  if (loading) loading.style.display = "block";
+
+  // ✅ centraliza no meio da tela (ignora anchor)
+    tp.style.left = "50%";
+    tp.style.top = "18vh";
+    tp.style.transform = "translateX(-50%)";
+    tp.style.display = "block";
+
+  // fecha ao clicar fora
+  if (!tp.__bindOutside) {
+    tp.__bindOutside = true;
+    document.addEventListener("mousedown", function (ev) {
+      const x = document.getElementById("cicloResumoTooltip");
+      if (!x || x.style.display === "none") return;
+      if (!x.contains(ev.target)) x.style.display = "none";
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") window.vektorResumoCicloHideTooltip();
+    });
+  }
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (loading) loading.style.display = "none";
+      if (!res || !res.ok) {
+        if (err) {
+          err.style.display = "block";
+          err.textContent = (res && res.error) ? res.error : "Falha ao carregar detalhes.";
+        }
+        return;
+      }
+
+      const rows = Array.isArray(res.rows) ? res.rows : [];
+      if (!rows.length) {
+        if (content) content.innerHTML = "<div style='color:#334155;font-weight:900;'>Nenhuma transação pendente encontrada para esta loja no ciclo.</div>";
+        return;
+      }
+
+      const html = `
+        <div style="overflow:auto; max-height:44vh; border:1px solid #e2e8f0; border-radius:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th style="text-align:right;">Valor</th>
+                <th>Categoria</th>
+                <th>Pendências</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map(r => `
+                <tr>
+                  <td>${r.dataTxt || "—"}</td>
+                  <td style="text-align:right; white-space:nowrap;">${r.valorTxt || "—"}</td>
+                  <td>${(r.categoria || "—")}</td>
+                  <td>${(r.pendencias || "—")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+      if (content) content.innerHTML = html;
+    })
+    .withFailureHandler(function () {
+      if (loading) loading.style.display = "none";
+      if (err) {
+        err.style.display = "block";
+        err.textContent = "Erro no backend ao buscar detalhes.";
+      }
+    })
+    .getResumoCicloPendenciasDetalheLojaResumo(loja);
+};
+
+// ✅ 1.3 — CENTRALIZAR TOOLTIP DO TIME + aceitar res.itens OU res.rows (e normalizar campos)
+window.vektorResumoCicloShowTooltipForTime = function (time, anchorEl) {
+  const tp = document.getElementById("cicloResumoTooltip");
+  const title = document.getElementById("cicloResumoTooltipTitle");
+  const sub = document.getElementById("cicloResumoTooltipSub");
+  const loading = document.getElementById("cicloResumoTooltipLoading");
+  const err = document.getElementById("cicloResumoTooltipErr");
+  const content = document.getElementById("cicloResumoTooltipContent");
+
+  if (!tp) return;
+
+  if (title) title.textContent = `Time: ${time}`;
+  if (sub) sub.textContent = "Detalhamento das transações pendentes (todas as lojas do time)";
+  if (err) { err.style.display = "none"; err.textContent = ""; }
+  if (content) content.innerHTML = "";
+  if (loading) loading.style.display = "block";
+
+  // ✅ centraliza no meio da tela (ignorando anchor)
+  tp.style.left = "50%";
+  tp.style.top = "18vh";
+  tp.style.transform = "translateX(-50%)";
+  tp.style.display = "block";
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (loading) loading.style.display = "none";
+
+      if (!res || !res.ok) {
+        if (err) { err.style.display = "block"; err.textContent = (res && res.error) ? res.error : "Falha ao carregar detalhes do time."; }
+        return;
+      }
+
+      // ✅ aceita backend em res.itens OU res.rows
+      const itens = Array.isArray(res.itens) ? res.itens : (Array.isArray(res.rows) ? res.rows : []);
+      if (!itens.length) {
+        if (content) content.innerHTML = "<div style='font-weight:900; color:#334155;'>Sem transações pendentes para este time.</div>";
+        return;
+      }
+
+      if (content) {
+        content.innerHTML = itens.map(it => {
+          const loja = it.loja || it.lojaNum || it.loja_num || "";
+          const data = it.data || it.dataTxt || it.data_transacao || "—";
+          const cat  = it.categoria || it.categoriaCompra || "—";
+          const pend = it.pendenciasTxt || it.pendencias || it.pendencia || "—";
+          const val  = it.valorFmt || it.valorTxt || it.valor || "—";
+
+          return `
+            <div style="display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid rgba(181,255,32,0.18);">
+              <div style="min-width:0;">
+                <div style="font-weight:900;">${loja ? ("Loja " + loja + " • ") : ""}${data}</div>
+                <div style="font-size:12px; opacity:0.9;">${cat}</div>
+                <div style="margin-top:6px; font-size:12px; color:#0f172a; font-weight:800">
+                  ${pend}
+                </div>
+              </div>
+              <div style="font-weight:1000; white-space:nowrap;">${val}</div>
+            </div>
+          `;
+        }).join("");
+      }
+    })
+    .withFailureHandler(function(e){
+      if (loading) loading.style.display = "none";
+      if (err) { err.style.display = "block"; err.textContent = (e && e.message) ? e.message : String(e); }
+    })
+    .getResumoCicloPendenciasDetalheTime(time);
+};
+
 // estado local da página
 window.__envPend = {
   periodo: { iniIso: "", fimIso: "" },
@@ -3625,12 +4306,19 @@ window.__envPend = {
 
 window.vektorEnvioPendenciasAbrirModal = function () {
   const m = document.getElementById("envPendModal");
-  if (m) m.classList.remove("hidden");
+  if (!m) return;
+
+  // ✅ desfaz o "display:none" que a view aplica
+  m.classList.remove("hidden");
+  m.style.display = "block";
 };
 
 window.vektorEnvioPendenciasFecharModal = function () {
   const m = document.getElementById("envPendModal");
-  if (m) m.classList.add("hidden");
+  if (!m) return;
+
+  m.classList.add("hidden");
+  m.style.display = "none";
 };
 
 window.vektorEnvPendSelectAll = function (on) {
@@ -4551,64 +5239,110 @@ window.vektorEnvioPendenciasEnviarSelecionadas = function () {
   const st = document.getElementById("envPend_statusText");
   if (falhasEl) falhasEl.innerHTML = "";
 
-  const iniIso = window.__envPend.periodo?.iniIso || "";
-  const fimIso = window.__envPend.periodo?.fimIso || "";
-  if (!iniIso || !fimIso) {
-    if (st) st.textContent = "Rode a prévia antes de enviar.";
-    return;
+  // ✅ anti-duplo-clique (front)
+  if (window.__envPendSendInFlight) return;
+  window.__envPendSendInFlight = true;
+
+  // ✅ desabilita botão
+  var btn = document.getElementById("envPend_btnEnviarSelecionadas");
+  if (btn) {
+    btn.disabled = true;
+    btn.style.opacity = "0.6";
+    btn.style.pointerEvents = "none";
   }
 
-  const keys = Object.keys(window.__envPend.selected || {}).filter(k => window.__envPend.selected[k]);
-  if (!keys.length) {
-    if (st) st.textContent = "Nenhuma linha selecionada para enviar.";
-    return;
+  function releaseUi_() {
+    window.__envPendSendInFlight = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.style.opacity = "";
+      btn.style.pointerEvents = "";
+    }
   }
 
-  if (st) st.textContent = "Enviando e-mails…";
+  try {
+    const iniIso = window.__envPend && window.__envPend.periodo ? (window.__envPend.periodo.iniIso || "") : "";
+    const fimIso = window.__envPend && window.__envPend.periodo ? (window.__envPend.periodo.fimIso || "") : "";
 
-  google.script.run
-    .withSuccessHandler(function(res){
-      if (!res || !res.ok) {
-        if (st) st.textContent = "Falha no envio.";
-        if (falhasEl) falhasEl.innerHTML = `<div style="color:rgba(248,113,113,0.95); font-weight:900;">${res && res.error ? res.error : "Erro desconhecido"}</div>`;
-        return;
-      }
+    if (!iniIso || !fimIso) {
+      if (st) st.textContent = "Rode a prévia antes de enviar.";
+      releaseUi_();
+      return;
+    }
 
-      if (st) st.textContent = `Envio concluído: e-mails=${res.emailsEnviados||0}, transações registradas=${res.txRegistradas||0}.`;
+    const selected = (window.__envPend && window.__envPend.selected) ? window.__envPend.selected : {};
+    const keys = Object.keys(selected).filter(k => selected[k]);
 
-      const falhas = Array.isArray(res.falhasPorLoja) ? res.falhasPorLoja : [];
-      const sucessos = Array.isArray(res.sucessoPorLoja) ? res.sucessoPorLoja : [];
+    if (!keys.length) {
+      if (st) st.textContent = "Nenhuma linha selecionada para enviar.";
+      releaseUi_();
+      return;
+    }
 
-      let html = "";
-      if (sucessos.length) {
-        html += `<div style="margin-top:8px; color:rgba(34,197,94,0.95); font-weight:900;">Enviados (${sucessos.length} loja(s))</div>`;
-        html += "<ul style='margin-left:18px; color:rgba(226,232,240,0.85); font-size:12px;'>";
-        sucessos.slice(0, 12).forEach(s => {
-          html += `<li>${s.lojaKey}: ${s.qtdTx} transação(ões)</li>`;
-        });
-        html += "</ul>";
-      }
+    if (st) st.textContent = "Enviando e-mails…";
 
-      if (falhas.length) {
-        html += `<div style="margin-top:12px; color:rgba(248,113,113,0.95); font-weight:900;">Não enviados (${falhas.length} loja(s))</div>`;
-        html += "<ul style='margin-left:18px; color:rgba(226,232,240,0.85); font-size:12px;'>";
-        falhas.slice(0, 12).forEach(f => {
-          html += `<li>${f.lojaKey}: ${f.error}</li>`;
-        });
-        html += "</ul>";
-      }
+    google.script.run
+      .withSuccessHandler(function (res) {
+        try {
+          if (!res || !res.ok) {
+            if (st) st.textContent = "Falha no envio.";
+            if (falhasEl) falhasEl.innerHTML =
+              `<div style="color:rgba(248,113,113,0.95); font-weight:900;">${res && res.error ? res.error : "Erro desconhecido"}</div>`;
+            return;
+          }
 
-      if (falhasEl) falhasEl.innerHTML = html;
+          if (st) st.textContent = `Envio concluído: e-mails=${res.emailsEnviados || 0}, transações registradas=${res.txRegistradas || 0}.`;
 
-      // Atualiza prévia (recalcula jaEnviado) para refletir envios
-      window.vektorEnvioPendenciasFecharModal();
-      window.vektorEnvioPendenciasPreview();
-    })
-    .withFailureHandler(function(err){
-      if (st) st.textContent = "Erro no envio.";
-      if (falhasEl) falhasEl.innerHTML = `<div style="color:rgba(248,113,113,0.95); font-weight:900;">${(err && err.message) ? err.message : String(err||"Erro")}</div>`;
-    })
-    .dispararEnvioPendenciasClaraRecusadasSelecionadas(iniIso, fimIso, keys);
+          const falhas = Array.isArray(res.falhasPorLoja) ? res.falhasPorLoja : [];
+          const sucessos = Array.isArray(res.sucessoPorLoja) ? res.sucessoPorLoja : [];
+
+          let html = "";
+          if (sucessos.length) {
+            html += `<div style="margin-top:8px; color:rgba(34,197,94,0.95); font-weight:900;">Enviados (${sucessos.length} loja(s))</div>`;
+            html += "<ul style='margin-left:18px; color:rgba(226,232,240,0.85); font-size:12px;'>";
+            sucessos.slice(0, 12).forEach(s => {
+              html += `<li>${s.lojaKey}: ${s.qtdTx} transação(ões)</li>`;
+            });
+            html += "</ul>";
+          }
+
+          if (falhas.length) {
+            html += `<div style="margin-top:12px; color:rgba(248,113,113,0.95); font-weight:900;">Não enviados (${falhas.length} loja(s))</div>`;
+            html += "<ul style='margin-left:18px; color:rgba(226,232,240,0.85); font-size:12px;'>";
+            falhas.slice(0, 12).forEach(f => {
+              html += `<li>${f.lojaKey}: ${f.error}</li>`;
+            });
+            html += "</ul>";
+          }
+
+          if (falhasEl) falhasEl.innerHTML = html;
+
+          // Atualiza prévia para refletir envios
+          window.vektorEnvioPendenciasFecharModal();
+          window.vektorEnvioPendenciasPreview();
+
+        } finally {
+          releaseUi_();
+        }
+      })
+      .withFailureHandler(function (err) {
+        try {
+          if (st) st.textContent = "Erro no envio.";
+          if (falhasEl) falhasEl.innerHTML =
+            `<div style="color:rgba(248,113,113,0.95); font-weight:900;">${(err && err.message) ? err.message : String(err || "Erro")}</div>`;
+        } finally {
+          releaseUi_();
+        }
+      })
+      .dispararEnvioPendenciasClaraRecusadasSelecionadas(iniIso, fimIso, keys);
+
+  } catch (e) {
+    // erro síncrono do JS (antes do google.script.run)
+    if (st) st.textContent = "Erro inesperado no envio.";
+    if (falhasEl) falhasEl.innerHTML =
+      `<div style="color:rgba(248,113,113,0.95); font-weight:900;">${(e && e.message) ? e.message : String(e || "Erro")}</div>`;
+    releaseUi_();
+  }
 };
 
 window.vektorOpenFluxograma = function () {
@@ -5733,17 +6467,31 @@ function renderRadarRanking_(lojas, detalhesPorLoja) {
 // ===============================
 
 function vektorShowMyAlertsView_() {
-  const chat = document.getElementById("chatView");
-  const radar = document.getElementById("radarView");
-  const fb = document.getElementById("feedbackView");
-  const my = document.getElementById("myAlertsView");
+  const chatView = document.getElementById("chatView");
+  const radarView = document.getElementById("radarView");
+  const feedbackView = document.getElementById("feedbackView");
+  const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
 
-  if (chat) chat.style.display = "none";
-  if (radar) radar.classList.add("hidden");
-  if (fb) fb.classList.add("hidden");
-  if (fluxView) fluxView.classList.add("hidden");
-  if (my) my.classList.remove("hidden");
+  const envioPendView = document.getElementById("envioPendView");
+  const envPendModal = document.getElementById("envPendModal");
+  const homeView = document.getElementById("homeView");
+  const cicloResumoView = document.getElementById("cicloResumoView");
+
+  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView].forEach(v => {
+    if (!v) return;
+    v.classList.add("hidden");
+    v.style.display = "none";
+  });
+  if (envPendModal) { envPendModal.classList.add("hidden"); envPendModal.style.display = "none"; }
+  if (homeView) { homeView.classList.add("hidden"); homeView.style.display = "none"; }
+
+  if (myAlertsView) {
+    myAlertsView.classList.remove("hidden");
+    myAlertsView.style.display = "block";
+  }
+
+  if (radarView) radarView.classList.remove("is-open");
 }
 
 window.vektorOpenMyAlerts = function () {
@@ -6539,6 +7287,7 @@ window.vektorMyAlertsRefresh = function () {
     });
 };
 
+// ✅ 4 — vektorShowResumoCicloView_ (corrigir: também setar display="none" nas outras views)
 window.vektorShowResumoCicloView_ = function () {
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
@@ -6548,22 +7297,18 @@ window.vektorShowResumoCicloView_ = function () {
   const envView = document.getElementById("envioPendView");
   const cicloView = document.getElementById("cicloResumoView");
 
-  // fecha outras views
-  if (chatView) {
-    chatView.classList.add("hidden");
-    chatView.style.display = "none"; // ✅ garante esconder (chat normalmente usa display)
-  }
+  // ✅ fecha outras views (hidden + display none)
+  if (chatView) { chatView.classList.add("hidden"); chatView.style.display = "none"; }
+  if (radarView) { radarView.classList.add("hidden"); radarView.style.display = "none"; }
+  if (feedbackView) { feedbackView.classList.add("hidden"); feedbackView.style.display = "none"; }
+  if (myAlertsView) { myAlertsView.classList.add("hidden"); myAlertsView.style.display = "none"; }
+  if (fluxView) { fluxView.classList.add("hidden"); fluxView.style.display = "none"; }
+  if (envView) { envView.classList.add("hidden"); envView.style.display = "none"; }
 
-  if (radarView) radarView.classList.add("hidden");
-  if (feedbackView) feedbackView.classList.add("hidden");
-  if (myAlertsView) myAlertsView.classList.add("hidden");
-  if (fluxView) fluxView.classList.add("hidden");
-  if (envView) envView.classList.add("hidden");
-
-  // abre resumo do ciclo
+  // ✅ abre resumo do ciclo
   if (cicloView) {
     cicloView.classList.remove("hidden");
-    cicloView.style.display = "block"; // ✅ ESSENCIAL (senão fica invisível)
+    cicloView.style.display = "block";
   }
 
   if (radarView) radarView.classList.remove("is-open");
@@ -6580,6 +7325,7 @@ function vektorResumoCicloGetRows_(res){
     loja: String(r.loja || ""),
     time: String(r.time || "N/D"),
     qtde: Number(r.qtde || 0),
+    txCount: Number((r.qtdeTransacoes != null ? r.qtdeTransacoes : r.txCount) || 0),
     valor: Number(r.valor || 0)
   }));
 }
@@ -6621,8 +7367,8 @@ function vektorResumoCicloApply_(){
 
   // 4) recalcula cards + top
   const totalLojas = new Set(filtered.map(r => r.loja)).size;
-  const totalPend = filtered.reduce((acc,r)=>acc + (r.qtde||0), 0);
-  const totalValor = filtered.reduce((acc,r)=>acc + (r.valor||0), 0);
+  const totalPend = filtered.reduce((acc,r)=>acc + (Number(r.qtde)||0), 0);
+  const totalValor = filtered.reduce((acc,r)=>acc + (Number(r.valor)||0), 0);
 
   const elL = document.getElementById("cicloResumo_totalLojas");
   const elP = document.getElementById("cicloResumo_totalPend");
@@ -6643,14 +7389,26 @@ function vektorResumoCicloApply_(){
   const tbody = document.getElementById("cicloResumo_tbody");
   if (tbody) {
     if (!top.length) {
-      tbody.innerHTML = `<tr><td colspan="4" style="padding:10px;color:rgba(226,232,240,0.9);">Nenhum resultado para o filtro.</td></tr>`;
+      // ✅ agora são 5 colunas
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:10px;color:#0f172a;font-weight:900;">Nenhum resultado para o filtro.</td></tr>`;
     } else {
       tbody.innerHTML = top.map(r => `
         <tr>
           <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.loja}</td>
           <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);white-space:nowrap;">${r.time}</td>
-          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${r.qtde}</td>
-          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">${fmtBRL(r.valor)}</td>
+
+          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">
+            ${Number(r.qtde||0)}
+          </td>
+
+          <!-- ✅ NOVO: Qtde total de transações -->
+          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">
+            ${Number(r.txCount||0)}
+          </td>
+
+          <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">
+            ${fmtBRL(r.valor)}
+          </td>
         </tr>
       `).join("");
     }
@@ -21029,7 +21787,9 @@ async function ensurePanelBubble_() {
     const lojas = Array.isArray(filtros.lojas) ? filtros.lojas : [];
     const etiquetas = Array.isArray(filtros.etiquetas) ? filtros.etiquetas : [];
 
-    const itens = Array.isArray(res.itens) ? res.itens : [];
+    // aceita backend em res.itens OU res.rows
+    const itens = Array.isArray(res.itens) ? res.itens : (Array.isArray(res.rows) ? res.rows : []);
+
     const somaValores = Number(res.somaValores || 0);
 
     // heat column (valor)
