@@ -12438,74 +12438,29 @@ function getLojasOfensorasParaChat(diasJanela) {
 }
 
 // ===============================
-// RESUMO DO CICLO (BACKEND)
-// - agora retorna rows (todas as lojas) para o front filtrar e renderizar tabela completa
+// RESUMO DO CICLO (BACKEND) — BASECLARA ONLY
+// Fonte única: aba BaseClara
+// Retorna transações pendentes detalhadas + agregações (cards/tabela/análise)
 // ===============================
 function getResumoCicloPendencias() {
   vektorAssertFunctionAllowed_("getResumoCicloPendencias");
 
   try {
-    // Reaproveita a função já “ciclo-aware”
-    var base = getLojasOfensorasParaChat(0);
-    if (!base || !base.ok) return base;
+    // ✅ cache curto (2 min) — evita “demorar pra carregar” em cliques/refresh
+    var cache = CacheService.getScriptCache();
+    var cacheKey = "RC_BASECLARA_" + getCicloKey06a05_(); // helper já existe no seu projeto :contentReference[oaicite:2]{index=2}
+    var cached = cache.get(cacheKey);
+    if (cached) return JSON.parse(cached);
 
-    var rows = Array.isArray(base.rows) ? base.rows : [];
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
 
-    var totalQtde = 0;
-    var totalValor = 0;
-    var pendNF = 0;
-    var pendDesc = 0;
-    var pendEtiqueta = 0;
+    // ✅ ciclo completo 06→05 (pra limitar o date-picker no front)
+    var pc = getPeriodoCicloClaraCompleto_(); // helper existe no seu projeto :contentReference[oaicite:3]{index=3}
+    var iniCiclo = pc.inicio;
+    var fimCiclo = pc.fim;
 
-    rows.forEach(function (r) {
-      totalQtde += Number(r.qtde || 0);
-      totalValor += Number(r.valor || 0);
-      pendNF += Number(r.pendNF || 0);
-      pendDesc += Number(r.pendDesc || 0);
-      pendEtiqueta += Number(r.pendEtiqueta || 0);
-    });
-
-    // ✅ rows normalizadas (todas) — o front ordena/filtra e monta a tabela completa
-    var normRows = rows.map(function (r) {
-        return {
-          loja: r.loja || "",
-          time: r.time || "N/D",
-          qtde: Number(r.qtde || 0),
-
-          // ✅ Qtde total de transações (1 por linha do HIST_PEND_CLARA_RAW no agregado)
-          txCount: Number(r.txCount || 0),
-
-          valor: Number(r.valor || 0)
-        };
-      });
-
-    return {
-      ok: true,
-      periodo: base.periodo || {},
-      meta: {
-        totalLojas: normRows.length,
-        totalPendencias: totalQtde,
-        totalValor: totalValor,
-        pendNF: pendNF,
-        pendDesc: pendDesc,
-        pendEtiqueta: pendEtiqueta
-      },
-      // ✅ dataset completo para filtros (time/loja)
-      rows: normRows
-    };
-
-  } catch (e) {
-    return { ok: false, error: (e && e.message) ? e.message : String(e) };
-  }
-}
-
-function getResumoCicloPendenciasDetalheLoja(loja) {
-  vektorAssertFunctionAllowed_("getResumoCicloPendenciasDetalheLoja");
-
-  try {
-    var lojaNum = normalizarLojaNumero_(String(loja || ""));
-    if (!lojaNum) return { ok:false, error:"Loja inválida." };
-    var loja4 = String(lojaNum).padStart(4, "0");
+    // mapa Loja -> Time (já existe no projeto; você usa em outras rotinas)
+    var mapaTime = construirMapaLojaParaTime_();
 
     var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
     var sh = ss.getSheetByName("BaseClara");
@@ -12513,11 +12468,15 @@ function getResumoCicloPendenciasDetalheLoja(loja) {
 
     var lastRow = sh.getLastRow();
     var lastCol = sh.getLastColumn();
-    if (lastRow < 2) return { ok:true, rows:[] };
+    if (lastRow < 2) {
+      var vazio = { ok: true, ciclo: formatPeriodoBR_(iniCiclo, fimCiclo), periodo: formatPeriodoBR_(iniCiclo, new Date()), meta: {}, tx: [], aggs: {} };
+      cache.put(cacheKey, JSON.stringify(vazio), 120);
+      return vazio;
+    }
 
-    var values = sh.getRange(1, 1, lastRow, lastCol).getValues();
-    var header = values[0].map(function(h){ return String(h || "").trim(); });
-    var rows = values.slice(1);
+    var all = sh.getRange(1, 1, lastRow, lastCol).getValues();
+    var header = all[0].map(h => String(h || "").trim());
+    var linhas = all.slice(1);
 
     function idxOf(possiveis) {
       for (var i = 0; i < possiveis.length; i++) {
@@ -12527,99 +12486,168 @@ function getResumoCicloPendenciasDetalheLoja(loja) {
       return -1;
     }
 
-    var idxDataTrans  = idxOf(["Data da Transação", "Data Transação", "Data"]);
+    // ===== mapeamento colunas (você pediu “identifique o mapeamento”: está aqui centralizado) =====
+    var idxDataTrans  = idxOf(["Data da Transação"]);
     var idxValorBRL   = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
     var idxLojaNum    = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
+    var idxEstab      = idxOf(["Transação"]);
     var idxEtiquetas  = idxOf(["Etiquetas"]);
     var idxRecibo     = idxOf(["Recibo"]);
-    var idxDescricao  = idxOf(["Descrição", "Descricao"]);
-    var idxCategoria  = idxOf(["Categoria da Compra", "Categoria", "Categoria Compra", "Categoria da Compra (Clara)"]);
+    var idxDescricao  = idxOf(["Descrição"]);
+    var idxCategoria  = idxOf(["Categoria da Compra"]);
 
     if (idxDataTrans < 0) throw new Error("Não encontrei a coluna de Data na BaseClara.");
     if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna de Valor na BaseClara.");
     if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna de Loja na BaseClara.");
-    if (idxEtiquetas < 0) throw new Error("Não encontrei a coluna 'Etiquetas' na BaseClara.");
-    if (idxRecibo    < 0) throw new Error("Não encontrei a coluna 'Recibo' na BaseClara.");
-    if (idxDescricao < 0) throw new Error("Não encontrei a coluna 'Descrição' na BaseClara.");
 
-    function isVazio_(v) {
+    function isVazioPend_(v) {
       if (v === null || v === undefined) return true;
-      if (v === false) return true;
+      if (typeof v === "boolean") return (v === false);
       var s = String(v).trim().toLowerCase();
       if (!s) return true;
-      if (s === "-" || s === "—" || s === "n/a" || s === "na") return true;
-      if (s === "false" || s === "0") return true;
+      if (s === "-" || s === "—" || s === "n/a") return true;
       if (s === "não" || s === "nao") return true;
-      if (s.indexOf("sem recibo") >= 0) return true;
-      if (s.indexOf("sem etiqueta") >= 0) return true;
+      if (s === "false" || s === "0") return true;
       return false;
     }
 
-    var ciclo = getPeriodoCicloClaraCompleto_();
-    var ini = ciclo.inicio;
-    var fim = ciclo.fim;
+    // ===== coletar transações pendentes =====
+    var tx = [];
 
-    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    for (var i = 0; i < linhas.length; i++) {
+      var r = linhas[i];
 
-    function fmtBRL_(v){
-      try { return Number(v || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
-      catch(e){ return String(v||""); }
-    }
+      var d = parseDateClara_(r[idxDataTrans]); // você já usa esse parse no projeto
+      if (!d) continue;
 
-    var out = [];
+      // limita dentro do ciclo 06→05 (completo)
+      if (d < iniCiclo || d > fimCiclo) continue;
 
-    for (var i = 0; i < rows.length; i++) {
-      var row = rows[i];
+      var lojaRaw = String(r[idxLojaNum] || "").trim();
+      var dig = lojaRaw.replace(/\D/g, "");
+      if (!dig) continue;
 
-      var lojaRow = normalizarLojaNumero_(row[idxLojaNum]);
-      if (!lojaRow) continue;
-      var lojaRow4 = String(lojaRow).padStart(4, "0");
-      if (lojaRow4 !== loja4) continue;
+      var lojaNum = String(Number(dig));
+      var loja4 = lojaNum.padStart(4, "0");
 
-      var dt = row[idxDataTrans];
-      var dt2 = (dt instanceof Date) ? dt : (vektorParseDateAny_(dt) || new Date(dt));
-      if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
-      if (dt2 < ini || dt2 > fim) continue;
+      var timeDaLoja = (mapaTime && (mapaTime[loja4] || mapaTime[lojaNum])) ? (mapaTime[loja4] || mapaTime[lojaNum]) : "N/D";
+      var valor = parseNumberSafe_(r[idxValorBRL]); // helper existe no projeto :contentReference[oaicite:4]{index=4}
 
-      var valor = row[idxValorBRL];
-      var valorNum = parseNumberSafe_(valor);
+      var recibo = (idxRecibo >= 0 ? r[idxRecibo] : "");
+      var etiqueta = (idxEtiquetas >= 0 ? r[idxEtiquetas] : "");
+      var desc = (idxDescricao >= 0 ? r[idxDescricao] : "");
 
-      var etiquetas = row[idxEtiquetas];
-      var recibo = row[idxRecibo];
-      var desc = row[idxDescricao];
+      var temPendRecibo = isVazioPend_(recibo);
+      var temPendEtiqueta = isVazioPend_(etiqueta);
+      var temPendDescricao = isVazioPend_(desc);
 
-      var pendEtiqueta = isVazio_(etiquetas);
-      var pendNF = isVazio_(recibo);
-      var pendDesc = isVazio_(desc);
+      if (!(temPendRecibo || temPendEtiqueta || temPendDescricao)) continue;
 
-      if (!(pendEtiqueta || pendNF || pendDesc)) continue;
+      var pendTxt = [
+        temPendRecibo ? "NF/Recibo" : null,
+        temPendEtiqueta ? "Etiqueta" : null,
+        temPendDescricao ? "Descrição" : null
+      ].filter(Boolean).join(" • ");
 
-      var pendList = [];
-      if (pendEtiqueta) pendList.push("Etiqueta");
-      if (pendNF) pendList.push("NF/Recibo");
-      if (pendDesc) pendList.push("Descrição");
-
-      var categoria = (idxCategoria >= 0) ? String(row[idxCategoria] || "").trim() : "";
-
-      out.push({
-        dataTxt: Utilities.formatDate(dt2, tz, "dd/MM/yyyy"),
-        valorTxt: fmtBRL_(valorNum),
-        valor: valorNum,
-        categoria: categoria || "—",
-        pendencias: pendList.join(", ")
+      tx.push({
+        loja: lojaNum,
+        loja4: loja4,
+        time: String(timeDaLoja || "N/D"),
+        dataIso: Utilities.formatDate(d, tz, "yyyy-MM-dd"),
+        dataTxt: Utilities.formatDate(d, tz, "dd/MM/yyyy"),
+        estabelecimento: (idxEstab >= 0 ? String(r[idxEstab] || "—") : "—"),
+        valor: valor,
+        valorTxt: valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        categoria: (idxCategoria >= 0 ? String(r[idxCategoria] || "—") : "—"),
+        pendencias: pendTxt,
+        pendNF: temPendRecibo ? 1 : 0,
+        pendEtiqueta: temPendEtiqueta ? 1 : 0,
+        pendDesc: temPendDescricao ? 1 : 0
       });
     }
 
-    // ordena por valor desc (e depois por data desc)
-    out.sort(function(a,b){
-      if ((b.valor||0) !== (a.valor||0)) return (b.valor||0) - (a.valor||0);
-      return String(b.dataTxt||"").localeCompare(String(a.dataTxt||""));
+    // ===== agregações para cards + análise =====
+    var aggTime = {};
+    var aggLoja = {};
+    var aggCat  = {};
+
+    var totalPend = 0;
+    var totalValor = 0;
+    var totalTx = tx.length;
+    var pendNF = 0, pendDesc = 0, pendEtiqueta = 0;
+
+    tx.forEach(function (t) {
+      var qtdPendTx = (t.pendNF + t.pendEtiqueta + t.pendDesc);
+      totalPend += qtdPendTx;
+      totalValor += Number(t.valor || 0);
+
+      pendNF += t.pendNF;
+      pendDesc += t.pendDesc;
+      pendEtiqueta += t.pendEtiqueta;
+
+      var kT = t.time || "N/D";
+      if (!aggTime[kT]) aggTime[kT] = { time: kT, pend: 0, valor: 0, tx: 0 };
+      aggTime[kT].pend += qtdPendTx;
+      aggTime[kT].valor += Number(t.valor || 0);
+      aggTime[kT].tx += 1;
+
+      var kL = t.loja4 || t.loja || "";
+      if (!aggLoja[kL]) aggLoja[kL] = { loja: (t.loja || ""), loja4: (t.loja4 || ""), time: (t.time || "N/D"), pend: 0, valor: 0, tx: 0 };
+      aggLoja[kL].pend += qtdPendTx;
+      aggLoja[kL].valor += Number(t.valor || 0);
+      aggLoja[kL].tx += 1;
+
+      var kC = t.categoria || "—";
+      if (!aggCat[kC]) aggCat[kC] = { categoria: kC, pend: 0, valor: 0, tx: 0 };
+      aggCat[kC].pend += qtdPendTx;
+      aggCat[kC].valor += Number(t.valor || 0);
+      aggCat[kC].tx += 1;
     });
 
-    return { ok:true, loja: loja4, rows: out };
+    var timesArr = Object.keys(aggTime).map(k => aggTime[k]).sort((a,b) => (b.pend - a.pend) || (b.valor - a.valor));
+    var lojasArr = Object.keys(aggLoja).map(k => aggLoja[k]).sort((a,b) => (b.pend - a.pend) || (b.valor - a.valor));
+    var catsArr  = Object.keys(aggCat).map(k => aggCat[k]).sort((a,b) => (b.valor - a.valor) || (b.pend - a.pend));
+
+    var topTime = timesArr[0] || null;
+    var topLoja = lojasArr[0] || null;
+
+    var resp = {
+      ok: true,
+
+      // ciclo completo (06→05) para limitar o date-filter no front
+      ciclo: formatPeriodoBR_(iniCiclo, fimCiclo),
+
+      // período “até hoje” só para texto de cabeçalho (igual você já faz hoje)
+      periodo: formatPeriodoBR_(iniCiclo, new Date()),
+
+      meta: {
+        totalPendencias: totalPend,
+        totalValor: totalValor,
+        totalTransacoes: totalTx,
+        pendNF: pendNF,
+        pendDesc: pendDesc,
+        pendEtiqueta: pendEtiqueta,
+
+        topTime: topTime ? { time: topTime.time, pend: topTime.pend, valor: topTime.valor, tx: topTime.tx } : null,
+        topLoja: topLoja ? { loja: (topLoja.loja || ""), loja4: (topLoja.loja4 || ""), time: (topLoja.time || "N/D"), pend: topLoja.pend, valor: topLoja.valor, tx: topLoja.tx } : null
+      },
+
+      // dataset detalhado (tabela nova + análise)
+      tx: tx,
+
+      // agregações (análise)
+      aggs: {
+        porTime: timesArr,
+        porLoja: lojasArr,
+        porCategoria: catsArr
+      }
+    };
+
+    cache.put(cacheKey, JSON.stringify(resp), 120);
+    return resp;
 
   } catch (e) {
-    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
 }
 
@@ -12765,115 +12793,6 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
-  }
-}
-
-function getResumoCicloPendenciasDetalheTime(time) {
-  vektorAssertFunctionAllowed_("getResumoCicloPendenciasDetalheTime");
-
-  try {
-    var t = String(time || "").trim();
-    if (!t) return { ok:false, error:"Time inválido." };
-
-    // Reaproveita BaseClara + mapa Loja->Time, igual a outras rotinas
-    var mapaTime = construirMapaLojaParaTime_();
-
-    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
-    if (!sh) throw new Error("Aba BaseClara não encontrada.");
-
-    var lastRow = sh.getLastRow();
-    if (lastRow < 2) return { ok:true, rows: [] };
-
-    var values = sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).getValues();
-
-        // 1) Lê cabeçalho+linhas igual ao detalhe loja
-    var all = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getValues();
-    var header = all[0].map(function(h){ return String(h || "").trim(); });
-    var linhas = all.slice(1);
-
-    function idxOf(possiveis) {
-      for (var i = 0; i < possiveis.length; i++) {
-        var ix = header.indexOf(possiveis[i]);
-        if (ix >= 0) return ix;
-      }
-      return -1;
-    }
-
-    var idxDataTrans  = idxOf(["Data da Transação", "Data Transação", "Data"]);
-    var idxValorBRL   = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
-    var idxLojaNum    = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
-    var idxEtiquetas  = idxOf(["Etiquetas"]);
-    var idxRecibo     = idxOf(["Recibo"]);
-    var idxDescricao  = idxOf(["Descrição", "Descricao"]);
-    var idxCategoria  = idxOf(["Categoria da Compra", "Categoria", "Categoria Compra", "Categoria da Compra (Clara)"]);
-
-    if (idxDataTrans < 0) throw new Error("Não encontrei a coluna de Data na BaseClara.");
-    if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna de Valor na BaseClara.");
-    if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna de Loja na BaseClara.");
-
-    // 2) Período do ciclo (mesma lógica do trecho de filtro por ciclo) :contentReference[oaicite:4]{index=4}
-    var pc = getPeriodoCicloClara_();
-    var ini = pc && pc.inicio ? pc.inicio : null;
-    var fim = new Date();
-    if (!ini) throw new Error("Não consegui identificar o início do ciclo atual.");
-
-    function isVazioPend_(v) {
-      if (v === null || v === undefined) return true;
-      if (typeof v === "boolean") return (v === false);
-      var s = String(v).trim().toLowerCase();
-      if (!s) return true;
-      if (s === "-" || s === "—" || s === "n/a") return true;
-      if (s === "não" || s === "nao") return true;
-      if (s === "false" || s === "0") return true;
-      return false;
-    }
-
-    // 3) Filtra: ciclo + time + tem pendência
-    var out = [];
-    for (var i = 0; i < linhas.length; i++) {
-      var r = linhas[i];
-
-      var lojaRaw = String(r[idxLojaNum] || "").trim();
-      var dig = lojaRaw.replace(/\D/g, "");
-      if (!dig) continue;
-      var lojaNum = String(Number(dig));              // normalizado
-      var loja4 = lojaNum.padStart(4, "0");
-
-      var timeDaLoja = (mapaTime && (mapaTime[loja4] || mapaTime[lojaNum])) ? (mapaTime[loja4] || mapaTime[lojaNum]) : "N/D";
-      if (String(timeDaLoja || "").trim() !== t) continue;
-
-      var d = parseDateClara_(r[idxDataTrans]);
-      if (!d) continue;
-      if (d < ini || d > fim) continue;
-
-      var recibo = r[idxRecibo];
-      var etiqueta = r[idxEtiquetas];
-      var desc = r[idxDescricao];
-
-      var temPendRecibo = isVazioPend_(recibo);
-      var temPendEtiqueta = isVazioPend_(etiqueta);
-      var temPendDescricao = isVazioPend_(desc);
-
-      if (!(temPendRecibo || temPendEtiqueta || temPendDescricao)) continue;
-
-      out.push({
-        dataTxt: Utilities.formatDate(d, Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy"),
-        valorTxt: (Number(r[idxValorBRL] || 0)).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }),
-        categoria: (idxCategoria >= 0 ? (r[idxCategoria] || "—") : "—"),
-        pendencias: [
-          temPendRecibo ? "NF/Recibo" : null,
-          temPendEtiqueta ? "Etiqueta" : null,
-          temPendDescricao ? "Descrição" : null
-        ].filter(Boolean).join(" • "),
-        loja: lojaNum
-      });
-    }
-
-    return { ok:true, rows: out };
-
-  } catch (e) {
-    return { ok:false, error: (e && e.message) ? e.message : String(e) };
   }
 }
 
