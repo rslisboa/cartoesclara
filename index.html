@@ -622,6 +622,68 @@ display: none;
   #vektorAppRoot.hidden { display: none !important; }
 </style>
 
+<style id="vektorSidebarCollapseStyle">
+
+/* =========================
+   SIDEBAR COLLAPSE (menu recolhível)
+   ========================= */
+
+#vektorShell.sidebar-collapsed aside{
+  width: 72px !important;      /* “modo ícones” */
+  padding: 12px !important;
+}
+
+#vektorShell.sidebar-collapsed aside h1,
+#vektorShell.sidebar-collapsed aside #vektorMenuTitle{
+  display: none !important;     /* some o título */
+}
+
+/* some o texto e deixa só o ícone */
+#vektorShell.sidebar-collapsed .vektor-nav-label{
+  display: none !important;
+}
+
+/* mantém alinhamento bonito no modo recolhido */
+#vektorShell.sidebar-collapsed .vektor-nav-btn{
+  justify-content: center !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+}
+
+/* evita que o emoji “encolha” */
+.vektor-nav-ico{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+}
+
+/* no recolhido, centraliza o botão do header */
+#vektorShell.sidebar-collapsed #vektorMenuHeader{
+  justify-content: center !important;
+}
+
+/* garante que “Menu” não aparece */
+#vektorShell.sidebar-collapsed #vektorMenuTitle{
+  display: none !important;
+}
+
+/* garante que o botão fica centralizado */
+#vektorShell.sidebar-collapsed #vektorSidebarToggleBtn{
+  margin: 0 auto !important;
+}
+
+/* remove qualquer “empurrão” do botão */
+#vektorShell.sidebar-collapsed #vektorSidebarToggleBtn{
+  margin: 0 !important;
+}
+
+#vektorShell.sidebar-collapsed #vektorSidebarFooterVersion{
+  display: none !important;
+}
+
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 </head>
@@ -780,27 +842,34 @@ display: none;
 </div>
 
  <div id="vektorAppRoot" class="hidden">
- <div class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
+ <div id="vektorShell" class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
    
   <aside class="hidden md:flex w-72 shrink-0 flex-none flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 self-stretch min-h-0">
 
   <!-- Bloco Vektor + título -->
   <div class="w-full flex flex-col items-center mb-4">
-    <img
-      src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b2c7d49969645f314f80fe7df3e0eaeb8ebaf585/ChatGPT%20Image%2012%20de%20nov.%20de%202025%2C%2011_41_54.png"
-      alt="Assistente Clara (robô)"
-      class="h-24 w-auto mb-3"
-    />
     <h1 class="text-xl font-extrabold bg-[#005E27] text-[#B5FF20] px-3 py-2 rounded-lg text-center">
       Grupo SBF | Vektor
     </h1>
   </div>
 
-  <!-- Título do menu -->
-  <div class="w-full text-center mb-1">
-    <p class="text-base font-semibold text-black">Menu</p>
-  </div>
+  <!-- Header do menu: título + recolher -->
+<div id="vektorMenuHeader" class="w-full mb-1 flex items-center justify-between">
+  <p id="vektorMenuTitle" class="text-base font-semibold text-black m-0">Menu</p>
+
+  <button
+    id="vektorSidebarToggleBtn"
+    type="button"
+    class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition"
+    title="Recolher/Expandir menu"
+    aria-label="Recolher/Expandir menu"
+    style="cursor:pointer;"
+  >
+    <!-- ícone simples -->
+    <span id="vektorSidebarToggleIcon" style="font-size:18px; line-height:1;">⫷</span>
+  </button>
+</div>
 
   <!-- Conteúdo rolável do menu (botões) -->
 <div class="flex-1 min-h-0 overflow-y-auto space-y-3.5 pb-2.5">
@@ -829,7 +898,8 @@ display: none;
   onclick="window.vektorShowChatView()"
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
-  💬 Chat
+  <span class="vektor-nav-ico" aria-hidden="true">💬</span>
+  <span class="vektor-nav-label">Chat</span>
 </button>
 
   <button
@@ -837,7 +907,8 @@ display: none;
   onclick="openStatusVektorModal()"
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
-  🟢 Estado Operacional
+  <span class="vektor-nav-ico" aria-hidden="true">🟢</span>
+  <span class="vektor-nav-label">Estado Operacional</span>
 </button>
 
 <button
@@ -845,7 +916,8 @@ display: none;
   onclick="window.vektorOpenResumoCiclo()"
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
-  📌 Resumo do ciclo
+  <span class="vektor-nav-ico" aria-hidden="true">📌</span>
+  <span class="vektor-nav-label">Resumo do ciclo</span>
 </button>
 
   <!--<button
@@ -861,7 +933,8 @@ display: none;
   onclick="window.vektorOpenFluxograma()"
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
-  🧩 Fluxograma
+  <span class="vektor-nav-ico" aria-hidden="true">🧩</span>
+  <span class="vektor-nav-label">Fluxograma</span>
 </button>
 
 <button
@@ -869,7 +942,8 @@ display: none;
   onclick="window.vektorOpenMyAlerts()"
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
-  ⏱️ Alertas Programados
+  <span class="vektor-nav-ico" aria-hidden="true">⏱️</span>
+  <span class="vektor-nav-label">Alertas Programados</span>
 </button>
 
 <? if ((userRole || "") === "Administrador") { ?>
@@ -880,7 +954,8 @@ display: none;
     onclick="openAlertasRecentesModal()"
     class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
-    📋 Disparo de Ocorrências
+    <span class="vektor-nav-ico" aria-hidden="true">📋</span>
+    <span class="vektor-nav-label">Disparo de Ocorrências</span> 
   </button>
 
   <!-- Botão: Radar de Irregularidade (somente Admin) -->
@@ -889,7 +964,8 @@ display: none;
     onclick="window.vektorOpenRadar('7d')"
     class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
-    📈 Radar de Irregularidade
+    <span class="vektor-nav-ico" aria-hidden="true">📈</span>
+    <span class="vektor-nav-label">Radar de Irregularidade</span>
   </button>
 
   <button
@@ -897,7 +973,8 @@ display: none;
   onclick="window.vektorOpenEnvioPendencias()"
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
-  📩 Envio de Pendências
+    <span class="vektor-nav-ico" aria-hidden="true">📩</span>
+    <span class="vektor-nav-label">Envio de Pendências</span>
 </button>
 
 <? } ?>
@@ -914,7 +991,7 @@ display: none;
   </div> <!-- fim do conteúdo rolável -->
 
   <!-- Rodapé do menu: Versão do Vektor -->
-<div class="mt-4 px-3 py-3 text-center border-t border-slate-200">
+<div id="vektorSidebarFooterVersion" class="mt-4 px-3 py-3 text-center border-t border-slate-200">
   <div class="text-[11px] text-slate-500 leading-tight">
     Vektor v1.6.0<br>
     <span class="text-slate-400">Build 12/01/2026</span>
@@ -3086,6 +3163,34 @@ function bindLoginHandlers_() {
 
 document.addEventListener("DOMContentLoaded", function () {
   bindLoginHandlers_(); // ✅ garante listeners sempre
+
+    // =========================
+  // SIDEBAR COLLAPSE (Menu recolhível)
+  // =========================
+  (function initSidebarCollapse_(){
+    const shell = document.getElementById("vektorShell");
+    const btn = document.getElementById("vektorSidebarToggleBtn");
+    if (!shell || !btn) return;
+
+    const KEY = "VEKTOR_SIDEBAR_COLLAPSED";
+
+    function apply_(collapsed){
+      shell.classList.toggle("sidebar-collapsed", !!collapsed);
+    }
+
+    // aplica estado salvo
+    let saved = null;
+    try { saved = localStorage.getItem(KEY); } catch(e) {}
+    apply_(saved === "1");
+
+    // click toggle
+    btn.addEventListener("click", function(){
+      const isCollapsed = shell.classList.contains("sidebar-collapsed");
+      const next = !isCollapsed;
+      apply_(next);
+      try { localStorage.setItem(KEY, next ? "1" : "0"); } catch(e) {}
+    });
+  })();
 
     // ✅ Logout (volta para tela de login)
       byId("vektorLogoutBtn")?.addEventListener("click", function () {
