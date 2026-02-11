@@ -1102,10 +1102,7 @@ display: none;
 
       <!-- Conteúdo -->
       <div class="cicloResumoPage" style="flex:1; min-height:0; overflow:auto; background:#fff; padding:14px 16px;">
-        <div id="cicloResumoLoading" style="display:none; color:#0f172a; font-size:15px; font-weight:800;">
-          Carregando resumo do ciclo…
-        </div>
-
+        
         <div id="cicloResumoContent" style="display:none;">
 
           <!-- Cards (mantém layout “como era” – cards em cima) -->
@@ -1226,6 +1223,23 @@ display: none;
           </div>
         </div>
       </div>
+
+      <!-- OVERLAY (bloqueia tela) - Resumo do Ciclo -->
+<div id="cicloResumo_overlay"
+     style="display:none; position:absolute; inset:0; z-index:110; background:rgba(0,0,0,0.65);">
+  <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:18px;">
+    <div style="width:min(520px, 92vw); background:#0b1220; border:1px solid rgba(148,163,184,0.22);
+                border-radius:16px; padding:18px; box-shadow:0 18px 46px rgba(0,0,0,0.55); text-align:center;">
+      <div style="display:flex; justify-content:center; margin-bottom:12px;">
+        <div class="envPend_spinner"></div>
+      </div>
+      <div id="cicloResumo_overlayTitle" style="color:#fff; font-weight:1000; font-size:16px;">Carregando…</div>
+      <div id="cicloResumo_overlaySub" style="color:rgba(226,232,240,0.75); font-size:12px; margin-top:6px;">
+        Aguarde um instante.
+      </div>
+    </div>
+  </div>
+</div>
 
     </div>
   </main>
@@ -3750,8 +3764,7 @@ window.vektorLoadResumoCiclo = function (force) {
   const content = document.getElementById("cicloResumoContent");
   const tbody = document.getElementById("cicloResumo_tbody");
 
-  if (loading) loading.style.display = "block";
-  if (content) content.style.display = "none";
+setResumoCicloBusy_(true, "Carregando resumo do ciclo…");
 
   if (tbody) tbody.innerHTML = "";
 
@@ -3764,27 +3777,32 @@ window.vektorLoadResumoCiclo = function (force) {
   const loading = document.getElementById("cicloResumoLoading");
   const content = document.getElementById("cicloResumoContent");
 
-  // controles da página
-  const dtIniEl = document.getElementById("cicloResumo_dtIni");
-  const dtFimEl = document.getElementById("cicloResumo_dtFim");
-  const selTime = document.getElementById("cicloResumo_selTime");
-  const selLoja = document.getElementById("cicloResumo_selLoja");
+  const ov = document.getElementById("cicloResumo_overlay"); // <<< precisa existir no HTML
+  const ovTitle = document.getElementById("cicloResumo_overlayTitle");
+  const ovSub = document.getElementById("cicloResumo_overlaySub");
 
-  const btnLimpar = document.getElementById("cicloResumo_btnLimpar");     // crie esse ID no HTML
-  const btnAtualizar = document.getElementById("cicloResumo_btnAtualizar"); // crie esse ID no HTML
-  const btnAI = document.getElementById("cicloResumo_aiBtn");
-  const btnCsv = document.getElementById("cicloResumo_btnCsv");
+  // overlay (trava tela)
+  if (ov) ov.style.display = isBusy ? "block" : "none";
+  if (ovTitle) ovTitle.textContent = msg || (isBusy ? "Carregando…" : "");
+  if (ovSub) ovSub.textContent = isBusy ? "Aguarde um instante." : "";
 
-  // mensagem / loading
+  // mensagem / loading (texto “Carregando resumo do ciclo…”)
   if (loading) {
     loading.textContent = msg || (isBusy ? "Carregando resumo do ciclo… aguarde." : "");
     loading.style.display = isBusy ? "block" : "none";
   }
 
-  // deixa visível porém “travado” (opcional). Se você prefere sumir, pode manter display:none.
   if (content) content.style.opacity = isBusy ? "0.55" : "1";
 
-  // trava inputs/botões
+  const dtIniEl = document.getElementById("cicloResumo_dtIni");
+  const dtFimEl = document.getElementById("cicloResumo_dtFim");
+  const selTime = document.getElementById("cicloResumo_selTime");
+  const selLoja = document.getElementById("cicloResumo_selLoja");
+  const btnLimpar = document.getElementById("cicloResumo_btnLimpar");
+  const btnAtualizar = document.getElementById("cicloResumo_btnAtualizar");
+  const btnAI = document.getElementById("cicloResumo_aiBtn");
+  const btnCsv = document.getElementById("cicloResumo_btnCsv");
+
   [dtIniEl, dtFimEl, selTime, selLoja, btnLimpar, btnAtualizar, btnAI, btnCsv].forEach(el => {
     if (!el) return;
     el.disabled = !!isBusy;
@@ -4011,6 +4029,8 @@ window.vektorLoadResumoCiclo = function (force) {
     a.remove();
   }, 0);
 }
+
+setResumoCicloBusy_(true, "Carregando resumo do ciclo…");
 
   google.script.run
     .withSuccessHandler(function (res) {
