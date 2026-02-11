@@ -511,7 +511,7 @@ display: none;
   position: sticky;
   top: 0;
   z-index: 2;
-  background: #0b1f3a;
+  background: #123a63;
   color: #ffffff;
   font-size: 14px;               /* +1 ponto */
   border-right: 2px double #005E27;
@@ -532,24 +532,12 @@ display: none;
   border-right: none;
 }
 
-.cicloResumoRow {
-  cursor:pointer;
-}
+.cicloResumoRow { cursor: default; }
+
 .cicloResumoRow:hover td {
   background:#f8fafc;
 }
 
-/* Tooltip estilo “Disparo de Ocorrências” */
-#cicloResumoTooltip {
-  position:fixed;
-  z-index:90;
-  width:min(680px, 94vw);
-  display:none;
-  border-radius:16px;
-  overflow:hidden;
-  box-shadow:0 18px 44px rgba(0,0,0,0.25);
-  border:1px solid rgba(148,163,184,0.55);
-}
 #cicloResumoTooltipHeader {
   background:#005E27;
   color:#fff;
@@ -562,43 +550,6 @@ display: none;
   background:#fff;
   padding:12px 14px;
   color:#0f172a;
-}
-
-/* Resumo do ciclo — linha de tipos de pendência no modal/tooltip */
-#cicloResumoTooltipContent .pend-types,
-#cicloResumoTooltipContent .pendencias-tipos,
-#cicloResumoTooltipContent [data-pend-types="1"]{
-  color: #000 !important;
-  opacity: 1 !important;
-}
-
-#cicloResumoPieCanvas {
-  display:block;
-  width:100%;
-}
-
-#cicloResumoPieBg * {
-  box-sizing: border-box;
-}
-
-#cicloResumoTooltipBody table {
-  width:100%;
-  border-collapse:collapse;
-  font-size:12px;
-}
-#cicloResumoTooltipBody th,
-#cicloResumoTooltipBody td {
-  padding:8px;
-  border-bottom:1px solid #e2e8f0;
-  vertical-align:top;
-}
-#cicloResumoTooltipBody th {
-  text-align:left;
-  color:#334155;
-  font-weight:900;
-  background:#f8fafc;
-  position:sticky;
-  top:0;
 }
 
 </style>
@@ -1047,6 +998,23 @@ display: none;
 
           <!-- Direita: filtros -->
           <div style="display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;">
+
+            <!-- Período -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Período</div>
+
+              <!-- ✅ APENAS 1 BLOCO DE CALENDÁRIO (não duplique IDs) -->
+              <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid rgba(226,232,240,0.45); border-radius:12px; background:rgba(2,6,23,0.18);">
+                <span style="font-size:14px; opacity:0.95;">📅</span>
+                <input id="cicloResumo_dtIni" type="date"
+                       style="border:none; outline:none; background:transparent; color:#e2e8f0; font-weight:800; font-size:12px;" />
+                <span style="opacity:0.65;">—</span>
+                <input id="cicloResumo_dtFim" type="date"
+                       style="border:none; outline:none; background:transparent; color:#e2e8f0; font-weight:800; font-size:12px;" />
+              </div>
+            </div>
+
+            <!-- Time -->
             <div style="display:flex; flex-direction:column; gap:6px;">
               <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Time</div>
               <select id="cicloResumo_selTime"
@@ -1055,6 +1023,7 @@ display: none;
               </select>
             </div>
 
+            <!-- Loja -->
             <div style="display:flex; flex-direction:column; gap:6px;">
               <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Loja</div>
               <select id="cicloResumo_selLoja"
@@ -1074,8 +1043,16 @@ display: none;
                     style="height:34px;border-radius:12px;padding:0 14px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.18);font-weight:1000;cursor:pointer;">
               Atualizar
             </button>
-          </div>
 
+                        <button id="cicloResumo_aiBtn" type="button"
+                    style="height:34px;border-radius:12px;padding:0 14px;
+                           border:1px solid rgba(0,94,39,.35);
+                           background:linear-gradient(180deg, rgba(181,255,32,.35), rgba(0,94,39,.10));
+                           font-weight:1000;color:#0b1220;cursor:pointer;white-space:nowrap;">
+              Análise do Ciclo
+            </button>
+
+          </div>
         </div>
       </div>
 
@@ -1087,130 +1064,117 @@ display: none;
 
         <div id="cicloResumoContent" style="display:none;">
 
-                    <!-- Cards -->
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px;">
-                      <div class="cicloCard">
-                        <div class="cicloCardLabel">🏬 Lojas com pendências</div>
-                        <div id="cicloResumo_totalLojas" class="cicloCardValue">—</div>
-                      </div>
-
-                      <div class="cicloCard" id="cicloResumo_cardTotalPend" style="cursor:pointer;">
-                        <div class="cicloCardLabel">🧾 Qtde de pendências</div>
-                        <div id="cicloResumo_totalPend" class="cicloCardValue">—</div>
-                      </div>
-
-                      <div class="cicloCard">
-                        <div class="cicloCardLabel">💰 Valor pendente</div>
-                        <div id="cicloResumo_totalValor" class="cicloCardValue">—</div>
-                      </div>
-
-                      <div class="cicloCard" id="cicloResumo_cardTopTime" style="cursor:pointer;">
-                        <div class="cicloCardLabel">🏆 Top time (mais pendências)</div>
-                        <div id="cicloResumo_topTime" class="cicloCardValue">—</div>
-                        <div id="cicloResumo_topTimeSub" class="cicloCardSub">—</div>
-                      </div>
-
-                      <div class="cicloCard">
-                        <div class="cicloCardLabel">🔥 Top loja (mais pendências)</div>
-                        <div id="cicloResumo_topLoja" class="cicloCardValue">—</div>
-                        <div id="cicloResumo_topLojaSub" class="cicloCardSub">—</div>
-                      </div>
-                    </div> <!-- ✅ FECHA O GRID AQUI -->
-
-                    <!-- Tooltip: detalhes da loja (Resumo do ciclo) -->
-                    <div id="cicloResumoTooltip">
-                      <div id="cicloResumoTooltipHeader">
-                        <div>
-                          <div id="cicloResumoTooltipTitle" style="font-weight:1000;">—</div>
-                          <div id="cicloResumoTooltipSub" style="font-size:12px; opacity:0.9;">—</div>
-                        </div>
-
-                        <button type="button"
-                                onclick="window.vektorResumoCicloHideTooltip && window.vektorResumoCicloHideTooltip()"
-                                style="background:rgba(255,255,255,0.15); padding:8px 10px; border-radius:10px; font-weight:900;">
-                          Fechar
-                        </button>
-                      </div>
-
-                      <div id="cicloResumoTooltipBody">
-                        <div id="cicloResumoTooltipLoading" style="display:none; font-weight:900; color:#334155;">
-                          Carregando detalhes…
-                        </div>
-                        <div id="cicloResumoTooltipErr" style="display:none; font-weight:900; color:#b91c1c;">
-                          —
-                        </div>
-                        <div id="cicloResumoTooltipContent"></div>
-                      </div>
-                    </div>
-
-                    <!-- ✅ Modal: gráfico pizza (Resumo do ciclo) — fora do tooltip e fora do grid -->
-                    <div id="cicloResumoPieBg"
-     style="display:none; position:fixed; inset:0; z-index:95; background:rgba(0,0,0,0.55);">
-                      <div id="cicloResumoPieModal"
-     style="width:min(980px, 96vw); margin:6vh auto; border-radius:16px; overflow:hidden; box-shadow:0 18px 44px rgba(0,0,0,0.25); border:1px solid rgba  (148,163,184,0.55); background:#fff;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid rgba(181,255,32,0.35);">
-                          <div>
-                            <div style="font-weight:1000; font-size:14px;">Distribuição de pendências por time</div>
-                            <div id="cicloResumoPieSub" style="font-size:12px; opacity:0.9;">—</div>
-                          </div>
-                          <button type="button"
-                                  id="cicloResumoPieClose"
-                                  style="background:rgba(255,255,255,0.12); padding:8px 10px; border-radius:10px; font-weight:900;">
-                            Fechar
-                          </button>
-                        </div>
-
-                        <div style="padding:12px 14px;">
-                          <canvas id="cicloResumoPieCanvas" width="560" height="360"></canvas>
-                          <div id="cicloResumoPieLegend" style="margin-top:12px; background:#fff; border-radius:12px; padding:10px;"></div>
-                          <div style="margin-top:10px; font-size:12px; opacity:0.85;">
-                            Clique em um setor para filtrar no futuro (se você quiser evoluir).
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-         <!-- Tabela (todas as lojas / filtradas) -->
-            <div style="margin-top:14px; background:#ffffff; border:2px solid #000; border-radius:14px; padding:12px;">
-              <div style="color:#0f172a; font-weight:1000; font-size:14px;">
-                Lojas (por valor pendente)
-                <span style="font-weight:900; font-size:13px; color:#334155;">
-                  — clique na linha da loja para ver detalhes das transações pendentes
-                </span>
-              </div>
-
-              <div style="margin-top:10px; overflow:auto; max-height:520px; border-radius:12px; border:2px solid #000; background:#fff;">
-                <table id="cicloResumoTable" style="width:100%; border-collapse:separate; border-spacing:0; font-size:13px; color:#000; background:#fff;">
-                  <thead>
-                    <tr>
-                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27;">
-                        Loja
-                      </th>
-
-                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27;">
-                        Time
-                      </th>
-
-                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:right; border-right:2px double #005E27; border-bottom:2px double #005E27;">
-                        Qtde
-                      </th>
-
-                      <!-- ✅ NOVO -->
-                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:right; border-right:2px double #005E27; border-bottom:2px double #005E27;">
-                        Qtde transações
-                      </th>
-
-                      <th style="position:sticky; top:0; z-index:2; background:#0b1f3a; color:#fff; padding:10px; text-align:right; border-bottom:2px double #005E27;">
-                        Valor
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody id="cicloResumo_tbody"></tbody>
-                </table>
-              </div>
+          <!-- Cards (mantém layout “como era” – cards em cima) -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; align-items:stretch;">
+            <div class="cicloCard">
+              <div class="cicloCardLabel">🏬 Lojas com pendências</div>
+              <div id="cicloResumo_totalLojas" class="cicloCardValue">—</div>
             </div>
 
+            <!-- ✅ sem clique -->
+            <div class="cicloCard" id="cicloResumo_cardTotalPend" style="cursor:default;">
+              <div class="cicloCardLabel">🧾 Qtde de pendências</div>
+              <div id="cicloResumo_totalPend" class="cicloCardValue">—</div>
+            </div>
+
+            <div class="cicloCard">
+              <div class="cicloCardLabel">💰 Valor pendente</div>
+              <div id="cicloResumo_totalValor" class="cicloCardValue">—</div>
+            </div>
+
+            <!-- ✅ sem clique -->
+            <div class="cicloCard" id="cicloResumo_cardTopTime" style="cursor:default;">
+              <div class="cicloCardLabel">🏆 Top time (mais pendências)</div>
+              <div id="cicloResumo_topTime" class="cicloCardValue">—</div>
+              <div id="cicloResumo_topTimeSub" class="cicloCardSub">—</div>
+            </div>
+
+            <div class="cicloCard">
+              <div class="cicloCardLabel">🔥 Top loja (mais pendências)</div>
+              <div id="cicloResumo_topLoja" class="cicloCardValue">—</div>
+              <div id="cicloResumo_topLojaSub" class="cicloCardSub">—</div>
+            </div>
+
+          </div>
+
+          <!-- Tabela (transações detalhadas / filtradas) -->
+          <div style="margin-top:14px; background:#ffffff; border:2px solid #000; border-radius:14px; padding:12px;">
+            <div style="color:#0f172a; font-weight:1000; font-size:14px;">
+              Transações pendentes (detalhado)
+              <span style="font-weight:900; font-size:13px; color:#334155;">
+                — ordene clicando no cabeçalho
+              </span>
+            </div>
+
+            <!-- wrapper com scroll vertical + horizontal -->
+            <div id="cicloResumoTableWrap"
+                 style="margin-top:10px; overflow:auto; max-height:520px; border-radius:12px; border:2px solid #000; background:#fff;">
+
+              <table id="cicloResumoTable"
+                     style="width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; font-size:13px; color:#000; background:#fff;">
+                <thead>
+                  <tr>
+                    <th data-sort="loja"
+                        style="position:sticky; top:0; z-index:2; background:#12325c; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; white-space:nowrap;">
+                      Loja
+                    </th>
+
+                    <th data-sort="time"
+                        style="position:sticky; top:0; z-index:2; background:#12325c; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; white-space:nowrap;">
+                      Time
+                    </th>
+
+                    <th data-sort="dataISO"
+                        style="position:sticky; top:0; z-index:2; background:#12325c; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; white-space:nowrap;">
+                      Data da transação
+                    </th>
+
+                    <th data-sort="estabelecimento"
+                        style="position:sticky; top:0; z-index:2; background:#12325c; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; white-space:nowrap;">
+                      Estabelecimento
+                    </th>
+
+                    <th data-sort="valor"
+                        style="position:sticky; top:0; z-index:2; background:#12325c; color:#fff; padding:10px; text-align:right; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; white-space:nowrap;">
+                      Valor
+                    </th>
+
+                    <th data-sort="categoria"
+                        style="position:sticky; top:0; z-index:2; background:#12325c; color:#fff; padding:10px; text-align:left; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; white-space:nowrap;">
+                      Categoria
+                    </th>
+
+                    <th data-sort="pendencias"
+                        style="position:sticky; top:0; z-index:2; background:#12325c; color:#fff; padding:10px; text-align:left; border-bottom:2px double #005E27; cursor:pointer; white-space:nowrap;">
+                      Pendências
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody id="cicloResumo_tbody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ✅ OVERLAY IA: FORA da tabela e FORA do grid (não quebra layout) -->
+      <div id="cicloResumoAI" style="display:none; position:fixed; inset:0; z-index:120; background:rgba(2,6,23,0.55);">
+        <div style="position:absolute; left:50%; top:12vh; transform:translateX(-50%);
+                    width:min(920px, 94vw); border-radius:18px; overflow:hidden;
+                    border:1px solid rgba(148,163,184,0.55);
+                    box-shadow:0 22px 60px rgba(0,0,0,0.35);">
+          <div style="background:#0b1220; color:#fff; padding:14px 16px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-weight:1000;">Análise do Ciclo (IA)</div>
+            <button id="cicloResumoAIClose" type="button"
+              style="background:rgba(255,255,255,0.12); padding:8px 12px; border-radius:12px; font-weight:900; color:#fff; border:1px solid rgba(255,255,255,0.18); cursor:pointer;">
+              Fechar
+            </button>
+          </div>
+          <div id="cicloResumoAIBody" style="background:#fff; padding:14px 16px; color:#0f172a;">
+            <!-- preenchido via JS -->
+          </div>
         </div>
       </div>
 
@@ -3741,191 +3705,171 @@ window.vektorLoadResumoCiclo = function (force) {
   if (content) content.style.display = "none";
   if (tbody) tbody.innerHTML = "";
 
-  const fmtBRL = (v) => {
-    try { return (Number(v || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
-    catch (e) { return String(v || 0); }
+  const fmtBRL = (n) => {
+    try { return (Number(n || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+    catch (e) { return String(n || 0); }
   };
 
-  // helpers locais (não dependem de nada externo)
-  function getRows_(res) {
-    const arr = (res && Array.isArray(res.rows)) ? res.rows : [];
-    return arr.map(r => ({
-      loja: String(r.loja || ""),
-      time: String(r.time || "N/D"),
-      qtde: Number(r.qtde || 0),
-
-      // ✅ Qtde de transações: aceita os dois nomes (back compat)
-      txCount: Number((r.txCount != null ? r.txCount : r.qtdeTransacoes) || 0),
-
-      valor: Number(r.valor || 0)
-    }));
-  }
-
-  function buildOptions_(selectEl, values, allLabel) {
-    if (!selectEl) return;
-    const current = selectEl.value || "";
-    selectEl.innerHTML =
-      `<option value="">${allLabel}</option>` +
-      values.map(v => `<option value="${String(v).replace(/"/g, "&quot;")}">${v}</option>`).join("");
-
-    // mantém seleção se ainda existe
-    if (current && values.indexOf(current) >= 0) selectEl.value = current;
-  }
-
-  function applyFiltros_() {
-    const res = window.__cicloResumoData;
-    if (!res || !res.ok) return;
+  function applyFiltros_(){
+    const res = window.__cicloResumoData || {};
+    const txAll = Array.isArray(res.tx) ? res.tx : [];
 
     const selTime = document.getElementById("cicloResumo_selTime");
     const selLoja = document.getElementById("cicloResumo_selLoja");
+    const dtIniEl = document.getElementById("cicloResumo_dtIni");
+    const dtFimEl = document.getElementById("cicloResumo_dtFim");
 
-    const timeSel = selTime ? (selTime.value || "") : "";
-    const lojaSel = selLoja ? (selLoja.value || "") : "";
+    const timeSel = (selTime && typeof selTime.value === "string") ? selTime.value : "";
+    const lojaSel = (selLoja && typeof selLoja.value === "string") ? selLoja.value : "";
 
-    const allRows = getRows_(res);
+    const dtIni = (dtIniEl && dtIniEl.value) ? dtIniEl.value : "";
+    const dtFim = (dtFimEl && dtFimEl.value) ? dtFimEl.value : "";
 
-    // ✅ bind card "Qtde de pendências" para abrir pizza (1x)
-        try {
-          const cardQtde = document.getElementById("cicloResumo_cardTotalPend");
-          if (cardQtde && !cardQtde.__bindPie) {
-            cardQtde.__bindPie = true;
-            cardQtde.style.cursor = "pointer";
-            cardQtde.addEventListener("click", function () {
-              window.vektorResumoCicloOpenPieTimes();
-            });
-          }
-        } catch(e){}
-
-    // 1) popula TIME com base no dataset total
-    const times = Array.from(new Set(allRows.map(r => r.time))).sort((a, b) => a.localeCompare(b, "pt-BR"));
-    buildOptions_(selTime, times, "Todos");
-
-    // 2) lojas dependem do time
-    const rowsByTime = timeSel ? allRows.filter(r => r.time === timeSel) : allRows;
-    const lojas = Array.from(new Set(rowsByTime.map(r => r.loja))).sort((a, b) => a.localeCompare(b, "pt-BR"));
-    buildOptions_(selLoja, lojas, "Todas");
-
-    // 3) aplica filtros finais
-    let filtered = rowsByTime;
-    if (lojaSel) filtered = filtered.filter(r => r.loja === lojaSel);
-
-    // 4) recalcula cards (com o filtrado)
-    const totalLojas = new Set(filtered.map(r => r.loja)).size;
-    const totalPend = filtered.reduce((acc, r) => acc + (r.qtde || 0), 0);
-    const totalValor = filtered.reduce((acc, r) => acc + (r.valor || 0), 0);
-
-    // 4.1) TOP TIME e TOP LOJA (por quantidade de pendências)
-const elTopTime = document.getElementById("cicloResumo_topTime");
-const elTopTimeSub = document.getElementById("cicloResumo_topTimeSub");
-const elTopLoja = document.getElementById("cicloResumo_topLoja");
-const elTopLojaSub = document.getElementById("cicloResumo_topLojaSub");
-
-let topTimeName = "—", topTimeQt = 0;
-let topLojaName = "—", topLojaQt = 0;
-
-// top loja
-filtered.forEach(r => {
-  const q = Number(r.qtde || 0);
-  if (q > topLojaQt) { topLojaQt = q; topLojaName = r.loja || "—"; }
-});
-
-// top time (soma qtde por time)
-const mapTime = {};
-filtered.forEach(r => {
-  const t = String(r.time || "N/D");
-  mapTime[t] = (mapTime[t] || 0) + Number(r.qtde || 0);
-});
-Object.keys(mapTime).forEach(t => {
-  if (mapTime[t] > topTimeQt) { topTimeQt = mapTime[t]; topTimeName = t; }
-});
-
-if (elTopTime) elTopTime.textContent = topTimeName;
-if (elTopTimeSub) elTopTimeSub.textContent = topTimeQt ? (topTimeQt + " pendências") : "—";
-
-if (elTopLoja) elTopLoja.textContent = topLojaName;
-if (elTopLojaSub) elTopLojaSub.textContent = topLojaQt ? (topLojaQt + " pendências") : "—";
-
-    const elL = document.getElementById("cicloResumo_totalLojas");
-    const elP = document.getElementById("cicloResumo_totalPend");
-    const elV = document.getElementById("cicloResumo_totalValor");
-
-    if (elL) elL.textContent = String(totalLojas || 0);
-    if (elP) elP.textContent = String(totalPend || 0);
-    if (elV) elV.textContent = fmtBRL(totalValor || 0);
-
-    // 5) tabela: TODAS as linhas (ordenadas por valor desc)
-    const ordered = filtered.slice().sort((a, b) => (b.valor || 0) - (a.valor || 0));
-
-    if (tbody) {
-      if (!ordered.length) {
-        tbody.innerHTML = "<tr><td colspan='5' style='padding:10px;color:rgba(226,232,240,0.9);'>Nenhum resultado para o filtro.</td></tr>";
-      } else {
-        tbody.innerHTML = ordered.map(r => {
-  return `
-    <tr class="cicloResumoRow" data-loja="${String(r.loja || "").replace(/"/g,'&quot;')}">
-      <td>${r.loja}</td>
-      <td>${r.time}</td>
-      <td style="text-align:right;">${Number(r.qtde || 0)}</td>
-      <td style="text-align:right;">${Number(r.txCount || 0)}</td>
-      <td style="text-align:right;">${fmtBRL(r.valor || 0)}</td>
-    </tr>
-  `;
-}).join("");
-
-// ✅ bind clique (tooltip)
-try {
-  Array.from(tbody.querySelectorAll("tr.cicloResumoRow")).forEach(tr => {
-    tr.addEventListener("click", function () {
-      const loja = this.getAttribute("data-loja") || "";
-      window.vektorResumoCicloShowTooltipForLoja && window.vektorResumoCicloShowTooltipForLoja(loja, this);
+    // 1) filtro por datas (ISO yyyy-mm-dd)
+    let tx = txAll.filter(r => {
+      const d = String(r.dataISO || r.dataIso || "");
+      if (dtIni && d < dtIni) return false;
+      if (dtFim && d > dtFim) return false;
+      return true;
     });
-  });
-} catch (e) {}
-      }
+
+    // 2) repopula TIME com base no recorte de data
+    const times = Array.from(new Set(tx.map(r => String(r.time || "N/D"))))
+      .filter(Boolean)
+      .sort((a,b)=>a.localeCompare(b, "pt-BR"));
+
+    if (selTime) {
+      const cur = timeSel;
+      selTime.innerHTML = "<option value=''>Todos</option>" +
+        times.map(t => `<option value="${String(t).replace(/"/g,"&quot;")}">${t}</option>`).join("");
+      selTime.value = (cur && times.includes(cur)) ? cur : "";
     }
 
-    if (content) content.style.display = "block";
+    // aplica TIME
+    const timeNow = selTime ? (selTime.value || "") : "";
+    if (timeNow) tx = tx.filter(r => String(r.time || "") === timeNow);
 
-    // --- binds de clique (idempotente) ---
-try {
-  const cardTopTime = document.getElementById("cicloResumo_cardTopTime");
-  if (cardTopTime && !cardTopTime.__binded) {
-    cardTopTime.__binded = true;
-    cardTopTime.addEventListener("click", function(){
-      // pega o texto atual do card (já renderizado)
-      const t = (document.getElementById("cicloResumo_topTime") || {}).textContent || "";
-      const time = String(t || "").trim();
-      if (!time || time === "—") return;
+    // 3) repopula LOJA com base no recorte (data + time)
+    const lojas = Array.from(new Set(tx.map(r => String(r.loja || ""))))
+      .filter(Boolean)
+      .sort((a,b)=>Number(a)-Number(b));
 
-      // ⚠️ aqui você deve chamar a SUA função de abrir tooltip/modal por TIME
-      // Ex.: window.vektorCicloResumoOpenDetalheTime(time)
-      if (window.vektorResumoCicloShowTooltipForTime) {
-        window.vektorResumoCicloShowTooltipForTime(time, this);
-      }
+    if (selLoja) {
+      const curL = lojaSel;
+      selLoja.innerHTML = "<option value=''>Todas</option>" +
+        lojas.map(l => `<option value="${l}">${l}</option>`).join("");
+      selLoja.value = (curL && lojas.includes(curL)) ? curL : "";
+    }
+
+    // aplica LOJA
+    const lojaNow = selLoja ? (selLoja.value || "") : "";
+    if (lojaNow) tx = tx.filter(r => String(r.loja || "") === lojaNow);
+
+    // 4) recalcula cards (consistente com filtros)
+    const lojasSet = {};
+    let totalPend = 0;
+    let totalValor = 0;
+
+    const aggTime = {};
+    const aggLoja = {};
+
+    tx.forEach(r => {
+      const loja = String(r.loja || "");
+      const time = String(r.time || "N/D");
+      const pend = Number(r.pendCount || 0);
+      const val  = Number(r.valor || 0);
+
+      if (loja) lojasSet[loja] = true;
+      totalPend += pend;
+      totalValor += val;
+
+      aggTime[time] = aggTime[time] || { k: time, pend: 0 };
+      aggTime[time].pend += pend;
+
+      aggLoja[loja] = aggLoja[loja] || { k: loja, pend: 0 };
+      aggLoja[loja].pend += pend;
     });
+
+    function pickTop(obj){
+      let best = null;
+      Object.keys(obj).forEach(k=>{
+        if (!best || obj[k].pend > best.pend) best = obj[k];
+      });
+      return best;
+    }
+
+    const topT = pickTop(aggTime);
+    const topL = pickTop(aggLoja);
+
+    const elTotLojas = document.getElementById("cicloResumo_totalLojas");
+    const elTotPend  = document.getElementById("cicloResumo_totalPend");
+    const elTotValor = document.getElementById("cicloResumo_totalValor");
+    const elTopTime  = document.getElementById("cicloResumo_topTime");
+    const elTopTimeSub = document.getElementById("cicloResumo_topTimeSub");
+    const elTopLoja  = document.getElementById("cicloResumo_topLoja");
+    const elTopLojaSub = document.getElementById("cicloResumo_topLojaSub");
+
+    if (elTotLojas) elTotLojas.textContent = String(Object.keys(lojasSet).length);
+    if (elTotPend)  elTotPend.textContent  = String(totalPend);
+    if (elTotValor) elTotValor.textContent = fmtBRL(totalValor);
+
+    if (elTopTime) elTopTime.textContent = topT ? topT.k : "—";
+    if (elTopTimeSub) elTopTimeSub.textContent = topT ? `${topT.pend} pendências` : "—";
+
+    if (elTopLoja) elTopLoja.textContent = topL ? topL.k : "—";
+    if (elTopLojaSub) elTopLojaSub.textContent = topL ? `${topL.pend} pendências` : "—";
+
+    // 5) ordenação
+    window.__cicloResumoSort = window.__cicloResumoSort || { col: "valor", dir: "desc" };
+    const sort = window.__cicloResumoSort;
+
+    function cmp(a,b){
+      const dir = (sort.dir === "asc") ? 1 : -1;
+      const col = sort.col || "valor";
+
+      const va = a[col];
+      const vb = b[col];
+
+      if (col === "valor" || col === "pendCount") return (Number(va||0) - Number(vb||0)) * dir;
+      if (col === "loja") return (Number(va||0) - Number(vb||0)) * dir;
+
+      // dataISO é yyyy-mm-dd: comparar string funciona
+      return String(va||"").localeCompare(String(vb||""), "pt-BR") * dir;
+    }
+
+    tx.sort(cmp);
+
+    // 6) render tabela (detalhada)
+    if (!tbody) return;
+
+    if (!tx.length) {
+      tbody.innerHTML = "<tr><td colspan='7' style='padding:10px;'>Sem transações pendentes no recorte.</td></tr>";
+      return;
+    }
+
+    tbody.innerHTML = tx.map(r => `
+      <tr class="cicloResumoRow">
+        <td>${r.loja || "—"}</td>
+        <td>${r.time || "N/D"}</td>
+        <td style="white-space:nowrap;">${r.dataBR || "—"}</td>
+        <td style="max-width:420px;">${(r.estabelecimento || "—")}</td>
+        <td style="text-align:right; white-space:nowrap;">${r.valorBRL || fmtBRL(r.valor)}</td>
+        <td style="max-width:260px;">${(r.categoria || "—")}</td>
+        <td style="max-width:320px;">${(r.pendencias || "—")}</td>
+      </tr>
+    `).join("");
   }
 
-  const cardTotalPend = document.getElementById("cicloResumo_cardTotalPend");
-  if (cardTotalPend && !cardTotalPend.__binded) {
-    cardTotalPend.__binded = true;
-    cardTotalPend.addEventListener("click", function(){
-      // ⚠️ aqui você deve chamar a SUA função de abrir o gráfico
-      // Ex.: window.vektorCicloResumoOpenPizzaTimes()
-      if (window.vektorCicloResumoOpenPizzaTimes) {
-        window.vektorCicloResumoOpenPizzaTimes();
-      }
-    });
-  }
-} catch(e) {}
-
-  }
-
-  // expõe limpar filtros (usado pelo botão)
+  // expõe limpar filtros (se você tiver botão de limpar)
   window.vektorResumoCicloLimparFiltros = function () {
     const selTime = document.getElementById("cicloResumo_selTime");
     const selLoja = document.getElementById("cicloResumo_selLoja");
+    const dtIniEl = document.getElementById("cicloResumo_dtIni");
+    const dtFimEl = document.getElementById("cicloResumo_dtFim");
+
     if (selTime) selTime.value = "";
     if (selLoja) selLoja.value = "";
+    // datas: mantém como estão (ou zera se você quiser)
     applyFiltros_();
   };
 
@@ -3935,9 +3879,35 @@ try {
 
       if (!res || !res.ok) {
         if (content) content.style.display = "block";
-        if (tbody) tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:#fff;'>Falha ao carregar resumo.</td></tr>";
+        if (tbody) tbody.innerHTML = "<tr><td colspan='7' style='padding:10px;color:#111;'>Falha ao carregar resumo.</td></tr>";
         return;
       }
+
+      if (content) content.style.display = "block";
+
+            // ✅ NORMALIZA tx (back devolve dataIso/dataTxt/valorTxt e flags; front usa dataISO/dataBR/valorBRL/pendCount)
+      try {
+        if (res && Array.isArray(res.tx)) {
+          res.tx = res.tx.map(r => {
+            const pendNF = Number(r.pendNF || 0);
+            const pendEtiqueta = Number(r.pendEtiqueta || 0);
+            const pendDesc = Number(r.pendDesc || 0);
+
+            return {
+              ...r,
+              // datas
+              dataISO: r.dataISO || r.dataIso || "",
+              dataBR:  r.dataBR  || r.dataTxt || "",
+              // valor
+              valorBRL: r.valorBRL || r.valorTxt || "",
+              // contagem de pendências
+              pendCount: (r.pendCount != null) ? Number(r.pendCount || 0) : (pendNF + pendEtiqueta + pendDesc),
+              // string pendências (garante)
+              pendencias: r.pendencias || "",
+            };
+          });
+        }
+      } catch(_) {}
 
       // ✅ guarda dataset inteiro para filtros
       window.__cicloResumoData = res;
@@ -3948,6 +3918,40 @@ try {
         sub.textContent = `Consolidado das pendências no ciclo atual (${res.periodo.inicio} → ${res.periodo.fim})`;
       }
 
+      // =========================================================
+      // 3) DATE RANGE (dtIni/dtFim) — BLOCO COMPLETO (min/max + bind)
+      // (cole aqui mesmo: depois do subtítulo e antes do bind dos filtros)
+      // =========================================================
+      try {
+        const dtIniEl = document.getElementById("cicloResumo_dtIni");
+        const dtFimEl = document.getElementById("cicloResumo_dtFim");
+
+        if (dtIniEl && dtFimEl && res && res.periodo && res.periodo.inicio && res.periodo.fim) {
+          function br2iso(br){
+            const m = String(br||"").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if (!m) return "";
+            return `${m[3]}-${m[2]}-${m[1]}`;
+          }
+          const min = br2iso(res.periodo.inicio);
+          const max = br2iso(res.periodo.fim);
+
+          if (min) { dtIniEl.min = min; dtFimEl.min = min; }
+          if (max) { dtIniEl.max = max; dtFimEl.max = max; }
+
+          if (!dtIniEl.value && min) dtIniEl.value = min;
+          if (!dtFimEl.value && max) dtFimEl.value = max;
+
+          if (!dtIniEl.__bindResumo) {
+            dtIniEl.__bindResumo = true;
+            dtIniEl.addEventListener("change", applyFiltros_);
+          }
+          if (!dtFimEl.__bindResumo) {
+            dtFimEl.__bindResumo = true;
+            dtFimEl.addEventListener("change", applyFiltros_);
+          }
+        }
+      } catch(_) {}
+
       // ✅ bind dos filtros (uma vez só)
       try {
         const selTime = document.getElementById("cicloResumo_selTime");
@@ -3956,7 +3960,6 @@ try {
         if (selTime && !selTime.__bindResumo) {
           selTime.__bindResumo = true;
           selTime.addEventListener("change", function () {
-            // quando muda time, reseta loja
             if (selLoja) selLoja.value = "";
             applyFiltros_();
           });
@@ -3970,331 +3973,218 @@ try {
         }
       } catch (e) {}
 
-      // ✅ aplica filtros + render inicial
+      // =========================================================
+      // 4.2) SORT NO THEAD — BLOCO COMPLETO (bind 1x)
+      // (cole aqui: depois do bind dos filtros e antes do applyFiltros_())
+      // =========================================================
+      try {
+        const thead = document.querySelector("#cicloResumoTable thead");
+        if (thead && !thead.__bindSortResumo) {
+          thead.__bindSortResumo = true;
+          thead.addEventListener("click", function(ev){
+            const th = ev.target && ev.target.closest ? ev.target.closest("th[data-sort]") : null;
+            if (!th) return;
+
+            const col = th.getAttribute("data-sort") || "";
+            if (!col) return;
+
+            window.__cicloResumoSort = window.__cicloResumoSort || { col: "valor", dir: "desc" };
+
+            if (window.__cicloResumoSort.col === col) {
+              window.__cicloResumoSort.dir = (window.__cicloResumoSort.dir === "desc") ? "asc" : "desc";
+            } else {
+              window.__cicloResumoSort.col = col;
+              window.__cicloResumoSort.dir = "desc";
+            }
+
+            applyFiltros_();
+          });
+        }
+      } catch(_) {}
+
+      // ✅ render inicial
       applyFiltros_();
     })
     .withFailureHandler(function (err) {
       if (loading) loading.style.display = "none";
       if (content) content.style.display = "block";
-      if (tbody) tbody.innerHTML = "<tr><td colspan='4' style='padding:10px;color:#fff;'>Erro no backend.</td></tr>";
+      if (tbody) tbody.innerHTML = "<tr><td colspan='7' style='padding:10px;color:#111;'>Erro no backend.</td></tr>";
     })
     .getResumoCicloPendencias();
 };
 
-window.vektorResumoCicloHideTooltip = function () {
-  const tp = document.getElementById("cicloResumoTooltip");
-  if (tp) tp.style.display = "none";
-};
+function vektorResumoCicloBuildAI_(){
+  const res = window.__cicloResumoData || {};
+  const txAll = Array.isArray(res.tx) ? res.tx : [];
 
-// ===============================
-// RESUMO DO CICLO — PIZZA por TIME (Qtde de pendências)
-// ===============================
-window.vektorResumoCicloClosePie = function () {
-  const bg = document.getElementById("cicloResumoPieBg");
-  if (bg) bg.style.display = "none";
-};
+  const selTime = document.getElementById("cicloResumo_selTime");
+  const selLoja = document.getElementById("cicloResumo_selLoja");
+  const dtIniEl = document.getElementById("cicloResumo_dtIni");
+  const dtFimEl = document.getElementById("cicloResumo_dtFim");
 
-window.vektorResumoCicloOpenPieTimes = function () {
-  const bg = document.getElementById("cicloResumoPieBg");
-  const errEl = document.getElementById("cicloResumoPieErr");
-  if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+  const timeSel = selTime ? (selTime.value||"") : "";
+  const lojaSel = selLoja ? (selLoja.value||"") : "";
+  const dtIni = dtIniEl && dtIniEl.value ? dtIniEl.value : "";
+  const dtFim = dtFimEl && dtFimEl.value ? dtFimEl.value : "";
 
-  if (!bg) return;
-  bg.style.display = "flex";
+  let tx = txAll.filter(r => {
+    const d = String(r.dataISO || r.dataIso || "");
+    if (dtIni && d < dtIni) return false;
+    if (dtFim && d > dtFim) return false;
+    return true;
+  });
+  if (timeSel) tx = tx.filter(r => String(r.time||"") === timeSel);
+  if (lojaSel) tx = tx.filter(r => String(r.loja||"") === lojaSel);
 
-  // bind fechar (1x)
-  try {
-    const btn = document.getElementById("cicloResumoPieClose");
-    if (btn && !btn.__bind) {
-      btn.__bind = true;
-      btn.addEventListener("click", window.vektorResumoCicloClosePie);
-    }
-    if (!bg.__bindOutside) {
-      bg.__bindOutside = true;
-      bg.addEventListener("mousedown", function (ev) {
-        if (ev.target === bg) window.vektorResumoCicloClosePie();
-      });
-      document.addEventListener("keydown", function (ev) {
-        if (ev.key === "Escape") window.vektorResumoCicloClosePie();
-      });
-    }
-  } catch(e) {}
+  const fmtBRL = (n)=> (Number(n)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 
-  // monta dados
-  try {
-    const res = window.__cicloResumoData;
-    if (!res || !res.ok) throw new Error("Resumo do ciclo ainda não carregou.");
+  const lojasSet = {};
+  let totalPend = 0, totalValor = 0;
 
-    const rows = Array.isArray(res.rows) ? res.rows : [];
-    if (!rows.length) throw new Error("Sem dados para montar o gráfico.");
+  const aggTime = {};
+  const aggLoja = {};
+  const aggCat  = {};
 
-    // agrega por time usando qtde (pendências)
-    const by = {};
-    rows.forEach(r => {
-      const t = String(r.time || "N/D");
-      const q = Number(r.qtde || 0);
-      by[t] = (by[t] || 0) + q;
-    });
+  tx.forEach(r=>{
+    const loja = String(r.loja||"");
+    const time = String(r.time||"N/D");
+    const cat  = String(r.categoria||"—");
+    const pend = Number(r.pendCount||0);
+    const val  = Number(r.valor||0);
 
-    const labels = Object.keys(by).sort((a,b) => by[b]-by[a]);
-    const values = labels.map(l => by[l]);
+    if (loja) lojasSet[loja] = true;
+    totalPend += pend;
+    totalValor += val;
 
-    // render
-    vektorResumoCicloRenderPie_(labels, values);
-  } catch (e) {
-    const msg = (e && e.message) ? e.message : String(e);
-    if (errEl) { errEl.style.display = "block"; errEl.textContent = msg; }
-  }
-};
+    aggTime[time] = aggTime[time] || { k: time, pend:0, valor:0 };
+    aggTime[time].pend += pend; aggTime[time].valor += val;
 
-// ✅ Render “dashboard” (bar horizontal) + legenda/% + escala adequada
-function vektorResumoCicloRenderPie_(labels, values) {
-  const canvas = document.getElementById("cicloResumoPieCanvas");
-  const legend = document.getElementById("cicloResumoPieLegend");
-  const errEl = document.getElementById("cicloResumoPieErr");
-  if (!canvas) return;
+    aggLoja[loja] = aggLoja[loja] || { k: loja, pend:0, valor:0 };
+    aggLoja[loja].pend += pend; aggLoja[loja].valor += val;
 
-  // limpa gráfico anterior
-  try {
-    if (window.__cicloResumoPieChart) {
-      window.__cicloResumoPieChart.destroy();
-      window.__cicloResumoPieChart = null;
-    }
-  } catch(e){}
-
-  const total = values.reduce((a,b)=>a+b,0) || 1;
-
-  // paleta fixa
-  const palette = ["#005E27","#0f172a","#22c55e","#16a34a","#64748b","#84cc16","#1f2937","#94a3b8","#10b981","#334155"];
-  const colors = labels.map((_,i)=> palette[i % palette.length]);
-
-  // garante tamanho estável (evita “sumir” quando abre modal)
-  canvas.style.width = "100%";
-  canvas.style.height = "320px";
-
-  const data = {
-    labels,
-    datasets: [{
-      label: "Pendências",
-      data: values,
-      backgroundColor: colors,
-      borderColor: "rgba(15,23,42,0.15)",
-      borderWidth: 1,
-      borderRadius: 10,
-      barThickness: 18,
-      maxBarThickness: 22,
-      categoryPercentage: 0.75,
-      barPercentage: 0.85
-    }]
-  };
-
-  window.__cicloResumoPieChart = new Chart(canvas.getContext("2d"), {
-    type: "bar",
-    data,
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 450 },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              const v = Number(ctx.raw || 0);
-              const pct = ((v/total)*100).toFixed(1).replace(".", ",");
-              return ` ${ctx.label}: ${v} pendências (${pct}%)`;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          ticks: { maxRotation: 0, autoSkip: true },
-          grid: { display: false }
-        },
-        y: {
-          beginAtZero: true,
-          ticks: { precision: 0 },
-          grid: { color: "rgba(15,23,42,0.06)" }
-        }
-      }
-    }
+    aggCat[cat] = aggCat[cat] || { k: cat, pend:0, valor:0 };
+    aggCat[cat].pend += pend; aggCat[cat].valor += val;
   });
 
-  // legenda (percentual por time)
-  if (legend) {
-    legend.innerHTML = labels.map((l, i) => {
-      const v = values[i];
-      const pct = ((v/total)*100).toFixed(1).replace(".", ",");
-      return `
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width:14px; height:14px; border-radius:4px; background:${colors[i]}; border:1px solid rgba(15,23,42,0.20)"></div>
-          <div style="flex:1; font-weight:900; color:#0f172a; font-size:12px;">${l}</div>
-          <div style="font-weight:1000; color:#0f172a; font-size:12px;">${pct}%</div>
-        </div>
-      `;
-    }).join("");
+  function topN(obj, n){
+    return Object.keys(obj).map(k=>obj[k]).sort((a,b)=>b.pend-a.pend).slice(0,n);
   }
 
-  if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+  const topTimes = topN(aggTime, 5);
+  const topLojas = topN(aggLoja, 5);
+  const topCats  = Object.keys(aggCat).map(k=>aggCat[k]).sort((a,b)=>b.valor-a.valor).slice(0,6);
+
+  const filtrosTxt = [
+    (dtIni && dtFim) ? `Período: <b>${dtIni.split("-").reverse().join("/")}</b> → <b>${dtFim.split("-").reverse().join("/")}</b>` : "",
+    timeSel ? `Time: <b>${timeSel}</b>` : "Time: <b>Todos</b>",
+    lojaSel ? `Loja: <b>${lojaSel}</b>` : ""
+  ].filter(Boolean).join(" • ");
+
+  return `
+    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
+      <div style="flex:1; min-width:280px;">
+        <div style="font-weight:1000; font-size:14px;">Leitura do cenário</div>
+        <div style="margin-top:6px; color:#334155; font-weight:800; font-size:12px;">${filtrosTxt}</div>
+
+        <div style="margin-top:12px; padding:12px; border-radius:14px; border:1px solid rgba(0,94,39,.25);
+                    background:linear-gradient(180deg, rgba(181,255,32,.18), rgba(0,94,39,.06));">
+          <div style="font-weight:1000; font-size:13px;">Resumo rápido</div>
+          <div style="margin-top:6px; font-size:13px; line-height:1.45;">
+            No recorte atual, existem <b>${Object.keys(lojasSet).length}</b> lojas com pendências,
+            totalizando <b>${totalPend}</b> pendências e <b>${fmtBRL(totalValor)}</b> em valor pendente.
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1; min-width:280px;">
+        <div style="font-weight:1000; font-size:14px;">Onde está concentrando</div>
+
+        <div style="margin-top:10px;">
+          <div style="font-weight:1000; font-size:12px; color:#0b1220;">Top times (por pendências)</div>
+          <div style="margin-top:6px; display:grid; gap:6px;">
+            ${topTimes.map(t=>{
+              const pct = totalPend ? Math.round((t.pend/totalPend)*100) : 0;
+              return `<div style="display:flex; justify-content:space-between; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;">
+                        <div style="font-weight:900;">${t.k}</div>
+                        <div style="font-weight:1000;">${t.pend} <span style="opacity:.65;">(${pct}%)</span></div>
+                      </div>`;
+            }).join("")}
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div style="font-weight:1000; font-size:12px; color:#0b1220;">Top lojas (por pendências)</div>
+          <div style="margin-top:6px; display:grid; gap:6px;">
+            ${topLojas.map(l=>{
+              const pct = totalPend ? Math.round((l.pend/totalPend)*100) : 0;
+              return `<div style="display:flex; justify-content:space-between; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;">
+                        <div style="font-weight:900;">Loja ${l.k}</div>
+                        <div style="font-weight:1000;">${l.pend} <span style="opacity:.65;">(${pct}%)</span></div>
+                      </div>`;
+            }).join("")}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px;">
+      <div style="font-weight:1000; font-size:14px;">Categorias (valor e participação)</div>
+      <div style="margin-top:8px; display:grid; gap:6px;">
+        ${topCats.map(c=>{
+          const pctV = totalValor ? Math.round((c.valor/totalValor)*100) : 0;
+          return `<div style="display:flex; justify-content:space-between; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;">
+                    <div style="font-weight:900;">${c.k}</div>
+                    <div style="font-weight:1000;">${fmtBRL(c.valor)} <span style="opacity:.65;">(${pctV}%)</span></div>
+                  </div>`;
+        }).join("")}
+      </div>
+      <div style="margin-top:10px; font-size:12px; color:#334155; font-weight:800;">
+        Observação: esta análise é calculada 100% a partir da BaseClara e respeita os filtros ativos.
+      </div>
+    </div>
+  `;
 }
 
-window.vektorResumoCicloShowTooltipForLoja = function (loja, anchorEl) {
-  const tp = document.getElementById("cicloResumoTooltip");
-  const title = document.getElementById("cicloResumoTooltipTitle");
-  const sub = document.getElementById("cicloResumoTooltipSub");
-  const loading = document.getElementById("cicloResumoTooltipLoading");
-  const err = document.getElementById("cicloResumoTooltipErr");
-  const content = document.getElementById("cicloResumoTooltipContent");
+function vektorResumoCicloOpenAI_(){
+  const bg = document.getElementById("cicloResumoAI");
+  const body = document.getElementById("cicloResumoAIBody");
+  if (!bg || !body) return;
+  body.innerHTML = vektorResumoCicloBuildAI_();
+  bg.style.display = "block";
+}
 
-  if (!tp) return;
+function vektorResumoCicloCloseAI_(){
+  const bg = document.getElementById("cicloResumoAI");
+  if (bg) bg.style.display = "none";
+}
 
-  if (title) title.textContent = "🏬 Loja " + (loja || "—") + " — transações pendentes";
-  if (sub) sub.textContent = "Detalhamento do ciclo atual (clique fora para fechar)";
-  if (content) content.innerHTML = "";
-  if (err) { err.style.display = "none"; err.textContent = ""; }
-  if (loading) loading.style.display = "block";
+// bind 1x (chame depois que a página existir no DOM)
+(function bindResumoCicloAI_(){
+  try{
+    const btn = document.getElementById("cicloResumo_aiBtn");
+    const close = document.getElementById("cicloResumoAIClose");
+    const bg = document.getElementById("cicloResumoAI");
 
-  // ✅ centraliza no meio da tela (ignora anchor)
-    tp.style.left = "50%";
-    tp.style.top = "18vh";
-    tp.style.transform = "translateX(-50%)";
-    tp.style.display = "block";
+    if (btn && !btn.__bindAI){
+      btn.__bindAI = true;
+      btn.addEventListener("click", vektorResumoCicloOpenAI_);
+    }
+    if (close && !close.__bindAI){
+      close.__bindAI = true;
+      close.addEventListener("click", vektorResumoCicloCloseAI_);
+    }
+    if (bg && !bg.__bindAI){
+      bg.__bindAI = true;
+      bg.addEventListener("mousedown", function(ev){
+        if (ev.target === bg) vektorResumoCicloCloseAI_();
+      });
+      document.addEventListener("keydown", function(ev){
+        if (ev.key === "Escape") vektorResumoCicloCloseAI_();
+      });
+    }
+  } catch(_) {}
+})();
 
-  // fecha ao clicar fora
-  if (!tp.__bindOutside) {
-    tp.__bindOutside = true;
-    document.addEventListener("mousedown", function (ev) {
-      const x = document.getElementById("cicloResumoTooltip");
-      if (!x || x.style.display === "none") return;
-      if (!x.contains(ev.target)) x.style.display = "none";
-    });
-    document.addEventListener("keydown", function (ev) {
-      if (ev.key === "Escape") window.vektorResumoCicloHideTooltip();
-    });
-  }
-
-  google.script.run
-    .withSuccessHandler(function (res) {
-      if (loading) loading.style.display = "none";
-      if (!res || !res.ok) {
-        if (err) {
-          err.style.display = "block";
-          err.textContent = (res && res.error) ? res.error : "Falha ao carregar detalhes.";
-        }
-        return;
-      }
-
-      const rows = Array.isArray(res.rows) ? res.rows : [];
-      if (!rows.length) {
-        if (content) content.innerHTML = "<div style='color:#334155;font-weight:900;'>Nenhuma transação pendente encontrada para esta loja no ciclo.</div>";
-        return;
-      }
-
-      const html = `
-        <div style="overflow:auto; max-height:44vh; border:1px solid #e2e8f0; border-radius:12px;">
-          <table>
-            <thead>
-              <tr>
-                <th>Data</th>
-                <th style="text-align:right;">Valor</th>
-                <th>Categoria</th>
-                <th>Pendências</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows.map(r => `
-                <tr>
-                  <td>${r.dataTxt || "—"}</td>
-                  <td style="text-align:right; white-space:nowrap;">${r.valorTxt || "—"}</td>
-                  <td>${(r.categoria || "—")}</td>
-                  <td>${(r.pendencias || "—")}</td>
-                </tr>
-              `).join("")}
-            </tbody>
-          </table>
-        </div>
-      `;
-      if (content) content.innerHTML = html;
-    })
-    .withFailureHandler(function () {
-      if (loading) loading.style.display = "none";
-      if (err) {
-        err.style.display = "block";
-        err.textContent = "Erro no backend ao buscar detalhes.";
-      }
-    })
-    .getResumoCicloPendenciasDetalheLojaResumo(loja);
-};
-
-// ✅ 1.3 — CENTRALIZAR TOOLTIP DO TIME + aceitar res.itens OU res.rows (e normalizar campos)
-window.vektorResumoCicloShowTooltipForTime = function (time, anchorEl) {
-  const tp = document.getElementById("cicloResumoTooltip");
-  const title = document.getElementById("cicloResumoTooltipTitle");
-  const sub = document.getElementById("cicloResumoTooltipSub");
-  const loading = document.getElementById("cicloResumoTooltipLoading");
-  const err = document.getElementById("cicloResumoTooltipErr");
-  const content = document.getElementById("cicloResumoTooltipContent");
-
-  if (!tp) return;
-
-  if (title) title.textContent = `Time: ${time}`;
-  if (sub) sub.textContent = "Detalhamento das transações pendentes (todas as lojas do time)";
-  if (err) { err.style.display = "none"; err.textContent = ""; }
-  if (content) content.innerHTML = "";
-  if (loading) loading.style.display = "block";
-
-  // ✅ centraliza no meio da tela (ignorando anchor)
-  tp.style.left = "50%";
-  tp.style.top = "18vh";
-  tp.style.transform = "translateX(-50%)";
-  tp.style.display = "block";
-
-  google.script.run
-    .withSuccessHandler(function(res){
-      if (loading) loading.style.display = "none";
-
-      if (!res || !res.ok) {
-        if (err) { err.style.display = "block"; err.textContent = (res && res.error) ? res.error : "Falha ao carregar detalhes do time."; }
-        return;
-      }
-
-      // ✅ aceita backend em res.itens OU res.rows
-      const itens = Array.isArray(res.itens) ? res.itens : (Array.isArray(res.rows) ? res.rows : []);
-      if (!itens.length) {
-        if (content) content.innerHTML = "<div style='font-weight:900; color:#334155;'>Sem transações pendentes para este time.</div>";
-        return;
-      }
-
-      if (content) {
-        content.innerHTML = itens.map(it => {
-          const loja = it.loja || it.lojaNum || it.loja_num || "";
-          const data = it.data || it.dataTxt || it.data_transacao || "—";
-          const cat  = it.categoria || it.categoriaCompra || "—";
-          const pend = it.pendenciasTxt || it.pendencias || it.pendencia || "—";
-          const val  = it.valorFmt || it.valorTxt || it.valor || "—";
-
-          return `
-            <div style="display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid rgba(181,255,32,0.18);">
-              <div style="min-width:0;">
-                <div style="font-weight:900;">${loja ? ("Loja " + loja + " • ") : ""}${data}</div>
-                <div style="font-size:12px; opacity:0.9;">${cat}</div>
-                <div style="margin-top:6px; font-size:12px; color:#0f172a; font-weight:800">
-                  ${pend}
-                </div>
-              </div>
-              <div style="font-weight:1000; white-space:nowrap;">${val}</div>
-            </div>
-          `;
-        }).join("");
-      }
-    })
-    .withFailureHandler(function(e){
-      if (loading) loading.style.display = "none";
-      if (err) { err.style.display = "block"; err.textContent = (e && e.message) ? e.message : String(e); }
-    })
-    .getResumoCicloPendenciasDetalheTime(time);
-};
 
 // estado local da página
 window.__envPend = {
@@ -4463,31 +4353,36 @@ window.vektorEnvPendLojasPopupClose_ = function(){
   } catch(_) {}
 };
 
-window.vektorEnvPendRenderLojasChart_ = function(){
+window.vektorEnvPendRenderLojasChart_ = function () {
   const canvas = document.getElementById("envPendLojasChart");
   if (!canvas) return;
 
   const resumo = (window.__envPend && window.__envPend.resumo) ? window.__envPend.resumo : {};
   const arr = Array.isArray(resumo.lojasValor) ? resumo.lojasValor : [];
 
-    // ✅ filtro por Time (usa arr com {lojaKey, valor, time})
+  // ✅ filtro por Time (usa arr com {lojaKey, valor, time})
   const sel = document.getElementById("envPendLojasTimeFilter");
 
   // popula opções 1x (ou quando mudar o conjunto)
   try {
     if (sel && !sel.__filled) {
-      const times = Array.from(new Set(arr.map(x => String(x.time || "—").trim()).filter(Boolean)))
-        .sort((a,b) => a.localeCompare(b));
+      const times = Array.from(
+        new Set(arr.map(x => String(x.time || "—").trim()).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b));
+
       // mantém primeira opção "Todos" e repopula
-      sel.innerHTML = "<option value=''>Todos</option>" + times.map(t => `<option value="${t.replace(/"/g,"&quot;")}">${t}</option>`).join("");
+      sel.innerHTML =
+        "<option value=''>Todos</option>" +
+        times.map(t => `<option value="${t.replace(/"/g, "&quot;")}">${t}</option>`).join("");
+
       sel.__filled = true;
 
       // onchange -> redesenha
-      sel.onchange = function() {
+      sel.onchange = function () {
         window.vektorEnvPendRenderLojasChart_();
       };
     }
-  } catch(_) {}
+  } catch (_) {}
 
   const timeSel = (sel && typeof sel.value === "string") ? sel.value : "";
   const arrFiltrado = timeSel ? arr.filter(x => String(x.time || "—").trim() === timeSel) : arr;
@@ -4498,16 +4393,15 @@ window.vektorEnvPendRenderLojasChart_ = function(){
   const maxV = values.reduce((m, v) => Math.max(m, Number(v) || 0), 0);
   const suggestedMaxX = maxV ? (maxV * 1.12) : 0; // 12% de folga pro rótulo caber
 
-
   // altura dinâmica (para permitir MUITAS lojas com scroll)
-  const rowH = 22;          // “grossura” por barra
+  const rowH = 22; // “grossura” por barra
   const topPad = 14;
   const minH = 260;
   const desiredH = topPad + labels.length * rowH;
   canvas.height = Math.max(minH, desiredH);
 
   // formata BRL
-  const fmtBRL = (n) => (Number(n)||0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+  const fmtBRL = (n) => (Number(n) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   // destroy antigo
   try {
@@ -4515,71 +4409,70 @@ window.vektorEnvPendRenderLojasChart_ = function(){
       window.__envPend.__lojasChart.destroy();
       window.__envPend.__lojasChart = null;
     }
-  } catch(_) {}
+  } catch (_) {}
 
   const ctx = canvas.getContext("2d");
 
-  // Chart.js horizontal bar
-try {
-  if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
-    Chart.register(ChartDataLabels);
-  }
-} catch (_) {}
+  // Chart.js + DataLabels
+  try {
+    if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
+      Chart.register(ChartDataLabels);
+    }
+  } catch (_) {}
 
-window.__envPend.__lojasChart = new Chart(ctx, {
-  type: "bar",
-  data: {
-    labels: labels,
-    datasets: [{
-      label: "Valor pendente (R$)",
-      data: values,
-      backgroundColor: "#005E27",
-      borderRadius: 10,
-      categoryPercentage: 0.75,
-      barPercentage: 0.85
-    }]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    indexAxis: "y",
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        callbacks: {
-          label: function (context) {
-            return " " + fmtBRL(context.parsed.x);
+  window.__envPend.__lojasChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Valor pendente (R$)",
+        data: values,
+        backgroundColor: "#005E27",
+        borderRadius: 10,
+        categoryPercentage: 0.75,
+        barPercentage: 0.85
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: "y",
+
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              return " " + fmtBRL(context.parsed.x);
+            }
           }
-        }
-      },
-      datalabels: {
+        },
+        datalabels: {
           color: "#0f172a",
           anchor: "end",
           align: "right",
           clamp: true,
           clip: false,
-          formatter: function(v){ return fmtBRL(v); },
+          formatter: function (v) { return fmtBRL(v); },
           font: { weight: "700", size: 11 }
         }
-      },
+      }, // ✅ vírgula correta aqui (fecha plugins)
 
-    layout: { padding: { right: 120, left: 10, top: 10, bottom: 10 } },
+      layout: { padding: { right: 120, left: 10, top: 10, bottom: 10 } },
 
-    scales: {
-      x: {
+      scales: {
+        x: {
           suggestedMax: suggestedMaxX,
           ticks: {
-            callback: function(v){ return fmtBRL(v); }
+            callback: function (v) { return fmtBRL(v); }
           }
         },
-      y: {
-        ticks: {
-          autoSkip: false
+        y: {
+          ticks: { autoSkip: false }
         }
       }
     }
-  }
-});
+  });
 };
 
 window.vektorEnvPendLojasPopupOpen_ = function(){
@@ -7319,15 +7212,37 @@ function vektorResumoCicloNorm_(s){
 }
 
 function vektorResumoCicloGetRows_(res){
-  const rows = (res && Array.isArray(res.rows)) ? res.rows : [];
-  // garante shape
-  return rows.map(r => ({
-    loja: String(r.loja || ""),
-    time: String(r.time || "N/D"),
-    qtde: Number(r.qtde || 0),
-    txCount: Number((r.qtdeTransacoes != null ? r.qtdeTransacoes : r.txCount) || 0),
-    valor: Number(r.valor || 0)
-  }));
+  // 1) compat: se vier rows pronto, usa
+  if (res && Array.isArray(res.rows) && res.rows.length) {
+    return res.rows.map(r => ({
+      loja: String(r.loja || ""),
+      time: String(r.time || "N/D"),
+      qtde: Number(r.qtde || 0),
+      txCount: Number((r.txCount != null ? r.txCount : r.qtdeTransacoes) || 0),
+      valor: Number(r.valor || 0)
+    }));
+  }
+
+  // 2) BaseClara-only: agrega a partir de tx
+  const tx = (res && Array.isArray(res.tx)) ? res.tx : [];
+  const byLoja = {}; // loja -> agg
+
+  tx.forEach(t => {
+    const loja = String(t.loja || "");
+    if (!loja) return;
+    const time = String(t.time || "N/D");
+    const valor = Number(t.valor || 0);
+    const pend = Number((t.pendNF||0) + (t.pendEtiqueta||0) + (t.pendDesc||0));
+
+    if (!byLoja[loja]) byLoja[loja] = { loja, time, qtde:0, txCount:0, valor:0 };
+    byLoja[loja].qtde += pend;      // “Qtde de pendências” = soma de pendências nas transações
+    byLoja[loja].txCount += 1;      // nº de transações pendentes
+    byLoja[loja].valor += valor;    // valor pendente somado
+    // se time variar (não deveria), mantém o último
+    byLoja[loja].time = time;
+  });
+
+  return Object.keys(byLoja).map(k => byLoja[k]);
 }
 
 function vektorResumoCicloBuildOptions_(selectEl, values, allLabel){
