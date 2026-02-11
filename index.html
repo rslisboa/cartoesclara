@@ -3795,6 +3795,9 @@ window.vektorLoadResumoCiclo = function (force) {
     const lojaNow = selLoja ? (selLoja.value || "") : "";
     if (lojaNow) tx = tx.filter(r => String(r.loja || "") === lojaNow);
 
+    // ✅ fonte única do recorte atual (IA usa isso)
+      window.__cicloResumoTxFiltered = tx;
+
     // 4) recalcula cards (consistente com filtros)
     const lojasSet = {};
     let totalPend = 0;
@@ -4088,7 +4091,7 @@ function vektorResumoCicloBuildAI_(data, opts){
 
     if (r.pendNF) nf++;
     if (r.pendEtiqueta) etiq++;
-    if (r.pendDescricao) desc++;
+    if (r.pendDesc) desc++;
   }
 
   const topN = (obj, n) =>
@@ -4252,38 +4255,6 @@ try{
     });
   }
 } catch(_){}
-
-function vektorResumoCicloCloseAI_(){
-  const bg = document.getElementById("cicloResumoAI");
-  if (bg) bg.style.display = "none";
-}
-
-// bind 1x (chame depois que a página existir no DOM)
-(function bindResumoCicloAI_(){
-  try{
-    const btn = document.getElementById("cicloResumo_aiBtn");
-    const close = document.getElementById("cicloResumoAIClose");
-    const bg = document.getElementById("cicloResumoAI");
-
-    if (btn && !btn.__bindAI){
-      btn.__bindAI = true;
-      btn.addEventListener("click", vektorResumoCicloOpenAI_);
-    }
-    if (close && !close.__bindAI){
-      close.__bindAI = true;
-      close.addEventListener("click", vektorResumoCicloCloseAI_);
-    }
-    if (bg && !bg.__bindAI){
-      bg.__bindAI = true;
-      bg.addEventListener("mousedown", function(ev){
-        if (ev.target === bg) vektorResumoCicloCloseAI_();
-      });
-      document.addEventListener("keydown", function(ev){
-        if (ev.key === "Escape") vektorResumoCicloCloseAI_();
-      });
-    }
-  } catch(_) {}
-})();
 
 
 // estado local da página
@@ -7365,7 +7336,7 @@ function vektorResumoCicloApply_(){
   const time = (selTime && selTime.value) ? selTime.value : "";
   const loja = (selLoja && selLoja.value) ? selLoja.value : "";
 
-    // ✅ recorte detalhado (BaseClara) para tabela + IA
+  // recorte detalhado (BaseClara) para tabela + IA
   const dtIniEl = document.getElementById("cicloResumo_dtIni");
   const dtFimEl = document.getElementById("cicloResumo_dtFim");
   const dtIni = dtIniEl && dtIniEl.value ? String(dtIniEl.value) : "";
@@ -7379,36 +7350,56 @@ function vektorResumoCicloApply_(){
     return Object.assign({}, t, { dataISO });
   });
 
-  // filtra por período (se informado)
+  // filtra por período (se informado) — ✅ mais rígido
   tx = tx.filter(t => {
     const d = String(t.dataISO || "");
-    if (dtIni && d && d < dtIni) return false;
-    if (dtFim && d && d > dtFim) return false;
+    if ((dtIni || dtFim) && !d) return false; // se tem filtro e a tx não tem data, descarta
+    if (dtIni && d < dtIni) return false;
+    if (dtFim && d > dtFim) return false;
     return true;
   });
 
   if (time) tx = tx.filter(t => String(t.time || "N/D") === String(time));
   if (loja) tx = tx.filter(t => String(t.loja || "") === String(loja));
 
-  // ✅ fonte única do recorte atual (IA usa isso)
+  // fonte única do recorte atual (IA usa isso)
   window.__cicloResumoTxFiltered = tx;
 
   const allRows = vektorResumoCicloGetRows_(res);
 
-  // 1) opções de TIME (sempre a partir do dataset total)
+  // opções de TIME (sempre a partir do dataset total)
   const times = Array.from(new Set(allRows.map(r => r.time))).sort((a,b)=>a.localeCompare(b,"pt-BR"));
   vektorResumoCicloBuildOptions_(selTime, times, "Todos");
 
-  // 2) opções de LOJA dependem do time selecionado
+  // opções de LOJA dependem do time selecionado
   const rowsByTime = time ? allRows.filter(r => r.time === time) : allRows;
   const lojas = Array.from(new Set(rowsByTime.map(r => r.loja))).sort((a,b)=>a.localeCompare(b,"pt-BR"));
   vektorResumoCicloBuildOptions_(selLoja, lojas, "Todas");
 
-  // 3) aplica filtros finais (time + loja)
+  // aplica filtros finais (time + loja)
   let filtered = rowsByTime;
   if (loja) filtered = filtered.filter(r => r.loja === loja);
 
-  // 4) recalcula cards + top
+  // ✅ FALLBACK: se backend não mandou tx detalhado, mas existe pendência agregada
+  // Evita a IA mentir "não existem transações pendentes" quando a página tem dados.
+  if ((!window.__cicloResumoTxFiltered || window.__cicloResumoTxFiltered.length === 0) && filtered && filtered.length) {
+    const temPendAgregada = filtered.some(r => Number(r.qtde || 0) > 0);
+    if (temPendAgregada) {
+      window.__cicloResumoTxFiltered = filtered.map(r => ({
+        loja: r.loja,
+        time: r.time,
+        dataISO: "",           // não existe no agregado
+        estabelecimento: "",
+        valor: Number(r.valor || 0),
+        categoria: "",
+        pendTotal: Number(r.qtde || 0),
+        txCount: Number(r.txCount || 0),
+        _agregado: true
+      }));
+    }
+  }
+
+  // recalcula cards + top
   const totalLojas = new Set(filtered.map(r => r.loja)).size;
   const totalPend = filtered.reduce((acc,r)=>acc + (Number(r.qtde)||0), 0);
   const totalValor = filtered.reduce((acc,r)=>acc + (Number(r.valor)||0), 0);
@@ -7432,7 +7423,6 @@ function vektorResumoCicloApply_(){
   const tbody = document.getElementById("cicloResumo_tbody");
   if (tbody) {
     if (!top.length) {
-      // ✅ agora são 5 colunas
       tbody.innerHTML = `<tr><td colspan="5" style="padding:10px;color:#0f172a;font-weight:900;">Nenhum resultado para o filtro.</td></tr>`;
     } else {
       tbody.innerHTML = top.map(r => `
@@ -7444,7 +7434,6 @@ function vektorResumoCicloApply_(){
             ${Number(r.qtde||0)}
           </td>
 
-          <!-- ✅ NOVO: Qtde total de transações -->
           <td style="padding:8px;border-top:1px solid rgba(148,163,184,0.12);text-align:right;white-space:nowrap;">
             ${Number(r.txCount||0)}
           </td>
