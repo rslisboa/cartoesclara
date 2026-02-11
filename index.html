@@ -682,6 +682,16 @@ display: none;
   display: none !important;
 }
 
+#vektorMenuHeader{
+  position: relative;
+}
+
+#vektorMenuTitle{
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -896,7 +906,7 @@ display: none;
   id="navChatBtn"
   type="button"
   onclick="window.vektorShowChatView()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
 >
   <span class="vektor-nav-ico" aria-hidden="true">💬</span>
   <span class="vektor-nav-label">Chat</span>
@@ -905,7 +915,7 @@ display: none;
   <button
   type="button"
   onclick="openStatusVektorModal()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
 >
   <span class="vektor-nav-ico" aria-hidden="true">🟢</span>
   <span class="vektor-nav-label">Estado Operacional</span>
@@ -914,7 +924,7 @@ display: none;
 <button
   type="button"
   onclick="window.vektorOpenResumoCiclo()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
 >
   <span class="vektor-nav-ico" aria-hidden="true">📌</span>
   <span class="vektor-nav-label">Resumo do ciclo</span>
@@ -931,7 +941,7 @@ display: none;
 <button
   type="button"
   onclick="window.vektorOpenFluxograma()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
 >
   <span class="vektor-nav-ico" aria-hidden="true">🧩</span>
   <span class="vektor-nav-label">Fluxograma</span>
@@ -940,7 +950,7 @@ display: none;
 <button
   type="button"
   onclick="window.vektorOpenMyAlerts()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
 >
   <span class="vektor-nav-ico" aria-hidden="true">⏱️</span>
   <span class="vektor-nav-label">Alertas Programados</span>
@@ -952,7 +962,7 @@ display: none;
   <button
     type="button"
     onclick="openAlertasRecentesModal()"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">📋</span>
     <span class="vektor-nav-label">Disparo de Ocorrências</span> 
@@ -962,7 +972,7 @@ display: none;
   <button
     type="button"
     onclick="window.vektorOpenRadar('7d')"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">📈</span>
     <span class="vektor-nav-label">Radar de Irregularidade</span>
@@ -971,7 +981,7 @@ display: none;
   <button
   type="button"
   onclick="window.vektorOpenEnvioPendencias()"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
 >
     <span class="vektor-nav-ico" aria-hidden="true">📩</span>
     <span class="vektor-nav-label">Envio de Pendências</span>
@@ -3176,6 +3186,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function apply_(collapsed){
       shell.classList.toggle("sidebar-collapsed", !!collapsed);
+      const icon = document.getElementById("vektorSidebarToggleIcon");
+        if (icon) {
+          icon.textContent = collapsed ? "⫸" : "⫷";
+        }
     }
 
     // aplica estado salvo
