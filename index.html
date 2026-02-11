@@ -532,18 +532,31 @@ display: none;
 
 #cicloResumoTable thead th{
   position: sticky;
+  text-align:center !important;
+  vertical-align:middle !important;
   top: 0;
   z-index: 2;
   background: #123a63;
   color: #ffffff;
-  font-size: 14px;               /* +1 ponto */
+  font-size: 13px;               /* +1 ponto */
   border-right: 2px double #005E27;
   border-bottom: 2px double #005E27;
   padding: 10px 10px;
 }
 
+#cicloResumoTable thead th[data-sort]::after{
+  content:" ⇅";
+  opacity:0;
+  transition: opacity .15s ease;
+  margin-left:6px;
+}
+
+#cicloResumoTable thead th[data-sort]:hover::after{
+  opacity:0.75;
+}
+
 #cicloResumoTable tbody td{
-  font-size: 14px;               /* +1 ponto */
+  font-size: 12px;               /* +1 ponto */
   border-right: 2px double #111;
   border-bottom: 2px double #111;
   padding: 10px 10px;
@@ -1015,7 +1028,7 @@ display: none;
             <div style="font-size:18px;font-weight:1000;color:#fff;line-height:1.1;">Resumo do ciclo</div>
             <div id="cicloResumoSubTitle"
                  style="margin-top:5px;font-size:12px;font-weight:800;color:rgba(226,232,240,0.8);">
-              Consolidado das pendências no ciclo atual
+              Consolidado das pendências no ciclo atual, considerando transações com status <b>Autorizada</b>.
             </div>
           </div>
 
@@ -1056,13 +1069,13 @@ display: none;
 
             <button type="button"
                     onclick="window.vektorResumoCicloLimparFiltros && window.vektorResumoCicloLimparFiltros()"
-                    style="height:34px;border-radius:12px;padding:0 14px;background:transparent;color:#B5FF20;border:1px solid rgba(181,255,32,0.45);font-weight:1000;cursor:pointer;">
+                    style="height:34px;border-radius:12px;padding:0 14px;background:transparent;color:#B5FF20;border:1px solid rgba(181,255,32,0.45);font-weight:1000; font-size: 12px; cursor:pointer;">
               Limpar
             </button>
 
             <button type="button"
                     onclick="window.vektorLoadResumoCiclo && window.vektorLoadResumoCiclo(true)"
-                    style="height:34px;border-radius:12px;padding:0 14px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.18);font-weight:1000;cursor:pointer;">
+                    style="height:34px;border-radius:12px;padding:0 14px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.18);font-weight:1000; font-size: 12px; cursor:pointer;">
               Atualizar
             </button>
 
@@ -1074,6 +1087,7 @@ display: none;
                             border:1px solid rgba(181,255,32,0.55);
                             background: linear-gradient(180deg, rgba(22,163,74,0.55), rgba(0,94,39,0.55));
                             font-weight:1000;
+                            font-size: 12px;
                             color:#ffffff;
                             box-shadow:0 10px 22px rgba(0,0,0,0.18);
                             cursor:pointer;
@@ -1128,13 +1142,18 @@ display: none;
           </div>
 
           <!-- Tabela (transações detalhadas / filtradas) -->
-          <div style="margin-top:14px; background:#ffffff; border:2px solid #000; border-radius:14px; padding:12px;">
-            <div style="color:#0f172a; font-weight:1000; font-size:14px;">
-              Transações pendentes (detalhado)
-              <span style="font-weight:900; font-size:13px; color:#334155;">
-                — ordene clicando no cabeçalho
-              </span>
+         <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 0 8px 0;">
+            <div style="font-weight:1000; font-size:13px;">
+              Transações pendentes (detalhado) — ordene clicando no cabeçalho
             </div>
+
+            <button id="cicloResumo_btnCsv"
+              style="border:none; cursor:pointer; border-radius:10px; padding:6px 10px; font-weight:900;
+                    font-size:12px; background:#0f172a; color:#fff; border:1px solid rgba(148,163,184,0.35);">
+              Exportar CSV
+            </button>
+
+          </div>
 
             <!-- wrapper com scroll vertical + horizontal -->
             <div id="cicloResumoTableWrap"
@@ -3872,6 +3891,8 @@ window.vektorLoadResumoCiclo = function (force) {
 
     tx.sort(cmp);
 
+    window.__cicloResumoTxExport = tx.slice();
+
     // 6) render tabela (detalhada)
     if (!tbody) return;
 
@@ -3905,6 +3926,57 @@ window.vektorLoadResumoCiclo = function (force) {
     // datas: mantém como estão (ou zera se você quiser)
     applyFiltros_();
   };
+
+  function exportCsv_(rows){
+  rows = Array.isArray(rows) ? rows : [];
+  if (!rows.length) {
+    alert("Sem dados para exportar no filtro atual.");
+    return;
+  }
+
+  const header = ["Loja", "Time", "Data da transação", "Estabelecimento", "Valor", "Categoria", "Pendências"];
+
+  const esc = (v) => {
+    const s = String(v ?? "");
+    if (/[",\n;]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+    return s;
+  };
+
+  const lines = [];
+  lines.push(header.join(";"));
+
+  rows.forEach(r => {
+    lines.push([
+      esc(r.loja || "—"),
+      esc(r.time || "N/D"),
+      esc(r.dataBR || r.dataTxt || "—"),
+      esc(r.estabelecimento || "—"),
+      esc(r.valorBRL || (typeof r.valor === "number" ? r.valor.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : (r.valor || ""))),
+      esc(r.categoria || "—"),
+      esc(r.pendencias || "—")
+    ].join(";"));
+  });
+
+  const csv = "\uFEFF" + lines.join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+
+  const dtIniEl = document.getElementById("cicloResumo_dtIni");
+  const dtFimEl = document.getElementById("cicloResumo_dtFim");
+  const dtIni = dtIniEl && dtIniEl.value ? dtIniEl.value : "";
+  const dtFim = dtFimEl && dtFimEl.value ? dtFimEl.value : "";
+
+  const fileName = `resumo_ciclo_pendencias_${dtIni || "ini"}_${dtFim || "fim"}.csv`;
+
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(a.href);
+    a.remove();
+  }, 0);
+}
 
   google.script.run
     .withSuccessHandler(function (res) {
@@ -3944,6 +4016,18 @@ window.vektorLoadResumoCiclo = function (force) {
 
       // ✅ guarda dataset inteiro para filtros
       window.__cicloResumoData = res;
+
+      // ✅ bind botão CSV (1x)
+        try {
+          const btnCsv = document.getElementById("cicloResumo_btnCsv");
+          if (btnCsv && !btnCsv.__bindCsv) {
+            btnCsv.__bindCsv = true;
+            btnCsv.addEventListener("click", function(){
+              const rows = Array.isArray(window.__cicloResumoTxExport) ? window.__cicloResumoTxExport : [];
+              exportCsv_(rows);
+            });
+          }
+        } catch(_) {}
 
       // cabeçalho (período)
       const sub = document.getElementById("cicloResumoSubTitle");
@@ -4080,6 +4164,18 @@ function vektorResumoCicloBuildAI_(data, opts){
   const byCatCompra = {}; // categoria da compra
   let nf = 0, etiq = 0, desc = 0;
 
+  // ✅ NOVO: datas com mais pendências
+  const byData = {}; // "dd/MM/yyyy" -> totalPendenciasNoDia
+
+  const getPendCount = (r) => {
+    // preferir pendCount se existir; senão soma flags
+    if (r && r.pendCount != null && isFinite(Number(r.pendCount))) return Number(r.pendCount) || 0;
+    const a = Number(r.pendNF || 0) + Number(r.pendEtiqueta || 0) + Number(r.pendDesc || 0);
+    // fallback extra (caso algum nome antigo apareça)
+    const b = Number(r.pendDescricao || 0);
+    return a + b;
+  };
+
   for (const r of tx){
     const time = (r.time || "Sem time").trim();
     const loja = (r.loja || r.lojaNum || "Sem loja").toString().trim();
@@ -4088,6 +4184,9 @@ function vektorResumoCicloBuildAI_(data, opts){
     byTime[time] = (byTime[time] || 0) + 1;
     byLoja[loja] = (byLoja[loja] || 0) + 1;
     byCatCompra[cat] = (byCatCompra[cat] || 0) + 1;
+    
+    const dataKey = String((r.dataBR || r.dataTxt || "")).trim() || "Sem data";
+    byData[dataKey] = (byData[dataKey] || 0) + getPendCount(r);
 
     if (r.pendNF) nf++;
     if (r.pendEtiqueta) etiq++;
@@ -4137,6 +4236,15 @@ function vektorResumoCicloBuildAI_(data, opts){
   const topLojasTxt = topLojas.map(([k,v]) => `• ${k}: ${v} (${pct(v,totalTx)}%)`).join("<br/>");
   const topCatsTxt  = topCats.map(([k,v]) => `• ${k}: ${v} (${pct(v,totalTx)}%)`).join("<br/>");
 
+  const topDatas = Object.entries(byData)
+  .filter(([k,v]) => k && k !== "Sem data" && Number(v) > 0)
+  .sort((a,b) => (Number(b[1]) - Number(a[1])))
+  .slice(0, 6);
+
+  const topDatasTxt = topDatas
+  .map(([k,v]) => `• ${k}: <b>${v}</b>`)
+  .join("<br/>");
+
   return `
     <div style="padding:14px 16px;">
       <div style="font-weight:1000; font-size:15px; color:#0f172a;">Leitura do cenário</div>
@@ -4176,10 +4284,19 @@ function vektorResumoCicloBuildAI_(data, opts){
         </div>
       </div>
 
-      <div style="margin-top:12px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; padding:12px;">
-        <div style="font-weight:1000; color:#0f172a;">Categorias de compra mais envolvidas</div>
-        <div style="margin-top:8px; font-size:13px; color:#334155; line-height:1.5;">
-          ${topCatsTxt || "Sem dados de categoria no recorte."}
+      <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; padding:12px;">
+          <div style="font-weight:1000; color:#0f172a;">Categorias de compra mais envolvidas</div>
+          <div style="margin-top:8px; font-size:13px; color:#334155; line-height:1.5;">
+            ${topCatsTxt || "Sem dados de categoria no recorte."}
+          </div>
+        </div>
+
+        <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; padding:12px;">
+          <div style="font-weight:1000; color:#0f172a;">Datas com mais pendências</div>
+          <div style="margin-top:8px; font-size:13px; color:#334155; line-height:1.5;">
+            ${topDatasTxt || "Sem dados de data no recorte."}
+          </div>
         </div>
       </div>
 
