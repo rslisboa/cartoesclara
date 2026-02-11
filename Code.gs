@@ -12448,18 +12448,18 @@ function getResumoCicloPendencias() {
   try {
     // ✅ cache curto (2 min) — evita “demorar pra carregar” em cliques/refresh
     var cache = CacheService.getScriptCache();
-    var cacheKey = "RC_BASECLARA_" + getCicloKey06a05_(); // helper já existe no seu projeto :contentReference[oaicite:2]{index=2}
+    var cacheKey = "RC_BASECLARA_" + getCicloKey06a05_();
     var cached = cache.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
     var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
 
     // ✅ ciclo completo 06→05 (pra limitar o date-picker no front)
-    var pc = getPeriodoCicloClaraCompleto_(); // helper existe no seu projeto :contentReference[oaicite:3]{index=3}
+    var pc = getPeriodoCicloClaraCompleto_();
     var iniCiclo = pc.inicio;
     var fimCiclo = pc.fim;
 
-    // mapa Loja -> Time (já existe no projeto; você usa em outras rotinas)
+    // mapa Loja -> Time
     var mapaTime = construirMapaLojaParaTime_();
 
     var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
@@ -12469,7 +12469,14 @@ function getResumoCicloPendencias() {
     var lastRow = sh.getLastRow();
     var lastCol = sh.getLastColumn();
     if (lastRow < 2) {
-      var vazio = { ok: true, ciclo: formatPeriodoBR_(iniCiclo, fimCiclo), periodo: formatPeriodoBR_(iniCiclo, new Date()), meta: {}, tx: [], aggs: {} };
+      var vazio = {
+        ok: true,
+        ciclo: formatPeriodoBR_(iniCiclo, fimCiclo),
+        periodo: formatPeriodoBR_(iniCiclo, new Date()),
+        meta: {},
+        tx: [],
+        aggs: {}
+      };
       cache.put(cacheKey, JSON.stringify(vazio), 120);
       return vazio;
     }
@@ -12486,11 +12493,11 @@ function getResumoCicloPendencias() {
       return -1;
     }
 
-    // ===== mapeamento colunas (você pediu “identifique o mapeamento”: está aqui centralizado) =====
+    // ===== mapeamento colunas =====
     var idxDataTrans  = idxOf(["Data da Transação"]);
     var idxValorBRL   = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
     var idxLojaNum    = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
-    var idxEstab      = idxOf(["Transação"]);
+    var idxEstab      = idxOf(["Transação"]); // ✅ correto se BaseClara C = Transação (estabelecimento)
     var idxEtiquetas  = idxOf(["Etiquetas"]);
     var idxRecibo     = idxOf(["Recibo"]);
     var idxDescricao  = idxOf(["Descrição"]);
@@ -12500,6 +12507,7 @@ function getResumoCicloPendencias() {
     if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna de Valor na BaseClara.");
     if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna de Loja na BaseClara.");
 
+    // ✅ Etiqueta/Descrição: sua regra atual (vazio/—/n/a/não/etc)
     function isVazioPend_(v) {
       if (v === null || v === undefined) return true;
       if (typeof v === "boolean") return (v === false);
@@ -12511,13 +12519,19 @@ function getResumoCicloPendencias() {
       return false;
     }
 
+    // ✅ Recibo: SOMENTE "Não" deve ser pendência (exatamente como você pediu)
+    function isPendRecibo_(v) {
+      var s = String(v || "").trim().toLowerCase();
+      return (s === "não" || s === "nao");
+    }
+
     // ===== coletar transações pendentes =====
     var tx = [];
 
     for (var i = 0; i < linhas.length; i++) {
       var r = linhas[i];
 
-      var d = parseDateClara_(r[idxDataTrans]); // você já usa esse parse no projeto
+      var d = parseDateClara_(r[idxDataTrans]); // assume helper já existe no projeto
       if (!d) continue;
 
       // limita dentro do ciclo 06→05 (completo)
@@ -12531,13 +12545,17 @@ function getResumoCicloPendencias() {
       var loja4 = lojaNum.padStart(4, "0");
 
       var timeDaLoja = (mapaTime && (mapaTime[loja4] || mapaTime[lojaNum])) ? (mapaTime[loja4] || mapaTime[lojaNum]) : "N/D";
-      var valor = parseNumberSafe_(r[idxValorBRL]); // helper existe no projeto :contentReference[oaicite:4]{index=4}
+      var valor = parseNumberSafe_(r[idxValorBRL]);
 
       var recibo = (idxRecibo >= 0 ? r[idxRecibo] : "");
       var etiqueta = (idxEtiquetas >= 0 ? r[idxEtiquetas] : "");
       var desc = (idxDescricao >= 0 ? r[idxDescricao] : "");
 
-      var temPendRecibo = isVazioPend_(recibo);
+      // ✅ AQUI ESTAVA O BUG DE REGRA:
+      // Antes: isVazioPend_(recibo) => vazio/—/false viravam pendência
+      // Agora: só "Não"
+      var temPendRecibo = (idxRecibo >= 0) ? isPendRecibo_(recibo) : false;
+
       var temPendEtiqueta = isVazioPend_(etiqueta);
       var temPendDescricao = isVazioPend_(desc);
 
@@ -12566,7 +12584,7 @@ function getResumoCicloPendencias() {
       });
     }
 
-    // ===== agregações para cards + análise =====
+    // ===== agregações =====
     var aggTime = {};
     var aggLoja = {};
     var aggCat  = {};
@@ -12613,13 +12631,8 @@ function getResumoCicloPendencias() {
 
     var resp = {
       ok: true,
-
-      // ciclo completo (06→05) para limitar o date-filter no front
       ciclo: formatPeriodoBR_(iniCiclo, fimCiclo),
-
-      // período “até hoje” só para texto de cabeçalho (igual você já faz hoje)
       periodo: formatPeriodoBR_(iniCiclo, new Date()),
-
       meta: {
         totalPendencias: totalPend,
         totalValor: totalValor,
@@ -12627,15 +12640,10 @@ function getResumoCicloPendencias() {
         pendNF: pendNF,
         pendDesc: pendDesc,
         pendEtiqueta: pendEtiqueta,
-
         topTime: topTime ? { time: topTime.time, pend: topTime.pend, valor: topTime.valor, tx: topTime.tx } : null,
         topLoja: topLoja ? { loja: (topLoja.loja || ""), loja4: (topLoja.loja4 || ""), time: (topLoja.time || "N/D"), pend: topLoja.pend, valor: topLoja.valor, tx: topLoja.tx } : null
       },
-
-      // dataset detalhado (tabela nova + análise)
       tx: tx,
-
-      // agregações (análise)
       aggs: {
         porTime: timesArr,
         porLoja: lojasArr,
@@ -12689,7 +12697,7 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
       return -1;
     }
 
-    // índices (mantém os mesmos nomes que você já usa no detalhe-loja)
+    // índices
     var idxDataTrans = idxOf(["Data da Transação", "Data Transação", "Data"]);
     var idxValorBRL  = idxOf(["Valor em R$", "Valor (R$)", "Valor"]);
     var idxLojaNum   = idxOf(["LojaNum", "Loja", "Código Loja", "cod_estbl", "cod_loja"]);
@@ -12699,7 +12707,7 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
     var idxDescricao = idxOf(["Descrição", "Descricao"]);
     var idxCategoria = idxOf(["Categoria da Compra", "Categoria", "Categoria Compra", "Categoria da Compra (Clara)"]);
 
-    // ✅ NOVO: texto agregado de pendências (quando existir)
+    // texto agregado de pendências (quando existir)
     var idxPendTxt   = idxOf(["Pendências", "Pendencias", "Pendência", "Pendencia"]);
 
     if (idxDataTrans < 0) throw new Error("Não encontrei a coluna de Data na BaseClara.");
@@ -12723,6 +12731,7 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
       return isNaN(d.getTime()) ? null : d;
     }
 
+    // ✅ mantém para Etiquetas/Descrição (pendência costuma ser vazio/"Não"/etc)
     function isVazioPend_(v) {
       if (v === null || v === undefined) return true;
       if (typeof v === "boolean") return (v === false);
@@ -12732,6 +12741,12 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
       if (s === "não" || s === "nao") return true;
       if (s === "false" || s === "0") return true;
       return false;
+    }
+
+    // ✅ NOVO: Recibo só é pendência quando for explicitamente "Não"
+    function isPendRecibo_(v) {
+      var s = String(v || "").trim().toLowerCase();
+      return (s === "não" || s === "nao");
     }
 
     // monta itens
@@ -12757,15 +12772,18 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
       if (d < ini || d > fim) continue;
 
       // regras de pendência
-      var temPendRecibo    = isVazioPend_(idxRecibo >= 0 ? r[idxRecibo] : "");
+      // ✅ Recibo: SOMENTE "Não"
+      var temPendRecibo = (idxRecibo >= 0) ? isPendRecibo_(r[idxRecibo]) : false;
+
+      // ✅ Etiquetas/Descrição: mantém tua heurística atual
       var temPendEtiqueta  = isVazioPend_(idxEtiquetas >= 0 ? r[idxEtiquetas] : "");
       var temPendDescricao = isVazioPend_(idxDescricao >= 0 ? r[idxDescricao] : "");
 
-      // ✅ NOVO: pendência por texto agregado (se coluna existir)
+      // pendência por texto agregado (se coluna existir)
       var pendTxt = (idxPendTxt >= 0) ? String(r[idxPendTxt] || "").trim() : "";
       var temPendTxt = !!pendTxt;
 
-      // ✅ Regra do RESUMO: vale se tiver texto OU uma das 3 pendências clássicas
+      // vale se tiver texto OU uma das 3 pendências clássicas
       if (!(temPendTxt || temPendRecibo || temPendEtiqueta || temPendDescricao)) continue;
 
       var v = Number(r[idxValorBRL] || 0);
