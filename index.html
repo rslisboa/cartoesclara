@@ -455,6 +455,29 @@ display: none;
   display: none;
 }
 
+/* Ícone do calendário */
+#cicloResumoView input[type="date"]::-webkit-calendar-picker-indicator{
+  filter: invert(1) brightness(2) contrast(1.2) !important;
+  opacity: 1 !important;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+/* evita botões extras */
+#cicloResumoView input[type="date"]::-webkit-inner-spin-button,
+#cicloResumoView input[type="date"]::-webkit-clear-button{
+  display: none;
+}
+
+/* ✅ Fundo cinza claro na faixa do filtro de período */
+#cicloResumoView .cicloResumoPeriodoBox{
+  background: #e5e7eb !important;   /* cinza claro */
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 14px !important;
+  padding: 10px 12px !important;
+}
+
 /* =========================
    RESUMO DO CICLO - VISUAL
    ========================= */
@@ -1004,13 +1027,12 @@ display: none;
               <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Período</div>
 
               <!-- ✅ APENAS 1 BLOCO DE CALENDÁRIO (não duplique IDs) -->
-              <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid rgba(226,232,240,0.45); border-radius:12px; background:rgba(2,6,23,0.18);">
-                <span style="font-size:14px; opacity:0.95;">📅</span>
+              <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid rgba(226,232,240,0.45); border-radius:12px; background:rgba(226,232,240,0.85);">
                 <input id="cicloResumo_dtIni" type="date"
-                       style="border:none; outline:none; background:transparent; color:#e2e8f0; font-weight:800; font-size:12px;" />
+                       style="border:none; outline:none; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px 8px; color:#000000; font-weight:800; font-size:12px;" />
                 <span style="opacity:0.65;">—</span>
                 <input id="cicloResumo_dtFim" type="date"
-                       style="border:none; outline:none; background:transparent; color:#e2e8f0; font-weight:800; font-size:12px;" />
+                       style="border:none; outline:none; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px 8px; color:#000000; font-weight:800; font-size:12px;" />
               </div>
             </div>
 
@@ -1044,13 +1066,21 @@ display: none;
               Atualizar
             </button>
 
-                        <button id="cicloResumo_aiBtn" type="button"
-                    style="height:34px;border-radius:12px;padding:0 14px;
-                           border:1px solid rgba(0,94,39,.35);
-                           background:linear-gradient(180deg, rgba(181,255,32,.35), rgba(0,94,39,.10));
-                           font-weight:1000;color:#0b1220;cursor:pointer;white-space:nowrap;">
-              Análise do Ciclo
-            </button>
+                      <button id="cicloResumo_aiBtn" type="button"
+                          style="
+                            height:34px;
+                            padding:0 14px;
+                            border-radius:12px;
+                            border:1px solid rgba(181,255,32,0.55);
+                            background: linear-gradient(180deg, rgba(22,163,74,0.55), rgba(0,94,39,0.55));
+                            font-weight:1000;
+                            color:#ffffff;
+                            box-shadow:0 10px 22px rgba(0,0,0,0.18);
+                            cursor:pointer;
+                            white-space:nowrap;
+                          ">
+                          Análise do Ciclo
+                        </button>
 
           </div>
         </div>
@@ -1166,7 +1196,7 @@ display: none;
                     border:1px solid rgba(148,163,184,0.55);
                     box-shadow:0 22px 60px rgba(0,0,0,0.35);">
           <div style="background:#0b1220; color:#fff; padding:14px 16px; display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-weight:1000;">Análise do Ciclo (IA)</div>
+            <div style="font-weight:1000;">Análise do Ciclo</div>
             <button id="cicloResumoAIClose" type="button"
               style="background:rgba(255,255,255,0.12); padding:8px 12px; border-radius:12px; font-weight:900; color:#fff; border:1px solid rgba(255,255,255,0.18); cursor:pointer;">
               Fechar
@@ -4013,133 +4043,151 @@ window.vektorLoadResumoCiclo = function (force) {
     .getResumoCicloPendencias();
 };
 
-function vektorResumoCicloBuildAI_(){
-  const res = window.__cicloResumoData || {};
-  const txAll = Array.isArray(res.tx) ? res.tx : [];
+function vektorResumoCicloBuildAI_(data, opts){
+  opts = opts || {};
+  const periodoTxt = opts.periodoTxt || "";
+  const filtroTxt  = opts.filtroTxt  || "";
 
-  const selTime = document.getElementById("cicloResumo_selTime");
-  const selLoja = document.getElementById("cicloResumo_selLoja");
-  const dtIniEl = document.getElementById("cicloResumo_dtIni");
-  const dtFimEl = document.getElementById("cicloResumo_dtFim");
+  const tx = (data && Array.isArray(data.tx)) ? data.tx : [];
+  const totalTx = tx.length;
 
-  const timeSel = selTime ? (selTime.value||"") : "";
-  const lojaSel = selLoja ? (selLoja.value||"") : "";
-  const dtIni = dtIniEl && dtIniEl.value ? dtIniEl.value : "";
-  const dtFim = dtFimEl && dtFimEl.value ? dtFimEl.value : "";
-
-  let tx = txAll.filter(r => {
-    const d = String(r.dataISO || r.dataIso || "");
-    if (dtIni && d < dtIni) return false;
-    if (dtFim && d > dtFim) return false;
-    return true;
-  });
-  if (timeSel) tx = tx.filter(r => String(r.time||"") === timeSel);
-  if (lojaSel) tx = tx.filter(r => String(r.loja||"") === lojaSel);
-
-  const fmtBRL = (n)=> (Number(n)||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-
-  const lojasSet = {};
-  let totalPend = 0, totalValor = 0;
-
-  const aggTime = {};
-  const aggLoja = {};
-  const aggCat  = {};
-
-  tx.forEach(r=>{
-    const loja = String(r.loja||"");
-    const time = String(r.time||"N/D");
-    const cat  = String(r.categoria||"—");
-    const pend = Number(r.pendCount||0);
-    const val  = Number(r.valor||0);
-
-    if (loja) lojasSet[loja] = true;
-    totalPend += pend;
-    totalValor += val;
-
-    aggTime[time] = aggTime[time] || { k: time, pend:0, valor:0 };
-    aggTime[time].pend += pend; aggTime[time].valor += val;
-
-    aggLoja[loja] = aggLoja[loja] || { k: loja, pend:0, valor:0 };
-    aggLoja[loja].pend += pend; aggLoja[loja].valor += val;
-
-    aggCat[cat] = aggCat[cat] || { k: cat, pend:0, valor:0 };
-    aggCat[cat].pend += pend; aggCat[cat].valor += val;
-  });
-
-  function topN(obj, n){
-    return Object.keys(obj).map(k=>obj[k]).sort((a,b)=>b.pend-a.pend).slice(0,n);
+  if (!totalTx){
+    return `
+      <div style="padding:14px 16px;">
+        <div style="font-weight:1000; font-size:15px; color:#0f172a;">Leitura do cenário</div>
+        <div style="margin-top:6px; font-size:13px; color:#334155; line-height:1.5;">
+          No recorte atual (${periodoTxt}${filtroTxt ? " • " + filtroTxt : ""}), não existem transações pendentes.
+          Se você esperava ver casos aqui, o problema provavelmente está na carga/consulta do backend (dados não chegando no resumo).
+        </div>
+      </div>
+    `;
   }
 
-  const topTimes = topN(aggTime, 5);
-  const topLojas = topN(aggLoja, 5);
-  const topCats  = Object.keys(aggCat).map(k=>aggCat[k]).sort((a,b)=>b.valor-a.valor).slice(0,6);
+  // helpers
+  const asNum = (v) => (typeof v === "number" && isFinite(v)) ? v : 0;
+  const pct = (a, b) => b ? Math.round((a / b) * 100) : 0;
 
-  const filtrosTxt = [
-    (dtIni && dtFim) ? `Período: <b>${dtIni.split("-").reverse().join("/")}</b> → <b>${dtFim.split("-").reverse().join("/")}</b>` : "",
-    timeSel ? `Time: <b>${timeSel}</b>` : "Time: <b>Todos</b>",
-    lojaSel ? `Loja: <b>${lojaSel}</b>` : ""
-  ].filter(Boolean).join(" • ");
+  // total valor pendente (se existir)
+  let totalValor = 0;
+  for (const r of tx) totalValor += asNum(r.valor);
+
+  // concentração por time / loja
+  const byTime = {};
+  const byLoja = {};
+  const byCatCompra = {}; // categoria da compra
+  let nf = 0, etiq = 0, desc = 0;
+
+  for (const r of tx){
+    const time = (r.time || "Sem time").trim();
+    const loja = (r.loja || r.lojaNum || "Sem loja").toString().trim();
+    const cat  = (r.categoria || r.categoriaCompra || "Sem categoria").trim();
+
+    byTime[time] = (byTime[time] || 0) + 1;
+    byLoja[loja] = (byLoja[loja] || 0) + 1;
+    byCatCompra[cat] = (byCatCompra[cat] || 0) + 1;
+
+    if (r.pendNF) nf++;
+    if (r.pendEtiqueta) etiq++;
+    if (r.pendDescricao) desc++;
+  }
+
+  const topN = (obj, n) =>
+    Object.entries(obj)
+      .sort((a,b) => b[1] - a[1])
+      .slice(0, n);
+
+  const topTimes = topN(byTime, 3);
+  const topLojas = topN(byLoja, 3);
+  const topCats  = topN(byCatCompra, 4);
+
+  const topTime = topTimes[0] ? { k: topTimes[0][0], v: topTimes[0][1] } : null;
+  const topLoja = topLojas[0] ? { k: topLojas[0][0], v: topLojas[0][1] } : null;
+
+  // “natureza” do problema (tipos de pendência)
+  // OBS: uma tx pode contar em mais de um tipo
+  const domTipo = (() => {
+    const arr = [
+      ["Nota fiscal/Recibo", nf],
+      ["Etiqueta", etiq],
+      ["Descrição", desc],
+    ].sort((a,b)=>b[1]-a[1]);
+    return arr[0];
+  })();
+
+  const fmtMoney = (v) => {
+    try { return v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
+    catch(_){ return "R$ " + (Math.round(v*100)/100).toFixed(2).replace(".",","); }
+  };
+
+  // Heurística de “concentração” (pra texto ficar útil)
+  const concTime = topTime ? pct(topTime.v, totalTx) : 0;
+  const concLoja = topLoja ? pct(topLoja.v, totalTx) : 0;
+
+  const concMsg = (() => {
+    if (concTime >= 35) return "Há uma concentração relevante em um único time, o que sugere falha local de disciplina/processo.";
+    if (concLoja >= 25) return "Há uma concentração relevante em uma loja específica, sugerindo gargalo operacional (rotina/treinamento/gestão).";
+    return "As pendências estão relativamente distribuídas, o que sugere um tema mais sistêmico (processo/treinamento geral).";
+  })();
+
+  // monta texto explicativo
+  const topTimesTxt = topTimes.map(([k,v]) => `• ${k}: ${v} (${pct(v,totalTx)}%)`).join("<br/>");
+  const topLojasTxt = topLojas.map(([k,v]) => `• ${k}: ${v} (${pct(v,totalTx)}%)`).join("<br/>");
+  const topCatsTxt  = topCats.map(([k,v]) => `• ${k}: ${v} (${pct(v,totalTx)}%)`).join("<br/>");
 
   return `
-    <div style="display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap;">
-      <div style="flex:1; min-width:280px;">
-        <div style="font-weight:1000; font-size:14px;">Leitura do cenário</div>
-        <div style="margin-top:6px; color:#334155; font-weight:800; font-size:12px;">${filtrosTxt}</div>
+    <div style="padding:14px 16px;">
+      <div style="font-weight:1000; font-size:15px; color:#0f172a;">Leitura do cenário</div>
+      <div style="margin-top:6px; font-size:13px; color:#334155; line-height:1.55;">
+        No recorte atual (${periodoTxt}${filtroTxt ? " • " + filtroTxt : ""}), existem
+        <b>${totalTx}</b> transações com pendência, somando <b>${fmtMoney(totalValor)}</b> em valor associado.
+        ${topTime ? `O principal foco é o time <b>${topTime.k}</b> (${topTime.v}, ${concTime}%).` : ""}
+        ${topLoja ? `A loja mais crítica é <b>${topLoja.k}</b> (${topLoja.v}, ${concLoja}%).` : ""}
+      </div>
 
-        <div style="margin-top:12px; padding:12px; border-radius:14px; border:1px solid rgba(0,94,39,.25);
-                    background:linear-gradient(180deg, rgba(181,255,32,.18), rgba(0,94,39,.06));">
-          <div style="font-weight:1000; font-size:13px;">Resumo rápido</div>
-          <div style="margin-top:6px; font-size:13px; line-height:1.45;">
-            No recorte atual, existem <b>${Object.keys(lojasSet).length}</b> lojas com pendências,
-            totalizando <b>${totalPend}</b> pendências e <b>${fmtBRL(totalValor)}</b> em valor pendente.
+      <div style="margin-top:10px; font-size:13px; color:#334155; line-height:1.55;">
+        <b>Interpretação:</b> ${concMsg}
+      </div>
+
+      <div style="margin-top:14px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px;">
+          <div style="font-weight:1000; color:#0f172a;">Onde está concentrando</div>
+          <div style="margin-top:8px; font-size:13px; color:#334155; line-height:1.5;">
+            <div style="font-weight:900; color:#0f172a;">Top times</div>
+            ${topTimesTxt || "—"}
+            <div style="margin-top:10px; font-weight:900; color:#0f172a;">Top lojas</div>
+            ${topLojasTxt || "—"}
+          </div>
+        </div>
+
+        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:12px;">
+          <div style="font-weight:1000; color:#0f172a;">Natureza do problema</div>
+          <div style="margin-top:8px; font-size:13px; color:#334155; line-height:1.5;">
+            <div>• Nota fiscal/Recibo: <b>${nf}</b></div>
+            <div>• Etiqueta: <b>${etiq}</b></div>
+            <div>• Descrição: <b>${desc}</b></div>
+            <div style="margin-top:8px;">
+              <b>Ponto dominante:</b> ${domTipo[0]} (${domTipo[1]} ocorrências).
+              <span style="opacity:0.9;">(uma mesma transação pode ter mais de um tipo de pendência)</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <div style="flex:1; min-width:280px;">
-        <div style="font-weight:1000; font-size:14px;">Onde está concentrando</div>
-
-        <div style="margin-top:10px;">
-          <div style="font-weight:1000; font-size:12px; color:#0b1220;">Top times (por pendências)</div>
-          <div style="margin-top:6px; display:grid; gap:6px;">
-            ${topTimes.map(t=>{
-              const pct = totalPend ? Math.round((t.pend/totalPend)*100) : 0;
-              return `<div style="display:flex; justify-content:space-between; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;">
-                        <div style="font-weight:900;">${t.k}</div>
-                        <div style="font-weight:1000;">${t.pend} <span style="opacity:.65;">(${pct}%)</span></div>
-                      </div>`;
-            }).join("")}
-          </div>
-        </div>
-
-        <div style="margin-top:12px;">
-          <div style="font-weight:1000; font-size:12px; color:#0b1220;">Top lojas (por pendências)</div>
-          <div style="margin-top:6px; display:grid; gap:6px;">
-            ${topLojas.map(l=>{
-              const pct = totalPend ? Math.round((l.pend/totalPend)*100) : 0;
-              return `<div style="display:flex; justify-content:space-between; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;">
-                        <div style="font-weight:900;">Loja ${l.k}</div>
-                        <div style="font-weight:1000;">${l.pend} <span style="opacity:.65;">(${pct}%)</span></div>
-                      </div>`;
-            }).join("")}
-          </div>
+      <div style="margin-top:12px; background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; padding:12px;">
+        <div style="font-weight:1000; color:#0f172a;">Categorias de compra mais envolvidas</div>
+        <div style="margin-top:8px; font-size:13px; color:#334155; line-height:1.5;">
+          ${topCatsTxt || "Sem dados de categoria no recorte."}
         </div>
       </div>
-    </div>
 
-    <div style="margin-top:14px;">
-      <div style="font-weight:1000; font-size:14px;">Categorias (valor e participação)</div>
-      <div style="margin-top:8px; display:grid; gap:6px;">
-        ${topCats.map(c=>{
-          const pctV = totalValor ? Math.round((c.valor/totalValor)*100) : 0;
-          return `<div style="display:flex; justify-content:space-between; border:1px solid #e2e8f0; border-radius:12px; padding:8px 10px;">
-                    <div style="font-weight:900;">${c.k}</div>
-                    <div style="font-weight:1000;">${fmtBRL(c.valor)} <span style="opacity:.65;">(${pctV}%)</span></div>
-                  </div>`;
-        }).join("")}
-      </div>
-      <div style="margin-top:10px; font-size:12px; color:#334155; font-weight:800;">
-        Observação: esta análise é calculada 100% a partir da BaseClara e respeita os filtros ativos.
+      <div style="margin-top:12px; background:rgba(181,255,32,0.12); border:1px solid rgba(181,255,32,0.45); border-radius:14px; padding:12px;">
+        <div style="font-weight:1000; color:#0f172a;">Ações recomendadas (objetivas)</div>
+        <div style="margin-top:8px; font-size:13px; color:#334155; line-height:1.55;">
+          1) Priorize o time/loja líder do ranking (ataca onde dói mais).<br/>
+          2) Se o dominante for <b>${domTipo[0]}</b>, padronize a rotina (checklist + cobrança diária) e valide se o problema é captura ou anexação.<br/>
+          3) Use o detalhamento por categoria de compra para focar em fornecedores/rotas que geram mais pendência (ex.: combustível, manutenção, alimentação).<br/>
+          4) Se a concentração estiver alta, trate como falha local; se estiver distribuída, trate como ajuste de processo/treinamento em rede.
+        </div>
       </div>
     </div>
   `;
@@ -4149,9 +4197,61 @@ function vektorResumoCicloOpenAI_(){
   const bg = document.getElementById("cicloResumoAI");
   const body = document.getElementById("cicloResumoAIBody");
   if (!bg || !body) return;
-  body.innerHTML = vektorResumoCicloBuildAI_();
+
+  // usa SEMPRE o recorte já filtrado pela tela (applyFiltros_/Apply_)
+  const tx = Array.isArray(window.__cicloResumoTxFiltered) ? window.__cicloResumoTxFiltered : [];
+
+  // texto do período (se inputs existirem)
+  const dtIniEl = document.getElementById("cicloResumo_dtIni");
+  const dtFimEl = document.getElementById("cicloResumo_dtFim");
+  const dtIni = dtIniEl && dtIniEl.value ? dtIniEl.value : "";
+  const dtFim = dtFimEl && dtFimEl.value ? dtFimEl.value : "";
+
+  const periodoTxt = (dtIni && dtFim)
+    ? `${dtIni.split("-").reverse().join("/") } → ${dtFim.split("-").reverse().join("/")}`
+    : "";
+
+  const selTime = document.getElementById("cicloResumo_selTime");
+  const selLoja = document.getElementById("cicloResumo_selLoja");
+  const filtroTxt = [
+    selTime && selTime.value ? `Time: ${selTime.value}` : "Time: Todos",
+    selLoja && selLoja.value ? `Loja: ${selLoja.value}` : ""
+  ].filter(Boolean).join(" • ");
+
+  body.innerHTML = vektorResumoCicloBuildAI_({ tx }, { periodoTxt, filtroTxt });
+
   bg.style.display = "block";
 }
+
+function vektorResumoCicloCloseAI_(){
+  const bg = document.getElementById("cicloResumoAI");
+  if (bg) bg.style.display = "none";
+}
+
+// bind 1x
+try{
+  const btn = document.getElementById("cicloResumo_aiBtn");
+  const close = document.getElementById("cicloResumoAIClose");
+  const bg = document.getElementById("cicloResumoAI");
+
+  if (btn && !btn.__bindAI){
+    btn.__bindAI = true;
+    btn.addEventListener("click", vektorResumoCicloOpenAI_);
+  }
+  if (close && !close.__bindAI){
+    close.__bindAI = true;
+    close.addEventListener("click", vektorResumoCicloCloseAI_);
+  }
+  if (bg && !bg.__bindAI){
+    bg.__bindAI = true;
+    bg.addEventListener("mousedown", function(ev){
+      if (ev.target === bg) vektorResumoCicloCloseAI_();
+    });
+    document.addEventListener("keydown", function(ev){
+      if (ev.key === "Escape") vektorResumoCicloCloseAI_();
+    });
+  }
+} catch(_){}
 
 function vektorResumoCicloCloseAI_(){
   const bg = document.getElementById("cicloResumoAI");
@@ -7264,6 +7364,34 @@ function vektorResumoCicloApply_(){
 
   const time = (selTime && selTime.value) ? selTime.value : "";
   const loja = (selLoja && selLoja.value) ? selLoja.value : "";
+
+    // ✅ recorte detalhado (BaseClara) para tabela + IA
+  const dtIniEl = document.getElementById("cicloResumo_dtIni");
+  const dtFimEl = document.getElementById("cicloResumo_dtFim");
+  const dtIni = dtIniEl && dtIniEl.value ? String(dtIniEl.value) : "";
+  const dtFim = dtFimEl && dtFimEl.value ? String(dtFimEl.value) : "";
+
+  let tx = (res && Array.isArray(res.tx)) ? res.tx.slice() : [];
+
+  // compat: data pode vir como dataIso (backend) ou dataISO (front antigo)
+  tx = tx.map(t => {
+    const dataISO = t.dataISO || t.dataIso || "";
+    return Object.assign({}, t, { dataISO });
+  });
+
+  // filtra por período (se informado)
+  tx = tx.filter(t => {
+    const d = String(t.dataISO || "");
+    if (dtIni && d && d < dtIni) return false;
+    if (dtFim && d && d > dtFim) return false;
+    return true;
+  });
+
+  if (time) tx = tx.filter(t => String(t.time || "N/D") === String(time));
+  if (loja) tx = tx.filter(t => String(t.loja || "") === String(loja));
+
+  // ✅ fonte única do recorte atual (IA usa isso)
+  window.__cicloResumoTxFiltered = tx;
 
   const allRows = vektorResumoCicloGetRows_(res);
 
