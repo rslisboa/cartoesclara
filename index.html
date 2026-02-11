@@ -783,7 +783,7 @@ display: none;
  <div class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
    
-   <aside class="hidden md:flex w-72 shrink-0 flex-none flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 self-stretch min-h-0">
+  <aside class="hidden md:flex w-72 shrink-0 flex-none flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 self-stretch min-h-0">
 
   <!-- Bloco Vektor + título -->
   <div class="w-full flex flex-col items-center mb-4">
@@ -924,7 +924,7 @@ display: none;
 </aside>
  
    <!-- COLUNA DIREITA: CHAT -->
-   <div class="flex-1 min-w-0 min-h-0">
+   <div class="flex-1 min-w-0 min-h-0" style="position:relative; overflow:hidden;">
      <div class="chat-wrapper">
 
     <!-- HEADER -->
@@ -1067,13 +1067,13 @@ display: none;
               </select>
             </div>
 
-            <button type="button"
-                    onclick="window.vektorResumoCicloLimparFiltros && window.vektorResumoCicloLimparFiltros()"
-                    style="height:34px;border-radius:12px;padding:0 14px;background:transparent;color:#B5FF20;border:1px solid rgba(181,255,32,0.45);font-weight:1000; font-size: 12px; cursor:pointer;">
-              Limpar
-            </button>
+           <button id="cicloResumo_btnLimpar" type="button"
+              onclick="window.vektorResumoCicloLimparFiltros && window.vektorResumoCicloLimparFiltros()"
+              style="height:34px;border-radius:12px;padding:0 14px;background:transparent;color:#B5FF20;border:1px solid rgba(181,255,32,0.45);font-weight:1000; font-size: 12px; cursor:pointer;">
+                    Limpar
+                  </button>
 
-            <button type="button"
+            <button id="cicloResumo_btnAtualizar" type="button"
                     onclick="window.vektorLoadResumoCiclo && window.vektorLoadResumoCiclo(true)"
                     style="height:34px;border-radius:12px;padding:0 14px;background:rgba(255,255,255,0.06);color:#fff;border:1px solid rgba(255,255,255,0.18);font-weight:1000; font-size: 12px; cursor:pointer;">
               Atualizar
@@ -1102,7 +1102,7 @@ display: none;
 
       <!-- Conteúdo -->
       <div class="cicloResumoPage" style="flex:1; min-height:0; overflow:auto; background:#fff; padding:14px 16px;">
-        <div id="cicloResumoLoading" style="display:none; color:#0f172a; font-size:13px; font-weight:800;">
+        <div id="cicloResumoLoading" style="display:none; color:#0f172a; font-size:15px; font-weight:800;">
           Carregando resumo do ciclo…
         </div>
 
@@ -3752,12 +3752,46 @@ window.vektorLoadResumoCiclo = function (force) {
 
   if (loading) loading.style.display = "block";
   if (content) content.style.display = "none";
+
   if (tbody) tbody.innerHTML = "";
 
   const fmtBRL = (n) => {
     try { return (Number(n || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
     catch (e) { return String(n || 0); }
   };
+
+  function setResumoCicloBusy_(isBusy, msg){
+  const loading = document.getElementById("cicloResumoLoading");
+  const content = document.getElementById("cicloResumoContent");
+
+  // controles da página
+  const dtIniEl = document.getElementById("cicloResumo_dtIni");
+  const dtFimEl = document.getElementById("cicloResumo_dtFim");
+  const selTime = document.getElementById("cicloResumo_selTime");
+  const selLoja = document.getElementById("cicloResumo_selLoja");
+
+  const btnLimpar = document.getElementById("cicloResumo_btnLimpar");     // crie esse ID no HTML
+  const btnAtualizar = document.getElementById("cicloResumo_btnAtualizar"); // crie esse ID no HTML
+  const btnAI = document.getElementById("cicloResumo_aiBtn");
+  const btnCsv = document.getElementById("cicloResumo_btnCsv");
+
+  // mensagem / loading
+  if (loading) {
+    loading.textContent = msg || (isBusy ? "Carregando resumo do ciclo… aguarde." : "");
+    loading.style.display = isBusy ? "block" : "none";
+  }
+
+  // deixa visível porém “travado” (opcional). Se você prefere sumir, pode manter display:none.
+  if (content) content.style.opacity = isBusy ? "0.55" : "1";
+
+  // trava inputs/botões
+  [dtIniEl, dtFimEl, selTime, selLoja, btnLimpar, btnAtualizar, btnAI, btnCsv].forEach(el => {
+    if (!el) return;
+    el.disabled = !!isBusy;
+    el.style.pointerEvents = isBusy ? "none" : "auto";
+    el.style.opacity = isBusy ? "0.65" : "1";
+  });
+}
 
   function applyFiltros_(){
     const res = window.__cicloResumoData || {};
@@ -3980,7 +4014,7 @@ window.vektorLoadResumoCiclo = function (force) {
 
   google.script.run
     .withSuccessHandler(function (res) {
-      if (loading) loading.style.display = "none";
+      setResumoCicloBusy_(false);
 
       if (!res || !res.ok) {
         if (content) content.style.display = "block";
@@ -4123,6 +4157,7 @@ window.vektorLoadResumoCiclo = function (force) {
       applyFiltros_();
     })
     .withFailureHandler(function (err) {
+      setResumoCicloBusy_(false);
       if (loading) loading.style.display = "none";
       if (content) content.style.display = "block";
       if (tbody) tbody.innerHTML = "<tr><td colspan='7' style='padding:10px;color:#111;'>Erro no backend.</td></tr>";
