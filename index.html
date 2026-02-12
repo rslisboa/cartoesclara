@@ -1937,46 +1937,81 @@ display: none;
                background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
         Fechar
       </button>
+
     </div>
 
     <!-- Filtros (LOCAL, sem recarregar backend) -->
-    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; padding:12px 14px;
-                border-bottom:1px solid rgba(148,163,184,0.18);">
+<div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; padding:12px 14px;
+            border-bottom:1px solid rgba(148,163,184,0.18);">
 
-      <div style="display:flex; flex-direction:column; gap:6px; min-width:160px;">
-        <div style="font-size:12px; color:rgba(226,232,240,0.75); font-weight:900;">Loja</div>
-        <select id="itensIrregDetFiltroLoja"
-          style="height:34px; border-radius:10px; padding:0 10px;
-                 background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.18);
-                 color:#fff; font-weight:900; font-size:12px;">
-          <option value="">Todas</option>
-        </select>
-      </div>
+  <!-- Loja -->
+  <div style="display:flex; flex-direction:column; gap:6px; min-width:160px;">
+    <div style="font-size:12px; color:rgba(226,232,240,0.75); font-weight:900;">Loja</div>
+    <select id="itensIrregDetFiltroLoja"
+      style="height:34px; border-radius:10px; padding:0 10px;
+             background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.18);
+             color:#fff; font-weight:900; font-size:12px;">
+      <option value="">Todas</option>
+    </select>
+  </div>
 
-      <div style="display:flex; flex-direction:column; gap:6px; min-width:220px;">
-        <div style="font-size:12px; color:rgba(226,232,240,0.75); font-weight:900;">Time</div>
-        <select id="itensIrregDetFiltroTime"
-          style="height:34px; border-radius:10px; padding:0 10px;
-                 background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.18);
-                 color:#fff; font-weight:900; font-size:12px;">
-          <option value="">Todos</option>
-        </select>
-      </div>
+  <!-- Time -->
+  <div style="display:flex; flex-direction:column; gap:6px; min-width:220px;">
+    <div style="font-size:12px; color:rgba(226,232,240,0.75); font-weight:900;">Time</div>
+    <select id="itensIrregDetFiltroTime"
+      style="height:34px; border-radius:10px; padding:0 10px;
+             background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.18);
+             color:#fff; font-weight:900; font-size:12px;">
+      <option value="">Todos</option>
+    </select>
+  </div>
 
-      <button type="button" onclick="window.vektorClearItensIrregDetFilters_()"
-        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(181,255,32,0.30);
-               background:rgba(181,255,32,0.10); color:#B5FF20;
-               font-weight:1000; font-size:12px; cursor:pointer;">
-        Limpar filtros
-      </button>
+  <!-- Limpar filtros -->
+  <button type="button" onclick="window.vektorClearItensIrregDetFilters_()"
+    style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(181,255,32,0.30);
+           background:rgba(181,255,32,0.10); color:#B5FF20;
+           font-weight:1000; font-size:12px; cursor:pointer;">
+    Limpar filtros
+  </button>
 
-    <button type="button" onclick="window.vektorEnviarNotificacaoItensIrregularesSelecionados_()"
-        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-              background:rgba(255,255,255,0.06); color:#fff;
-              font-weight:1000; font-size:12px; cursor:pointer;">
-        Enviar Notificação
-      </button>
-      </div>
+  <!-- ✅ NOVO: Prévia (fica no “lugar” do enviar) -->
+  <button type="button" onclick="window.vektorOpenPreviewItensIrregDet_()"
+    style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+           background:rgba(255,255,255,0.06); color:#fff;
+           font-weight:1000; font-size:12px; cursor:pointer;">
+    Prévia
+  </button>
+
+  <!-- ✅ Espaço do meio: Sel. All / Desel. All -->
+<div style="flex:1 1 auto; display:flex; justify-content:flex-end; gap:10px; padding-right:10px;">
+
+  <button type="button" onclick="window.vektorItensIrregDetSelectAll_()"
+    style="height:34px; padding:0 12px; border-radius:10px;
+           border:1px solid rgba(255,255,255,0.18);
+           background:rgba(255,255,255,0.06); color:#fff;
+           font-weight:1000; font-size:12px; cursor:pointer;">
+    Sel. All
+  </button>
+
+  <button type="button" onclick="window.vektorItensIrregDetDeselectAll_()"
+    style="height:34px; padding:0 12px; border-radius:10px;
+           border:1px solid rgba(255,255,255,0.18);
+           background:rgba(255,255,255,0.06); color:#fff;
+           font-weight:1000; font-size:12px; cursor:pointer;">
+    Desel. All
+  </button>
+
+</div>
+
+  <!-- ✅ Enviar Notificação no canto direito -->
+  <button type="button" onclick="window.vektorEnviarNotificacaoItensIrregularesSelecionados_()"
+    style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+           background:rgba(255,255,255,0.06); color:#fff;
+           font-weight:1000; font-size:12px; cursor:pointer;">
+    Enviar Notificação
+  </button>
+
+</div>
 
     <!-- Table (scroll) -->
     <div style="padding:12px;">
@@ -2024,6 +2059,38 @@ display: none;
               </td>
             </tr>
           </tbody>
+
+        <!-- ✅ MINI MODAL: Prévia seleção -->
+<div id="itensIrregPreviewModal" style="display:none; position:fixed; inset:0; z-index:999999;">
+  <div onclick="window.vektorClosePreviewItensIrregDet_()"
+       style="position:absolute; inset:0; background:rgba(0,0,0,0.55);"></div>
+
+  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+              width:min(900px, calc(100vw - 28px));
+              max-height:calc(100vh - 120px);
+              overflow:auto;
+              background:linear-gradient(180deg, rgba(15,23,42,0.98), rgba(2,6,23,0.98));
+              border:1px solid rgba(148,163,184,0.22);
+              border-radius:16px;
+              box-shadow:0 18px 50px rgba(0,0,0,0.45);">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 16px;
+                border-bottom:1px solid rgba(148,163,184,0.18);">
+      <div style="color:#fff; font-weight:1000; font-size:14px;">Prévia — Itens selecionados</div>
+      <button type="button" onclick="window.vektorClosePreviewItensIrregDet_()"
+        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+               background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
+        Fechar
+      </button>
+    </div>
+
+    <div id="itensIrregPreviewBody" style="padding:14px 16px; color:rgba(226,232,240,0.92);">
+      <!-- preenchido via JS -->
+    </div>
+
+  </div>
+</div>
+
         </table>
 
       </div>
@@ -6334,6 +6401,31 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
   });
 };
 
+window.vektorItensIrregDetSelectAll_ = function () {
+  const baseRows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
+  if (!baseRows.length) return;
+
+  window.__itensIrregDetSel = {};
+
+  for (let i = 0; i < baseRows.length; i++) {
+    window.__itensIrregDetSel[i] = true;
+  }
+
+  // Atualiza visualmente os checkboxes visíveis
+  document.querySelectorAll("#itensIrregDetTbody input.itensIrregDetChk").forEach(chk => {
+    chk.checked = true;
+  });
+};
+
+window.vektorItensIrregDetDeselectAll_ = function () {
+  window.__itensIrregDetSel = {};
+
+  // Atualiza visualmente os checkboxes visíveis
+  document.querySelectorAll("#itensIrregDetTbody input.itensIrregDetChk").forEach(chk => {
+    chk.checked = false;
+  });
+};
+
 window.vektorEnviarNotificacaoItensIrregularesSelecionados_ = function () {
   const baseRows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
   const selMap = window.__itensIrregDetSel || {};
@@ -6387,6 +6479,104 @@ window.vektorEnviarNotificacaoItensIrregularesSelecionados_ = function () {
       alert("Falha ao enviar e-mails: " + msg);
     })
     .dispararNotificacaoItensIrregularesSelecionados(selected);
+};
+
+window.vektorClosePreviewItensIrregDet_ = function () {
+  const m = document.getElementById("itensIrregPreviewModal");
+  if (m) m.style.display = "none";
+};
+
+window.vektorOpenPreviewItensIrregDet_ = function () {
+  const m = document.getElementById("itensIrregPreviewModal");
+  const body = document.getElementById("itensIrregPreviewBody");
+  if (!m || !body) return;
+
+  const baseRows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
+  const selMap = window.__itensIrregDetSel || {};
+  const idxs = Object.keys(selMap).map(n => Number(n)).filter(n => Number.isFinite(n));
+
+  if (!idxs.length) {
+    body.innerHTML = `<div style="font-weight:900; color:rgba(226,232,240,0.92);">
+      Nenhuma linha selecionada. Marque os checkboxes na tabela para ver a prévia.
+    </div>`;
+    m.style.display = "block";
+    return;
+  }
+
+  const selected = idxs.map(i => baseRows[i]).filter(Boolean);
+
+  const sumBRL = (n) => {
+    try { return Number(n || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
+    catch(e){ return String(n || 0); }
+  };
+
+  function addAgg(map, key, valor) {
+    key = String(key || "—").trim() || "—";
+    if (!map[key]) map[key] = { key, qtd: 0, total: 0 };
+    map[key].qtd += 1;
+    map[key].total += Number(valor || 0);
+  }
+
+  const byTime = {};
+  const byLoja = {};
+
+  selected.forEach(r => {
+    addAgg(byTime, r.time, r.valor);
+    addAgg(byLoja, r.loja, r.valor);
+  });
+
+  const arrTime = Object.values(byTime).sort((a,b) => b.total - a.total);
+  const arrLoja = Object.values(byLoja).sort((a,b) => b.total - a.total);
+
+  const mkTable = (title, arr) => {
+    const rows = arr.map(x => `
+      <tr>
+        <td style="padding:10px; border-top:1px solid rgba(148,163,184,0.18); font-weight:900;">${x.key}</td>
+        <td style="padding:10px; border-top:1px solid rgba(148,163,184,0.18); text-align:right; font-weight:1000;">${x.qtd}</td>
+        <td style="padding:10px; border-top:1px solid rgba(148,163,184,0.18); text-align:right; font-weight:1000;">${sumBRL(x.total)}</td>
+      </tr>
+    `).join("");
+
+    return `
+      <div style="margin-top:12px; font-weight:1000; color:#fff;">${title}</div>
+      <div style="margin-top:8px; border:1px solid rgba(148,163,184,0.18); border-radius:12px; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="background:rgba(255,255,255,0.06);">
+              <th style="text-align:left; padding:10px; font-size:12px; color:rgba(226,232,240,0.85);">Grupo</th>
+              <th style="text-align:right; padding:10px; font-size:12px; color:rgba(226,232,240,0.85);">Qtde</th>
+              <th style="text-align:right; padding:10px; font-size:12px; color:rgba(226,232,240,0.85);">Total</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  };
+
+  const totalSel = selected.length;
+  const totalValor = selected.reduce((acc, r) => acc + Number(r.valor || 0), 0);
+
+  body.innerHTML = `
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <div style="padding:10px 12px; border-radius:12px; border:1px solid rgba(148,163,184,0.18);
+                  background:rgba(255,255,255,0.04);">
+        <div style="font-size:12px; color:rgba(226,232,240,0.75); font-weight:900;">Linhas selecionadas</div>
+        <div style="font-size:18px; color:#fff; font-weight:1000;">${totalSel}</div>
+      </div>
+
+      <div style="padding:10px 12px; border-radius:12px; border:1px solid rgba(148,163,184,0.18);
+                  background:rgba(255,255,255,0.04);">
+        <div style="font-size:12px; color:rgba(226,232,240,0.75); font-weight:900;">Valor total selecionado</div>
+        <div style="font-size:18px; color:#fff; font-weight:1000;">${sumBRL(totalValor)}</div>
+      </div>
+    </div>
+
+    ${mkTable("Resumo por Time", arrTime)}
+    ${mkTable("Resumo por Loja", arrLoja)}
+  `;
+
+  m.style.display = "block";
 };
 
 window.vektorExportRadarItensIrregularesCSV = function() {
