@@ -4299,6 +4299,173 @@ function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFi
   }
 }
 
+function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
+  vektorAssertFunctionAllowed_("dispararNotificacaoItensIrregularesSelecionados");
+
+  rowsSelecionadas = Array.isArray(rowsSelecionadas) ? rowsSelecionadas : [];
+  if (!rowsSelecionadas.length) return { ok: false, error: "Nenhuma linha selecionada." };
+
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var hoje = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy");
+
+  var REPLY_TO = "contasateceber@gruposbf.com.br";
+  var CC_FIXO = "contasateceber@gruposbf.com.br";
+  var SENDER_NAME = "Vektor - Grupo SBF";
+
+  // ✅ mesmo mapa do envio de pendências (padrão CE0000)
+  // (no seu projeto ele já é usado em outros envios)
+  var mapEmails = vektorCarregarMapaEmailsLojas_(); // deve retornar { CE0001: { emailGerente, emailGerenteRegional, ... }, ... }
+
+  function normLojaKey_(lojaRaw) {
+    var s = String(lojaRaw || "").trim().toUpperCase();
+    if (!s) return "";
+
+    // se vier "CE0007"
+    var m1 = s.match(/^CE\s*0*(\d{1,4})/);
+    if (m1 && m1[1]) {
+      var d1 = ("0000" + m1[1]).slice(-4);
+      return "CE" + d1;
+    }
+
+    // se vier "0062 (Lobos SP)" ou "62" ou "305"
+    var m2 = s.match(/(\d{1,4})/);
+    if (m2 && m2[1]) {
+      var d2 = ("0000" + m2[1]).slice(-4);
+      return "CE" + d2;
+    }
+
+    return "";
+  }
+
+  // agrupa por lojaKey
+  var grupos = {};
+  rowsSelecionadas.forEach(function(r) {
+    var lk = normLojaKey_(r.loja);
+    if (!lk) return;
+    if (!grupos[lk]) grupos[lk] = [];
+    grupos[lk].push(r);
+  });
+
+  var lojaKeys = Object.keys(grupos);
+  if (!lojaKeys.length) return { ok: false, error: "Não foi possível identificar lojas (lojaKey) nas linhas selecionadas." };
+
+  // helper HTML table (usa badge no estilo do Vektor)
+  function esc_(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function fmtBRL_(n) {
+    try { return (Number(n || 0)).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
+    catch(e){ return String(n || 0); }
+  }
+  function badgeHtml_(c) {
+    var x = String(c || "").toUpperCase();
+    var bg = "rgba(255,255,255,0.06)", bd = "rgba(148,163,184,0.25)", tx = "rgba(226,232,240,0.95)";
+    if (x === "OK") { bg = "rgba(34,197,94,0.18)"; bd = "rgba(34,197,94,0.35)"; tx = "#14532d"; }
+    if (x === "REVISAR") { bg = "rgba(245,158,11,0.20)"; bd = "rgba(245,158,11,0.40)"; tx = "#713f12"; }
+    if (x === "ALERTA") { bg = "rgba(248,113,113,0.20)"; bd = "rgba(248,113,113,0.40)"; tx = "#7f1d1d"; }
+    return '<span style="display:inline-flex; align-items:center; height:22px; padding:0 10px; border-radius:999px;'
+      + 'border:1px solid ' + bd + '; background:' + bg + '; color:' + tx + '; font-weight:1000; font-size:11px;">'
+      + esc_(x || "—") + '</span>';
+  }
+
+  function montarTabelaHtml_(rows) {
+    var h = '';
+    h += '<div style="font-family:Inter,Arial,sans-serif; color:#0f172a;">';
+    h += '<div style="font-size:14px; font-weight:900; margin-bottom:10px;">Itens Irregulares</div>';
+
+    h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
+      + 'Identificamos que os itens abaixo foram comprados irregularmente com o cartão da Clara, conforme nossa Política. '
+      + 'Solicitamos que nos informem o motivo da compra para evitar o bloqueio do cartão e categoria da compra.'
+      + '</div>';
+
+    h += '<div style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">';
+    h += '<table style="width:100%; border-collapse:collapse;">';
+    h += '<thead><tr style="background:#0b1220; color:#fff;">';
+    h += '<th style="text-align:left; padding:10px; font-size:12px;">Data</th>';
+    h += '<th style="text-align:right; padding:10px; font-size:12px;">Valor (R$)</th>';
+    h += '<th style="text-align:left; padding:10px; font-size:12px;">Loja</th>';
+    h += '<th style="text-align:left; padding:10px; font-size:12px;">Time</th>';
+    h += '<th style="text-align:left; padding:10px; font-size:12px;">Item Comprado</th>';
+    h += '<th style="text-align:left; padding:10px; font-size:12px;">Conformidade</th>';
+    h += '<th style="text-align:left; padding:10px; font-size:12px;">Motivo</th>';
+    h += '</tr></thead><tbody>';
+
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i] || {};
+      h += '<tr style="border-top:1px solid #e2e8f0;">';
+      h += '<td style="padding:10px; font-size:12px;">' + esc_(r.dataTxt || "") + '</td>';
+      h += '<td style="padding:10px; font-size:12px; text-align:right; font-weight:800;">' + esc_(fmtBRL_(r.valor || 0)) + '</td>';
+      h += '<td style="padding:10px; font-size:12px;">' + esc_(r.loja || "") + '</td>';
+      h += '<td style="padding:10px; font-size:12px;">' + esc_(r.time || "") + '</td>';
+      h += '<td style="padding:10px; font-size:12px;">' + esc_(r.item || "") + '</td>';
+      h += '<td style="padding:10px; font-size:12px;">' + badgeHtml_(r.conformidade || "ALERTA") + '</td>';
+      h += '<td style="padding:10px; font-size:12px;">' + esc_(r.motivo || "") + '</td>';
+      h += '</tr>';
+    }
+
+    h += '</tbody></table></div></div>';
+    return h;
+  }
+
+  var enviados = 0;
+  var skipped = [];
+  var erros = [];
+
+  lojaKeys.forEach(function(lojaKey) {
+    try {
+      var pack = grupos[lojaKey] || [];
+      if (!pack.length) return;
+
+      var info = mapEmails ? mapEmails[lojaKey] : null;
+
+      // ✅ mesmos alvos do envio de pendências: gerente (E) e regional (G)
+      var to = info && info.emailGerente ? String(info.emailGerente).trim() : "";
+      var cc = [];
+
+      if (info && info.emailGerenteRegional) cc.push(String(info.emailGerenteRegional).trim());
+      cc.push(CC_FIXO);
+
+      // fallback mínimo para não “sumir” notificação
+      if (!to) {
+        if (info && info.emailGerenteRegional) to = String(info.emailGerenteRegional).trim();
+      }
+      if (!to) {
+        to = CC_FIXO; // último fallback
+      }
+
+      // limpa duplicados / vazios
+      cc = cc.filter(function(x){ return x && x.indexOf("@") > 0; });
+      var ccUniq = {};
+      cc = cc.filter(function(x){ x = x.toLowerCase(); if (ccUniq[x]) return false; ccUniq[x]=true; return true; });
+
+      var subject = "[ALERTA CLARA | ITENS] Itens Irregulares | " + hoje;
+      var htmlBody = montarTabelaHtml_(pack);
+
+      MailApp.sendEmail({
+        to: to,
+        cc: cc.join(","),
+        subject: subject,
+        htmlBody: htmlBody,
+        name: SENDER_NAME,
+        replyTo: REPLY_TO
+      });
+
+      enviados++;
+    } catch (e) {
+      erros.push({ lojaKey: lojaKey, error: String(e && e.message ? e.message : e) });
+    }
+  });
+
+  if (erros.length) {
+    // Não falha tudo (parte pode ter enviado), mas devolve diagnóstico
+    return { ok: true, enviados: enviados, lojas: lojaKeys.length, erros: erros, skipped: skipped };
+  }
+
+  return { ok: true, enviados: enviados, lojas: lojaKeys.length, skipped: skipped };
+}
+
 // Procura o índice de uma coluna no cabeçalho da BaseClara
 // usando uma lista de possíveis nomes (variações de texto).
 function encontrarIndiceColuna_(header, nomesPossiveis) {
@@ -13475,6 +13642,17 @@ function buildEmailItensIrregulares_(rows, periodoTxt) {
   rows = Array.isArray(rows) ? rows : [];
   var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
 
+  function badgeHtml_(c) {
+  var x = String(c || "").toUpperCase();
+  var bg = "rgba(255,255,255,0.06)", bd = "rgba(148,163,184,0.25)", tx = "rgba(226,232,240,0.95)";
+  if (x === "OK") { bg = "rgba(34,197,94,0.18)"; bd = "rgba(34,197,94,0.35)"; tx = "#14532d"; }
+  if (x === "REVISAR") { bg = "rgba(245,158,11,0.20)"; bd = "rgba(245,158,11,0.40)"; tx = "#713f12"; }
+  if (x === "ALERTA") { bg = "rgba(248,113,113,0.20)"; bd = "rgba(248,113,113,0.40)"; tx = "#7f1d1d"; }
+  return '<span style="display:inline-flex; align-items:center; height:22px; padding:0 10px; border-radius:999px;'
+    + 'border:1px solid ' + bd + '; background:' + bg + '; color:' + tx + '; font-weight:1000; font-size:11px;">'
+    + esc_(x || "—") + '</span>';
+}
+
   function esc_(s){
     return String(s || "")
       .replace(/&/g,"&amp;")
@@ -13526,7 +13704,7 @@ function buildEmailItensIrregulares_(rows, periodoTxt) {
     h += '<td style="padding:10px; font-size:12px;">' + esc_(r.loja || r.alias || "") + '</td>';
     h += '<td style="padding:10px; font-size:12px;">' + esc_(r.time || "") + '</td>';
     h += '<td style="padding:10px; font-size:12px;">' + esc_(r.item || r.descricao || "") + '</td>';
-    h += '<td style="padding:10px; font-size:12px; font-weight:900; color:#b91c1c;">ALERTA</td>';
+    h += '<td style="padding:10px; font-size:12px;">' + badgeHtml_(r.conformidade || r.status || "ALERTA") + '</td>';
     h += '<td style="padding:10px; font-size:12px;">' + esc_(r.motivo || "") + '</td>';
     h += '</tr>';
   }
