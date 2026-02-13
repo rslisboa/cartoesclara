@@ -622,6 +622,38 @@ display: none;
   z-index: 1;
 }
 
+/* =========================
+   FLUXOGRAMA - background blur (layer real)
+   ========================= */
+.vektor-fluxo-bg{
+  position: relative;
+  overflow: hidden;
+  background: transparent !important;
+}
+
+.vektor-fluxo-bg-layer{
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+
+  background-image: url("https://raw.githubusercontent.com/rslisboa/cartoesclara/b2a74cc141e69f3940ecaa90855709f743979a34/back_v.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  filter: blur(6px);
+  opacity: 0.30;
+
+  transform: scale(1.12);
+  z-index: 0;
+}
+
+/* garante que o conteúdo fica por cima */
+.vektor-fluxo-bg > :not(.vektor-fluxo-bg-layer){
+  position: relative;
+  z-index: 2;
+}
+
 </style>
 
 <style>
@@ -2689,7 +2721,9 @@ display: none;
 <div id="fluxogramaView" class="hidden" style="position:absolute; inset:0; z-index:20;">
 
   <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
-    <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+    <div class="vektor-fluxo-bg relative overflow-hidden"
+     style="height:100%; width:100%; display:flex; flex-direction:column;">
+        <div class="vektor-fluxo-bg-layer" aria-hidden="true"></div>
 
       <!-- Header do Fluxograma -->
       <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
