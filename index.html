@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-<title>Grupo CBF | Agente Clara</title>
+<title>Grupo CBF | Vektor</title>
 <script src="https://cdn.tailwindcss.com"></script>
 
 <!-- Chart.js + plugin de data labels para o gráfico de faturas -->
@@ -588,6 +588,40 @@ display: none;
   color:#0f172a;
 }
 
+/* =========================
+   STATUS (Estado Operacional) - background blur
+   ========================= */
+.vektor-status-card{
+  position: relative;
+}
+
+/* layer do fundo */
+.vektor-status-card::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("https://raw.githubusercontent.com/rslisboa/cartoesclara/b2a74cc141e69f3940ecaa90855709f743979a34/back_v.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  /* desfoca e deixa bem leve */
+  filter: blur(6px);
+  opacity: 0.35;
+
+  /* evita borda “fantasma” do blur */
+  transform: scale(1.08);
+
+  /* garante que fica atrás do conteúdo */
+  z-index: 0;
+}
+
+/* conteúdo sempre acima do fundo */
+.vektor-status-card > *{
+  position: relative;
+  z-index: 1;
+}
+
 </style>
 
 <style>
@@ -873,6 +907,205 @@ display: none;
     </div>
   </div>
 </div>
+
+<script>
+/**
+ * VEKTOR — Single Tab Guard (aba única)
+ * Regra: a aba mais recente toma posse e desativa a anterior.
+ * - Usa localStorage (compatível geral)
+ * - Usa BroadcastChannel quando disponível (mais rápido)
+ */
+(function vektorSingleTabGuard_(){
+  const LOCK_KEY = "VEKTOR_ACTIVE_TAB_LOCK";
+  const CHANNEL  = "vektor-single-tab";
+  const HEARTBEAT_MS = 5000;     // atualiza "vida" da aba dona
+  const STALE_MS = 15000;        // se não bater heartbeat nesse tempo, considera morto
+  const TAKEOVER_GRACE_MS = 800; // evita flicker em loads rápidos
+
+  // id único da aba (vive enquanto a aba existir)
+  let tabId = "";
+  try {
+    tabId = sessionStorage.getItem("VEKTOR_TAB_ID") || "";
+    if (!tabId) {
+      tabId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+        : (String(Date.now()) + "_" + Math.random().toString(16).slice(2));
+      sessionStorage.setItem("VEKTOR_TAB_ID", tabId);
+    }
+  } catch (e) {
+    // fallback: ainda dá pra funcionar, só menos robusto
+    tabId = "tab_" + String(Date.now()) + "_" + Math.random().toString(16).slice(2);
+  }
+
+  const bc = ("BroadcastChannel" in window) ? new BroadcastChannel(CHANNEL) : null;
+
+  function now_(){ return Date.now(); }
+
+  function safeJsonParse_(s){
+    try { return JSON.parse(s); } catch (e) { return null; }
+  }
+
+  function readLock_(){
+    return safeJsonParse_(localStorage.getItem(LOCK_KEY) || "null");
+  }
+
+  function writeLock_(obj){
+    localStorage.setItem(LOCK_KEY, JSON.stringify(obj || {}));
+  }
+
+  function removeLock_(){
+    localStorage.removeItem(LOCK_KEY);
+  }
+
+  function isStale_(lock){
+    if (!lock || !lock.ts) return true;
+    return (now_() - Number(lock.ts || 0)) > STALE_MS;
+  }
+
+  function showDisabledOverlay_(title, msg){
+    let el = document.getElementById("vektorSingleTabOverlay");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "vektorSingleTabOverlay";
+      el.className = "fixed inset-0 z-[10060]";
+      el.style.display = "none";
+      el.innerHTML = `
+        <div class="absolute inset-0 bg-white"></div>
+        <div class="absolute inset-0 bg-black/60"></div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="w-[95%] max-w-[560px] rounded-2xl bg-white border border-slate-200 shadow-2xl p-6 text-center">
+            <div id="vektorSingleTabOverlayTitle" class="text-2xl font-extrabold text-slate-900"></div>
+            <div id="vektorSingleTabOverlayMsg" class="mt-2 text-sm text-slate-600"></div>
+            <div class="mt-4 text-[11px] text-slate-500">
+              Esta guia foi desativada para evitar múltiplas sessões abertas. Use a guia mais recente.
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(el);
+    }
+
+    el.querySelector("#vektorSingleTabOverlayTitle").textContent = title || "Aba desativada";
+    el.querySelector("#vektorSingleTabOverlayMsg").textContent = msg || "";
+    el.style.display = "block";
+  }
+
+  function hideDisabledOverlay_(){
+    const el = document.getElementById("vektorSingleTabOverlay");
+    if (el) el.style.display = "none";
+  }
+
+  function forceLogoutUI_(reason){
+    // 1) tenta clicar no Logout (se existir)
+    try {
+      const btn = document.getElementById("vektorLogoutBtn");
+      if (btn) btn.click();
+    } catch (e) {}
+
+    // 2) mostra mensagem no modal de login (se existir)
+    try {
+      const err = document.getElementById("vektorLoginError");
+      if (err) {
+        err.classList.remove("hidden");
+        err.textContent = reason || "Sessão movida para outra aba.";
+      }
+      const modal = document.getElementById("vektorLoginModal");
+      if (modal) modal.style.display = "block";
+    } catch (e) {}
+
+    // 3) esconde app root (se existir)
+    try {
+      const root = document.getElementById("vektorAppRoot");
+      if (root) root.classList.add("hidden");
+    } catch (e) {}
+  }
+
+  function disableThisTab_(lockOwnerId){
+    if (window.__vektorTabDisabled) return;
+    window.__vektorTabDisabled = true;
+
+    forceLogoutUI_("Você abriu o Vektor em outra guia. Esta guia foi desativada.");
+
+    showDisabledOverlay_(
+      "Esta aba foi desativada",
+      "Você abriu o Vektor em outra guia. Use a guia mais recente."
+    );
+  }
+
+  function enableThisTab_(){
+    if (!window.__vektorTabDisabled) return;
+    window.__vektorTabDisabled = false;
+    hideDisabledOverlay_();
+  }
+
+  function broadcast_(payload){
+    try { if (bc) bc.postMessage(payload); } catch (e) {}
+  }
+
+  function takeover_(why){
+    const ts = now_();
+    writeLock_({ tabId, ts });
+    broadcast_({ type: "TAKEOVER", tabId, ts, why: why || "" });
+  }
+
+  // Regra: SEMPRE que esta aba carregar, ela toma posse (aba mais recente manda).
+  // Pequena graça pra evitar flicker em refresh instantâneo.
+  setTimeout(function(){
+    takeover_("init");
+    enableThisTab_();
+  }, TAKEOVER_GRACE_MS);
+
+  // Heartbeat: se eu sou dono, atualizo timestamp
+  setInterval(function(){
+    const lock = readLock_();
+    if (lock && lock.tabId === tabId) {
+      writeLock_({ tabId, ts: now_() });
+    }
+  }, HEARTBEAT_MS);
+
+  // Se outra aba tomar posse (localStorage), eu desativo
+  window.addEventListener("storage", function(e){
+    if (e.key !== LOCK_KEY) return;
+
+    const lock = readLock_();
+    if (!lock) return;
+
+    // se eu não sou dono e o lock está vivo, desabilita
+    if (lock.tabId !== tabId && !isStale_(lock)) {
+      disableThisTab_(lock.tabId);
+    }
+  });
+
+  // BroadcastChannel: resposta mais rápida que storage event
+  if (bc) {
+    bc.onmessage = function(ev){
+      const m = ev && ev.data ? ev.data : null;
+      if (!m || m.type !== "TAKEOVER") return;
+
+      if (m.tabId !== tabId) {
+        // alguém tomou posse
+        const lock = readLock_();
+        if (lock && lock.tabId !== tabId && !isStale_(lock)) {
+          disableThisTab_(lock.tabId);
+        }
+      }
+    };
+  }
+
+  // Se eu fechar e eu era dono, removo lock (boa prática; heartbeat já cobre queda)
+  window.addEventListener("beforeunload", function(){
+    const lock = readLock_();
+    if (lock && lock.tabId === tabId) {
+      removeLock_();
+      broadcast_({ type: "RELEASE", tabId, ts: now_() });
+    }
+  });
+
+  // Export (debug manual)
+  window.vektorSingleTabTakeover = function(){
+    takeover_("manual");
+    enableThisTab_();
+  };
+})();
+</script>
 
  <div id="vektorAppRoot" class="hidden">
  <div id="vektorShell" class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
@@ -2806,7 +3039,7 @@ display: none;
 
 <div id="statusVektorModal"
      class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
-  <div class="bg-white p-5 rounded-xl shadow-lg max-w-[520px] w-[95%] text-sm text-slate-700">
+  <div class="bg-white p-5 rounded-xl shadow-lg max-w-[520px] w-[95%] text-sm text-slate-700 relative overflow-hidden vektor-status-card">
     <h2 class="text-base font-semibold text-slate-800 mb-3">
       Status
     </h2>
@@ -2840,7 +3073,7 @@ display: none;
      class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
   <div class="bg-white p-5 rounded-xl shadow-lg max-w-[720px] w-[95%]">
     <h2 class="text-base font-semibold text-slate-800 mb-2">
-      ❓ Como usar o Vektor
+      Como usar o Vektor ❓
     </h2>
     <p class="text-xs text-slate-500 mb-3">
       Guia rápido dos principais procedimentos e exemplos de uso.
@@ -8398,7 +8631,7 @@ renderBotMessage(
       "style='width:100%; display:flex; align-items:center; justify-content:center; gap:8px;" +
       "padding:10px 12px; border-radius:12px; border:1px solid rgba(181,255,32,0.9);" +
       "background:#0b1220; color:#fff; font-weight:900; cursor:pointer;'>" +
-      "❓ Como usar o Vektor" +
+      "Como usar o Vektor ❓" +
     "</button>" +
     "<div style='margin-top:8px; font-size:12px; color:#475569;'>Clique para abrir exemplos e procedimentos.</div>" +
   "</div>"
