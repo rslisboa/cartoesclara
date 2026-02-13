@@ -1862,6 +1862,194 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
   return out;
 }
 
+// =====================================================
+// VALORES CONTABILIZADOS (BaseClara) - Back-end
+// =====================================================
+function getValoresContabilizadosEtiquetas(req) {
+  vektorAssertFunctionAllowed_("getValoresContabilizadosEtiquetas");
+  try {
+    req = req || {};
+    var timeSel = String(req.time || "").trim();     // "" = todos
+    var lojaSel = String(req.loja || "").trim();     // "" = todas
+    var iniIso  = String(req.dataInicioIso || "").trim();
+    var fimIso  = String(req.dataFimIso || "").trim();
+
+    var ini = iniIso ? vektorParseIsoDateSafe_(iniIso) : null;
+    var fim = fimIso ? vektorParseIsoDateSafe_(fimIso) : null;
+
+    // período inclusivo (fim 23:59:59)
+    if (ini) ini = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0,0,0);
+    if (fim) fim = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23,59,59);
+
+    // mapa loja->time (você já usa em outros fluxos)
+    var mapLojaTime = {};
+    try { mapLojaTime = construirMapaLojaParaTime_() || {}; } catch (_) { mapLojaTime = {}; }
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error("Aba BaseClara não encontrada.");
+
+    var lr = sh.getLastRow();
+    if (lr < 2) return { ok:true, total:0, rows:[], categorias:[] };
+
+    // A..W (23 colunas) — mesmo padrão da queryPendenciasBaseClaraAlert_
+    var values = sh.getRange(2, 1, lr - 1, 23).getValues();
+
+    var IDX_DATA      = 0;   // A
+    var IDX_VALOR     = 5;   // F
+    var IDX_GRUPO     = 17;  // R
+    var IDX_ETIQUETA  = 19;  // T
+    var IDX_LOJA_NUM  = 21;  // V
+
+    function normLoja4_(x) {
+      var s = String(x || "").trim();
+      if (!s) return "";
+      var m = s.match(/(\d{1,4})/);
+      if (!m) return "";
+      return String(Number(m[1])).padStart(4, "0");
+    }
+
+    function parseConta_(etq) {
+      etq = String(etq || "").trim();
+      if (!etq) return { conta:"", etiqueta: "" };
+
+      // pega números no início (ex: "7170 - MATERIAL DE ...")
+      var m = etq.match(/^(\d{2,})\s*[-–]?\s*(.*)$/);
+      if (m) {
+        var num = String(m[1] || "").trim();
+        return { conta: num, etiqueta: etq };
+      }
+
+      // se não tiver numeração, conta = descrição toda (como você pediu)
+      return { conta: etq, etiqueta: etq };
+    }
+
+    function normEtqKey_(etq) {
+      return String(etq || "").trim();
+    }
+
+    // categorias fixas (matching por “contém” no texto)
+    var CATS = [
+      { cat:"🏛️ Administrativo e Geral", keys:[
+        "MATERIAL DE ESCRITÓRIO",
+        "TAXAS E EMOLUMENTOS",
+        "CORREIOS_SEDEX/AR/POSTAGEM",
+        "SERVIÇOS GRÁFICOS E DE COPIADORAS"
+      ]},
+      { cat:"💰 Financeiro e Operações de Venda", keys:[
+        "BOBINA ECF",
+        "TRANSPORTE SERVICOS EMERGENCIAS"
+      ]},
+      { cat:"📢 Comercial e Marketing", keys:[
+        "MARKETING_PUBLICIDADE E PROPAGANDA",
+        "SERVIÇOS GRÁFICOS OPERAÇÕES"
+      ]},
+      { cat:"🛠️ Manutenção e Conservação", keys:[
+        "MANUTENÇÃO CIVIL",
+        "MANUTENÇÃO ELETRICO",
+        "MANUTENÇÃO AR-CONDICIONADO",
+        "MANUTENÇÃO EQUIPAMENTOS",
+        "MANUTENÇÃO MAQ ESTAMPAR",
+        "MATERIAL DE INFORMÁTICA",
+        "CHAVEIRO EMERGENCIAL"
+      ]},
+      { cat:"🧼 Limpeza e Higiene", keys:[
+        "MATERIAL DE LIMPEZA",
+        "MATERIAL DE LIMPEZA OPERAÇÕES",
+        "SERVIÇOS DE LIMPEZA"
+      ]},
+      { cat:"☕ Copa, Cozinha e Bem-estar", keys:[
+        "MATERIAL DE COPA E COZINHA",
+        "MATERIAL DE COPA E COZINHA OPERAÇÕES",
+        "AGUA POTÁVEL",
+        "LANCHES DE REFEIÇÕES"
+      ]}
+    ];
+
+    function categoriaDaEtiqueta_(etq) {
+      var s = String(etq || "").toUpperCase();
+      for (var i=0; i<CATS.length; i++) {
+        for (var j=0; j<CATS[i].keys.length; j++) {
+          var k = String(CATS[i].keys[j] || "").toUpperCase();
+          if (k && s.indexOf(k) >= 0) return CATS[i].cat;
+        }
+      }
+      return "Outros";
+    }
+
+    var sumByEtq = {};    // { etiquetaKey: { etiqueta, conta, valor } }
+    var sumByCat = {};    // { categoria: valor }
+    var total = 0;
+
+    for (var i=0; i<values.length; i++) {
+      var row = values[i];
+
+      var dt = row[IDX_DATA];
+      if (!(dt instanceof Date) || isNaN(dt.getTime())) continue;
+
+      if (ini && dt < ini) continue;
+      if (fim && dt > fim) continue;
+
+      var loja4 = normLoja4_(row[IDX_LOJA_NUM]);
+      if (lojaSel && loja4 !== String(lojaSel).padStart(4,"0")) continue;
+
+      // time: tenta coluna R; se vier vazio, usa mapa loja->time
+      var timeRow = String(row[IDX_GRUPO] || "").trim();
+      var timeFinal = timeRow || (mapLojaTime[loja4] ? String(mapLojaTime[loja4]).trim() : "N/D");
+
+      if (timeSel && timeFinal !== timeSel) continue;
+
+      var etqRaw = String(row[IDX_ETIQUETA] || "").trim();
+      if (!etqRaw) continue;
+
+      var valor = Number(row[IDX_VALOR] || 0) || 0;
+      if (!valor) continue;
+
+      total += valor;
+
+      // chave da etiqueta
+      var etqKey = normEtqKey_(etqRaw);
+      if (!sumByEtq[etqKey]) {
+        var p = parseConta_(etqRaw);
+        sumByEtq[etqKey] = { etiqueta: p.etiqueta, conta: p.conta, valor: 0 };
+      }
+      sumByEtq[etqKey].valor += valor;
+
+      var cat = categoriaDaEtiqueta_(etqRaw);
+      if (!sumByCat[cat]) sumByCat[cat] = 0;
+      sumByCat[cat] += valor;
+    }
+
+    var rowsOut = Object.keys(sumByEtq).map(function(k){
+      var r = sumByEtq[k];
+      return {
+        etiqueta: r.etiqueta,
+        conta: r.conta,
+        valor: r.valor,
+        pct: (total > 0 ? (r.valor / total) : 0)
+      };
+    });
+
+    rowsOut.sort(function(a,b){ return (b.valor||0) - (a.valor||0); });
+
+    var catsOut = Object.keys(sumByCat).map(function(k){
+      var v = sumByCat[k];
+      return { categoria: k, valor: v, pct: (total > 0 ? (v / total) : 0) };
+    });
+    catsOut.sort(function(a,b){ return (b.valor||0) - (a.valor||0); });
+
+    return {
+      ok: true,
+      total: total,
+      rows: rowsOut,
+      categorias: catsOut
+    };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 function montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows) {
   var esc = function (s) {
     return String(s == null ? "" : s)
