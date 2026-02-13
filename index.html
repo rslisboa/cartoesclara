@@ -2406,44 +2406,44 @@ display: none;
 <div id="myAlertsView" class="hidden" style="position:absolute; inset:0; z-index:20;">
 
   <!-- MODAL: Tutorial (Alertas Programados) -->
-<div id="myAlTutorialModal"
-     class="fixed inset-0 bg-black/60 z-[80] hidden items-center justify-center"
-     style="display:none;">
-  <div class="bg-white rounded-2xl shadow-2xl w-[95%] max-w-[980px] overflow-hidden border border-slate-200">
-    <!-- Header -->
-    <div class="px-5 py-4 text-white flex items-center justify-between"
-         style="background:#005E27;">
-      <div>
-        <div class="text-base font-extrabold">Tutorial — Alertas Programados</div>
-        <div class="text-xs opacity-90">Vídeo rápido de uso da página</div>
+  <div id="myAlTutorialModal"
+       class="fixed inset-0 bg-black/60 z-[80] hidden items-center justify-center"
+       style="display:none;">
+    <div class="bg-white rounded-2xl shadow-2xl w-[95%] max-w-[980px] overflow-hidden border border-slate-200">
+      <!-- Header -->
+      <div class="px-5 py-4 text-white flex items-center justify-between"
+           style="background:#005E27;">
+        <div>
+          <div class="text-base font-extrabold">Tutorial — Alertas Programados</div>
+          <div class="text-xs opacity-90">Vídeo rápido de uso da página</div>
+        </div>
+
+        <button type="button"
+                onclick="closeMyAlTutorialModal()"
+                class="transition rounded-lg px-3 py-2 text-sm font-semibold"
+                style="background:rgba(255,255,255,0.18);">
+          Fechar
+        </button>
       </div>
 
-      <button type="button"
-              onclick="closeMyAlTutorialModal()"
-              class="transition rounded-lg px-3 py-2 text-sm font-semibold"
-              style="background:rgba(255,255,255,0.18);">
-        Fechar
-      </button>
-    </div>
+      <!-- Faixa destaque -->
+      <div style="height:6px; background:#B5FF20;"></div>
 
-    <!-- Faixa destaque -->
-    <div style="height:6px; background:#B5FF20;"></div>
-
-    <!-- Body -->
-    <div class="p-4" style="background:#f8fafc;">
-      <div style="position:relative; padding-bottom:56.25%; height:0; border-radius:12px; overflow:hidden; border:1px solid rgba(15,23,42,0.12); background:#000;">
-        <iframe
-          src="https://www.loom.com/embed/4c49cc7ba6444bc9ae7931e4a9940b57"
-          frameborder="0"
-          webkitallowfullscreen
-          mozallowfullscreen
-          allowfullscreen
-          style="position:absolute; top:0; left:0; width:100%; height:100%;">
-        </iframe>
+      <!-- Body -->
+      <div class="p-4" style="background:#f8fafc;">
+        <div style="position:relative; padding-bottom:56.25%; height:0; border-radius:12px; overflow:hidden; border:1px solid rgba(15,23,42,0.12); background:#000;">
+          <iframe
+            src="https://www.loom.com/embed/4c49cc7ba6444bc9ae7931e4a9940b57"
+            frameborder="0"
+            webkitallowfullscreen
+            mozallowfullscreen
+            allowfullscreen
+            style="position:absolute; top:0; left:0; width:100%; height:100%;">
+          </iframe>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
   <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
     <div style="height:100%; width:100%; display:flex; flex-direction:column;">
@@ -2453,34 +2453,58 @@ display: none;
         <div style="display:flex; align-items:center;">
 
           <div>
-            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Definição de Alertas</div>
+            <div id="myAl_title" style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Definição de Alertas</div>
             <div style="color:rgba(226,232,240,0.9); font-size:13px; margin-top:2px;">
               <span id="myAl_subtitle">Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.</span>
             </div>
           </div>
         </div>
 
-                    <button
-              type="button"
-              onclick="openMyAlTutorialModal()"
-              style="
-                height:36px;
-                padding:0 14px;
-                border-radius:10px;
-                border:1px solid rgba(0,0,0,0.25);
-                background:#00FFFF;
-                color:#000;
-                font-weight:900;
-                font-size:12px;
-                display:flex;
-                align-items:center;
-                gap:6px;
-                transform: translateY(13px);
-              ">
-              ▶ Tutorial (vídeo)
-            </button>
+        <div id="myAl_headerBtns"
+             style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:flex-end; transform: translateY(13px);">
 
-        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+          <button
+            id="myAl_btnValores"
+            type="button"
+            onclick="openMyAlValoresContabilizadosView()"
+            style="
+              height:36px;
+              padding:0 14px;
+              border-radius:10px;
+              border:1px solid rgba(148,163,184,0.28);
+              background:rgba(255,255,255,0.10);
+              color:#fff;
+              font-weight:900;
+              font-size:12px;
+              display:flex;
+              align-items:center;
+              gap:8px;
+            ">
+            📊 Valores Contabilizados
+          </button>
+
+          <button
+            id="myAl_btnTutorial"
+            type="button"
+            onclick="openMyAlTutorialModal()"
+            style="
+              height:36px;
+              padding:0 14px;
+              border-radius:10px;
+              border:1px solid rgba(0,0,0,0.25);
+              background:#00FFFF;
+              color:#000;
+              font-weight:900;
+              font-size:12px;
+              display:flex;
+              align-items:center;
+              gap:6px;
+            ">
+            ▶ Tutorial (vídeo)
+          </button>
+        </div>
+
+        <div id="myAl_typeWrap" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
           <div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">
             <div style="color:rgba(226,232,240,0.85); font-size:13px; font-weight:900;">Tipo de alerta</div>
             <select id="myAl_alertType"
@@ -2494,169 +2518,320 @@ display: none;
       </div>
 
       <!-- Conteúdo -->
-<div style="flex:1; overflow:auto; background:#070b14; padding:14px 16px;">
+      <div style="flex:1; overflow:auto; background:#070b14; padding:14px 16px;">
 
-  <!-- Cards: Criar + Listagem -->
-  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+        <!-- ===== VIEW 1: Definição de Alertas (tudo que já existe) ===== -->
+        <div id="myAl_defView">
 
-    <!-- Card: Criar alerta -->
-    <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-      <div style="color:#fff; font-weight:900; font-size:15px;">Criar alerta</div>
-      <div style="color:rgba(226,232,240,0.75); font-size:12px; margin-top:2px;">
-        <span id="myAl_createHint">O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).</span>
-      </div>
+          <!-- Cards: Criar + Listagem -->
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
 
-      <div style="margin-top:10px; display:grid; gap:10px;">
+            <!-- Card: Criar alerta -->
+            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+              <div style="color:#fff; font-weight:900; font-size:15px;">Criar alerta</div>
+              <div style="color:rgba(226,232,240,0.75); font-size:12px; margin-top:2px;">
+                <span id="myAl_createHint">O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).</span>
+              </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-          <div>
-            <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Frequência</label>
-            <select id="myAl_freq" style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
-              <option value="DAILY">Diário</option>
-              <option value="3D">A cada 3 dias</option>
-              <option value="WEEKLY">Semanal</option>
-              <option value="MONTHLY">Mensal</option>
-            </select>
+              <div style="margin-top:10px; display:grid; gap:10px;">
+
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                  <div>
+                    <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Frequência</label>
+                    <select id="myAl_freq" style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
+                      <option value="DAILY">Diário</option>
+                      <option value="3D">A cada 3 dias</option>
+                      <option value="WEEKLY">Semanal</option>
+                      <option value="MONTHLY">Mensal</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Janela de análise (dias)</label>
+                    <input id="myAl_windowDays" type="number" min="1" max="365" placeholder="30"
+                      title="Se vazio, considera automaticamente os últimos 30 dias."
+                      style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+                  </div>
+                </div>
+
+                <div>
+                  <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
+                    Horário do e-mail (opcional)
+                  </label>
+                  <input id="myAl_sendAt" type="time"
+                    style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+                  <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
+                    Se vazio, o Vektor dispara assim que a frequência vencer.
+                  </div>
+                </div>
+
+                <div>
+                  <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Time</label>
+                  <select id="myAl_team" style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
+                    <option value="__ALL__">Todos os times</option>
+                    <option value="" disabled>Carregando…</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Lojas (do time)</label>
+                  <div id="myAl_storesBox" style="max-height:160px; overflow:auto; border-radius:12px; border:1px solid rgba(148,163,184,0.18); padding:10px; background:rgba(255,255,255,0.03); color:#fff;">
+                    <div style="opacity:0.8; font-size:12px;">Selecione um time para listar as lojas.</div>
+                  </div>
+                </div>
+
+                <div>
+                  <div id="myAl_labelWrap">
+                    <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
+                      Etiquetas (multi-seleção)
+                    </label>
+
+                    <select id="myAl_label" multiple
+                      style="width:100%; min-height:120px; border-radius:12px; background:rgba(255,255,255,0.06);
+                            color:#fff; border:1px solid rgba(148,163,184,0.18); padding:8px 10px; font-size:12px;">
+                      <option value="__ALL__">Todas</option>
+                    </select>
+
+                    <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
+                      Dica: segure Ctrl (Windows) ou Cmd (Mac) para selecionar mais de uma etiqueta.
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+                  <button id="myAl_saveBtn" type="button" onclick="window.vektorMyAlertsCreate()"
+                    style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;">
+                    Criar alerta
+                  </button>
+
+                  <button type="button" onclick="window.vektorMyAlertsRefresh()"
+                    style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
+                    Atualizar lista
+                  </button>
+
+                  <button id="myAl_cancelEditBtn" type="button" onclick="window.vektorMyAlertsCancelEdit_()"
+                    style="display:none;
+                    height:36px;
+                    padding:0 14px;
+                    border-radius:10px;
+                    border:1px solid rgba(148,163,184,0.18);
+                    background:rgba(255,255,255,0.06);
+                    color:#fff;
+                    font-weight:900;
+                    font-size:12px;
+                    align-items:center;
+                    justify-content:center;
+                    line-height:1;">
+                    Cancelar edição
+                  </button>
+                </div>
+
+                <div id="myAl_createStatus" style="margin-top:4px; font-size:12px; color:rgba(226,232,240,0.85);"></div>
+
+              </div>
+            </div>
+
+            <!-- Card: Alertas existentes -->
+            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+
+              <!-- Header do card -->
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="color:#fff; font-weight:900; font-size:15px;">
+                  Alertas cadastrados
+                </div>
+                <div style="color:rgba(226,232,240,0.75); font-size:12px;">
+                  Seu histórico é privado. O botão <b>Executar</b> irá enviar o alerta diretamente aqui no chat. O envio por e-mail ocorrerá <b>automaticamente</b> conforme a <b>frequência</b> configurada neste alerta.
+                </div>
+              </div>
+
+              <!-- Filtros ADMIN -->
+              <div id="myAl_adminFilterBox" style="display:none; margin-top:12px;">
+
+                <div style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
+                  Filtros (Admin)
+                </div>
+
+                <div style="display:flex; gap:8px; width:100%;">
+
+                  <input
+                    id="myAl_adminEmail"
+                    type="text"
+                    placeholder="filtrar por e-mail"
+                    style="flex:1; height:34px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-size:12px;"
+                  />
+
+                  <select
+                    id="myAl_adminRole"
+                    style="flex:1; height:34px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-size:12px;"
+                  >
+                    <option value="">Todas as áreas</option>
+                  </select>
+
+                </div>
+              </div>
+
+              <!-- ✅ LISTA: agora DENTRO do card Alertas cadastrados -->
+              <div id="myAl_list"
+                style="margin-top:12px; display:flex; flex-direction:column; gap:10px; max-height:520px; overflow:auto; padding-right:6px;">
+                <div style="color:rgba(226,232,240,0.85); font-size:12px;">Carregando…</div>
+              </div>
+            </div>
+
+          </div> <!-- /Cards grid -->
+
+        </div> <!-- /myAl_defView -->
+
+
+        <!-- ===== VIEW 2: Valores Contabilizados (NOVA PÁGINA) ===== -->
+        <div id="myAl_valoresView" style="display:none;">
+
+          <!-- Barra superior da visão -->
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+            <button
+              type="button"
+              onclick="openMyAlDefinicaoAlertasView()"
+              style="
+                height:34px;
+                padding:0 12px;
+                border-radius:10px;
+                border:1px solid rgba(148,163,184,0.22);
+                background:rgba(255,255,255,0.06);
+                color:#fff;
+                font-weight:900;
+                font-size:12px;
+                display:inline-flex;
+                align-items:center;
+                gap:8px;
+              ">
+              ← Definição de Alertas
+            </button>
+
+            <button
+              type="button"
+              onclick="myAlValoresDownloadCsv()"
+              style="
+                height:34px;
+                padding:0 12px;
+                border-radius:10px;
+                border:1px solid rgba(0,0,0,0.25);
+                background:#B5FF20;
+                color:#000;
+                font-weight:900;
+                font-size:12px;
+                display:inline-flex;
+                align-items:center;
+                gap:8px;
+              ">
+              ⬇ Download
+            </button>
           </div>
 
-          <div>
-            <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Janela de análise (dias)</label>
-            <input id="myAl_windowDays" type="number" min="1" max="365" placeholder="30"
-              title="Se vazio, considera automaticamente os últimos 30 dias."
-              style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
-          </div>
-        </div>
+          <!-- Filtros -->
+          <div style="
+              background:#0b1220;
+              border:1px solid rgba(148,163,184,0.18);
+              border-radius:14px;
+              padding:12px;
+              margin-bottom:12px;
+            ">
+            <div style="color:#fff; font-weight:900; font-size:13px; margin-bottom:10px;">Filtros</div>
 
-        <div>
-          <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
-            Horário do e-mail (opcional)
-          </label>
-          <input id="myAl_sendAt" type="time"
-            style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
-          <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
-            Se vazio, o Vektor dispara assim que a frequência vencer.
-          </div>
-        </div>
+            <div style="display:grid; grid-template-columns: 1.1fr 1.3fr 1fr 1fr auto; gap:10px; align-items:end;">
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Time</div>
+                <select id="myAl_val_time"
+                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
+                         border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
+                </select>
+              </div>
 
-        <div>
-          <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Time</label>
-          <select id="myAl_team" style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
-            <option value="__ALL__">Todos os times</option>
-            <option value="" disabled>Carregando…</option>
-          </select>
-        </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Loja</div>
+                <select id="myAl_val_loja"
+                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
+                         border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
+                </select>
+              </div>
 
-        <div>
-          <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">Lojas (do time)</label>
-          <div id="myAl_storesBox" style="max-height:160px; overflow:auto; border-radius:12px; border:1px solid rgba(148,163,184,0.18); padding:10px; background:rgba(255,255,255,0.03); color:#fff;">
-            <div style="opacity:0.8; font-size:12px;">Selecione um time para listar as lojas.</div>
-          </div>
-        </div>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Período (Início)</div>
+                <input id="myAl_val_dtIni" type="date"
+                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
+                         border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;" />
+              </div>
 
-        <div>
-          <div id="myAl_labelWrap">
-          <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
-            Etiquetas (multi-seleção)
-          </label>
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Período (Fim)</div>
+                <input id="myAl_val_dtFim" type="date"
+                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
+                         border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;" />
+              </div>
 
-          <select id="myAl_label" multiple
-            style="width:100%; min-height:120px; border-radius:12px; background:rgba(255,255,255,0.06);
-                  color:#fff; border:1px solid rgba(148,163,184,0.18); padding:8px 10px; font-size:12px;">
-            <option value="__ALL__">Todas</option>
-          </select>
-
-          <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
-            Dica: segure Ctrl (Windows) ou Cmd (Mac) para selecionar mais de uma etiqueta.
+              <button
+                type="button"
+                onclick="myAlValoresClearFilters()"
+                style="
+                  height:36px;
+                  padding:0 12px;
+                  border-radius:10px;
+                  border:1px solid rgba(148,163,184,0.22);
+                  background:rgba(255,255,255,0.06);
+                  color:#fff;
+                  font-weight:900;
+                  font-size:12px;
+                ">
+                Limpar
+              </button>
             </div>
           </div>
-        </div>
 
-        <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-          <button id="myAl_saveBtn" type="button" onclick="window.vektorMyAlertsCreate()"
-            style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;">
-            Criar alerta
-          </button>
+            <!-- Loading (Valores Contabilizados) -->
+              <div id="myAl_valLoading"
+                  style="display:none; margin-bottom:12px; padding:10px 12px; border-radius:12px;
+                          background:#0b1220; border:1px solid rgba(148,163,184,0.18); color:#fff; font-weight:900;">
+                Carregando valores contabilizados…
+                <div style="margin-top:4px; font-size:12px; color:rgba(226,232,240,0.75); font-weight:700;">
+                  Aguarde a consolidação por etiqueta e categoria.
+                </div>
+              </div>
 
-          <button type="button" onclick="window.vektorMyAlertsRefresh()"
-            style="height:36px; padding:0 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;">
-            Atualizar lista
-          </button>
+          <!-- Layout: Funil + Tabela -->
+          <div style="display:grid; grid-template-columns: 420px 1fr; gap:12px; align-items:start;">
+            <!-- Funil -->
+            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
+              <div style="color:#fff; font-weight:900; font-size:13px; margin-bottom:10px;">
+                Funil por categoria (valor e %)
+              </div>
+              <div id="myAl_funilWrap" style="width:100%; overflow:hidden;"></div>
+            </div>
 
-          <button id="myAl_cancelEditBtn" type="button" onclick="window.vektorMyAlertsCancelEdit_()"
-            style="display:none;
-            height:36px;
-            padding:0 14px;
-            border-radius:10px;
-            border:1px solid rgba(148,163,184,0.18);
-            background:rgba(255,255,255,0.06);
-            color:#fff;
-            font-weight:900;
-            font-size:12px;
-            align-items:center;
-            justify-content:center;
-            line-height:1;">
-            Cancelar edição
-          </button>
+            <!-- Tabela -->
+            <div style="background:#ffffff; border:1px solid #000; border-radius:14px; padding:10px; overflow:auto;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
+                <div style="font-weight:900; color:#000;">Valores por Etiqueta (BaseClara)</div>
+                <div id="myAl_valoresMeta" style="font-size:12px; color:#111;"></div>
+              </div>
 
-        </div>
+              <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                <thead>
+                  <tr style="background:#bfe8ff; color:#000; font-weight:900;">
+                    <th style="border:1px solid #000; padding:8px; text-align:left;">Etiquetas</th>
+                    <th style="border:1px solid #000; padding:8px; text-align:left;">Conta Contábil</th>
+                    <th style="border:1px solid #000; padding:8px; text-align:right;">Valor</th>
+                    <th style="border:1px solid #000; padding:8px; text-align:right;">% Valor</th>
+                  </tr>
+                </thead>
+                <tbody id="myAl_valoresTbody"></tbody>
+              </table>
+            </div>
+          </div>
 
-        <div id="myAl_createStatus" style="margin-top:4px; font-size:12px; color:rgba(226,232,240,0.85);"></div>
+        </div> <!-- /myAl_valoresView -->
 
-      </div>
-    </div>
+      </div> <!-- /Conteúdo -->
 
-    <!-- Card: Alertas existentes -->
-    <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
 
-      <!-- Header do card -->
-      <div style="display:flex; flex-direction:column; gap:6px;">
-        <div style="color:#fff; font-weight:900; font-size:15px;">
-          Alertas cadastrados
-        </div>
-        <div style="color:rgba(226,232,240,0.75); font-size:12px;">
-          Seu histórico é privado. O botão <b>Executar</b> irá enviar o alerta diretamente aqui no chat. O envio por e-mail ocorrerá <b>automaticamente</b> conforme a <b>frequência</b> configurada neste alerta.
-        </div>
-      </div>
-
-      <!-- Filtros ADMIN -->
-      <div id="myAl_adminFilterBox" style="display:none; margin-top:12px;">
-
-        <div style="color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
-          Filtros (Admin)
-        </div>
-
-        <div style="display:flex; gap:8px; width:100%;">
-
-          <input
-            id="myAl_adminEmail"
-            type="text"
-            placeholder="filtrar por e-mail"
-            style="flex:1; height:34px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-size:12px;"
-          />
-
-          <select
-            id="myAl_adminRole"
-            style="flex:1; height:34px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-size:12px;"
-          >
-            <option value="">Todas as áreas</option>
-          </select>
-
-        </div>
-      </div>
-
-      <!-- ✅ LISTA: agora DENTRO do card Alertas cadastrados -->
-      <div id="myAl_list"
-        style="margin-top:12px; display:flex; flex-direction:column; gap:10px; max-height:520px; overflow:auto; padding-right:6px;">
-        <div style="color:rgba(226,232,240,0.85); font-size:12px;">Carregando…</div>
-      </div>
-      </div>
-
-    </div>
-
-  </div>
-</div>
-
-    <!-- ✅ Overlay / Toast (My Alerts) -->
+      <!-- ✅ Overlay / Toast (My Alerts) -->
       <div id="myAl_overlay" style="display:none; position:absolute; inset:0; z-index:60; background:rgba(0,0,0,0.55);">
         <div style="height:100%; display:flex; align-items:center; justify-content:center; padding:16px;">
           <div style="width:min(420px, 92vw); background:#0b1220; border:1px solid rgba(148,163,184,0.25); border-radius:16px; padding:14px;">
@@ -2676,6 +2851,7 @@ display: none;
         <div id="myAl_toastMsg" style="color:#fff; font-weight:900; font-size:12px;">OK</div>
       </div>
 
+    </div>
   </main>
 </div>
 
@@ -8114,6 +8290,346 @@ window.vektorMyAlertsRefresh = function () {
       adminFilterRole: adminFilterRole
     });
 };
+
+// ================================
+// VIEW: Valores Contabilizados
+// ================================
+window.__myAl_valores_last = { ok:false, rows:[], categorias:[], total:0 };
+
+
+function openMyAlValoresContabilizadosView() {
+  // 1) header texts
+  const title = document.getElementById("myAl_title");
+  const sub   = document.getElementById("myAl_subtitle");
+  if (title) title.textContent = "Valores Contabilizados";
+  if (sub)   sub.textContent   = "Consolidação histórica de valores por etiqueta (BaseClara) + funil por categoria.";
+
+  // 2) hide header controls
+  const btns = document.getElementById("myAl_headerBtns");
+  const type = document.getElementById("myAl_typeWrap");
+  if (btns) btns.style.display = "none";
+  if (type) type.style.display = "none";
+
+  // 3) swap body
+  const defV = document.getElementById("myAl_defView");
+  const valV = document.getElementById("myAl_valoresView");
+  if (defV) defV.style.display = "none";
+  if (valV) valV.style.display = "block";
+
+  function openMyAlValoresContabilizadosView() {
+  // esconde view antiga
+  const defView = document.getElementById("myAl_defView");
+  const valView = document.getElementById("myAl_valoresView");
+
+  if (defView) defView.style.display = "none";
+  if (valView) valView.style.display = "block";
+
+  // mostra loading
+  myAlValLoading_(true);
+
+  // limpa tabela anterior (opcional mas recomendado)
+  const tbody = document.getElementById("myAl_valoresTbody");
+  if (tbody) tbody.innerHTML = "";
+
+  const funil = document.getElementById("myAl_funilWrap");
+  if (funil) funil.innerHTML = "";
+
+  // chama backend e carrega dados
+  myAlValoresLoadData_();
+}
+
+  // 4) init filters + load
+  myAlValoresInitOnce_();
+  myAlValoresLoad_();
+}
+
+function myAlValoresLoadData_() {
+  try {
+    myAlValLoading_(true);
+
+    const time = document.getElementById("myAl_val_time")?.value || "__ALL__";
+    const loja = document.getElementById("myAl_val_loja")?.value || "__ALL__";
+    const dtIni = document.getElementById("myAl_val_dtIni")?.value || "";
+    const dtFim = document.getElementById("myAl_val_dtFim")?.value || "";
+
+    google.script.run
+      .withSuccessHandler(function(resp) {
+        try {
+          // aqui você vai renderizar tabela + funil
+          // exemplo:
+          // renderMyAlValoresTabela_(resp);
+          // renderMyAlValoresFunil_(resp);
+
+        } finally {
+          myAlValLoading_(false);
+        }
+      })
+      .withFailureHandler(function(err) {
+        myAlValLoading_(false);
+        alert("Erro ao carregar Valores Contabilizados: " + (err && err.message ? err.message : err));
+      })
+      .myAlGetValoresContabilizados(time, loja, dtIni, dtFim); // backend
+  } catch (e) {
+    myAlValLoading_(false);
+    alert("Erro inesperado: " + e.message);
+  }
+}
+
+function myAlValLoading_(on) {
+  const el = document.getElementById("myAl_valLoading");
+  if (el) el.style.display = on ? "block" : "none";
+}
+
+function openMyAlDefinicaoAlertasView() {
+  const title = document.getElementById("myAl_title");
+  const sub   = document.getElementById("myAl_subtitle");
+  if (title) title.textContent = "Definição de Alertas";
+  if (sub)   sub.textContent   = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
+
+  const btns = document.getElementById("myAl_headerBtns");
+  const type = document.getElementById("myAl_typeWrap");
+  if (btns) btns.style.display = "flex";
+  if (type) type.style.display = "flex";
+
+  const defV = document.getElementById("myAl_defView");
+  const valV = document.getElementById("myAl_valoresView");
+  if (valV) valV.style.display = "none";
+  if (defV) defV.style.display = "block";
+}
+
+let __myAl_valores_inited = false;
+
+function myAlValoresInitOnce_() {
+  if (__myAl_valores_inited) return;
+  __myAl_valores_inited = true;
+
+  const selTime = document.getElementById("myAl_val_time");
+  const selLoja = document.getElementById("myAl_val_loja");
+
+  // monta times
+  const times = (typeof VEKTOR_TIMES !== "undefined" && Array.isArray(VEKTOR_TIMES)) ? VEKTOR_TIMES.slice() : [];
+  if (selTime) {
+    selTime.innerHTML = `<option value="">Todos</option>` + times.map(t => `<option value="${escAttr_(t)}">${t}</option>`).join("");
+  }
+
+  // monta lojas (depende do time)
+  function refreshLojas() {
+    const time = selTime && selTime.value ? String(selTime.value) : "";
+    const lojas = (window.__VEKTOR_LOJAS && Array.isArray(window.__VEKTOR_LOJAS)) ? window.__VEKTOR_LOJAS.slice() : [];
+
+    // aqui a regra de “time respeita loja” precisa de um mapeamento
+    // Se sua getListaLojas() já traz "time" dentro do objeto, filtramos por ele.
+    // Se não trouxer, deixamos todas as lojas disponíveis (e o backend filtra pelo mapa loja->time).
+    const filtradas = (!time)
+      ? lojas
+      : lojas.filter(l => String(l.time || "").trim() === time);
+
+    if (selLoja) {
+      selLoja.innerHTML = `<option value="">Todas</option>` + filtradas
+        .map(l => {
+          const cod = String(l.codigo || "").padStart(4, "0");
+          const nome = String(l.nome || l.nomeLojaTxt || "").trim();
+          const label = nome ? `${cod} - ${nome}` : cod;
+          return `<option value="${escAttr_(cod)}">${escHtml_(label)}</option>`;
+        })
+        .join("");
+    }
+  }
+
+  if (selTime) selTime.addEventListener("change", function(){
+    refreshLojas();
+    myAlValoresLoad_();
+  });
+  if (selLoja) selLoja.addEventListener("change", myAlValoresLoad_);
+
+  const dtIni = document.getElementById("myAl_val_dtIni");
+  const dtFim = document.getElementById("myAl_val_dtFim");
+  if (dtIni) dtIni.addEventListener("change", myAlValoresLoad_);
+  if (dtFim) dtFim.addEventListener("change", myAlValoresLoad_);
+
+  refreshLojas();
+}
+
+function myAlValoresClearFilters() {
+  const selTime = document.getElementById("myAl_val_time");
+  const selLoja = document.getElementById("myAl_val_loja");
+  const dtIni   = document.getElementById("myAl_val_dtIni");
+  const dtFim   = document.getElementById("myAl_val_dtFim");
+  if (selTime) selTime.value = "";
+  if (selLoja) selLoja.value = "";
+  if (dtIni) dtIni.value = "";
+  if (dtFim) dtFim.value = "";
+  myAlValoresLoad_();
+}
+
+function myAlValoresLoad_() {
+  const time = document.getElementById("myAl_val_time")?.value || "";
+  const loja = document.getElementById("myAl_val_loja")?.value || "";
+  const dtIni = document.getElementById("myAl_val_dtIni")?.value || "";
+  const dtFim = document.getElementById("myAl_val_dtFim")?.value || "";
+
+  // (opcional) mostrar overlay do próprio MyAlerts se existir
+  try { window.vektorMyAlertsShowLoading_ && window.vektorMyAlertsShowLoading_("Carregando valores contabilizados..."); } catch(_) {}
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      try { window.vektorMyAlertsHideLoading_ && window.vektorMyAlertsHideLoading_(); } catch(_) {}
+
+      if (!res || !res.ok) {
+        const tb = document.getElementById("myAl_valoresTbody");
+        if (tb) tb.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">Falha ao carregar: ${escHtml_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
+        return;
+      }
+
+      window.__myAl_valores_last = res;
+
+      myAlValoresRenderTable_(res);
+      myAlValoresRenderFunil_(res);
+    })
+    .withFailureHandler(function(err){
+      try { window.vektorMyAlertsHideLoading_ && window.vektorMyAlertsHideLoading_(); } catch(_) {}
+
+      const tb = document.getElementById("myAl_valoresTbody");
+      if (tb) tb.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">Erro: ${escHtml_(err && err.message ? err.message : String(err))}</td></tr>`;
+    })
+    .getValoresContabilizadosEtiquetas({
+      time: String(time || ""),
+      loja: String(loja || ""),
+      dataInicioIso: dtIni ? (dtIni + "T00:00:00") : "",
+      dataFimIso:    dtFim ? (dtFim + "T23:59:59") : ""
+    });
+}
+
+function myAlValoresRenderTable_(res) {
+  const tbody = document.getElementById("myAl_valoresTbody");
+  const meta  = document.getElementById("myAl_valoresMeta");
+  if (!tbody) return;
+
+  const rows = Array.isArray(res.rows) ? res.rows : [];
+  const total = Number(res.total || 0) || 0;
+
+  if (meta) meta.textContent = `Total: ${fmtBRL_(total)} | Linhas: ${rows.length}`;
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">Sem dados para os filtros.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    return `
+      <tr>
+        <td style="border:1px solid #000; padding:8px; text-align:left;">${escHtml_(r.etiqueta || "")}</td>
+        <td style="border:1px solid #000; padding:8px; text-align:left;">${escHtml_(r.conta || "")}</td>
+        <td style="border:1px solid #000; padding:8px; text-align:right;">${fmtBRL_(r.valor || 0)}</td>
+        <td style="border:1px solid #000; padding:8px; text-align:right;">${fmtPct_(r.pct || 0)}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function myAlValoresRenderFunil_(res) {
+  const wrap = document.getElementById("myAl_funilWrap");
+  if (!wrap) return;
+
+  const cats = Array.isArray(res.categorias) ? res.categorias : [];
+  if (!cats.length) {
+    wrap.innerHTML = `<div style="color:rgba(226,232,240,0.8); font-size:12px;">Sem dados para funil.</div>`;
+    return;
+  }
+
+  // constrói um “funnel” em SVG (sem plugin externo)
+  const max = Math.max.apply(null, cats.map(c => Number(c.valor || 0) || 0)) || 1;
+
+  const W = 360;
+  const H = 520;
+  const topW = 320;
+  const bottomW = 120;
+  const x0 = (W - topW)/2;
+  const y0 = 20;
+  const segH = Math.floor((H - 60) / cats.length);
+
+  function segWidth(i) {
+    // largura interpolada pela proporção do valor
+    const v = (Number(cats[i].valor || 0) || 0);
+    const p = Math.max(0.08, v / max); // mínimo para manter visível
+    return bottomW + (topW - bottomW) * p;
+  }
+
+  let y = y0;
+  let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += `<text x="${W/2}" y="14" text-anchor="middle" font-size="12" fill="#e2e8f0" font-weight="800">Funil de valores por categoria</text>`;
+
+  for (let i=0; i<cats.length; i++) {
+    const w1 = (i===0) ? segWidth(i) : segWidth(i-1);
+    const w2 = segWidth(i);
+    const x1 = (W - w1)/2;
+    const x2 = (W - w2)/2;
+
+    const y1 = y;
+    const y2 = y + segH;
+
+    // trapezoid
+    const path = `M ${x1} ${y1} L ${x1+w1} ${y1} L ${x2+w2} ${y2} L ${x2} ${y2} Z`;
+
+    // cores alternadas azul (claro -> escuro)
+    const fill = (i % 2 === 0) ? "#2aa3ff" : "#0f7dd8";
+
+    svg += `<path d="${path}" fill="${fill}" stroke="#071229" stroke-width="2"/>`;
+
+    const label = `${cats[i].categoria || ""}`;
+    const vTxt = fmtBRL_(cats[i].valor || 0);
+    const pTxt = fmtPct_(cats[i].pct || 0);
+
+    svg += `<text x="${W/2}" y="${y1 + segH/2 - 6}" text-anchor="middle" font-size="12" fill="#001018" font-weight="900">${escSvg_(label)}</text>`;
+    svg += `<text x="${W/2}" y="${y1 + segH/2 + 12}" text-anchor="middle" font-size="12" fill="#001018" font-weight="900">${escSvg_(vTxt)}  •  ${escSvg_(pTxt)}</text>`;
+
+    y += segH;
+  }
+
+  svg += `</svg>`;
+  wrap.innerHTML = svg;
+}
+
+function myAlValoresDownloadCsv() {
+  const res = window.__myAl_valores_last;
+  if (!res || !res.ok) {
+    try { window.vektorMyAlertsToast_ && window.vektorMyAlertsToast_("Não há dados para download.", "error"); } catch(_) {}
+    return;
+  }
+
+  const rows = Array.isArray(res.rows) ? res.rows : [];
+  const header = ["Etiquetas","Conta Contábil","Valor","% Valor"];
+  const lines = [header.join(";")];
+
+  rows.forEach(r => {
+    lines.push([
+      String(r.etiqueta || ""),
+      String(r.conta || ""),
+      String(Number(r.valor||0) || 0).replace(".", ","),
+      String((Number(r.pct||0)*100).toFixed(2)).replace(".", ",") + "%"
+    ].map(csvEsc_).join(";"));
+  });
+
+  const blob = new Blob([lines.join("\n")], { type:"text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "Vektor_Valores_Contabilizados.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ===== helpers locais (não conflitar com os seus) =====
+function escHtml_(s){ return String(s==null?"":s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function escAttr_(s){ return String(s==null?"":s).replace(/"/g,'&quot;'); }
+function escSvg_(s){ return String(s==null?"":s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function fmtBRL_(n){ try { return (Number(n||0)).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); } catch(_) { return String(n||0); } }
+function fmtPct_(p){ const v = Number(p||0); return (v*100).toFixed(1).replace(".",",") + "%"; }
+function csvEsc_(s){ s = String(s==null?"":s); if (/[;\n"]/.test(s)) s = '"' + s.replace(/"/g,'""') + '"'; return s; }
+
 
 // ✅ 4 — vektorShowResumoCicloView_ (corrigir: também setar display="none" nas outras views)
 window.vektorShowResumoCicloView_ = function () {
