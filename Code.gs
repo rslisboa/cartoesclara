@@ -82,30 +82,36 @@ function isAdminEmail(email) {
 }
 
 // =======================
-// VEKTOR - CONTROLE DE ACESSO (WHITELIST) -- LIBERAR ACESSO AQUI!!!!!!!!!!!!!
+// VEKTOR - CONTROLE DE ACESSO (WHITELIST via planilha VEKTOR_EMAILS)
 // =======================
 
-// ✅ Lista de e-mails autorizados a usar o Vektor (whitelist)
-var VEKTOR_WHITELIST_EMAILS = [
-  "rodrigo.lisboa@gruposbf.com.br",
-  "tainara.nascimento@gruposbf.com.br",
-  "durval.neto@centauro.com.br",
-  "gabriela.crochiquia@centauro.com.br",
-  "julia.ssantos@gruposbf.com.br"
-  // adicione outros aqui
-];
-
+// ✅ A whitelist agora é a aba VEKTOR_EMAILS (EMAIL/ROLE/ATIVO)
+// ATIVO=SIM => habilitado; ATIVO=NÃO => bloqueado
 function isWhitelistedEmail_(email) {
-  if (!email) return false;
-  var e = String(email).trim().toLowerCase();
-  return VEKTOR_WHITELIST_EMAILS.map(function(x){ return String(x).trim().toLowerCase(); }).indexOf(e) !== -1;
+  try {
+    var e = String(email || "").trim().toLowerCase();
+    if (!e) return false;
+
+    var map = vektorLoadEmailsRoleMap_(); // { byEmail: { "a@b": { role, ativo } } }
+    var rec = map && map.byEmail ? map.byEmail[e] : null;
+    if (!rec) return false;
+
+    // ATIVO precisa ser true
+    return rec.ativo === true;
+  } catch (err) {
+    return false;
+  }
 }
 
 // (recomendado) Use este "porteiro" no começo das funções expostas via google.script.run
 function vektorAssertWhitelisted_() {
   var sess = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
   if (!sess) throw new Error("Não foi possível identificar seu e-mail Google.");
-  if (!isWhitelistedEmail_(sess)) throw new Error("Acesso negado: usuário não habilitado no Vektor.");
+
+  // ✅ fonte de verdade: VEKTOR_EMAILS (ATIVO)
+  if (!isWhitelistedEmail_(sess)) {
+    throw new Error("Acesso negado: usuário não habilitado no Vektor.");
+  }
   return sess;
 }
 
@@ -136,25 +142,11 @@ function validarLoginVektor(emailInformado) {
 
   // RBAC: precisa estar ATIVO na VEKTOR_EMAILS
 try {
-  var ctx = vektorGetUserRole_();
+  vektorGetUserRole_(); // valida ATIVO e retorna role
 } catch (e) {
-  var sessDebug = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
-  var emailsMap = null;
-  var recDebug = null;
-
-  try {
-    emailsMap = vektorLoadEmailsRoleMap_();
-    recDebug = (emailsMap && emailsMap.byEmail) ? emailsMap.byEmail[sessDebug] : null;
-  } catch (e2) {
-    return { ok: false, error: "RBAC DEBUG: sess=" + sessDebug + " | loadEmailsRoleMap falhou: " + (e2 && e2.message ? e2.message : e2) };
-  }
-
   return {
     ok: false,
-    error:
-      "RBAC DEBUG: sess=" + sessDebug +
-      " | rec=" + JSON.stringify(recDebug) +
-      " | err=" + (e && e.message ? e.message : e)
+    error: "Acesso não disponível. Solicite a liberação junto ao administrador do sistema."
   };
 }
 
@@ -181,7 +173,7 @@ var VEKTOR_ACL_SPREADSHEET_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI";
 
 var VEKTOR_ACL_CACHE_EMAILS = "VEKTOR_ACL_EMAILS_V1";
 var VEKTOR_ACL_CACHE_ACESSOS = "VEKTOR_ACL_ACESSOS_V1";
-var VEKTOR_ACL_CACHE_TTL = 300; // 5 min
+var VEKTOR_ACL_CACHE_TTL = 120; // 2 min
 
 function vektorNorm_(s) {
   return String(s || "").trim();
@@ -302,13 +294,17 @@ function vektorLoadRoleAllowedFunctions_() {
 }
 
 function vektorGetUserRole_() {
-  var sess = vektorAssertWhitelisted_(); // mantém whitelist intacta :contentReference[oaicite:4]{index=4}
-  var emails = vektorLoadEmailsRoleMap_();
-  var rec = emails.byEmail[vektorNormEmail_(sess)];
+  // ✅ email do usuário logado no domínio
+  var sess = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+  if (!sess) throw new Error("Não foi possível identificar seu e-mail Google.");
 
-  if (!rec || !rec.ativo) {
-    throw new Error("Não disponível para o seu perfil.");
-  }
+  // ✅ fonte de verdade: VEKTOR_EMAILS (ATIVO + ROLE)
+  var emails = vektorLoadEmailsRoleMap_();
+  var rec = emails && emails.byEmail ? emails.byEmail[sess] : null;
+
+  if (!rec || rec.ativo !== true) {
+  throw new Error("Acesso não disponível. Solicite a liberação junto ao administrador do sistema.");
+    }
   return { email: sess, role: rec.role };
 }
 
@@ -403,7 +399,7 @@ function vektorValidateSessionToken_(token) {
   var emailSessao = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
   if (!emailSessao) return { ok: false, error: "Não foi possível identificar seu e-mail Google." };
 
-  // whitelist continua sendo a fonte de verdade
+  // ✅ VEKTOR_EMAILS (ATIVO) é a fonte de verdade
   if (!isWhitelistedEmail_(emailSessao)) {
     return { ok: false, error: "Acesso negado: usuário não habilitado no Vektor." };
   }
@@ -485,10 +481,10 @@ try {
   template.userRole  = role;
 
   return template
-    .evaluate()
-    .setTitle('Grupo SBF | Vektor')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
+  .evaluate()
+  .setTitle('Grupo SBF | Vektor')
+  .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
 
 // ✅ ID da planilha de métricas do Vektor
 // (a planilha que você mandou)
