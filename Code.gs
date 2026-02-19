@@ -1872,12 +1872,14 @@ function getValoresContabilizadosEtiquetas(req) {
 
     var timeSel = String(req.time || "").trim();     // "" = todos
     var lojaSel = String(req.loja || "").trim();     // "" = todas
+    var contaSel = String(req.conta || "").trim();   // "" = todas
     var iniIso  = String(req.dataInicioIso || "").trim();
     var fimIso  = String(req.dataFimIso || "").trim();
 
     // ✅ NORMALIZA "__ALL__" (front manda isso)
     if (timeSel === "__ALL__") timeSel = "";
     if (lojaSel === "__ALL__") lojaSel = "";
+    if (contaSel === "__ALL__") contaSel = "";
 
     var ini = iniIso ? vektorParseIsoDateSafe_(iniIso) : null;
     var fim = fimIso ? vektorParseIsoDateSafe_(fimIso) : null;
