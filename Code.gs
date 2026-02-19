@@ -1914,8 +1914,17 @@ function getValoresContabilizadosEtiquetas(req) {
       return String(Number(m[1])).padStart(4, "0");
     }
 
+    // ✅ normaliza etiqueta para evitar duplicadas “iguais” (NBSP, hífens, espaços)
+    function normEtq_(s){
+      s = String(s || "");
+      s = s.replace(/\u00A0/g, " ");      // NBSP -> espaço normal
+      s = s.replace(/[–—]/g, "-");        // hífens “diferentes” -> "-"
+      s = s.replace(/\s+/g, " ").trim();  // colapsa espaços
+      return s;
+    }
+
     function parseConta_(etq) {
-      etq = String(etq || "").trim();
+      etq = normEtq_(etq);
       if (!etq) return { conta:"", etiqueta:"" };
 
       var m = etq.match(/^(\d{2,})\s*[-–]?\s*(.*)$/);
@@ -1960,16 +1969,27 @@ function getValoresContabilizadosEtiquetas(req) {
         "MATERIAL DE COPA E COZINHA",
         "MATERIAL DE COPA E COZINHA OPERAÇÕES",
         "AGUA POTÁVEL",
-        "LANCHES DE REFEIÇÕES"
+        "LANCHES DE REFEIÇÕES",
+        "ACAO BF"
       ]}
     ];
 
     function categoriaDaEtiqueta_(etq) {
-      var s = String(etq || "").toUpperCase();
+
+      var s = normEtq_(etq).toUpperCase();
+
+      // remove acentos (NFD)
+      try {
+        s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      } catch (_) {}
+
       for (var i=0; i<CATS.length; i++) {
-        for (var j=0; j<CATS[i].keys.length; j++) {
-          var k = String(CATS[i].keys[j] || "").toUpperCase();
-          if (k && s.indexOf(k) >= 0) return CATS[i].cat;
+        for (var j=0; j<CATS[i].keys.length; j++) 
+        {
+          var k = String(CATS[i].keys[j] || "");
+            k = normEtq_(k).toUpperCase();
+            try { k = k.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (_) {}
+            if (k && s.indexOf(k) >= 0) return CATS[i].cat;
         }
       }
       return "Outros";
@@ -1998,24 +2018,50 @@ function getValoresContabilizadosEtiquetas(req) {
       var timeFinal = timeRow || (mapLojaTime[loja4] ? String(mapLojaTime[loja4]).trim() : "N/D");
       if (timeSel && timeFinal !== timeSel) continue;
 
-      var etqRaw = String(row[IDX_ETIQUETA] || "").trim();
+      var etqRaw = normEtq_(row[IDX_ETIQUETA]);
       if (!etqRaw) continue;
 
       var valor = Number(row[IDX_VALOR] || 0) || 0;
       if (!valor) continue;
 
+      // ✅ total real do período (não duplicar por multi-etiqueta)
       total += valor;
 
-      var cat = categoriaDaEtiqueta_(etqRaw);
-      if (!sumByCat[cat]) sumByCat[cat] = 0;
-      sumByCat[cat] += valor;
+      // ✅ quebra múltiplas etiquetas (com ou sem espaços ao redor do "|")
+      var parts = etqRaw.split(/\s*\|\s*/).map(normEtq_).filter(function(s){ return !!s; });
+      if (!parts.length) parts = [etqRaw];
 
-      var etqKey = String(etqRaw).trim();
-      if (!sumByEtq[etqKey]) {
-        var p = parseConta_(etqRaw);
-        sumByEtq[etqKey] = { etiqueta: p.etiqueta, conta: p.conta, categoria: cat, valor: 0 };
+      // ✅ divide para o total/% fechar 100%
+      var valorPorEtiqueta = valor / parts.length;
+
+      // ✅ processa cada etiqueta separadamente
+      for (var p = 0; p < parts.length; p++) {
+        var etqPart = parts[p];
+        if (!etqPart) continue;
+
+        var contaObj = parseConta_(etqPart); // {conta, etiqueta}
+        var conta = contaObj.conta || "";
+        var etiquetaFinal = normEtq_(contaObj.etiqueta || etqPart);
+
+        // ✅ chave ÚNICA: somente pela etiqueta normalizada (1 linha por etiqueta)
+        var etqKey = etiquetaFinal;
+
+        var catPart = categoriaDaEtiqueta_(etqPart);
+
+        if (!sumByEtq[etqKey]) {
+          sumByEtq[etqKey] = {
+            etiqueta: etiquetaFinal,
+            conta: conta,
+            categoria: catPart,
+            valor: 0
+          };
+        }
+
+        sumByEtq[etqKey].valor += valorPorEtiqueta;
+
+        if (!sumByCat[catPart]) sumByCat[catPart] = 0;
+        sumByCat[catPart] += valorPorEtiqueta;
       }
-      sumByEtq[etqKey].valor += valor;
     }
 
     var rowsOut = Object.keys(sumByEtq).map(function(k){
