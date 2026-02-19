@@ -1169,132 +1169,98 @@ display: none;
   </button>
 </div>
 
-  <!-- Conteúdo rolável do menu (botões) -->
+ <!-- Conteúdo rolável do menu (botões) -->
 <div class="flex-1 min-h-0 overflow-y-auto space-y-3.5 pb-2.5">
 
-  <!-- Botão: assistir apresentação 
+  <!-- Apresentação Vektor desativada -->
+  <!-- Relatório Clara (Looker Studio) desativado -->
+
   <button
+    id="navChatBtn"
     type="button"
-    onclick="window.open('https://drive.google.com/file/d/1nYhrveAoL2A5cYfV_LdzXECC2_5BpM-b/view?usp=sharing','_blank')"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
-  >
-    ▶ Apresentação Vektor
-  </button>-->
-
-  <!-- Botão: relatório Looker Studio 
-  <button
-    type="button"
-    onclick="window.open('https://lookerstudio.google.com/u/0/reporting/58cacb07-6ece-45cb-a42a-15f328c5710d/page/uOaeF/edit','_blank')"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1 hover:bg-slate-900 transition"
-  >
-    📊 Relatório Clara (Looker Studio)
-  </button> -->
-
-  <button
-  id="navChatBtn"
-  type="button"
-  onclick="window.vektorShowChatView()"
-  title="Chat"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
->
-  <span class="vektor-nav-ico" aria-hidden="true">💬</span>
-  <span class="vektor-nav-label">Chat</span>
-</button>
-
-  <button
-  type="button"
-  onclick="openStatusVektorModal()"
-  title="Estado Operacional"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
->
-  <span class="vektor-nav-ico" aria-hidden="true">🟢</span>
-  <span class="vektor-nav-label">Estado Operacional</span>
-</button>
-
-<button
-  type="button"
-  onclick="window.vektorOpenResumoCiclo()"
-  title="Resumo do Ciclo"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
->
-  <span class="vektor-nav-ico" aria-hidden="true">📌</span>
-  <span class="vektor-nav-label">Resumo do Ciclo</span>
-</button>
-
-  <!--<button
-  type="button"
-  onclick="window.open(POLITICA_CARTOES_CLARA_LINK,'_blank')"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
->
-  📘 Regras e Políticas
-</button>-->
-
-<button
-  type="button"
-  onclick="window.vektorOpenFluxograma()"
-  title="Fluxograma"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
->
-  <span class="vektor-nav-ico" aria-hidden="true">🧩</span>
-  <span class="vektor-nav-label">Fluxograma</span>
-</button>
-
-<button
-  type="button"
-  onclick="window.vektorOpenMyAlerts()"
-  title="Alertas Programados"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
->
-  <span class="vektor-nav-ico" aria-hidden="true">⏱️</span>
-  <span class="vektor-nav-label">Alertas Programados</span>
-</button>
-
-<? if ((userRole || "") === "Administrador") { ?>
-
-  <!-- Botão: Alertas Recentes (somente Admin) -->
-  <button
-    type="button"
-    onclick="openAlertasRecentesModal()"
-    title="Disparo de Ocorrências"
+    onclick="window.vektorShowChatView()"
+    title="Chat"
     class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
   >
-    <span class="vektor-nav-ico" aria-hidden="true">📋</span>
-    <span class="vektor-nav-label">Disparo de Ocorrências</span> 
-  </button>
-
-  <!-- Botão: Radar de Irregularidade (somente Admin) -->
-  <button
-    type="button"
-    onclick="window.vektorOpenRadar('7d')"
-    title="Radar de Irregularidade"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
-  >
-    <span class="vektor-nav-ico" aria-hidden="true">📈</span>
-    <span class="vektor-nav-label">Radar de Irregularidade</span>
+    <span class="vektor-nav-ico" aria-hidden="true">💬</span>
+    <span class="vektor-nav-label">Chat</span>
   </button>
 
   <button
-  type="button"
-  onclick="window.vektorOpenEnvioPendencias()"
-  title="Envio de Pendências"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
->
-    <span class="vektor-nav-ico" aria-hidden="true">📩</span>
-    <span class="vektor-nav-label">Envio de Pendências</span>
-</button>
+    type="button"
+    onclick="openStatusVektorModal()"
+    title="Estado Operacional"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  >
+    <span class="vektor-nav-ico" aria-hidden="true">🟢</span>
+    <span class="vektor-nav-label">Estado Operacional</span>
+  </button>
 
-<? } ?>
-
-  <!-- Botão: Feedbacks
   <button
     type="button"
-    onclick="window.vektorOpenFeedback()"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
+    onclick="window.vektorOpenResumoCiclo()"
+    title="Resumo do Ciclo"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
   >
-    📝 Feedback
-  </button> -->
+    <span class="vektor-nav-ico" aria-hidden="true">📌</span>
+    <span class="vektor-nav-label">Resumo do Ciclo</span>
+  </button>
 
-  </div> <!-- fim do conteúdo rolável -->
+  <button
+    type="button"
+    onclick="window.vektorOpenFluxograma()"
+    title="Fluxograma"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  >
+    <span class="vektor-nav-ico" aria-hidden="true">🧩</span>
+    <span class="vektor-nav-label">Fluxograma</span>
+  </button>
+
+  <button
+    type="button"
+    onclick="window.vektorOpenMyAlerts()"
+    title="Alertas Programados"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  >
+    <span class="vektor-nav-ico" aria-hidden="true">⏱️</span>
+    <span class="vektor-nav-label">Alertas Programados</span>
+  </button>
+
+  <? if ((userRole || "") === "Administrador") { ?>
+
+    <button
+      type="button"
+      onclick="openAlertasRecentesModal()"
+      title="Disparo de Ocorrências"
+      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    >
+      <span class="vektor-nav-ico" aria-hidden="true">📋</span>
+      <span class="vektor-nav-label">Disparo de Ocorrências</span>
+    </button>
+
+    <button
+      type="button"
+      onclick="window.vektorOpenRadar('7d')"
+      title="Radar de Irregularidade"
+      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    >
+      <span class="vektor-nav-ico" aria-hidden="true">📈</span>
+      <span class="vektor-nav-label">Radar de Irregularidade</span>
+    </button>
+
+    <button
+      type="button"
+      onclick="window.vektorOpenEnvioPendencias()"
+      title="Envio de Pendências"
+      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    >
+      <span class="vektor-nav-ico" aria-hidden="true">📩</span>
+      <span class="vektor-nav-label">Envio de Pendências</span>
+    </button>
+
+  <? } ?>
+
+</div>
 
   <!-- Rodapé do menu: Versão do Vektor -->
 <div id="vektorSidebarFooterVersion" class="mt-4 px-3 py-3 text-center border-t border-slate-200">
@@ -2450,7 +2416,7 @@ display: none;
 
       <!-- Header -->
       <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
-        <div style="display:flex; align-items:center;">
+        <div style="display:flex; align-items:center; gap:10px;">
 
           <div>
             <div id="myAl_title" style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Definição de Alertas</div>
@@ -2683,49 +2649,9 @@ display: none;
 
 
         <!-- ===== VIEW 2: Valores Contabilizados (NOVA PÁGINA) ===== -->
-        <div id="myAl_valoresView" style="display:none;">
 
-          <!-- Barra superior da visão -->
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
-            <button
-              type="button"
-              onclick="openMyAlDefinicaoAlertasView()"
-              style="
-                height:34px;
-                padding:0 12px;
-                border-radius:10px;
-                border:1px solid rgba(148,163,184,0.22);
-                background:rgba(255,255,255,0.06);
-                color:#fff;
-                font-weight:900;
-                font-size:12px;
-                display:inline-flex;
-                align-items:center;
-                gap:8px;
-              ">
-              ← Definição de Alertas
-            </button>
-
-            <button
-              type="button"
-              onclick="myAlValoresDownloadCsv()"
-              style="
-                height:34px;
-                padding:0 12px;
-                border-radius:10px;
-                border:1px solid rgba(0,0,0,0.25);
-                background:#B5FF20;
-                color:#000;
-                font-weight:900;
-                font-size:12px;
-                display:inline-flex;
-                align-items:center;
-                gap:8px;
-              ">
-              ⬇ Download
-            </button>
-          </div>
-
+      <div id="myAl_valoresView" style="display:none;">
+      
           <!-- Filtros -->
           <div style="
               background:#0b1220;
@@ -2736,7 +2662,7 @@ display: none;
             ">
             <div style="color:#fff; font-weight:900; font-size:13px; margin-bottom:10px;">Filtros</div>
 
-            <div style="display:grid; grid-template-columns: 1.1fr 1.3fr 1fr 1fr auto; gap:10px; align-items:end;">
+            <div style="display:grid; grid-template-columns: 1.0fr 1.2fr 170px 170px auto; gap:10px; align-items:end;">
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Time</div>
                 <select id="myAl_val_time"
@@ -2756,15 +2682,15 @@ display: none;
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Período (Início)</div>
                 <input id="myAl_val_dtIni" type="date"
-                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
-                         border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;" />
+                  style="height:34px; border-radius:10px; background:#e5e7eb; color:#0b1220;
+                    border:1px solid #cbd5e1; padding:0 10px; font-weight:900; font-size:12px;"/>
               </div>
 
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Período (Fim)</div>
                 <input id="myAl_val_dtFim" type="date"
-                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
-                         border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;" />
+                  style="height:34px; border-radius:10px; background:#e5e7eb; color:#0b1220;
+       border:1px solid #cbd5e1; padding:0 10px; font-weight:900; font-size:12px;"/>
               </div>
 
               <button
@@ -2796,35 +2722,66 @@ display: none;
               </div>
 
           <!-- Layout: Funil + Tabela -->
-          <div style="display:grid; grid-template-columns: 420px 1fr; gap:12px; align-items:start;">
-            <!-- Funil -->
-            <div style="background:#0b1220; border:1px solid rgba(148,163,184,0.18); border-radius:14px; padding:12px;">
-              <div style="color:#fff; font-weight:900; font-size:13px; margin-bottom:10px;">
-                Funil por categoria (valor e %)
-              </div>
-              <div id="myAl_funilWrap" style="width:100%; overflow:hidden;"></div>
-            </div>
+<div style="display:grid; grid-template-columns: 560px 1fr; gap:12px; align-items:start;">
 
-            <!-- Tabela -->
-            <div style="background:#ffffff; border:1px solid #000; border-radius:14px; padding:10px; overflow:auto;">
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px;">
-                <div style="font-weight:900; color:#000;">Valores por Etiqueta (BaseClara)</div>
-                <div id="myAl_valoresMeta" style="font-size:12px; color:#111;"></div>
-              </div>
+  <!-- Gráfico por categoria (barras) -->
+  <div style="background:#0b1220; border:1px solid rgba(255,255,255,0.85); border-radius:14px; padding:12px;">
+    <div style="color:#fff; font-weight:900; font-size:13px; margin-bottom:10px;">
+      Barras por clusterização das categorias (valor e %)
+    </div>
 
-              <table style="width:100%; border-collapse:collapse; font-size:12px;">
-                <thead>
-                  <tr style="background:#bfe8ff; color:#000; font-weight:900;">
-                    <th style="border:1px solid #000; padding:8px; text-align:left;">Etiquetas</th>
-                    <th style="border:1px solid #000; padding:8px; text-align:left;">Conta Contábil</th>
-                    <th style="border:1px solid #000; padding:8px; text-align:right;">Valor</th>
-                    <th style="border:1px solid #000; padding:8px; text-align:right;">% Valor</th>
-                  </tr>
-                </thead>
-                <tbody id="myAl_valoresTbody"></tbody>
-              </table>
-            </div>
-          </div>
+    <div id="myAl_funilWrap" style="width:100%; overflow:hidden;">
+  <div id="myAl_catChartWrap" style="height:360px; position:relative; width:100%;">
+    <canvas id="myAl_catChart" style="width:100%; height:100%; display:none;"></canvas>
+  </div>
+
+  <div id="myAl_catHint"
+       style="margin-top:10px; font-size:12px; color:rgba(226,232,240,0.75); font-weight:800;">
+    Defina o período para exibir o gráfico.
+  </div>
+</div>
+
+  </div>
+
+  <!-- Tabela - wrapper com scroll -->
+  <div style="background:#e5e7eb; border:1px solid #000; border-radius:14px; padding:10px; overflow:auto; max-height:420px;">
+    <table style="width:100%; border-collapse:collapse; font-size:12px; background:#f8fafc;">
+      <thead>
+        <tr>
+          <th style="
+            position:sticky; top:0; z-index:3;
+            background:#005E27; color:#fff; font-weight:900;
+            border:1px solid #000; padding:8px; text-align:center;
+            background-clip:padding-box;
+          ">Etiquetas</th>
+
+          <th style="
+            position:sticky; top:0; z-index:3;
+            background:#005E27; color:#fff; font-weight:900;
+            border:1px solid #000; padding:8px; text-align:center;
+            background-clip:padding-box;
+          ">Conta Contábil</th>
+
+          <th style="
+            position:sticky; top:0; z-index:3;
+            background:#005E27; color:#fff; font-weight:900;
+            border:1px solid #000; padding:8px; text-align:center;
+            background-clip:padding-box;
+          ">Valor</th>
+
+          <th style="
+            position:sticky; top:0; z-index:3;
+            background:#005E27; color:#fff; font-weight:900;
+            border:1px solid #000; padding:8px; text-align:center;
+            background-clip:padding-box;
+          ">% Valor</th>
+        </tr>
+      </thead>
+
+      <tbody id="myAl_valoresTbody"></tbody>
+    </table>
+  </div>
+</div>
 
         </div> <!-- /myAl_valoresView -->
 
@@ -8304,43 +8261,51 @@ function openMyAlValoresContabilizadosView() {
   if (title) title.textContent = "Valores Contabilizados";
   if (sub)   sub.textContent   = "Consolidação histórica de valores por etiqueta (BaseClara) + funil por categoria.";
 
-  // 2) hide header controls
+    // 2) header: trocar botões (canto direito) para o modo "Valores"
   const btns = document.getElementById("myAl_headerBtns");
   const type = document.getElementById("myAl_typeWrap");
-  if (btns) btns.style.display = "none";
+
+  // guarda o HTML original (uma vez) para poder voltar depois
+  if (btns && !window.__myAl_headerBtns_defaultHTML) {
+    window.__myAl_headerBtns_defaultHTML = btns.innerHTML;
+  }
+
+  // mostra headerBtns e injeta os 3 botões aqui (em vez de ficar dentro da view)
+  if (btns) {
+    btns.style.display = "flex";
+    btns.innerHTML = `
+      <button type="button"
+        onclick="openMyAlDefinicaoAlertasView()"
+        style="height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(148,163,184,0.22);background:rgba(255,255,255,0.06);color:#fff;font-weight:900;font-size:12px;display:inline-flex;align-items:center;gap:8px;">
+        ← Definição de Alertas
+      </button>
+
+      <button type="button"
+        onclick="myAlValoresLoadData_()"
+        style="height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(148,163,184,0.22);background:rgba(255,255,255,0.06);color:#fff;font-weight:900;font-size:12px;display:inline-flex;align-items:center;gap:8px;">
+        Aplicar
+      </button>
+
+      <button type="button"
+        onclick="myAlValoresDownloadCsv()"
+        style="height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(0,0,0,0.25);background:#B5FF20;color:#000;font-weight:900;font-size:12px;display:inline-flex;align-items:center;gap:8px;">
+        ⬇ Download
+      </button>
+    `;
+  }
+
+  // some com o seletor "Tipo de alerta" nesse modo
   if (type) type.style.display = "none";
 
   // 3) swap body
   const defV = document.getElementById("myAl_defView");
   const valV = document.getElementById("myAl_valoresView");
+
   if (defV) defV.style.display = "none";
   if (valV) valV.style.display = "block";
 
-  function openMyAlValoresContabilizadosView() {
-  // esconde view antiga
-  const defView = document.getElementById("myAl_defView");
-  const valView = document.getElementById("myAl_valoresView");
-
-  if (defView) defView.style.display = "none";
-  if (valView) valView.style.display = "block";
-
-  // mostra loading
-  myAlValLoading_(true);
-
-  // limpa tabela anterior (opcional mas recomendado)
-  const tbody = document.getElementById("myAl_valoresTbody");
-  if (tbody) tbody.innerHTML = "";
-
-  const funil = document.getElementById("myAl_funilWrap");
-  if (funil) funil.innerHTML = "";
-
-  // chama backend e carrega dados
-  myAlValoresLoadData_();
-}
-
   // 4) init filters + load
   myAlValoresInitOnce_();
-  myAlValoresLoad_();
 }
 
 function myAlValoresLoadData_() {
@@ -8355,10 +8320,15 @@ function myAlValoresLoadData_() {
     google.script.run
       .withSuccessHandler(function(resp) {
         try {
-          // aqui você vai renderizar tabela + funil
-          // exemplo:
-          // renderMyAlValoresTabela_(resp);
-          // renderMyAlValoresFunil_(resp);
+          // normaliza resposta
+          const res = (resp && typeof resp === "object") ? resp : { ok:false, rows:[], categorias:[], total:0 };
+
+          // guarda cache global (se você estiver usando)
+          window.__myAl_valores_last = res;
+
+          // ✅ renderiza tabela + funil
+          if (typeof myAlValoresRenderTable_ === "function") myAlValoresRenderTable_(res);
+          if (typeof myAlValoresRenderFunil_ === "function") myAlValoresRenderFunil_(res);
 
         } finally {
           myAlValLoading_(false);
@@ -8368,10 +8338,11 @@ function myAlValoresLoadData_() {
         myAlValLoading_(false);
         alert("Erro ao carregar Valores Contabilizados: " + (err && err.message ? err.message : err));
       })
-      .myAlGetValoresContabilizados(time, loja, dtIni, dtFim); // backend
+      .getValoresContabilizadosEtiquetas({ time: time, loja: loja, dataInicioIso: dtIni, dataFimIso: dtFim })
+
   } catch (e) {
     myAlValLoading_(false);
-    alert("Erro inesperado: " + e.message);
+    alert("Erro inesperado: " + (e && e.message ? e.message : e));
   }
 }
 
@@ -8391,6 +8362,11 @@ function openMyAlDefinicaoAlertasView() {
   if (btns) btns.style.display = "flex";
   if (type) type.style.display = "flex";
 
+    // restaura os botões originais do header (Valores Contabilizados + Tutorial)
+  if (btns && window.__myAl_headerBtns_defaultHTML) {
+    btns.innerHTML = window.__myAl_headerBtns_defaultHTML;
+  }
+
   const defV = document.getElementById("myAl_defView");
   const valV = document.getElementById("myAl_valoresView");
   if (valV) valV.style.display = "none";
@@ -8399,55 +8375,218 @@ function openMyAlDefinicaoAlertasView() {
 
 let __myAl_valores_inited = false;
 
-function myAlValoresInitOnce_() {
+function myAlValoresInitOnce_(){
   if (__myAl_valores_inited) return;
   __myAl_valores_inited = true;
 
   const selTime = document.getElementById("myAl_val_time");
   const selLoja = document.getElementById("myAl_val_loja");
+  const dtIniEl = document.getElementById("myAl_val_dtIni");
+  const dtFimEl = document.getElementById("myAl_val_dtFim");
 
-  // monta times
-  const times = (typeof VEKTOR_TIMES !== "undefined" && Array.isArray(VEKTOR_TIMES)) ? VEKTOR_TIMES.slice() : [];
-  if (selTime) {
-    selTime.innerHTML = `<option value="">Todos</option>` + times.map(t => `<option value="${escAttr_(t)}">${t}</option>`).join("");
+  // =========================
+  // helpers UI
+  // =========================
+  function setSelectLoading_(sel, label){
+    if (!sel) return;
+    sel.innerHTML = `<option value="__ALL__">${label}</option>`;
   }
 
-  // monta lojas (depende do time)
-  function refreshLojas() {
-    const time = selTime && selTime.value ? String(selTime.value) : "";
-    const lojas = (window.__VEKTOR_LOJAS && Array.isArray(window.__VEKTOR_LOJAS)) ? window.__VEKTOR_LOJAS.slice() : [];
-
-    // aqui a regra de “time respeita loja” precisa de um mapeamento
-    // Se sua getListaLojas() já traz "time" dentro do objeto, filtramos por ele.
-    // Se não trouxer, deixamos todas as lojas disponíveis (e o backend filtra pelo mapa loja->time).
-    const filtradas = (!time)
-      ? lojas
-      : lojas.filter(l => String(l.time || "").trim() === time);
-
-    if (selLoja) {
-      selLoja.innerHTML = `<option value="">Todas</option>` + filtradas
-        .map(l => {
-          const cod = String(l.codigo || "").padStart(4, "0");
-          const nome = String(l.nome || l.nomeLojaTxt || "").trim();
-          const label = nome ? `${cod} - ${nome}` : cod;
-          return `<option value="${escAttr_(cod)}">${escHtml_(label)}</option>`;
-        })
-        .join("");
+  // ✅ NÃO MEXE no innerHTML do myAl_funilWrap (não destrói o canvas)
+  function renderNeedPeriod_(){
+    const tbody = document.getElementById("myAl_valoresTbody");
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
+        Defina <b>Período (Início)</b> e <b>Período (Fim)</b> para carregar.
+      </td></tr>`;
     }
+
+    const hint = document.getElementById("myAl_catHint");
+    if (hint) {
+      hint.innerHTML = `<span style="color:rgba(226,232,240,0.75);">
+        Defina o período para exibir o gráfico.
+      </span>`;
+    }
+
+    const canvas = document.getElementById("myAl_catChart");
+    if (canvas) {
+      canvas.style.display = "none";
+      try {
+        const ctx0 = canvas.getContext("2d");
+        ctx0 && ctx0.clearRect(0,0,canvas.width,canvas.height);
+      } catch(_) {}
+    }
+
+    // mata instância anterior do chart pra parar qualquer "vida própria"
+    try {
+      if (window.__myAl_catChartInst) {
+        window.__myAl_catChartInst.destroy();
+        window.__myAl_catChartInst = null;
+      }
+    } catch(_) {}
+
+    const meta = document.getElementById("myAl_valoresMeta");
+    if (meta) meta.textContent = "";
   }
 
-  if (selTime) selTime.addEventListener("change", function(){
-    refreshLojas();
-    myAlValoresLoad_();
+  function canLoad_(){
+    const a = dtIniEl ? String(dtIniEl.value || "").trim() : "";
+    const b = dtFimEl ? String(dtFimEl.value || "").trim() : "";
+    return !!(a && b);
+  }
+
+  function tryLoad_(){
+    if (!canLoad_()) {
+      renderNeedPeriod_();
+      return;
+    }
+    // debounce simples
+    if (window.__myAl_valores_tryload_tmr) clearTimeout(window.__myAl_valores_tryload_tmr);
+    window.__myAl_valores_tryload_tmr = setTimeout(function(){
+      myAlValoresLoad_();
+    }, 150);
+  }
+
+  // =========================
+  // Map (Time -> Lojas)
+  // =========================
+  let map = (window.__myAl_lojasPorTime && typeof window.__myAl_lojasPorTime === "object")
+    ? window.__myAl_lojasPorTime
+    : {};
+
+  function normLojas_(arr){
+    return (arr || []).map(it => {
+      if (typeof it === "string") return { lojaKey: it, lojaNome: it };
+      return {
+        lojaKey: (it && (it.lojaKey || it.key || it.codigo || "")) || "",
+        lojaNome: (it && (it.lojaNome || it.nome || it.label || it.lojaKey || "")) || ""
+      };
+    });
+  }
+
+  function fillTimes_(){
+    if (!selTime) return;
+    const times = Object.keys(map).sort((a,b)=>String(a).localeCompare(String(b), "pt-BR"));
+    selTime.innerHTML =
+      `<option value="__ALL__">Todos</option>` +
+      times.map(t => `<option value="${escAttr_(t)}">${escHtml_(t)}</option>`).join("");
+  }
+
+  function fillLojas_(){
+    if (!selLoja) return;
+
+    const t = selTime ? (selTime.value || "__ALL__") : "__ALL__";
+    let lojas = [];
+
+    if (t === "__ALL__"){
+      Object.keys(map).forEach(k => (map[k] || []).forEach(x => lojas.push(x)));
+    } else {
+      lojas = Array.isArray(map[t]) ? map[t] : [];
+    }
+
+    lojas = normLojas_(lojas);
+    lojas.sort((a,b)=>String(a.lojaNome||"").localeCompare(String(b.lojaNome||""), "pt-BR"));
+
+    selLoja.innerHTML =
+      `<option value="__ALL__">Todas</option>` +
+      lojas.map(x => `<option value="${escAttr_(x.lojaKey || "")}">${escHtml_(x.lojaNome || x.lojaKey || "")}</option>`).join("");
+  }
+
+  // =========================
+  // ✅ Se map vazio, carrega DIRETO do backend (mesma fonte da tela principal)
+  // getTimesELojasParaAlertasVektor() existe no Code.gs
+  // =========================
+  if (!map || Object.keys(map).length === 0) {
+    setSelectLoading_(selTime, "Carregando times…");
+    setSelectLoading_(selLoja, "Carregando lojas…");
+
+    if (typeof google !== "undefined" && google.script && google.script.run) {
+      google.script.run
+        .withSuccessHandler(function(res){
+          if (!res || !res.ok) {
+            setSelectLoading_(selTime, "Sem times (falha ao carregar)");
+            setSelectLoading_(selLoja, "Sem lojas (falha ao carregar)");
+            renderNeedPeriod_();
+            return;
+          }
+
+          // backend retorna { times, lojasPorTime }, onde lojasPorTime pode ser array de strings
+          const lp = res.lojasPorTime || {};
+          const fixed = {};
+
+          Object.keys(lp).forEach(function(t){
+            fixed[t] = (lp[t] || []).map(function(l){
+              // mantém compat com o resto do front
+              return { lojaKey: String(l||""), lojaNome: String(l||"") };
+            });
+          });
+
+          window.__myAl_lojasPorTime = fixed;
+          map = fixed;
+
+          fillTimes_();
+          fillLojas_();
+
+          // não carrega automaticamente sem período; mas se já estiver preenchido, carrega.
+          tryLoad_();
+        })
+        .withFailureHandler(function(err){
+          setSelectLoading_(selTime, "Sem times (erro)");
+          setSelectLoading_(selLoja, "Sem lojas (erro)");
+          renderNeedPeriod_();
+        })
+        .getTimesELojasParaAlertasVektor();
+    } else {
+      setSelectLoading_(selTime, "Sem times (google.script.run indisponível)");
+      setSelectLoading_(selLoja, "Sem lojas (google.script.run indisponível)");
+      renderNeedPeriod_();
+    }
+  } else {
+    fillTimes_();
+    fillLojas_();
+  }
+
+  // =========================
+  // binds
+  // =========================
+  selTime && selTime.addEventListener("change", function(){
+    fillLojas_();
+    tryLoad_();
   });
-  if (selLoja) selLoja.addEventListener("change", myAlValoresLoad_);
 
-  const dtIni = document.getElementById("myAl_val_dtIni");
-  const dtFim = document.getElementById("myAl_val_dtFim");
-  if (dtIni) dtIni.addEventListener("change", myAlValoresLoad_);
-  if (dtFim) dtFim.addEventListener("change", myAlValoresLoad_);
+  selLoja && selLoja.addEventListener("change", function(){
+    tryLoad_();
+  });
 
-  refreshLojas();
+  dtIniEl && dtIniEl.addEventListener("change", function(){
+    tryLoad_();
+  });
+
+  dtFimEl && dtFimEl.addEventListener("change", function(){
+    tryLoad_();
+  });
+
+  // ✅ IMPORTANTE: não carregar ao abrir
+  renderNeedPeriod_();
+}
+
+function myAlValoresOnPeriodChange_(){
+  // ids: ajuste para os ids reais dos seus inputs
+  const iniEl = document.getElementById("myAl_val_dtIni");
+  const fimEl = document.getElementById("myAl_val_dtFim");
+  if (!iniEl || !fimEl) return;
+
+  const dtIni = String(iniEl.value || "").trim();
+  const dtFim = String(fimEl.value || "").trim();
+
+  // Só carrega quando os DOIS estiverem preenchidos
+  if (!dtIni || !dtFim) return;
+
+  // (Opcional) evita disparar várias vezes seguidas
+  if (window.__myAl_valores_period_tmr) clearTimeout(window.__myAl_valores_period_tmr);
+  window.__myAl_valores_period_tmr = setTimeout(function(){
+    myAlValoresLoad_();
+  }, 200);
 }
 
 function myAlValoresClearFilters() {
@@ -8455,11 +8594,41 @@ function myAlValoresClearFilters() {
   const selLoja = document.getElementById("myAl_val_loja");
   const dtIni   = document.getElementById("myAl_val_dtIni");
   const dtFim   = document.getElementById("myAl_val_dtFim");
-  if (selTime) selTime.value = "";
-  if (selLoja) selLoja.value = "";
+
+  // volta para "Todos/Todas" (se você usar "__ALL__" nos options)
+  if (selTime) selTime.value = "__ALL__";
+  if (selLoja) selLoja.value = "__ALL__";
+
+  // limpa período
   if (dtIni) dtIni.value = "";
   if (dtFim) dtFim.value = "";
-  myAlValoresLoad_();
+
+  // limpa filtro de categoria do gráfico/tabela
+  window.__myAl_valores_filterCategoria = "";
+
+  // ❌ não chama load ao limpar: só mostra placeholder
+  const tbody = document.getElementById("myAl_valoresTbody");
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
+      Defina <b>Período (Início)</b> e <b>Período (Fim)</b> para carregar.
+    </td></tr>`;
+  }
+
+  const hint = document.getElementById("myAl_catHint");
+  if (hint) hint.innerHTML = `Defina o período para exibir o gráfico.`;
+
+  const canvas = document.getElementById("myAl_catChart");
+  if (canvas) canvas.style.display = "none";
+
+  try {
+    if (window.__myAl_catChartInst) {
+      window.__myAl_catChartInst.destroy();
+      window.__myAl_catChartInst = null;
+    }
+  } catch (_) {}
+
+  const meta = document.getElementById("myAl_valoresMeta");
+  if (meta) meta.textContent = "";
 }
 
 function myAlValoresLoad_() {
@@ -8467,6 +8636,27 @@ function myAlValoresLoad_() {
   const loja = document.getElementById("myAl_val_loja")?.value || "";
   const dtIni = document.getElementById("myAl_val_dtIni")?.value || "";
   const dtFim = document.getElementById("myAl_val_dtFim")?.value || "";
+
+    // ✅ não chama backend sem período completo
+  if (!String(dtIni || "").trim() || !String(dtFim || "").trim()) {
+    myAlValLoading_(false);
+    // reaproveita o placeholder “defina período”
+    if (typeof myAlValoresInitOnce_ === "function") {
+      // chama só para renderNeedPeriod_ (já existe dentro do init),
+      // mas se quiser mais direto, mantenha o placeholder da tabela/hint aqui.
+    }
+    const tbody = document.getElementById("myAl_valoresTbody");
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
+        Defina <b>Período (Início)</b> e <b>Período (Fim)</b> para carregar.
+      </td></tr>`;
+    }
+    const hint = document.getElementById("myAl_catHint");
+    if (hint) hint.innerHTML = `Defina o período para exibir o gráfico.`;
+    const canvas = document.getElementById("myAl_catChart");
+    if (canvas) canvas.style.display = "none";
+    return;
+  }
 
   // (opcional) mostrar overlay do próprio MyAlerts se existir
   try { window.vektorMyAlertsShowLoading_ && window.vektorMyAlertsShowLoading_("Carregando valores contabilizados..."); } catch(_) {}
@@ -8484,7 +8674,8 @@ function myAlValoresLoad_() {
       window.__myAl_valores_last = res;
 
       myAlValoresRenderTable_(res);
-      myAlValoresRenderFunil_(res);
+      myAlValoresRenderCategoriasBar_(res);
+
     })
     .withFailureHandler(function(err){
       try { window.vektorMyAlertsHideLoading_ && window.vektorMyAlertsHideLoading_(); } catch(_) {}
@@ -8511,83 +8702,196 @@ function myAlValoresRenderTable_(res) {
   if (meta) meta.textContent = `Total: ${fmtBRL_(total)} | Linhas: ${rows.length}`;
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">Sem dados para os filtros.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px; color:#000; background:#fff;">Sem dados para os filtros.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = rows.map(r => {
+    const etiqueta  = r.etiqueta || "";
+    const conta     = r.conta || "";
+    const categoria = r.categoria || ""; // <- vem do backend (vou ajustar no Code.gs)
     return `
-      <tr>
-        <td style="border:1px solid #000; padding:8px; text-align:left;">${escHtml_(r.etiqueta || "")}</td>
-        <td style="border:1px solid #000; padding:8px; text-align:left;">${escHtml_(r.conta || "")}</td>
-        <td style="border:1px solid #000; padding:8px; text-align:right;">${fmtBRL_(r.valor || 0)}</td>
-        <td style="border:1px solid #000; padding:8px; text-align:right;">${fmtPct_(r.pct || 0)}</td>
+      <tr data-conta="${escAttr_(conta)}" data-etiqueta="${escAttr_(etiqueta)}" data-categoria="${escAttr_(categoria)}"
+          style="background:#fff; color:#000;">
+        <td style="border:1px solid #000; padding:8px; text-align:left; color:#000; background:#fff;">${escHtml_(etiqueta)}</td>
+        <td style="border:1px solid #000; padding:8px; text-align:left; color:#000; background:#fff;">${escHtml_(conta)}</td>
+        <td style="border:1px solid #000; padding:8px; text-align:right; color:#000; background:#fff;">${fmtBRL_(r.valor || 0)}</td>
+        <td style="border:1px solid #000; padding:8px; text-align:right; color:#000; background:#fff;">${fmtPct_(r.pct || 0)}</td>
       </tr>
     `;
   }).join("");
+
+  // aplica filtro de categoria se já houver
+  myAlValoresApplyCategoriaFilter_();
 }
 
-function myAlValoresRenderFunil_(res) {
-  const wrap = document.getElementById("myAl_funilWrap");
-  if (!wrap) return;
+// aplica filtro local na tabela (não chama backend)
+function myAlValoresApplyCategoriaFilter_(){
+  const cat = (window.__myAl_valores_filterCategoria || "").trim();
+  const tbody = document.getElementById("myAl_valoresTbody");
+  if (!tbody) return;
 
-  const cats = Array.isArray(res.categorias) ? res.categorias : [];
+  Array.from(tbody.querySelectorAll("tr[data-categoria]")).forEach(tr=>{
+    const c = (tr.getAttribute("data-categoria") || "").trim();
+    tr.style.display = (!cat || c === cat) ? "" : "none";
+  });
+}
+
+let __myAl_catChartInst = null;
+
+function myAlValoresRenderCategoriasBar_(res){
+  const canvas = document.getElementById("myAl_catChart");
+  const hint   = document.getElementById("myAl_catHint");
+  if (!canvas) return;
+
+  canvas.style.display = "block";
+
+  const cats  = Array.isArray(res && res.categorias) ? res.categorias : [];
+  const total = Number((res && res.total) || 0) || 0;
+
+  // limpa chart anterior
+  try {
+    if (__myAl_catChartInst) {
+      __myAl_catChartInst.destroy();
+      __myAl_catChartInst = null;
+    }
+  } catch(_) {}
+
   if (!cats.length) {
-    wrap.innerHTML = `<div style="color:rgba(226,232,240,0.8); font-size:12px;">Sem dados para funil.</div>`;
+    if (hint) hint.textContent = "Sem dados para o gráfico.";
+    const ctx0 = canvas.getContext("2d");
+    ctx0 && ctx0.clearRect(0,0,canvas.width,canvas.height);
     return;
   }
 
-  // constrói um “funnel” em SVG (sem plugin externo)
-  const max = Math.max.apply(null, cats.map(c => Number(c.valor || 0) || 0)) || 1;
+  const labels = cats.map(x => String(x.categoria || ""));
+  const values = cats.map(x => Number(x.valor || 0) || 0);
 
-  const W = 360;
-  const H = 520;
-  const topW = 320;
-  const bottomW = 120;
-  const x0 = (W - topW)/2;
-  const y0 = 20;
-  const segH = Math.floor((H - 60) / cats.length);
-
-  function segWidth(i) {
-    // largura interpolada pela proporção do valor
-    const v = (Number(cats[i].valor || 0) || 0);
-    const p = Math.max(0.08, v / max); // mínimo para manter visível
-    return bottomW + (topW - bottomW) * p;
+  // hint de filtro atual
+  const sel = window.__myAl_valores_filterCategoria ? String(window.__myAl_valores_filterCategoria) : "";
+  if (hint) {
+    hint.innerHTML = sel
+      ? `Filtro ativo: <b>${escHtml_(sel)}</b> (clique novamente na barra para limpar)`
+      : `Clique em uma categoria para filtrar a tabela.`;
   }
 
-  let y = y0;
-  let svg = `<svg width="100%" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
-  svg += `<text x="${W/2}" y="14" text-anchor="middle" font-size="12" fill="#e2e8f0" font-weight="800">Funil de valores por categoria</text>`;
+  const ctx = canvas.getContext("2d");
 
-  for (let i=0; i<cats.length; i++) {
-    const w1 = (i===0) ? segWidth(i) : segWidth(i-1);
-    const w2 = segWidth(i);
-    const x1 = (W - w1)/2;
-    const x2 = (W - w2)/2;
+  // Chart.js + DataLabels (igual você já faz em outros gráficos)
+  try {
+    if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
+      Chart.register(ChartDataLabels);
+    }
+  } catch (_) {}
 
-    const y1 = y;
-    const y2 = y + segH;
+  __myAl_catChartInst = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Valor",
+        data: values,
 
-    // trapezoid
-    const path = `M ${x1} ${y1} L ${x1+w1} ${y1} L ${x2+w2} ${y2} L ${x2} ${y2} Z`;
+        // ✅ CORES PEDIDAS
+        backgroundColor: "#005E27", // verde escuro
+        borderColor: "#B5FF20",     // verde claro
+        borderWidth: 2,
 
-    // cores alternadas azul (claro -> escuro)
-    const fill = (i % 2 === 0) ? "#2aa3ff" : "#0f7dd8";
+        maxBarThickness: 18,
+        categoryPercentage: 0.75,
+        barPercentage: 0.75
+      }]
+    },
+    options: {
+      // ✅ barras horizontais (deitadas)
+      indexAxis: "y",
 
-    svg += `<path d="${path}" fill="${fill}" stroke="#071229" stroke-width="2"/>`;
+      responsive: true,
+      maintainAspectRatio: false,
 
-    const label = `${cats[i].categoria || ""}`;
-    const vTxt = fmtBRL_(cats[i].valor || 0);
-    const pTxt = fmtPct_(cats[i].pct || 0);
+      // ✅ reduz “resize thrash” em layouts com container problemático
+      resizeDelay: 150,
 
-    svg += `<text x="${W/2}" y="${y1 + segH/2 - 6}" text-anchor="middle" font-size="12" fill="#001018" font-weight="900">${escSvg_(label)}</text>`;
-    svg += `<text x="${W/2}" y="${y1 + segH/2 + 12}" text-anchor="middle" font-size="12" fill="#001018" font-weight="900">${escSvg_(vTxt)}  •  ${escSvg_(pTxt)}</text>`;
+      // ✅ mata animações/reflows “fantasmas”
+      animation: false,
 
-    y += segH;
-  }
+      layout: {
+        padding: { top: 12, right: 70, bottom: 6, left: 0 }
+      },
 
-  svg += `</svg>`;
-  wrap.innerHTML = svg;
+      onClick: function(evt, elements){
+        if (!elements || !elements.length) return;
+
+        const idx = elements[0].index;
+        const cat = labels[idx] || "";
+
+        // toggle: se clicar na mesma, limpa
+        const cur = window.__myAl_valores_filterCategoria ? String(window.__myAl_valores_filterCategoria) : "";
+        window.__myAl_valores_filterCategoria = (cur === cat ? "" : cat);
+
+        // aplica filtro na tabela + re-render hint
+        myAlValoresApplyCategoriaFilter_();
+        myAlValoresRenderCategoriasBar_(window.__myAl_valores_last || res);
+      },
+
+      plugins: {
+        legend: { display: false },
+
+        tooltip: {
+          callbacks: {
+            label: function(tctx){
+              const v = Number(tctx.raw || 0) || 0;
+              const pct = total > 0 ? (v / total) : 0;
+              return `${fmtBRL_(v)} (${fmtPct_(pct)})`;
+            }
+          }
+        },
+
+        // ✅ rótulos (valor + %), brancos
+        datalabels: {
+          color: "#ffffff",
+          anchor: "end",
+          align: "right",
+          offset: 6,
+          clamp: true,
+          clip: false,
+          formatter: function(value){
+            const v = Number(value || 0) || 0;
+            const pct = total > 0 ? (v / total) : 0;
+            const brl0 = new Intl.NumberFormat("pt-BR", {
+              style: "currency",
+              currency: "BRL",
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0
+            }).format(v);
+
+            return `${brl0}\n${fmtPct_(pct)}`;
+          },
+          font: { weight: "700", size: 11 }
+        }
+      },
+
+      scales: {
+        // ✅ eixo X é o valor (BRL) no gráfico horizontal
+        x: {
+          ticks: {
+            color: "rgba(255,255,255,0.85)",
+            callback: function(v){ return fmtBRL_(v); }
+          },
+          grid: { color: "rgba(148,163,184,0.18)" }
+        },
+
+        // ✅ eixo Y são as categorias (não formatar como dinheiro)
+        y: {
+          ticks: {
+            color: "rgba(255,255,255,0.85)",
+            autoSkip: false
+          },
+          grid: { color: "rgba(148,163,184,0.12)" }
+        }
+      }
+    }
+  });
 }
 
 function myAlValoresDownloadCsv() {
@@ -8629,6 +8933,8 @@ function escSvg_(s){ return String(s==null?"":s).replace(/[&<>]/g, c => ({'&':'&
 function fmtBRL_(n){ try { return (Number(n||0)).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}); } catch(_) { return String(n||0); } }
 function fmtPct_(p){ const v = Number(p||0); return (v*100).toFixed(1).replace(".",",") + "%"; }
 function csvEsc_(s){ s = String(s==null?"":s); if (/[;\n"]/.test(s)) s = '"' + s.replace(/"/g,'""') + '"'; return s; }
+
+let __myAl_barTimer = null;
 
 
 // ✅ 4 — vektorShowResumoCicloView_ (corrigir: também setar display="none" nas outras views)
