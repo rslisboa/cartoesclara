@@ -2792,6 +2792,22 @@ display: none;
   </div>
 </div>
 
+          <!-- ✅ NOVO: Série 12 meses (Total + Variação) -->
+          <div style="margin-top:12px; background:#0b1220; border:1px solid #ffffff; border-radius:14px; padding:12px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
+              <div style="color:#fff; font-weight:900; font-size:13px;">
+                Evolução (últimos 12 meses) — Total e Variação mensal
+              </div>
+              <div id="myAl_serie12mHint" style="color:rgba(226,232,240,0.75); font-size:12px; font-weight:800;">
+                Defina o período para exibir o gráfico.
+              </div>
+            </div>
+
+            <div id="myAl_serie12mWrap" style="margin-top:10px; height:340px; position:relative; width:100%;">
+              <canvas id="myAl_serie12mChart" style="width:100%; height:100%; display:none;"></canvas>
+            </div>
+          </div>
+
         </div> <!-- /myAl_valoresView -->
 
       </div> <!-- /Conteúdo -->
@@ -8402,38 +8418,57 @@ function myAlValoresInitOnce_(){
     }
   }
 
-  // ✅ NÃO MEXE no innerHTML do myAl_funilWrap (não destrói o canvas)
-  function renderNeedPeriod_(){
-    const tbody = document.getElementById("myAl_valoresTbody");
-    if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
-        Defina <b>Período (Início)</b> e <b>Período (Fim)</b> para carregar.
-      </td></tr>`;
-    }
-
-    const hint = document.getElementById("myAl_catHint");
-    if (hint) {
-      hint.innerHTML = `<span style="color:rgba(226,232,240,0.75);">
-        Defina o período para exibir o gráfico.
-      </span>`;
-    }
-
-    const canvas = document.getElementById("myAl_catChart");
-    if (canvas) {
-      canvas.style.display = "none";
-      try {
-        const ctx0 = canvas.getContext("2d");
-        ctx0 && ctx0.clearRect(0,0,canvas.width,canvas.height);
-      } catch(_) {}
-    }
-
-    // mata instância anterior do chart pra parar qualquer "vida própria"
-    try {
-      if (window.__myAl_catChartInst) {
-        window.__myAl_catChartInst.destroy();
-        window.__myAl_catChartInst = null;
+    // ✅ NÃO MEXE no innerHTML do myAl_funilWrap (não destrói o canvas)
+    function renderNeedPeriod_(){
+      const tbody = document.getElementById("myAl_valoresTbody");
+      if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
+          Defina <b>Período (Início)</b> e <b>Período (Fim)</b> para carregar.
+        </td></tr>`;
       }
-    } catch(_) {}
+
+      const hint = document.getElementById("myAl_catHint");
+      if (hint) {
+        hint.innerHTML = `<span style="color:rgba(226,232,240,0.75);">
+          Defina o período para exibir o gráfico.
+        </span>`;
+      }
+
+      const canvas = document.getElementById("myAl_catChart");
+      if (canvas) {
+        canvas.style.display = "none";
+        try {
+          const ctx0 = canvas.getContext("2d");
+          ctx0 && ctx0.clearRect(0,0,canvas.width,canvas.height);
+        } catch(_) {}
+      }
+
+      // mata instância anterior do chart pra parar qualquer "vida própria"
+      try {
+        if (window.__myAl_catChartInst) {
+          window.__myAl_catChartInst.destroy();
+          window.__myAl_catChartInst = null;
+        }
+      } catch(_) {}
+
+          // ✅ NOVO: reseta o chart de série 12m
+      const c12 = document.getElementById("myAl_serie12mChart");
+      if (c12) {
+        c12.style.display = "none";
+        try {
+          const ctx12 = c12.getContext("2d");
+          ctx12 && ctx12.clearRect(0,0,c12.width,c12.height);
+        } catch(_) {}
+      }
+      const hint12 = document.getElementById("myAl_serie12mHint");
+      if (hint12) hint12.textContent = "Defina o período para exibir o gráfico.";
+
+      try {
+        if (window.__myAl_serie12mChartInst) {
+          window.__myAl_serie12mChartInst.destroy();
+          window.__myAl_serie12mChartInst = null;
+        }
+      } catch(_) {}
 
     const meta = document.getElementById("myAl_valoresMeta");
     if (meta) meta.textContent = "";
@@ -8565,29 +8600,34 @@ function myAlValoresInitOnce_(){
     fillLojas_();
   }
 
-  // =========================
+    // =========================
   // binds
   // =========================
   selTime && selTime.addEventListener("change", function(){
     fillLojas_();
     tryLoad_();
+    try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
   });
 
   selLoja && selLoja.addEventListener("change", function(){
     tryLoad_();
+    try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
   });
 
   // ✅ filtro Conta Contábil
   selConta && selConta.addEventListener("change", function(){
     tryLoad_();
+    try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
   });
 
   dtIniEl && dtIniEl.addEventListener("change", function(){
     tryLoad_();
+    try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
   });
 
   dtFimEl && dtFimEl.addEventListener("change", function(){
     tryLoad_();
+    try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
   });
 
   // ✅ IMPORTANTE: não carregar ao abrir
@@ -8708,10 +8748,10 @@ function myAlValoresLoad_() {
     const hint = document.getElementById("myAl_catHint");
     if (hint) hint.innerHTML = `Defina o período para exibir o gráfico.`;
 
-    const canvas = document.getElementById("myAl_catChart");
-    if (canvas) canvas.style.display = "none";
+    // ✅ NOVO: a série 12m NÃO depende de período → carrega mesmo sem dtIni/dtFim
+        try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
 
-    return;
+        return;
   }
 
   // ✅ loading da página (barra “Carregando valores contabilizados…”)
@@ -8802,6 +8842,9 @@ function myAlValoresLoad_() {
         if (typeof myAlValoresRenderTable_ === "function") myAlValoresRenderTable_(res);
         if (typeof myAlValoresRenderFunil_ === "function") myAlValoresRenderFunil_(res);
         if (typeof myAlValoresRenderCategoriasBar_ === "function") myAlValoresRenderCategoriasBar_(res);
+
+                // ✅ NOVO: render série 12 meses (total + variação)
+        try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
 
       } finally {
         myAlValLoading_(false);
@@ -8998,10 +9041,15 @@ function myAlValoresRenderCategoriasBar_(res){
         const cur = window.__myAl_valores_filterCategoria ? String(window.__myAl_valores_filterCategoria) : "";
         window.__myAl_valores_filterCategoria = (cur === cat ? "" : cat);
 
-        // aplica filtro na tabela + re-render hint
+        // aplica filtro na tabela
         myAlValoresApplyCategoriaFilter_();
+
+        // re-render gráfico de categorias
         myAlValoresRenderCategoriasBar_(window.__myAl_valores_last || res);
-      },
+
+        // ✅ NOVO: atualizar gráfico 12 meses conforme cluster selecionado
+        try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
+          },
 
       plugins: {
         legend: { display: false },
@@ -9060,6 +9108,280 @@ function myAlValoresRenderCategoriasBar_(res){
         }
       }
     }
+  });
+}
+
+function myAlValoresLoadSerie12m_(){
+  const selTime  = document.getElementById("myAl_val_time");
+  const selLoja  = document.getElementById("myAl_val_loja");
+  const selConta = document.getElementById("myAl_val_conta");
+
+  const hint = document.getElementById("myAl_serie12mHint");
+  const canvas = document.getElementById("myAl_serie12mChart");
+
+  const time  = selTime  ? String(selTime.value || "__ALL__") : "__ALL__";
+  const loja  = selLoja  ? String(selLoja.value || "__ALL__") : "__ALL__";
+  const conta = selConta ? String(selConta.value || "__ALL__") : "__ALL__";
+
+  // categoria selecionada no gráfico de cluster (se existir)
+  const catSel = (window.__myAl_valores_filterCategoria != null)
+    ? String(window.__myAl_valores_filterCategoria || "").trim()
+    : "";
+
+  if (hint) hint.textContent = "Carregando…";
+  if (canvas) canvas.style.display = "block";
+
+  // mata instância anterior para evitar “travadas”
+  try {
+    if (window.__myAl_serie12mChartInst) {
+      window.__myAl_serie12mChartInst.destroy();
+      window.__myAl_serie12mChartInst = null;
+    }
+  } catch(_) {}
+
+  if (!(typeof google !== "undefined" && google.script && google.script.run)) {
+    if (hint) hint.textContent = "google.script.run indisponível.";
+    if (canvas) canvas.style.display = "none";
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(resp){
+      const r = (resp && typeof resp === "object") ? resp : { ok:false };
+      if (!r.ok) {
+        if (hint) hint.textContent = r.error ? String(r.error) : "Falha ao carregar série 12m.";
+        if (canvas) canvas.style.display = "none";
+        return;
+      }
+      try {
+        myAlValoresRenderSerie12m_(r);
+        if (hint) hint.textContent = "";
+        if (canvas) canvas.style.display = "block";
+      } catch(e) {
+        if (hint) hint.textContent = "Erro ao renderizar série 12m.";
+        if (canvas) canvas.style.display = "none";
+      }
+    })
+    .withFailureHandler(function(err){
+      if (hint) hint.textContent = "Erro ao carregar série 12m.";
+      if (canvas) canvas.style.display = "none";
+    })
+    .getValoresContabilizadosSerie12m({
+      time: time,
+      loja: loja,
+      conta: conta,
+      categoria: catSel,
+      // mantidos só por compatibilidade (backend vai ignorar)
+      dataInicioIso: "",
+      dataFimIso: ""
+    });
+}
+
+function myAlValoresRenderSerie12m_(serie){
+  const canvas = document.getElementById("myAl_serie12mChart");
+  const hint = document.getElementById("myAl_serie12mHint");
+  if (!canvas) return;
+
+  const labels = Array.isArray(serie.labels) ? serie.labels : [];
+  const totais = Array.isArray(serie.totais) ? serie.totais : [];
+  const varsPct = Array.isArray(serie.variacoesPct) ? serie.variacoesPct : [];
+
+  if (!labels.length) {
+    if (hint) hint.textContent = "Sem dados para a série.";
+    canvas.style.display = "none";
+    return;
+  }
+
+  if (hint) hint.textContent = "";
+
+  // garante visível
+  canvas.style.display = "block";
+
+  // mata instância anterior
+  try {
+    if (window.__myAl_serie12mChartInst) {
+      window.__myAl_serie12mChartInst.destroy();
+      window.__myAl_serie12mChartInst = null;
+    }
+  } catch(_) {}
+
+  const ctx = canvas.getContext("2d");
+
+  // ✅ Plugin: desenha rótulo no centro exato das barras (dataset 0)
+const vektorBarCenterLabelsPlugin = {
+  id: "vektorBarCenterLabels",
+  afterDatasetsDraw(chart, args, pluginOptions) {
+    const dsIndex = 0; // barras = dataset 0
+    const meta = chart.getDatasetMeta(dsIndex);
+    if (!meta || meta.hidden) return;
+
+    const data = chart.data.datasets[dsIndex]?.data || [];
+    const ctx = chart.ctx;
+
+    ctx.save();
+    ctx.fillStyle = (pluginOptions && pluginOptions.color) ? pluginOptions.color : "#ffffff";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const fontSize = (pluginOptions && pluginOptions.fontSize) ? pluginOptions.fontSize : 11;
+    const fontWeight = (pluginOptions && pluginOptions.fontWeight) ? pluginOptions.fontWeight : "900";
+    ctx.font = `${fontWeight} ${fontSize}px Arial`;
+
+    function formatK(v){
+      v = Number(v || 0) || 0;
+      const abs = Math.abs(v);
+      if (abs >= 1000000) return "R$ " + (v/1000000).toFixed(1).replace(".", ",") + "M";
+      if (abs >= 1000) return "R$ " + Math.round(v/1000) + "k";
+      return "R$ " + Math.round(v);
+    }
+
+    for (let i = 0; i < meta.data.length; i++) {
+      const el = meta.data[i];
+      if (!el) continue;
+
+      const v = data[i];
+      if (!v) continue;
+
+      // Para barra vertical: el.x = centro X, el.y = topo da barra, el.base = base (zero)
+      const x = el.x;
+      const yTop = el.y;
+      const yBase = el.base;
+      const y = yTop + (yBase - yTop) / 2; // ✅ centro exato da barra
+
+      ctx.fillText(formatK(v), x, y);
+    }
+
+    ctx.restore();
+  }
+};
+
+  window.__myAl_serie12mChartInst = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: "bar",
+          label: "Total (R$)",
+          data: totais,
+          borderWidth: 0,
+          backgroundColor: "rgba(255,255,255,0.22)",   // barra “cinza-branco” elegante
+          borderColor: "rgba(255,255,255,0.55)",
+          borderWidth: 1,
+          barPercentage: 0.8,
+          categoryPercentage: 0.9,
+          order: 1
+        },
+        {
+          type: "line",
+          label: "Variação mensal (%)",
+          data: varsPct,
+          yAxisID: "y2",
+          tension: 0.22,
+          fill: false,
+          borderColor: "#38bdf8",   // azul claro brilhante (sky)
+          borderWidth: 2,
+          borderDash: [7, 5],       // tracejada
+          pointRadius: 3,
+          pointHoverRadius: 4,
+          order: 2
+        }
+      ]
+    },
+    plugins: [ChartDataLabels, vektorBarCenterLabelsPlugin],
+    options: {
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: { mode: "index", intersect: false },
+
+  // ✅ animação geral
+  animation: {
+    duration: 1100,
+    easing: "easeOutQuart"
+  },
+
+    // ✅ animações específicas (linha desenhando ponto a ponto)
+  animations: {
+    // barras sobem primeiro (rápido) — sem delay
+    y: {
+      duration: 700,
+      easing: "easeOutCubic",
+      delay: function(ctx) {
+        // ✅ delay só na linha (datasetIndex 1)
+        if (ctx.type !== "data" || ctx.datasetIndex !== 1) return 0;
+        return ctx.dataIndex * 80;
+      }
+    },
+
+    // linha: aparece ponto a ponto (datasetIndex === 1)
+    x: {
+      type: "number",
+      easing: "linear",
+      duration: 900,
+      delay: function(ctx) {
+        if (ctx.type !== "data" || ctx.datasetIndex !== 1) return 0;
+        return ctx.dataIndex * 80;
+      }
+    }
+  },
+
+  plugins: {
+    legend: {
+      labels: { color: "rgba(255,255,255,0.85)", font: { weight: "800" } }
+    },
+    tooltip: {
+      callbacks: {
+        label: function(ctx){
+          const v = Number(ctx.raw || 0) || 0;
+          if (ctx.datasetIndex === 0) return `${ctx.dataset.label}: ${fmtBRL_(v)}`;
+          return `${ctx.dataset.label}: ${v.toFixed(1)}%`;
+        }
+      }
+    },
+
+    datalabels: {
+        display: false
+      }
+  },
+
+  scales: {
+    x: {
+      ticks: { color: "rgba(255,255,255,0.85)" },
+      grid: { color: "rgba(148,163,184,0.14)" }
+    },
+    y: {
+      beginAtZero: true,
+      ticks: {
+        color: "rgba(255,255,255,0.85)",
+        callback: function(v){
+          const n = Number(v || 0) || 0;
+
+          if (Math.abs(n) >= 1000000) {
+            return (n / 1000000).toFixed(0) + "M";
+          }
+
+          if (Math.abs(n) >= 1000) {
+            return Math.round(n / 1000) + "k";
+          }
+
+          return n;
+    }
+      },
+      grid: { color: "rgba(148,163,184,0.18)" }
+    },
+    y2: {
+      position: "right",
+      ticks: {
+        color: "rgba(56,189,248,0.95)",
+        callback: function(v){
+          const n = Number(v || 0) || 0;
+          return n.toFixed(0) + "%";
+        }
+      },
+      grid: { drawOnChartArea: false }
+    }
+  }
+}
   });
 }
 
