@@ -2662,7 +2662,7 @@ display: none;
             ">
             <div style="color:#fff; font-weight:900; font-size:13px; margin-bottom:10px;">Filtros</div>
 
-            <div style="display:grid; grid-template-columns: 1.0fr 1.2fr 170px 170px auto; gap:10px; align-items:end;">
+            <div style="display:grid; grid-template-columns: 0.85fr 0.95fr 0.75fr 160px 160px auto; gap:10px; align-items:end;">
               <div style="display:flex; flex-direction:column; gap:6px;">
                 <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Time</div>
                 <select id="myAl_val_time"
@@ -2676,6 +2676,15 @@ display: none;
                 <select id="myAl_val_loja"
                   style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
                          border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
+                </select>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Conta Contábil</div>
+                <select id="myAl_val_conta"
+                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
+                        border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
+                  <option value="__ALL__">Todas</option>
                 </select>
               </div>
 
@@ -8312,21 +8321,25 @@ function myAlValoresLoadData_() {
   try {
     myAlValLoading_(true);
 
-    const time = document.getElementById("myAl_val_time")?.value || "__ALL__";
-    const loja = document.getElementById("myAl_val_loja")?.value || "__ALL__";
+    const time  = document.getElementById("myAl_val_time")?.value  || "__ALL__";
+    const loja  = document.getElementById("myAl_val_loja")?.value  || "__ALL__";
+    const conta = document.getElementById("myAl_val_conta")?.value || "__ALL__";
     const dtIni = document.getElementById("myAl_val_dtIni")?.value || "";
     const dtFim = document.getElementById("myAl_val_dtFim")?.value || "";
 
     google.script.run
-      .withSuccessHandler(function(resp) {
+      .withSuccessHandler(function (resp) {
         try {
-          // normaliza resposta
-          const res = (resp && typeof resp === "object") ? resp : { ok:false, rows:[], categorias:[], total:0 };
+          const res = (resp && typeof resp === "object")
+            ? resp
+            : { ok:false, rows:[], categorias:[], total:0 };
 
-          // guarda cache global (se você estiver usando)
           window.__myAl_valores_last = res;
 
-          // ✅ renderiza tabela + funil
+          // ✅ popula o filtro de contas (a partir do retorno real)
+          myAlValoresFillContasFromRows_(Array.isArray(res.rows) ? res.rows : []);
+
+          // ✅ renderizações
           if (typeof myAlValoresRenderTable_ === "function") myAlValoresRenderTable_(res);
           if (typeof myAlValoresRenderFunil_ === "function") myAlValoresRenderFunil_(res);
 
@@ -8334,11 +8347,18 @@ function myAlValoresLoadData_() {
           myAlValLoading_(false);
         }
       })
-      .withFailureHandler(function(err) {
+      .withFailureHandler(function (err) {
         myAlValLoading_(false);
         alert("Erro ao carregar Valores Contabilizados: " + (err && err.message ? err.message : err));
       })
-      .getValoresContabilizadosEtiquetas({ time: time, loja: loja, dataInicioIso: dtIni, dataFimIso: dtFim })
+      // ✅ envia também o filtro de conta (mesmo que o backend ainda ignore, o front fica pronto)
+      .getValoresContabilizadosEtiquetas({
+        time: time,
+        loja: loja,
+        conta: conta,
+        dataInicioIso: dtIni,
+        dataFimIso: dtFim
+      });
 
   } catch (e) {
     myAlValLoading_(false);
@@ -8379,10 +8399,11 @@ function myAlValoresInitOnce_(){
   if (__myAl_valores_inited) return;
   __myAl_valores_inited = true;
 
-  const selTime = document.getElementById("myAl_val_time");
-  const selLoja = document.getElementById("myAl_val_loja");
-  const dtIniEl = document.getElementById("myAl_val_dtIni");
-  const dtFimEl = document.getElementById("myAl_val_dtFim");
+  const selTime  = document.getElementById("myAl_val_time");
+  const selLoja  = document.getElementById("myAl_val_loja");
+  const selConta = document.getElementById("myAl_val_conta");
+  const dtIniEl  = document.getElementById("myAl_val_dtIni");
+  const dtFimEl  = document.getElementById("myAl_val_dtFim");
 
   // =========================
   // helpers UI
@@ -8390,6 +8411,44 @@ function myAlValoresInitOnce_(){
   function setSelectLoading_(sel, label){
     if (!sel) return;
     sel.innerHTML = `<option value="__ALL__">${label}</option>`;
+  }
+
+  // ✅ popula contas a partir do último dataset retornado (se existir)
+  function fillContasFromLast_(){
+    if (!selConta) return;
+
+    const cur = String(selConta.value || "__ALL__");
+    const rows = (window.__myAl_valores_last && Array.isArray(window.__myAl_valores_last.rows))
+      ? window.__myAl_valores_last.rows
+      : [];
+
+    // sem dados ainda: deixa somente "Todas"
+    if (!rows.length) {
+      selConta.innerHTML = `<option value="__ALL__">Todas</option>`;
+      selConta.value = "__ALL__";
+      return;
+    }
+
+    const seen = {};
+    rows.forEach(function(r){
+      const c = (r && r.conta != null) ? String(r.conta).trim() : "";
+      if (c) seen[c] = true;
+    });
+
+    const contas = Object.keys(seen).sort(function(a,b){
+      return String(a).localeCompare(String(b), "pt-BR");
+    });
+
+    selConta.innerHTML =
+      `<option value="__ALL__">Todas</option>` +
+      contas.map(c => `<option value="${escAttr_(c)}">${escHtml_(c)}</option>`).join("");
+
+    // tenta manter o valor atual
+    if (cur && Array.prototype.some.call(selConta.options, o => o.value === cur)) {
+      selConta.value = cur;
+    } else {
+      selConta.value = "__ALL__";
+    }
   }
 
   // ✅ NÃO MEXE no innerHTML do myAl_funilWrap (não destrói o canvas)
@@ -8493,6 +8552,15 @@ function myAlValoresInitOnce_(){
   }
 
   // =========================
+  // ✅ init Conta Contábil (placeholder) + tenta popular se já houver dataset
+  // =========================
+  if (selConta) {
+    selConta.innerHTML = `<option value="__ALL__">Todas</option>`;
+    // se já tem resultado anterior (ex.: usuário voltou pra view), tenta popular
+    fillContasFromLast_();
+  }
+
+  // =========================
   // ✅ Se map vazio, carrega DIRETO do backend (mesma fonte da tela principal)
   // getTimesELojasParaAlertasVektor() existe no Code.gs
   // =========================
@@ -8558,6 +8626,11 @@ function myAlValoresInitOnce_(){
     tryLoad_();
   });
 
+  // ✅ filtro Conta Contábil
+  selConta && selConta.addEventListener("change", function(){
+    tryLoad_();
+  });
+
   dtIniEl && dtIniEl.addEventListener("change", function(){
     tryLoad_();
   });
@@ -8568,6 +8641,36 @@ function myAlValoresInitOnce_(){
 
   // ✅ IMPORTANTE: não carregar ao abrir
   renderNeedPeriod_();
+}
+
+function myAlValoresFillContasFromRows_(rows){
+  const selConta = document.getElementById("myAl_val_conta");
+  if (!selConta) return;
+
+  const cur = String(selConta.value || "__ALL__");
+
+  const seen = {};
+  (rows || []).forEach(function(r){
+    const c = (r && r.conta != null) ? String(r.conta).trim() : "";
+    if (c) seen[c] = true;
+  });
+
+  const contas = Object.keys(seen).sort(function(a,b){
+    return String(a).localeCompare(String(b), "pt-BR");
+  });
+
+  selConta.innerHTML =
+    `<option value="__ALL__">Todas</option>` +
+    contas.map(function(c){
+      return `<option value="${escAttr_(c)}">${escHtml_(c)}</option>`;
+    }).join("");
+
+  // mantém seleção se ainda existir
+  if (cur && Array.prototype.some.call(selConta.options, function(o){ return o.value === cur; })) {
+    selConta.value = cur;
+  } else {
+    selConta.value = "__ALL__";
+  }
 }
 
 function myAlValoresOnPeriodChange_(){
@@ -8592,12 +8695,14 @@ function myAlValoresOnPeriodChange_(){
 function myAlValoresClearFilters() {
   const selTime = document.getElementById("myAl_val_time");
   const selLoja = document.getElementById("myAl_val_loja");
+  const selConta = document.getElementById("myAl_val_conta");
   const dtIni   = document.getElementById("myAl_val_dtIni");
   const dtFim   = document.getElementById("myAl_val_dtFim");
 
   // volta para "Todos/Todas" (se você usar "__ALL__" nos options)
   if (selTime) selTime.value = "__ALL__";
   if (selLoja) selLoja.value = "__ALL__";
+  if (selConta) selConta.value = "__ALL__";
 
   // limpa período
   if (dtIni) dtIni.value = "";
