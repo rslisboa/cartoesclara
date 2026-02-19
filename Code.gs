@@ -2092,6 +2092,183 @@ function getValoresContabilizadosEtiquetas(req) {
   }
 }
 
+// =====================================================
+// VALORES CONTABILIZADOS (BaseClara) - Série 12 meses
+// =====================================================
+function getValoresContabilizadosSerie12m(req) {
+  vektorAssertFunctionAllowed_("getValoresContabilizadosSerie12m");
+  try {
+    req = req || {};
+
+    var timeSel  = String(req.time || "").trim();
+    var lojaSel  = String(req.loja || "").trim();
+    var contaSel = String(req.conta || "").trim();
+    var catSel   = String(req.categoria || "").trim();
+
+    if (timeSel === "__ALL__") timeSel = "";
+    if (lojaSel === "__ALL__") lojaSel = "";
+    if (contaSel === "__ALL__") contaSel = "";
+    if (catSel === "__ALL__") catSel = "";
+
+    // ✅ SEMPRE: últimos 12 meses a partir de hoje
+    var now = new Date();
+    var endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    var startMonth = new Date(endMonth.getFullYear(), endMonth.getMonth() - 11, 1);
+
+    function mmYYYY_(d) {
+      var mm = String(d.getMonth() + 1).padStart(2, "0");
+      return mm + "/" + String(d.getFullYear());
+    }
+    function ymKey_(d) {
+      var mm = String(d.getMonth() + 1).padStart(2, "0");
+      return String(d.getFullYear()) + "-" + mm;
+    }
+
+    var labels = [];
+    var monthKeys = [];
+    var cur = new Date(startMonth.getFullYear(), startMonth.getMonth(), 1);
+    var guard = 0;
+    while (cur <= endMonth && guard < 36) {
+      labels.push(mmYYYY_(cur));
+      monthKeys.push(ymKey_(cur));
+      cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+      guard++;
+    }
+
+    // mapa loja->time
+    var mapLojaTime = {};
+    try { mapLojaTime = construirMapaLojaParaTime_() || {}; } catch (_) { mapLojaTime = {}; }
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error("Aba BaseClara não encontrada.");
+
+    var lr = sh.getLastRow();
+    if (lr < 2) {
+      return { ok:true, labels: labels, totais: labels.map(function(){return 0;}), variacoes: labels.map(function(){return 0;}) };
+    }
+
+    // A.W (23 colunas)
+    var values = sh.getRange(2, 1, lr - 1, 23).getValues();
+
+    var IDX_DATA      = 0;   // A
+    var IDX_VALOR     = 5;   // F
+    var IDX_ETIQUETA  = 19;  // T
+    var IDX_LOJA_NUM  = 21;  // V
+
+    function normLoja4_(x) {
+      var s = String(x || "").trim();
+      if (!s) return "";
+      var m = s.match(/(\d{1,4})/);
+      if (!m) return "";
+      return String(Number(m[1])).padStart(4, "0");
+    }
+
+    function normEtq_(s){
+      s = String(s || "");
+      s = s.replace(/\u00A0/g, " ");
+      s = s.replace(/[–—]/g, "-");
+      s = s.replace(/\s+/g, " ").trim();
+      return s;
+    }
+
+    function parseConta_(etq) {
+      etq = normEtq_(etq);
+      if (!etq) return { conta:"", etiqueta:"" };
+      var m = etq.match(/^(\d{2,})\s*[-–]?\s*(.*)$/);
+      if (m) {
+        var num = String(m[1] || "").trim();
+        return { conta: num, etiqueta: etq };
+      }
+      return { conta: etq, etiqueta: etq };
+    }
+
+    // acumula por mês
+    var sumByMonth = {};
+    monthKeys.forEach(function(k){ sumByMonth[k] = 0; });
+
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+
+      // data
+      var dt = row[IDX_DATA];
+      dt = (dt instanceof Date) ? dt : new Date(dt);
+      if (!(dt instanceof Date) || isNaN(dt.getTime())) continue;
+
+      // ✅ recorta apenas pela janela 12m (startMonth..agora)
+      if (dt < startMonth || dt > now) continue;
+
+      // loja
+      var loja4 = normLoja4_(row[IDX_LOJA_NUM]);
+      if (lojaSel) {
+        var lojaSel4 = normLoja4_(lojaSel);
+        if (lojaSel4 && loja4 !== lojaSel4) continue;
+      }
+
+      // time (via map loja->time)
+      var timeFinal = (loja4 && mapLojaTime[loja4] != null ? String(mapLojaTime[loja4]).trim() : "N/D");
+      if (timeSel && timeFinal !== timeSel) continue;
+
+      // etiqueta
+      var etqRaw = normEtq_(row[IDX_ETIQUETA]);
+      if (!etqRaw) continue;
+
+      // valor
+      var valor = Number(row[IDX_VALOR] || 0) || 0;
+      if (!valor) continue;
+
+      // quebra múltiplas etiquetas e aloca
+      var parts = etqRaw.split(/\s*\|\s*/).map(normEtq_).filter(function(s){ return !!s; });
+      if (!parts.length) parts = [etqRaw];
+
+      var valorPorEtiqueta = valor / parts.length;
+
+      // mês
+      var ym = String(dt.getFullYear()) + "-" + String(dt.getMonth() + 1).padStart(2, "0");
+      if (sumByMonth[ym] == null) continue;
+
+      for (var p = 0; p < parts.length; p++) {
+        var etqPart = parts[p];
+        if (!etqPart) continue;
+
+        // filtro conta
+        var contaObj = parseConta_(etqPart);
+        var conta = contaObj.conta || "";
+        if (contaSel && conta !== contaSel) continue;
+
+        // filtro categoria (cluster)
+        var cat = "";
+        try { cat = categoriaDaEtiqueta_(etqPart) || ""; } catch(_) { cat = ""; }
+        if (catSel && cat !== catSel) continue;
+
+        sumByMonth[ym] += valorPorEtiqueta;
+      }
+    }
+
+    var totais = monthKeys.map(function(k){ return Number(sumByMonth[k] || 0) || 0; });
+
+    // ✅ variação mensal (MoM) em %: (atual - anterior) / anterior * 100
+      var variacoesPct = [];
+      for (var j = 0; j < totais.length; j++) {
+        if (j === 0) {
+          variacoesPct.push(0);
+        } else {
+          var prev = Number(totais[j - 1] || 0) || 0;
+          var cur  = Number(totais[j] || 0) || 0;
+
+          // evita divisão por zero
+          if (!prev) variacoesPct.push(0);
+          else variacoesPct.push(((cur - prev) / prev) * 100);
+        }
+      }
+
+return { ok:true, labels: labels, totais: totais, variacoesPct: variacoesPct };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 function montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows) {
   var esc = function (s) {
     return String(s == null ? "" : s)
