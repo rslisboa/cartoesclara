@@ -1869,19 +1869,24 @@ function getValoresContabilizadosEtiquetas(req) {
   vektorAssertFunctionAllowed_("getValoresContabilizadosEtiquetas");
   try {
     req = req || {};
+
     var timeSel = String(req.time || "").trim();     // "" = todos
     var lojaSel = String(req.loja || "").trim();     // "" = todas
     var iniIso  = String(req.dataInicioIso || "").trim();
     var fimIso  = String(req.dataFimIso || "").trim();
 
+    // ✅ NORMALIZA "__ALL__" (front manda isso)
+    if (timeSel === "__ALL__") timeSel = "";
+    if (lojaSel === "__ALL__") lojaSel = "";
+
     var ini = iniIso ? vektorParseIsoDateSafe_(iniIso) : null;
     var fim = fimIso ? vektorParseIsoDateSafe_(fimIso) : null;
 
     // período inclusivo (fim 23:59:59)
-    if (ini) ini = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0,0,0);
-    if (fim) fim = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23,59,59);
+    if (ini) ini = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0, 0, 0);
+    if (fim) fim = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59);
 
-    // mapa loja->time (você já usa em outros fluxos)
+    // mapa loja->time
     var mapLojaTime = {};
     try { mapLojaTime = construirMapaLojaParaTime_() || {}; } catch (_) { mapLojaTime = {}; }
 
@@ -1892,7 +1897,7 @@ function getValoresContabilizadosEtiquetas(req) {
     var lr = sh.getLastRow();
     if (lr < 2) return { ok:true, total:0, rows:[], categorias:[] };
 
-    // A..W (23 colunas) — mesmo padrão da queryPendenciasBaseClaraAlert_
+    // A..W (23 colunas)
     var values = sh.getRange(2, 1, lr - 1, 23).getValues();
 
     var IDX_DATA      = 0;   // A
@@ -1911,24 +1916,17 @@ function getValoresContabilizadosEtiquetas(req) {
 
     function parseConta_(etq) {
       etq = String(etq || "").trim();
-      if (!etq) return { conta:"", etiqueta: "" };
+      if (!etq) return { conta:"", etiqueta:"" };
 
-      // pega números no início (ex: "7170 - MATERIAL DE ...")
       var m = etq.match(/^(\d{2,})\s*[-–]?\s*(.*)$/);
       if (m) {
         var num = String(m[1] || "").trim();
         return { conta: num, etiqueta: etq };
       }
-
-      // se não tiver numeração, conta = descrição toda (como você pediu)
       return { conta: etq, etiqueta: etq };
     }
 
-    function normEtqKey_(etq) {
-      return String(etq || "").trim();
-    }
-
-    // categorias fixas (matching por “contém” no texto)
+    // categorias fixas
     var CATS = [
       { cat:"🏛️ Administrativo e Geral", keys:[
         "MATERIAL DE ESCRITÓRIO",
@@ -1977,8 +1975,8 @@ function getValoresContabilizadosEtiquetas(req) {
       return "Outros";
     }
 
-    var sumByEtq = {};    // { etiquetaKey: { etiqueta, conta, valor } }
-    var sumByCat = {};    // { categoria: valor }
+    var sumByEtq = {}; // { etiquetaKey: { etiqueta, conta, categoria, valor } }
+    var sumByCat = {}; // { categoria: valor }
     var total = 0;
 
     for (var i=0; i<values.length; i++) {
@@ -1991,12 +1989,13 @@ function getValoresContabilizadosEtiquetas(req) {
       if (fim && dt > fim) continue;
 
       var loja4 = normLoja4_(row[IDX_LOJA_NUM]);
-      if (lojaSel && loja4 !== String(lojaSel).padStart(4,"0")) continue;
+      if (lojaSel) {
+        var lojaSel4 = String(lojaSel).padStart(4,"0");
+        if (loja4 !== lojaSel4) continue;
+      }
 
-      // time: tenta coluna R; se vier vazio, usa mapa loja->time
       var timeRow = String(row[IDX_GRUPO] || "").trim();
       var timeFinal = timeRow || (mapLojaTime[loja4] ? String(mapLojaTime[loja4]).trim() : "N/D");
-
       if (timeSel && timeFinal !== timeSel) continue;
 
       var etqRaw = String(row[IDX_ETIQUETA] || "").trim();
@@ -2007,17 +2006,16 @@ function getValoresContabilizadosEtiquetas(req) {
 
       total += valor;
 
-      // chave da etiqueta
-      var etqKey = normEtqKey_(etqRaw);
-      if (!sumByEtq[etqKey]) {
-        var p = parseConta_(etqRaw);
-        sumByEtq[etqKey] = { etiqueta: p.etiqueta, conta: p.conta, valor: 0 };
-      }
-      sumByEtq[etqKey].valor += valor;
-
       var cat = categoriaDaEtiqueta_(etqRaw);
       if (!sumByCat[cat]) sumByCat[cat] = 0;
       sumByCat[cat] += valor;
+
+      var etqKey = String(etqRaw).trim();
+      if (!sumByEtq[etqKey]) {
+        var p = parseConta_(etqRaw);
+        sumByEtq[etqKey] = { etiqueta: p.etiqueta, conta: p.conta, categoria: cat, valor: 0 };
+      }
+      sumByEtq[etqKey].valor += valor;
     }
 
     var rowsOut = Object.keys(sumByEtq).map(function(k){
@@ -2025,6 +2023,7 @@ function getValoresContabilizadosEtiquetas(req) {
       return {
         etiqueta: r.etiqueta,
         conta: r.conta,
+        categoria: r.categoria,
         valor: r.valor,
         pct: (total > 0 ? (r.valor / total) : 0)
       };
@@ -2038,12 +2037,7 @@ function getValoresContabilizadosEtiquetas(req) {
     });
     catsOut.sort(function(a,b){ return (b.valor||0) - (a.valor||0); });
 
-    return {
-      ok: true,
-      total: total,
-      rows: rowsOut,
-      categorias: catsOut
-    };
+    return { ok:true, total: total, rows: rowsOut, categorias: catsOut };
 
   } catch (e) {
     return { ok:false, error: (e && e.message) ? e.message : String(e) };
