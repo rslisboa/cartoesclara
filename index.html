@@ -9093,7 +9093,19 @@ function myAlValoresRenderCategoriasBar_(res){
         x: {
           ticks: {
             color: "rgba(255,255,255,0.85)",
-            callback: function(v){ return fmtBRL_(v); }
+            callback: function(v){
+              const n = Number(v || 0) || 0;
+
+              if (Math.abs(n) >= 1000000) {
+                return (n / 1000000).toFixed(0) + "M";
+              }
+
+              if (Math.abs(n) >= 1000) {
+                return Math.round(n / 1000) + "k";
+              }
+
+              return n;
+            }
           },
           grid: { color: "rgba(148,163,184,0.18)" }
         },
