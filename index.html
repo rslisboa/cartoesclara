@@ -2744,7 +2744,7 @@ display: none;
   </div>
 
   <!-- Tabela - wrapper com scroll -->
-  <div style="background:#e5e7eb; border:1px solid #000; border-radius:14px; padding:10px; overflow:auto; max-height:420px;">
+  <div style="background:#e5e7eb; border:1px solid #000; border-radius:14px; padding:10px; overflow:auto; max-height:440px;">
     <table style="width:100%; border-collapse:collapse; font-size:12px; background:#f8fafc;">
       <thead>
         <tr>
@@ -8711,7 +8711,7 @@ function myAlValoresRenderTable_(res) {
     const conta     = r.conta || "";
     const categoria = r.categoria || ""; // <- vem do backend (vou ajustar no Code.gs)
     return `
-      <tr data-conta="${escAttr_(conta)}" data-etiqueta="${escAttr_(etiqueta)}" data-categoria="${escAttr_(categoria)}"
+      <tr data-conta="${escAttr_(conta)}" data-etiqueta="${escAttr_(etiqueta)}" data-categoria="${escAttr_(categoria)}" data-valor="${Number(r.valor||0)||0}"
           style="background:#fff; color:#000;">
         <td style="border:1px solid #000; padding:8px; text-align:left; color:#000; background:#fff;">${escHtml_(etiqueta)}</td>
         <td style="border:1px solid #000; padding:8px; text-align:left; color:#000; background:#fff;">${escHtml_(conta)}</td>
@@ -8720,6 +8720,17 @@ function myAlValoresRenderTable_(res) {
       </tr>
     `;
   }).join("");
+
+  // ✅ adiciona uma linha TOTAL (será recalculada conforme filtro)
+tbody.insertAdjacentHTML("beforeend", `
+  <tr id="myAl_valTotalRow" data-total="1"
+      style="background:#f3f4f6; color:#000; font-weight:900;">
+    <td style="border:1px solid #000; padding:8px; text-align:left;">TOTAL</td>
+    <td style="border:1px solid #000; padding:8px; text-align:left;">—</td>
+    <td id="myAl_totalValorCell" style="border:1px solid #000; padding:8px; text-align:right;">—</td>
+    <td id="myAl_totalPctCell" style="border:1px solid #000; padding:8px; text-align:right;">100%</td>
+  </tr>
+`);
 
   // aplica filtro de categoria se já houver
   myAlValoresApplyCategoriaFilter_();
@@ -8735,6 +8746,33 @@ function myAlValoresApplyCategoriaFilter_(){
     const c = (tr.getAttribute("data-categoria") || "").trim();
     tr.style.display = (!cat || c === cat) ? "" : "none";
   });
+
+  myAlValoresUpdateTotalRow_();
+}
+
+function myAlValoresUpdateTotalRow_(){
+  const tbody = document.getElementById("myAl_valoresTbody");
+  if (!tbody) return;
+
+  const totalRow = document.getElementById("myAl_valTotalRow");
+  const cellV = document.getElementById("myAl_totalValorCell");
+  const cellP = document.getElementById("myAl_totalPctCell");
+  if (!totalRow || !cellV || !cellP) return;
+
+  let sum = 0;
+
+  const trs = Array.from(tbody.querySelectorAll("tr"));
+  trs.forEach(tr => {
+    if (tr.getAttribute("data-total") === "1") return;
+    if (tr.style.display === "none") return;
+
+    // pega o valor real do dataset (mais confiável) ou parse da célula
+    const v = Number(tr.getAttribute("data-valor") || 0) || 0;
+    sum += v;
+  });
+
+  cellV.textContent = fmtBRL_(sum);
+  cellP.textContent = "100%";
 }
 
 let __myAl_catChartInst = null;
