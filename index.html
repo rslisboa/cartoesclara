@@ -8290,7 +8290,7 @@ function openMyAlValoresContabilizadosView() {
       </button>
 
       <button type="button"
-        onclick="myAlValoresLoadData_()"
+        onclick="myAlValoresLoad_()"
         style="height:34px;padding:0 12px;border-radius:10px;border:1px solid rgba(148,163,184,0.22);background:rgba(255,255,255,0.06);color:#fff;font-weight:900;font-size:12px;display:inline-flex;align-items:center;gap:8px;">
         Aplicar
       </button>
@@ -8315,55 +8315,6 @@ function openMyAlValoresContabilizadosView() {
 
   // 4) init filters + load
   myAlValoresInitOnce_();
-}
-
-function myAlValoresLoadData_() {
-  try {
-    myAlValLoading_(true);
-
-    const time  = document.getElementById("myAl_val_time")?.value  || "__ALL__";
-    const loja  = document.getElementById("myAl_val_loja")?.value  || "__ALL__";
-    const conta = document.getElementById("myAl_val_conta")?.value || "__ALL__";
-    const dtIni = document.getElementById("myAl_val_dtIni")?.value || "";
-    const dtFim = document.getElementById("myAl_val_dtFim")?.value || "";
-
-    google.script.run
-      .withSuccessHandler(function (resp) {
-        try {
-          const res = (resp && typeof resp === "object")
-            ? resp
-            : { ok:false, rows:[], categorias:[], total:0 };
-
-          window.__myAl_valores_last = res;
-
-          // ✅ popula o filtro de contas (a partir do retorno real)
-          myAlValoresFillContasFromRows_(Array.isArray(res.rows) ? res.rows : []);
-
-          // ✅ renderizações
-          if (typeof myAlValoresRenderTable_ === "function") myAlValoresRenderTable_(res);
-          if (typeof myAlValoresRenderFunil_ === "function") myAlValoresRenderFunil_(res);
-
-        } finally {
-          myAlValLoading_(false);
-        }
-      })
-      .withFailureHandler(function (err) {
-        myAlValLoading_(false);
-        alert("Erro ao carregar Valores Contabilizados: " + (err && err.message ? err.message : err));
-      })
-      // ✅ envia também o filtro de conta (mesmo que o backend ainda ignore, o front fica pronto)
-      .getValoresContabilizadosEtiquetas({
-        time: time,
-        loja: loja,
-        conta: conta,
-        dataInicioIso: dtIni,
-        dataFimIso: dtFim
-      });
-
-  } catch (e) {
-    myAlValLoading_(false);
-    alert("Erro inesperado: " + (e && e.message ? e.message : e));
-  }
 }
 
 function myAlValLoading_(on) {
@@ -8737,62 +8688,137 @@ function myAlValoresClearFilters() {
 }
 
 function myAlValoresLoad_() {
-  const time = document.getElementById("myAl_val_time")?.value || "";
-  const loja = document.getElementById("myAl_val_loja")?.value || "";
+  const time  = document.getElementById("myAl_val_time")?.value  || "__ALL__";
+  const loja  = document.getElementById("myAl_val_loja")?.value  || "__ALL__";
+  const conta = document.getElementById("myAl_val_conta")?.value || "__ALL__";
   const dtIni = document.getElementById("myAl_val_dtIni")?.value || "";
   const dtFim = document.getElementById("myAl_val_dtFim")?.value || "";
 
-    // ✅ não chama backend sem período completo
+  // ✅ não chama backend sem período completo
   if (!String(dtIni || "").trim() || !String(dtFim || "").trim()) {
     myAlValLoading_(false);
-    // reaproveita o placeholder “defina período”
-    if (typeof myAlValoresInitOnce_ === "function") {
-      // chama só para renderNeedPeriod_ (já existe dentro do init),
-      // mas se quiser mais direto, mantenha o placeholder da tabela/hint aqui.
-    }
+
     const tbody = document.getElementById("myAl_valoresTbody");
     if (tbody) {
       tbody.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
         Defina <b>Período (Início)</b> e <b>Período (Fim)</b> para carregar.
       </td></tr>`;
     }
+
     const hint = document.getElementById("myAl_catHint");
     if (hint) hint.innerHTML = `Defina o período para exibir o gráfico.`;
+
     const canvas = document.getElementById("myAl_catChart");
     if (canvas) canvas.style.display = "none";
+
     return;
   }
 
-  // (opcional) mostrar overlay do próprio MyAlerts se existir
-  try { window.vektorMyAlertsShowLoading_ && window.vektorMyAlertsShowLoading_("Carregando valores contabilizados..."); } catch(_) {}
+  // ✅ loading da página (barra “Carregando valores contabilizados…”)
+  myAlValLoading_(true);
+
+  // ✅ (opcional) overlay do MyAlerts
+  try { window.vektorMyAlertsShowLoading_ && window.vektorMyAlertsShowLoading_("Carregando valores contabilizados."); } catch(_) {}
 
   google.script.run
-    .withSuccessHandler(function(res){
-      try { window.vektorMyAlertsHideLoading_ && window.vektorMyAlertsHideLoading_(); } catch(_) {}
+    .withSuccessHandler(function(resp){
+      try {
+        const res0 = (resp && typeof resp === "object")
+          ? resp
+          : { ok:false, rows:[], categorias:[], total:0 };
 
-      if (!res || !res.ok) {
-        const tb = document.getElementById("myAl_valoresTbody");
-        if (tb) tb.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">Falha ao carregar: ${escHtml_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
-        return;
+        // guarda cache global
+        window.__myAl_valores_last = res0;
+
+        // ✅ preenche filtro de contas a partir do retorno real
+        // (mantém a seleção se ela ainda existir)
+        try {
+          myAlValoresFillContasFromRows_(Array.isArray(res0.rows) ? res0.rows : []);
+        } catch (_) {}
+
+        if (!res0.ok) {
+          const tb = document.getElementById("myAl_valoresTbody");
+          if (tb) tb.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
+            ${escHtml_(res0.error || "Falha ao carregar dados.")}
+          </td></tr>`;
+
+          // esconde gráfico se falhou
+          const canvas = document.getElementById("myAl_catChart");
+          if (canvas) canvas.style.display = "none";
+          return;
+        }
+
+        // ============================================================
+        // ✅ Fallback de filtro no FRONT por Conta (se backend não filtrar)
+        // ============================================================
+        let res = res0;
+
+        const contaSel = String(conta || "__ALL__");
+        if (contaSel !== "__ALL__") {
+          const rowsAll = Array.isArray(res0.rows) ? res0.rows : [];
+
+          // filtra por conta
+          const rowsFiltradas = rowsAll.filter(function(r){
+            const c = (r && r.conta != null) ? String(r.conta).trim() : "";
+            return c === contaSel;
+          });
+
+          // recalcula total
+          let total = 0;
+          for (let i = 0; i < rowsFiltradas.length; i++) {
+            total += (Number(rowsFiltradas[i].valor || 0) || 0);
+          }
+
+          // recalcula pct nas rows
+          const rowsOut = rowsFiltradas.map(function(r){
+            const v = Number(r.valor || 0) || 0;
+            return Object.assign({}, r, {
+              pct: (total > 0 ? (v / total) : 0)
+            });
+          });
+
+          // recalcula categorias (para o gráfico de barras)
+          const sumCat = {};
+          for (let i = 0; i < rowsOut.length; i++) {
+            const cat = String(rowsOut[i].categoria || "").trim();
+            if (!cat) continue;
+            sumCat[cat] = (Number(sumCat[cat] || 0) || 0) + (Number(rowsOut[i].valor || 0) || 0);
+          }
+
+          const catsOut = Object.keys(sumCat).map(function(k){
+            const v = Number(sumCat[k] || 0) || 0;
+            return { categoria: k, valor: v, pct: (total > 0 ? (v / total) : 0) };
+          }).sort(function(a,b){ return (b.valor||0) - (a.valor||0); });
+
+          res = {
+            ok: true,
+            total: total,
+            rows: rowsOut,
+            categorias: catsOut
+          };
+        }
+
+        // ✅ render: tabela + funil + gráfico de barras
+        if (typeof myAlValoresRenderTable_ === "function") myAlValoresRenderTable_(res);
+        if (typeof myAlValoresRenderFunil_ === "function") myAlValoresRenderFunil_(res);
+        if (typeof myAlValoresRenderCategoriasBar_ === "function") myAlValoresRenderCategoriasBar_(res);
+
+      } finally {
+        myAlValLoading_(false);
+        try { window.vektorMyAlertsHideLoading_ && window.vektorMyAlertsHideLoading_(); } catch(_) {}
       }
-
-      window.__myAl_valores_last = res;
-
-      myAlValoresRenderTable_(res);
-      myAlValoresRenderCategoriasBar_(res);
-
     })
     .withFailureHandler(function(err){
+      myAlValLoading_(false);
       try { window.vektorMyAlertsHideLoading_ && window.vektorMyAlertsHideLoading_(); } catch(_) {}
-
-      const tb = document.getElementById("myAl_valoresTbody");
-      if (tb) tb.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">Erro: ${escHtml_(err && err.message ? err.message : String(err))}</td></tr>`;
+      alert("Erro ao carregar Valores Contabilizados: " + (err && err.message ? err.message : err));
     })
     .getValoresContabilizadosEtiquetas({
-      time: String(time || ""),
-      loja: String(loja || ""),
-      dataInicioIso: dtIni ? (dtIni + "T00:00:00") : "",
-      dataFimIso:    dtFim ? (dtFim + "T23:59:59") : ""
+      time: time,
+      loja: loja,
+      conta: conta,
+      dataInicioIso: dtIni,
+      dataFimIso: dtFim
     });
 }
 
