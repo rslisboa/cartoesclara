@@ -14378,11 +14378,34 @@ function getAnaliseGastosMeta(){
     var iCategoria  = 13;  // N - Categoria da Compra
     var iTime       = 17;  // R - Grupos (Time)
     var iLojaNum    = 21;  // V - LojaNum (somente número) ✅ ACL/Filtro
+    var iData       = 0;   // A - Data da Transação ✅ para Ano/Mês
 
     var lojasSet = {};
     var timesSet = {};
     var catsSet  = {};
     var comboMap = {}; // chave única time|loja|categoria
+
+    var anosSet = {};
+var mesesPorAnoMap = {}; // { "2026": { "01":true, "02":true } }
+
+function toISODateMeta_(v){
+  if (v instanceof Date) {
+    var y = v.getFullYear();
+    var m = String(v.getMonth() + 1).padStart(2, "0");
+    var d = String(v.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + d;
+  }
+  var s = String(v || "").trim();
+  if (!s) return "";
+
+  var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // dd/mm/yyyy
+  if (m1) return m1[3] + "-" + m1[2] + "-" + m1[1];
+
+  var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);   // yyyy-mm-dd
+  if (m2) return s;
+
+  return "";
+}
 
     values.forEach(function(row){
       var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
@@ -14392,6 +14415,15 @@ function getAnaliseGastosMeta(){
       // ACL (não-admin)
       if (Array.isArray(allowedLojas)) {
         if (allowedLojas.indexOf(lojaNum) < 0) return;
+      }
+
+      var dataISO = toISODateMeta_(row[iData]);
+      if (dataISO) {
+        var ano = String(dataISO).slice(0, 4);
+        var mes = String(dataISO).slice(5, 7);
+        anosSet[ano] = true;
+        if (!mesesPorAnoMap[ano]) mesesPorAnoMap[ano] = {};
+        mesesPorAnoMap[ano][mes] = true;
       }
 
       var time = String(row[iTime] || "").trim();
@@ -14420,7 +14452,12 @@ function getAnaliseGastosMeta(){
       lojas: Object.keys(lojasSet).sort(function(a,b){ return Number(a) - Number(b); }),
       times: Object.keys(timesSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
       categorias: Object.keys(catsSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
-      combos: Object.keys(comboMap).map(function(k){ return comboMap[k]; })
+      combos: Object.keys(comboMap).map(function(k){ return comboMap[k]; }),
+      anos: Object.keys(anosSet).sort(function(a,b){ return Number(a) - Number(b); }),
+      mesesPorAno: Object.keys(mesesPorAnoMap).reduce(function(acc, ano){
+        acc[ano] = Object.keys(mesesPorAnoMap[ano]).sort(function(a,b){ return Number(a) - Number(b); });
+        return acc;
+      }, {})
     };
 
   } catch (e) {
@@ -14570,6 +14607,187 @@ function getAnaliseGastosDataset(req){
         totalTx: tx.length
       },
       tx: tx
+    };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Macro Visões (modal independente da tela principal)
+ * Retorna 2 séries mensais:
+ * - serieLojas: somatória mensal (opcional filtro de loja)
+ * - serieCategorias: somatória mensal (opcional filtro de categoria)
+ * Ambas respeitam ACL/permissão do usuário.
+ *
+ * req: { loja, categoria }
+ */
+function getAnaliseGastosMacroVisoesDataset(req){
+  vektorAssertFunctionAllowed_("getAnaliseGastosMacroVisoesDataset");
+
+  try {
+    req = req || {};
+    var fLoja = String(req.loja || "").trim();        // LojaNum (string)
+    var fCat  = String(req.categoria || "").trim();   // categoria
+    var fAno = String(req.ano || "").trim(); // "2025", "2026"...
+      if (fAno && !/^\d{4}$/.test(fAno)) fAno = "";
+
+    var ctx = vektorGetUserRole_();
+    var email = (ctx && ctx.email)
+      ? String(ctx.email).trim().toLowerCase()
+      : String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+
+    if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
+
+    // null => admin; array => lojas permitidas
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email);
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error('Aba "BaseClara" não encontrada.');
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 2) {
+      return {
+        ok: true,
+        filtros: { loja: fLoja, categoria: fCat },
+        serieLojas: { labels: [], totais: [], variacoesPct: [] },
+        serieCategorias: { labels: [], totais: [], variacoesPct: [] }
+      };
+    }
+
+    var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+    // BaseClara (0-based)
+    var iData      = 0;   // A
+    var iValor     = 5;   // F
+    var iCategoria = 13;  // N
+    var iLojaNum   = 21;  // V
+
+    function toISODate_(v){
+      if (v instanceof Date) {
+        var y = v.getFullYear();
+        var m = String(v.getMonth() + 1).padStart(2, "0");
+        var d = String(v.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + d;
+      }
+      var s = String(v || "").trim();
+      if (!s) return "";
+
+      var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m1) return m1[3] + "-" + m1[2] + "-" + m1[1];
+
+      var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) return s;
+
+      return "";
+    }
+
+    function monthKeyToLabel_(ym){
+      // "2026-02" -> "fev/2026"
+      var y = String(ym || "").slice(0,4);
+      var m = String(ym || "").slice(5,7);
+      var map = {
+        "01":"jan","02":"fev","03":"mar","04":"abr","05":"mai","06":"jun",
+        "07":"jul","08":"ago","09":"set","10":"out","11":"nov","12":"dez"
+      };
+      return (map[m] || m) + "/" + y;
+    }
+
+    function buildSerie_(monthlyMap, anoBase){
+  var keys = [];
+  var labels = [];
+  var totais = [];
+  var variacoesPct = [];
+
+  function monthKeyToLabel_(ym){
+    var y = String(ym || "").slice(0,4);
+    var m = String(ym || "").slice(5,7);
+    var map = {
+      "01":"jan","02":"fev","03":"mar","04":"abr","05":"mai","06":"jun",
+      "07":"jul","08":"ago","09":"set","10":"out","11":"nov","12":"dez"
+    };
+    return (map[m] || m) + "/" + y;
+  }
+
+  if (anoBase && /^\d{4}$/.test(String(anoBase))) {
+    // força jan..dez do ano selecionado
+    for (var m = 1; m <= 12; m++) {
+      keys.push(String(anoBase) + "-" + String(m).padStart(2, "0"));
+    }
+  } else {
+    // sem ano -> usa últimos 12 meses disponíveis
+    var all = Object.keys(monthlyMap).sort(); // yyyy-mm
+    keys = all.slice(-12);
+  }
+
+  var prev = null;
+  for (var i=0; i<keys.length; i++){
+    var ym = keys[i];
+    var total = Number(monthlyMap[ym] || 0) || 0;
+
+    labels.push(monthKeyToLabel_(ym));
+    totais.push(total);
+
+    if (prev === null || prev === 0) {
+      variacoesPct.push(0);
+    } else {
+      variacoesPct.push(((total - prev) / prev) * 100);
+    }
+
+    prev = total;
+  }
+
+  return { labels: labels, totais: totais, variacoesPct: variacoesPct };
+}
+
+    var monthlyLojas = {};      // série mensal para visão de lojas (opcional filtro de loja)
+    var monthlyCats  = {};      // série mensal para visão de categorias (opcional filtro de categoria)
+
+    values.forEach(function(row){
+      var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
+      if (!lojaNum) return;
+      lojaNum = String(lojaNum);
+
+      // ACL
+      if (Array.isArray(allowedLojas)) {
+        if (allowedLojas.indexOf(lojaNum) < 0) return;
+      }
+
+      var dataISO = toISODate_(row[iData]);
+      if (!dataISO) return;
+
+      var ym = String(dataISO).slice(0, 7); // yyyy-mm
+      if (!/^\d{4}-\d{2}$/.test(ym)) return;
+
+      var anoRow = String(dataISO).slice(0, 4);
+
+      // Se usuário selecionou ano, usa somente aquele ano
+      if (fAno && anoRow !== fAno) return;
+
+      var categoria = String(row[iCategoria] || "").trim();
+      if (!categoria) categoria = "Sem categoria";
+
+      var valor = Number(row[iValor]) || 0;
+
+      // Série Lojas (filtra por loja se informado)
+      if (!fLoja || lojaNum === fLoja) {
+        monthlyLojas[ym] = (Number(monthlyLojas[ym]) || 0) + valor;
+      }
+
+      // Série Categorias (filtra por categoria se informado)
+      if (!fCat || categoria === fCat) {
+        monthlyCats[ym] = (Number(monthlyCats[ym]) || 0) + valor;
+      }
+    });
+
+    return {
+      ok: true,
+      filtros: { loja: fLoja, categoria: fCat },
+      serieLojas: buildSerie_(monthlyLojas, fAno),
+      serieCategorias: buildSerie_(monthlyCats, fAno)
     };
 
   } catch (e) {
