@@ -14257,3 +14257,322 @@ function vektorParseIsoDate_(iso) {
   dt.setHours(0, 0, 0, 0);
   return dt;
 }
+
+// ===============================
+// ANALISE DE GASTOS (BACKEND) — BaseClara
+// - Admin: tudo
+// - Não-admin: lojas permitidas via aba "Emails"
+//   - Coluna B: LojaNorm
+//   - Coluna "E-mail Gerente Regional"
+//   - Coluna H: "Usuários adicionais"
+// ===============================
+
+function vektorNormLower_(s){ return String(s || "").trim().toLowerCase(); }
+
+function vektorSplitUsers_(s){
+  var raw = String(s || "").trim();
+  if (!raw) return [];
+  return raw
+    .split(/[;,|\n\r]+/g)
+    .map(function(x){ return String(x||"").trim(); })
+    .filter(function(x){ return !!x; });
+}
+
+function vektorHeaderIndex_(header, names){
+  header = (header || []).map(function(h){ return String(h||"").trim().toLowerCase(); });
+  for (var i=0; i<names.length; i++){
+    var target = String(names[i]||"").trim().toLowerCase();
+    for (var c=0; c<header.length; c++){
+      if (header[c] === target) return c;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Retorna lojas permitidas do usuário (não-admin) via aba "Emails".
+ * Admin => null (significa "todas").
+ */
+function vektorGetAllowedLojasFromEmails_(userEmail){
+  var em = vektorNormLower_(userEmail);
+  if (!em) return [];
+
+  // Admin vê tudo
+  var ctx = vektorGetUserRole_();
+  var role = String(ctx && ctx.role ? ctx.role : "").trim().toLowerCase();
+  if (role === "administrador") return null;
+
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName("Emails");
+  if (!sh) throw new Error('Aba "Emails" não encontrada na planilha BaseClara.');
+
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return [];
+
+  var header = values[0];
+
+  var iLoja = 1; // coluna B = LojaNorm (fixo como você disse)
+  var iGer = vektorHeaderIndex_(header, ["e-mail gerente regional", "email gerente regional", "e-mail ger regional", "email ger regional"]);
+  var iAdd = 7; // coluna H (0-based 7)
+
+  if (iGer < 0) throw new Error('Não encontrei a coluna "E-mail Gerente Regional" na aba Emails.');
+
+  var allowed = {};
+  for (var r=1; r<values.length; r++){
+    var row = values[r];
+    var lojaNorm = normalizarLojaNumero_(row[iLoja]);
+    if (!lojaNorm) continue;
+
+    var ger = vektorNormLower_(row[iGer]);
+    var addList = vektorSplitUsers_(row[iAdd]).map(vektorNormLower_);
+
+    var ok = false;
+    if (ger && ger === em) ok = true;
+    if (!ok && addList && addList.length){
+      for (var k=0; k<addList.length; k++){
+        if (addList[k] && addList[k] === em) { ok = true; break; }
+      }
+    }
+
+    if (ok) allowed[String(lojaNorm)] = true;
+  }
+
+  return Object.keys(allowed).sort(function(a,b){ return Number(a)-Number(b); });
+}
+
+/**
+ * Meta da página: times/lojas/categorias permitidos
+ * - Admin: times/lojas/categorias de toda BaseClara
+ * - Não-admin: lojas filtradas pela aba Emails, e times/categorias derivadas dessas lojas
+ */
+function getAnaliseGastosMeta(){
+  vektorAssertFunctionAllowed_("getAnaliseGastosMeta");
+
+  try {
+    var ctx = vektorGetUserRole_();
+    var email = (ctx && ctx.email)
+      ? String(ctx.email).trim().toLowerCase()
+      : String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+
+    if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
+
+    // null => admin (vê tudo); array => lojas permitidas (LojaNorm numérica da aba Emails)
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email);
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error('Aba "BaseClara" não encontrada.');
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 2) {
+      return { ok: true, lojas: [], times: [], categorias: [], combos: [] };
+    }
+
+    var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+    // =========================
+    // ÍNDICES FIXOS (0-based) — BaseClara
+    // =========================
+    var iLojaAlias  = 7;   // H - Alias do Cartão (opcional exibição)
+    var iCategoria  = 13;  // N - Categoria da Compra
+    var iTime       = 17;  // R - Grupos (Time)
+    var iLojaNum    = 21;  // V - LojaNum (somente número) ✅ ACL/Filtro
+
+    var lojasSet = {};
+    var timesSet = {};
+    var catsSet  = {};
+    var comboMap = {}; // chave única time|loja|categoria
+
+    values.forEach(function(row){
+      var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
+      if (!lojaNum) return;
+      lojaNum = String(lojaNum);
+
+      // ACL (não-admin)
+      if (Array.isArray(allowedLojas)) {
+        if (allowedLojas.indexOf(lojaNum) < 0) return;
+      }
+
+      var time = String(row[iTime] || "").trim();
+      if (!time) time = "N/D";
+
+      var cat = String(row[iCategoria] || "").trim();
+      if (!cat) cat = "Sem categoria";
+
+      // filtro Loja exibirá LojaNum (número)
+      lojasSet[lojaNum] = true;
+      timesSet[time] = true;
+      catsSet[cat] = true;
+
+      var k = [time, lojaNum, cat].join("¦");
+      if (!comboMap[k]) {
+        comboMap[k] = {
+          time: time,
+          loja: lojaNum,
+          categoria: cat
+        };
+      }
+    });
+
+    return {
+      ok: true,
+      lojas: Object.keys(lojasSet).sort(function(a,b){ return Number(a) - Number(b); }),
+      times: Object.keys(timesSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
+      categorias: Object.keys(catsSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
+      combos: Object.keys(comboMap).map(function(k){ return comboMap[k]; })
+    };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Dataset da página: retorna tx já filtradas por ACL e pelo recorte solicitado.
+ * req: {dtIni, dtFim, time, loja, categoria}
+ */
+function getAnaliseGastosDataset(req){
+  vektorAssertFunctionAllowed_("getAnaliseGastosDataset");
+
+  try {
+    req = req || {};
+    var dtIni = String(req.dtIni || "").trim();   // yyyy-mm-dd
+    var dtFim = String(req.dtFim || "").trim();   // yyyy-mm-dd
+    var fTime = String(req.time || "").trim();
+    var fLoja = String(req.loja || "").trim();    // LojaNum (número em string)
+    var fCat  = String(req.categoria || "").trim();
+
+    if (!dtIni || !dtFim) throw new Error("Informe dtIni e dtFim.");
+    if (dtIni > dtFim) throw new Error("Período inválido: dtIni > dtFim.");
+
+    var ctx = vektorGetUserRole_();
+    var email = (ctx && ctx.email)
+      ? String(ctx.email).trim().toLowerCase()
+      : String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+
+    if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
+
+    // null => admin; array => lojas permitidas (LojaNorm da aba Emails)
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email);
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error('Aba "BaseClara" não encontrada.');
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+
+    if (lastRow < 2) {
+      return { ok: true, meta: { periodoTxt: dtIni + " a " + dtFim, totalTx: 0 }, tx: [] };
+    }
+
+    var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+    // =========================
+    // ÍNDICES FIXOS (0-based) — BaseClara
+    // =========================
+    var iData      = 0;   // A - Data da Transação
+    var iEstab     = 2;   // C - Transação (Estabelecimento)
+    var iValor     = 5;   // F - Valor em R$
+    var iLojaAlias = 7;   // H - Alias do Cartão (opcional exibição)
+    var iCategoria = 13;  // N - Categoria da Compra ✅
+    var iTime      = 17;  // R - Grupos (Time)
+    var iDesc      = 20;  // U - Descrição (Item comprado)
+    var iLojaNum   = 21;  // V - LojaNum ✅ ACL/Filtro
+
+    function toISODate_(v){
+      if (v instanceof Date) {
+        var y = v.getFullYear();
+        var m = String(v.getMonth() + 1).padStart(2, "0");
+        var d = String(v.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + d;
+      }
+
+      var s = String(v || "").trim();
+      if (!s) return "";
+
+      // dd/mm/yyyy
+      var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m1) return m1[3] + "-" + m1[2] + "-" + m1[1];
+
+      // yyyy-mm-dd
+      var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) return s;
+
+      return "";
+    }
+
+    function toBR_(iso){
+      if (!iso) return "";
+      var p = String(iso).split("-");
+      if (p.length === 3) return p[2] + "/" + p[1] + "/" + p[0];
+      return iso;
+    }
+
+    var tx = [];
+
+    values.forEach(function(row){
+      var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
+      if (!lojaNum) return;
+      lojaNum = String(lojaNum);
+
+      // ACL (comparando LojaNorm da aba Emails com BaseClara!V = LojaNum)
+      if (Array.isArray(allowedLojas)) {
+        if (allowedLojas.indexOf(lojaNum) < 0) return;
+      }
+
+      var dataISO = toISODate_(row[iData]);
+      if (!dataISO) return;
+
+      // período
+      if (dataISO < dtIni || dataISO > dtFim) return;
+
+      var time = String(row[iTime] || "").trim();
+      if (!time) time = "N/D";
+
+      var categoria = String(row[iCategoria] || "").trim();
+      if (!categoria) categoria = "Sem categoria";
+
+      var estabelecimento = String(row[iEstab] || "").trim();
+      if (!estabelecimento) estabelecimento = "—";
+
+      var descricao = String(row[iDesc] || "").trim();
+      if (!descricao) descricao = "—";
+
+      var valor = Number(row[iValor]) || 0;
+
+      // filtro Loja (agora é LojaNum)
+      if (fTime && time !== fTime) return;
+      if (fLoja && lojaNum !== fLoja) return;
+      if (fCat && categoria !== fCat) return;
+
+      // Exibição: se quiser mostrar alias junto, você pode concatenar
+      // var lojaAlias = String(row[iLojaAlias] || "").trim();
+      // var lojaExib = lojaAlias ? (lojaNum + " - " + lojaAlias) : lojaNum;
+
+      tx.push({
+        dataISO: dataISO,
+        dataBR: toBR_(dataISO),
+        loja: lojaNum, // ✅ mantendo filtro/coluna Loja como número da loja
+        time: time,
+        categoria: categoria,
+        estabelecimento: estabelecimento,
+        valor: valor,
+        descricao: descricao
+      });
+    });
+
+    return {
+      ok: true,
+      meta: {
+        periodoTxt: dtIni + " a " + dtFim,
+        totalTx: tx.length
+      },
+      tx: tx
+    };
+
+  } catch (e) {
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
