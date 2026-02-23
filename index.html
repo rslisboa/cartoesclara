@@ -2040,6 +2040,20 @@ display: none;
                     <div style="margin-top:10px; height:320px; position:relative;">
                       <canvas id="analiseGastos_macro_chartLojas" style="width:100%; height:100%;"></canvas>
                     </div>
+                    <!-- Chart 1.2 - Top 10 Lojas -->
+                    <div style="border:1px solid rgba(148,163,184,0.18); border-radius:14px; background:rgba(15,23,42,0.65); padding:12px;">
+                      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                        <div>
+                          <div style="font-size:13px; font-weight:1000; color:#fff;">Top 10 Lojas — Maior valor de gastos</div>
+                          <div id="analiseGastos_macro_hintTopLojas" style="margin-top:4px; font-size:12px; font-weight:800; color:rgba(226,232,240,0.75);">
+                            —
+                          </div>
+                        </div>
+                      </div>
+                      <div style="margin-top:10px; height:320px; position:relative;">
+                        <canvas id="analiseGastos_macro_chartTopLojas" style="width:100%; height:100%;"></canvas>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Chart 2 -->
@@ -2054,6 +2068,20 @@ display: none;
                     </div>
                     <div style="margin-top:10px; height:320px; position:relative;">
                       <canvas id="analiseGastos_macro_chartCategorias" style="width:100%; height:100%;"></canvas>
+                    </div>
+                    <!-- Chart 2.2 - Top 10 Categorias -->
+                    <div style="border:1px solid rgba(148,163,184,0.18); border-radius:14px; background:rgba(15,23,42,0.65); padding:12px;">
+                      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                        <div>
+                          <div style="font-size:13px; font-weight:1000; color:#fff;">Top 10 Categorias — Maior valor de gastos</div>
+                          <div id="analiseGastos_macro_hintTopCategorias" style="margin-top:4px; font-size:12px; font-weight:800; color:rgba(226,232,240,0.75);">
+                            —
+                          </div>
+                        </div>
+                      </div>
+                      <div style="margin-top:10px; height:320px; position:relative;">
+                        <canvas id="analiseGastos_macro_chartTopCategorias" style="width:100%; height:100%;"></canvas>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -6646,6 +6674,8 @@ function vektorAnaliseGastosMacroLoad_(){
 
       var hintL = document.getElementById("analiseGastos_macro_hintLojas");
       var hintC = document.getElementById("analiseGastos_macro_hintCategorias");
+      var hintTopL = document.getElementById("analiseGastos_macro_hintTopLojas");
+      var hintTopC = document.getElementById("analiseGastos_macro_hintTopCategorias");
 
       if (hintL) {
         hintL.textContent = loja
@@ -6657,11 +6687,33 @@ function vektorAnaliseGastosMacroLoad_(){
           ? ("Recorte aplicado na visão de Categorias: " + categoria)
           : "Acumulado mensal de todas as categorias";
       }
+      if (hintTopL) {
+        hintTopL.textContent =
+          "Ranking por somatória no período (Top 10)";
+      }
+      if (hintTopC) {
+        hintTopC.textContent =
+          "Ranking por somatória no período (Top 10)";
+      }
 
       vektorAnaliseGastosMacroRenderChart_(
         "analiseGastos_macro_chartLojas",
         res.serieLojas || { labels: [], totais: [], variacoesPct: [] },
         "__analiseGastosMacroChartLojas"
+      );
+
+      vektorAnaliseGastosMacroRenderTop10Chart_(
+        "analiseGastos_macro_chartTopLojas",
+        res.top10Lojas || { labels: [], totais: [] },
+        "__analiseGastosMacroChartTopLojas",
+        "Lojas"
+      );
+
+      vektorAnaliseGastosMacroRenderTop10Chart_(
+        "analiseGastos_macro_chartTopCategorias",
+        res.top10Categorias || { labels: [], totais: [] },
+        "__analiseGastosMacroChartTopCategorias",
+        "Categorias"
       );
 
       vektorAnaliseGastosMacroRenderChart_(
@@ -6685,8 +6737,13 @@ function vektorAnaliseGastosMacroRenderEmpty_(msg){
   msg = String(msg || "Sem dados.");
   var hL = document.getElementById("analiseGastos_macro_hintLojas");
   var hC = document.getElementById("analiseGastos_macro_hintCategorias");
+  var hTopL = document.getElementById("analiseGastos_macro_hintTopLojas");
+  var hTopC = document.getElementById("analiseGastos_macro_hintTopCategorias");
+
   if (hL) hL.textContent = msg;
   if (hC) hC.textContent = msg;
+  if (hTopL) hTopL.textContent = msg;
+  if (hTopC) hTopC.textContent = msg;
 
   try {
     if (window.__analiseGastosMacroChartLojas) {
@@ -6700,6 +6757,19 @@ function vektorAnaliseGastosMacroRenderEmpty_(msg){
       window.__analiseGastosMacroChartCategorias = null;
     }
   } catch(_) {}
+  try {
+  if (window.__analiseGastosMacroChartTopLojas) {
+    window.__analiseGastosMacroChartTopLojas.destroy();
+    window.__analiseGastosMacroChartTopLojas = null;
+  }
+} catch(_) {}
+
+try {
+  if (window.__analiseGastosMacroChartTopCategorias) {
+    window.__analiseGastosMacroChartTopCategorias.destroy();
+    window.__analiseGastosMacroChartTopCategorias = null;
+  }
+} catch(_) {}
 }
 
 function vektorAnaliseGastosMacroRenderChart_(canvasId, serie, chartRefName){
@@ -6868,6 +6938,156 @@ function vektorAnaliseGastosMacroRenderChart_(canvasId, serie, chartRefName){
             }
           },
           grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+}
+
+function vektorAnaliseGastosMacroRenderTop10Chart_(canvasId, serie, chartRefName, tipoLabel){
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  var labels = Array.isArray(serie && serie.labels) ? serie.labels.slice() : [];
+  var totais = Array.isArray(serie && serie.totais) ? serie.totais.slice() : [];
+
+  try {
+    if (window[chartRefName]) {
+      window[chartRefName].destroy();
+      window[chartRefName] = null;
+    }
+  } catch(_) {}
+
+  if (!labels.length) return;
+
+  var ctx = canvas.getContext("2d");
+
+  function fmtCompactK_(n){
+    n = Number(n || 0) || 0;
+    var abs = Math.abs(n);
+    if (abs >= 1000000) return Math.round(n / 1000000) + "M";
+    if (abs >= 1000)    return Math.round(n / 1000) + "k";
+    return String(Math.round(n));
+  }
+
+  // ✅ plugin custom: desenha nome (loja/categoria) no centro da barra horizontal
+  var vektorMacroTop10BarLabelsPlugin = {
+    id: "vektorMacroTop10BarLabels",
+    afterDatasetsDraw: function(chart, args, pluginOptions) {
+      var dsIndex = 0;
+      var meta = chart.getDatasetMeta(dsIndex);
+      if (!meta || meta.hidden) return;
+
+      var c = chart.ctx;
+      var ds = chart.data.datasets[dsIndex];
+      var textLabels = (chart.data && chart.data.labels) ? chart.data.labels : [];
+
+      c.save();
+      c.fillStyle = (pluginOptions && pluginOptions.color) ? pluginOptions.color : "#ffffff";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+
+      var fontSize = (pluginOptions && pluginOptions.fontSize) ? pluginOptions.fontSize : 10;
+      var fontWeight = (pluginOptions && pluginOptions.fontWeight) ? pluginOptions.fontWeight : "900";
+      c.font = fontWeight + " " + fontSize + "px Arial";
+
+      for (var i = 0; i < meta.data.length; i++) {
+        var el = meta.data[i];
+        if (!el) continue;
+
+        var v = Number(ds.data[i] || 0) || 0;
+        if (!v) continue;
+
+        var label = String(textLabels[i] || "");
+        if (!label) continue;
+
+        // centro geométrico da barra horizontal
+        var xCenter = el.base + (el.x - el.base) / 2;
+        var yCenter = el.y;
+
+        // evita escrever em barras curtas demais
+        if (Math.abs(el.x - el.base) < 60) continue;
+
+        // truncar visualmente labels muito longos
+        var txt = label.length > 28 ? (label.slice(0, 28) + "…") : label;
+
+        c.fillText(txt, xCenter, yCenter);
+      }
+
+      c.restore();
+    }
+  };
+
+  window[chartRefName] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Total (R$)",
+          data: totais,
+          backgroundColor: "#005E27",
+          borderColor: "#B5FF20",
+          borderWidth: 2,
+          borderRadius: 6,
+          barPercentage: 0.78,
+          categoryPercentage: 0.82
+        }
+      ]
+    },
+    plugins: [ChartDataLabels, vektorMacroTop10BarLabelsPlugin],
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600, easing: "easeOutQuart" },
+
+      plugins: {
+        legend: { display: false },
+
+        tooltip: {
+          callbacks: {
+            title: function(items){
+              if (!items || !items.length) return "";
+              return String(items[0].label || "");
+            },
+            label: function(ctx){
+              var v = Number(ctx.raw || 0) || 0;
+              return "Total: " + vektorFmtBRL_(v);
+            }
+          }
+        },
+
+        datalabels: { display: false },
+
+        vektorMacroTop10BarLabels: {
+          color: "#ffffff",
+          fontSize: 10,
+          fontWeight: "900"
+        }
+      },
+
+      scales: {
+        y: {
+          ticks: {
+            // ✅ nomes já vão dentro das barras, então eixo Y pode ficar discreto/oculto
+            display: false,
+            color: "rgba(255,255,255,0.75)"
+          },
+          grid: { display: false }
+        },
+        x: {
+          beginAtZero: true,
+          ticks: {
+            color: "rgba(255,255,255,0.85)",
+            callback: function(v){
+              var n = Number(v || 0) || 0;
+              if (Math.abs(n) >= 1000000) return Math.round(n / 1000000) + "M";
+              if (Math.abs(n) >= 1000) return Math.round(n / 1000) + "k";
+              return Math.round(n);
+            }
+          },
+          grid: { color: "rgba(148,163,184,0.14)" }
         }
       }
     }
