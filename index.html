@@ -821,6 +821,249 @@ display: none;
   padding-right: 10px !important;
 }
 
+/* ===========================
+   Análise de Gastos - Card Estabelecimento (clicável + hover help)
+=========================== */
+#analiseGastos_cardEstabWrap{
+  cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+#analiseGastos_cardEstabWrap:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 14px 26px rgba(0,0,0,0.12);
+}
+
+/* linha acima do título em vermelho claro */
+#analiseGastos_cardEstabWrap .analiseGastosCardLabel::after{
+  background: #fca5a5; /* vermelho claro */
+}
+
+/* borda do card em tom vermelho claro */
+#analiseGastos_cardEstabWrap{
+  border-color: #ef4444 !important;
+}
+
+/* área decorativa inferior em vermelho claro (substitui verde nesse card) */
+#analiseGastos_cardEstabWrap::before{
+  background:
+    radial-gradient(120% 90% at 0% 100%, rgba(239,68,68,0.16) 0%, rgba(239,68,68,0.07) 42%, rgba(239,68,68,0.00) 70%),
+    radial-gradient(95% 80% at 45% 100%, rgba(252,165,165,0.14) 0%, rgba(252,165,165,0.06) 45%, rgba(252,165,165,0.00) 72%),
+    radial-gradient(85% 75% at 90% 100%, rgba(254,202,202,0.12) 0%, rgba(254,202,202,0.05) 44%, rgba(254,202,202,0.00) 70%);
+}
+
+#analiseGastos_cardEstabWrap::after{
+  background: linear-gradient(180deg, rgba(252,165,165,0.00), rgba(252,165,165,0.12));
+}
+
+/* texto de ajuda no hover (sobe) */
+.analiseGastosCardHoverHelp{
+  position:absolute;
+  left:10px;
+  right:10px;
+  bottom:8px;
+  z-index:2;
+  background: rgba(255,255,255,0.96);
+  border:1px solid #fecaca;
+  color:#7f1d1d;
+  border-radius:10px;
+  padding:6px 8px;
+  font-size:11px;
+  font-weight:900;
+  line-height:1.2;
+  box-shadow:0 8px 18px rgba(0,0,0,0.08);
+  transform: translateY(12px);
+  opacity:0;
+  pointer-events:none;
+  transition: transform .18s ease, opacity .18s ease;
+}
+
+#analiseGastos_cardEstabWrap:hover .analiseGastosCardHoverHelp{
+  transform: translateY(0);
+  opacity:1;
+}
+
+/* ===========================
+   Modal claro - Detalhe por Estabelecimentos (pivot mensal)
+=========================== */
+#analiseGastos_estabModal{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+}
+
+#analiseGastos_estabModal.hidden{
+  display: none !important;
+}
+
+#analiseGastos_estabModalBackdrop{
+  position:absolute;
+  inset:0;
+  background: rgba(15,23,42,0.45);
+  backdrop-filter: blur(2px);
+}
+
+#analiseGastos_estabModalPanel{
+  position:absolute;
+  inset: 18px 20px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  box-shadow: 0 28px 60px rgba(2,6,23,0.28);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+#analiseGastos_estabModalHeader{
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 14px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+#analiseGastos_estabModalTitle{
+  font-size: 16px;
+  font-weight: 1000;
+  color:#0f172a;
+  line-height:1.15;
+}
+
+#analiseGastos_estabModalSub{
+  margin-top:4px;
+  font-size:12px;
+  font-weight:800;
+  color:#475569;
+  line-height:1.25;
+}
+
+#analiseGastos_estabModalClose{
+  border:1px solid #cbd5e1;
+  background:#fff;
+  color:#0f172a;
+  border-radius:12px;
+  min-width:40px;
+  height:40px;
+  font-size:22px;
+  font-weight:900;
+  line-height:1;
+  cursor:pointer;
+}
+
+#analiseGastos_estabModalClose:hover{
+  border-color:#93c5fd;
+  background:#eff6ff;
+}
+
+#analiseGastos_estabModalBody{
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-height:0;
+  flex:1;
+}
+
+#analiseGastos_estabPivotWrap{
+  flex:1;
+  min-height:0;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background:#ffffff;
+  overflow:auto;               /* ✅ scroll horizontal e vertical */
+  max-height: calc(100vh - 190px);
+}
+
+#analiseGastos_estabPivotTable{
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;          /* ✅ permite crescer horizontalmente */
+  min-width: 100%;
+  color:#0f172a;
+  background:#fff;
+}
+
+#analiseGastos_estabPivotTable thead th{
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #ecfdf5;
+  color:#064e3b;
+  border-bottom: 2px solid #10b981;
+  border-right: 1px solid #d1fae5;
+  padding: 10px 10px;
+  font-size: 12px;
+  font-weight: 1000;
+  text-align:center;
+  white-space: nowrap;
+}
+
+#analiseGastos_estabPivotTable thead th:first-child{
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: #d1fae5;
+  text-align:left;
+  min-width: 280px;
+}
+
+#analiseGastos_estabPivotTable tbody td,
+#analiseGastos_estabPivotTable tfoot td{
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#analiseGastos_estabPivotTable tbody td:first-child,
+#analiseGastos_estabPivotTable tfoot td:first-child{
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background:#ffffff;
+  font-weight: 900;
+  min-width: 280px;
+  max-width: 420px;
+  white-space: normal;
+}
+
+#analiseGastos_estabPivotTable tbody tr:nth-child(even) td{
+  background:#f8fafc;
+}
+
+#analiseGastos_estabPivotTable tbody tr:nth-child(even) td:first-child{
+  background:#f8fafc;
+}
+
+#analiseGastos_estabPivotTable td.num{
+  text-align: right;
+  font-weight: 800;
+  min-width: 120px;
+}
+
+#analiseGastos_estabPivotTable tfoot td{
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background:#f0fdf4;
+  font-weight: 1000;
+  color:#14532d;
+  border-top: 2px solid #22c55e;
+}
+
+#analiseGastos_estabPivotMsg{
+  padding: 18px;
+  text-align:center;
+  font-size:13px;
+  font-weight:900;
+  color:#475569;
+}
+
 /* =========================
    STATUS (Estado Operacional) - background blur
    ========================= */
@@ -1862,12 +2105,12 @@ display: none;
           <!-- Direita superior: botões -->
           <div style="display:flex; align-items:flex-start; gap:8px; margin-left:auto;">
             <button id="analiseGastos_btnBuscar" type="button"
-                    style="height:36px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:11px; background:#006b2c; color:#ffffff; cursor:pointer; white-space:nowrap;">
+                    style="height:36px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:12px; background:#006b2c; color:#ffffff; cursor:pointer; white-space:nowrap;">
               Buscar
             </button>
 
             <button id="analiseGastos_btnMacroVisoes" type="button"
-                    style="height:36px; padding:0 14px; border:1px solid rgba(181,255,32,0.35); border-radius:10px; font-weight:900; font-size:11px; background:rgba(181,255,32,0.10); color:#eaffb8; cursor:pointer; white-space:nowrap;">
+                    style="height:36px; padding:0 14px; border:1px solid rgba(181,255,32,0.35); border-radius:10px; font-weight:900; font-size:12px; background:rgba(181,255,32,0.10); color:#eaffb8; cursor:pointer; white-space:nowrap;">
               Macro Visões
             </button>
           </div>
@@ -2091,6 +2334,30 @@ display: none;
           </div>
         </div>
 
+        <!-- Modal: Detalhe de Estabelecimentos (pivot mensal) -->
+        <div id="analiseGastos_estabModal" class="hidden" aria-hidden="true">
+          <div id="analiseGastos_estabModalBackdrop"></div>
+
+          <div id="analiseGastos_estabModalPanel" role="dialog" aria-modal="true" aria-labelledby="analiseGastos_estabModalTitle">
+            <div id="analiseGastos_estabModalHeader">
+              <div>
+                <div id="analiseGastos_estabModalTitle">Detalhamento de Estabelecimentos por mês</div>
+                <div id="analiseGastos_estabModalSub">
+                  Somatória mensal por estabelecimento com base nos filtros aplicados na página principal.
+                </div>
+              </div>
+
+              <button id="analiseGastos_estabModalClose" type="button" title="Fechar">×</button>
+            </div>
+
+            <div id="analiseGastos_estabModalBody">
+              <div id="analiseGastos_estabPivotWrap">
+                <div id="analiseGastos_estabPivotMsg">Clique no card para carregar os detalhes.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Cards -->
         <div style="display:grid; grid-template-columns:repeat(4, minmax(220px, 1fr)); gap:10px; align-items:stretch;">
           <div class="analiseGastosCard">
@@ -2111,10 +2378,14 @@ display: none;
             <div id="analiseGastos_cardCategoriaTopSub" class="analiseGastosCardSub">—</div>
           </div>
 
-          <div class="analiseGastosCard">
+          <div class="analiseGastosCard" id="analiseGastos_cardEstabWrap" role="button" tabindex="0" aria-label="Abrir detalhes de estabelecimentos por mês">
             <div class="analiseGastosCardLabel">Estabelecimento com maior valor</div>
             <div id="analiseGastos_cardEstabTop" class="analiseGastosCardValue">—</div>
             <div id="analiseGastos_cardEstabTopSub" class="analiseGastosCardSub">—</div>
+
+            <div class="analiseGastosCardHoverHelp">
+              Clique para visualizar mais detalhes de todos os estabelecimentos do período aplicado.
+            </div>
           </div>
         </div>
 
@@ -5942,6 +6213,11 @@ function vektorAnaliseGastosInitOnce_(){
   const macroSelCat  = document.getElementById("analiseGastos_macro_selCategoria");
   const macroSelAno = document.getElementById("analiseGastos_macro_selAno");
 
+  const cardEstabWrap = document.getElementById("analiseGastos_cardEstabWrap");
+  const estabModal = document.getElementById("analiseGastos_estabModal");
+  const estabModalClose = document.getElementById("analiseGastos_estabModalClose");
+  const estabModalBackdrop = document.getElementById("analiseGastos_estabModalBackdrop");
+
   // Estado inicial da tabela (sem carregar automaticamente)
   const tb = document.getElementById("analiseGastos_tbody");
   if (tb && !tb.dataset.initMsgDone) {
@@ -6085,6 +6361,39 @@ if (macroSelCat && !macroSelCat.__bindMacroChange) {
   macroSelCat.__bindMacroChange = true;
   macroSelCat.addEventListener("change", function(){
     try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+  });
+}
+
+// ✅ abrir modal de detalhe por estabelecimentos (pivot mensal)
+if (cardEstabWrap && !cardEstabWrap.__bindEstabPivotOpen) {
+  cardEstabWrap.__bindEstabPivotOpen = true;
+
+  cardEstabWrap.addEventListener("click", function(){
+    try { vektorAnaliseGastosOpenEstabPivotModal_(); } catch(e){ console.error(e); }
+  });
+
+  // acessibilidade por teclado
+  cardEstabWrap.addEventListener("keydown", function(ev){
+    if (!ev) return;
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      try { vektorAnaliseGastosOpenEstabPivotModal_(); } catch(e){ console.error(e); }
+    }
+  });
+}
+
+// ✅ fechar modal de estabelecimentos
+if (estabModalClose && !estabModalClose.__bindEstabPivotClose) {
+  estabModalClose.__bindEstabPivotClose = true;
+  estabModalClose.addEventListener("click", function(){
+    try { vektorAnaliseGastosCloseEstabPivotModal_(); } catch(e){ console.error(e); }
+  });
+}
+
+if (estabModalBackdrop && !estabModalBackdrop.__bindEstabPivotClose) {
+  estabModalBackdrop.__bindEstabPivotClose = true;
+  estabModalBackdrop.addEventListener("click", function(){
+    try { vektorAnaliseGastosCloseEstabPivotModal_(); } catch(e){ console.error(e); }
   });
 }
 
@@ -6303,6 +6612,12 @@ function vektorAnaliseGastosApply_(){
 }
 
 function vektorAnaliseGastosRender_(tx, meta){
+  // ✅ guarda snapshot filtrado atual para o modal de estabelecimentos
+    try {
+      window.__analiseGastosLastFilteredTx = Array.isArray(tx) ? tx.slice() : [];
+      window.__analiseGastosLastFilteredMeta = meta || null;
+    } catch(_) {}
+
   function toBRPeriod_(txt){
     var s = String(txt || "").trim();
     if (!s) return "—";
@@ -6391,6 +6706,158 @@ function vektorAnaliseGastosRender_(tx, meta){
       </tr>
     `;
   }).join("");
+}
+
+function vektorAnaliseGastosOpenEstabPivotModal_(){
+  var modal = document.getElementById("analiseGastos_estabModal");
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  modal.style.display = "block";
+  modal.setAttribute("aria-hidden", "false");
+
+  vektorAnaliseGastosRenderEstabPivotModal_();
+}
+
+function vektorAnaliseGastosCloseEstabPivotModal_(){
+  var modal = document.getElementById("analiseGastos_estabModal");
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  modal.style.display = "none";
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function vektorAnaliseGastosRenderEstabPivotModal_(){
+  var wrap = document.getElementById("analiseGastos_estabPivotWrap");
+  var sub  = document.getElementById("analiseGastos_estabModalSub");
+  if (!wrap) return;
+
+  var tx = Array.isArray(window.__analiseGastosLastFilteredTx) ? window.__analiseGastosLastFilteredTx.slice() : [];
+  var meta = window.__analiseGastosLastFilteredMeta || {};
+
+  if (!tx.length) {
+    wrap.innerHTML = `<div id="analiseGastos_estabPivotMsg">Sem dados para os filtros aplicados na página principal.</div>`;
+    if (sub) sub.textContent = "Sem dados para os filtros aplicados na página principal.";
+    return;
+  }
+
+  function ymFromISO_(iso){
+    var s = String(iso || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
+    return s.slice(0, 7); // yyyy-mm
+  }
+
+  function ymToMMYYYY_(ym){
+    if (!/^\d{4}-\d{2}$/.test(String(ym || ""))) return String(ym || "");
+    return String(ym).slice(5,7) + "/" + String(ym).slice(0,4);
+  }
+
+  // maps
+  var monthSet = {};
+  var estabMap = {}; // { estab: { total, byMonth:{ym:sum} } }
+  var colTotals = {};
+  var grandTotal = 0;
+
+  tx.forEach(function(t){
+    var est = String((t && t.estabelecimento) || "").trim() || "—";
+    var dIso = String((t && t.dataISO) || "").trim();
+    var ym = ymFromISO_(dIso);
+    if (!ym) return;
+
+    var v = Number((t && t.valor) || 0) || 0;
+
+    monthSet[ym] = true;
+
+    if (!estabMap[est]) {
+      estabMap[est] = { total: 0, byMonth: {} };
+    }
+
+    estabMap[est].total += v;
+    estabMap[est].byMonth[ym] = (Number(estabMap[est].byMonth[ym]) || 0) + v;
+
+    colTotals[ym] = (Number(colTotals[ym]) || 0) + v;
+    grandTotal += v;
+  });
+
+  var months = Object.keys(monthSet).sort(); // yyyy-mm crescente
+  if (!months.length) {
+    wrap.innerHTML = `<div id="analiseGastos_estabPivotMsg">Não foi possível identificar os meses no período filtrado.</div>`;
+    return;
+  }
+
+  // ordena estabelecimentos por total desc
+  var estRows = Object.keys(estabMap).map(function(est){
+    return {
+      estabelecimento: est,
+      total: Number(estabMap[est].total || 0) || 0,
+      byMonth: estabMap[est].byMonth || {}
+    };
+  });
+
+  estRows.sort(function(a,b){
+    if (b.total !== a.total) return b.total - a.total;
+    return String(a.estabelecimento).localeCompare(String(b.estabelecimento), "pt-BR");
+  });
+
+  // subtítulo do modal
+  try {
+    var qtdEst = estRows.length;
+    var perTxt = (meta && meta.periodoTxt) ? String(meta.periodoTxt) : "";
+    sub.textContent =
+      "Somatória mensal por estabelecimento (" + qtdEst + " estabelecimento" + (qtdEst === 1 ? "" : "s") + ") • " +
+      (perTxt ? ("Período aplicado: " + perTxt.replace(/^(\d{4})-(\d{2})-(\d{2})\s+a\s+(\d{4})-(\d{2})-(\d{2})$/, "$3/$2/$1 a $6/$5/$4")) : "Filtros da página principal");
+  } catch(_) {}
+
+  // header
+  var thead = `
+    <thead>
+      <tr>
+        <th>Estabelecimento</th>
+        ${months.map(function(ym){ return `<th>${vektorSafe_(ymToMMYYYY_(ym))}</th>`; }).join("")}
+        <th>Total</th>
+      </tr>
+    </thead>
+  `;
+
+  // body
+  var tbody = `
+    <tbody>
+      ${estRows.map(function(r){
+        return `
+          <tr>
+            <td>${vektorSafe_(r.estabelecimento)}</td>
+            ${months.map(function(ym){
+              var v = Number(r.byMonth[ym] || 0) || 0;
+              return `<td class="num">${vektorFmtBRL_(v)}</td>`;
+            }).join("")}
+            <td class="num" style="font-weight:1000;">${vektorFmtBRL_(r.total)}</td>
+          </tr>
+        `;
+      }).join("")}
+    </tbody>
+  `;
+
+  // footer (totais por mês + total geral)
+  var tfoot = `
+    <tfoot>
+      <tr>
+        <td>Total geral</td>
+        ${months.map(function(ym){
+          return `<td class="num">${vektorFmtBRL_(Number(colTotals[ym] || 0) || 0)}</td>`;
+        }).join("")}
+        <td class="num">${vektorFmtBRL_(grandTotal)}</td>
+      </tr>
+    </tfoot>
+  `;
+
+  wrap.innerHTML = `
+    <table id="analiseGastos_estabPivotTable">
+      ${thead}
+      ${tbody}
+      ${tfoot}
+    </table>
+  `;
 }
 
 /* =========================================================
