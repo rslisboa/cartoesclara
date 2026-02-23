@@ -1969,7 +1969,7 @@ display: none;
                 <div>
                   <div style="font-size:16px; font-weight:1000; color:#ffffff;">Visão Mensal de Valores</div>
                   <div style="margin-top:4px; font-size:12px; font-weight:800; color:rgba(226,232,240,0.75);">
-                    Séries mensais consolidadas (somatória) com linha de variação percentual. Modal independente dos filtros da página principal.
+                    Séries mensais consolidadas (somatória) com linha de variação percentual e visões por <b>Lojas</b> e <b>Categorias</b>.
                   </div>
                 </div>
                 <button id="analiseGastos_btnMacroFechar" type="button"
@@ -7005,13 +7005,34 @@ function vektorAnaliseGastosMacroRenderTop10Chart_(canvasId, serie, chartRefName
         var xCenter = el.base + (el.x - el.base) / 2;
         var yCenter = el.y;
 
-        // evita escrever em barras curtas demais
-        if (Math.abs(el.x - el.base) < 60) continue;
+        // largura visual da barra em pixels
+        var barW = Math.abs(el.x - el.base);
 
-        // truncar visualmente labels muito longos
-        var txt = label.length > 28 ? (label.slice(0, 28) + "…") : label;
+        // texto (truncado para não poluir)
+        var txt = label.length > 30 ? (label.slice(0, 30) + "…") : label;
 
-        c.fillText(txt, xCenter, yCenter);
+        // mede largura do texto para decidir se cabe dentro
+        var textW = c.measureText(txt).width;
+        var paddingInside = 14; // margem interna
+        var xMax = chart.chartArea ? chart.chartArea.right : el.x + 200;
+
+        // Se couber dentro da barra -> centro (branco)
+        // Se não couber -> desenha à frente da barra (à direita), alinhado à esquerda
+        if (barW >= (textW + paddingInside)) {
+          c.textAlign = "center";
+          c.fillStyle = (pluginOptions && pluginOptions.colorInside) ? pluginOptions.colorInside : "#ffffff";
+          c.fillText(txt, xCenter, yCenter);
+        } else {
+          var xOutside = el.x + 8;
+          // evita sair da área do gráfico
+          if (xOutside + textW > xMax) {
+            xOutside = Math.max(el.base + 4, xMax - textW - 2);
+          }
+
+          c.textAlign = "left";
+          c.fillStyle = (pluginOptions && pluginOptions.colorOutside) ? pluginOptions.colorOutside : "rgba(255,255,255,0.92)";
+          c.fillText(txt, xOutside, yCenter);
+        }
       }
 
       c.restore();
@@ -7030,8 +7051,8 @@ function vektorAnaliseGastosMacroRenderTop10Chart_(canvasId, serie, chartRefName
           borderColor: "#B5FF20",
           borderWidth: 2,
           borderRadius: 6,
-          barPercentage: 0.78,
-          categoryPercentage: 0.82
+          barPercentage: 0.92,
+          categoryPercentage: 0.92
         }
       ]
     },
