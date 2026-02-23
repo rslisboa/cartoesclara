@@ -1845,10 +1845,11 @@ display: none;
   <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
     <div style="height:100%; width:100%; display:flex; flex-direction:column; min-height:0;">
 
-      <!-- Header (título/sub + filtros) -->
+            <!-- Header (título/sub + filtros + Macro Visões) -->
       <div style="padding:14px 16px; background:#0b1220; border-bottom:1px solid rgba(148,163,184,0.18);">
-        <div style="display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap;">
-
+        
+        <!-- Linha superior: título/sub + Macro Visões -->
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap;">
           <!-- Esquerda: título + subtítulo -->
           <div style="min-width:260px;">
             <div style="font-size:18px;font-weight:1000;color:#fff;line-height:1.1;">Análise de gastos</div>
@@ -1858,61 +1859,82 @@ display: none;
             </div>
           </div>
 
-          <!-- Direita: filtros -->
-            <div id="analiseGastosFilterRow"
-                style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; justify-content:flex-start; width:100%;">
+          <!-- Direita superior: botões -->
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-left:auto;">
+            <button id="analiseGastos_btnBuscar" type="button"
+                    style="height:36px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:11px; background:#006b2c; color:#ffffff; cursor:pointer; white-space:nowrap;">
+              Buscar
+            </button>
 
-              <!-- Período -->
-              <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 auto;">
-                <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Período</div>
+            <button id="analiseGastos_btnMacroVisoes" type="button"
+                    style="height:36px; padding:0 14px; border:1px solid rgba(181,255,32,0.35); border-radius:10px; font-weight:900; font-size:11px; background:rgba(181,255,32,0.10); color:#eaffb8; cursor:pointer; white-space:nowrap;">
+              Macro Visões
+            </button>
+          </div>
+        </div>
 
-                <div class="analiseGastosPeriodoBox"
-                    style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid rgba(226,232,240,0.45); border-radius:12px; background:rgba(226,232,240,0.85);">
-                  <input id="analiseGastos_dtIni" type="date"
-                        style="width:150px; min-width:150px; max-width:150px; box-sizing:border-box; border:none; outline:none; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px 8px; color:#000000; font-weight:800; font-size:12px; text-align:center;" />
-                  <span style="opacity:0.65; min-width:14px; text-align:center;">—</span>
-                  <input id="analiseGastos_dtFim" type="date"
-                        style="width:150px; min-width:150px; max-width:150px; box-sizing:border-box; border:none; outline:none; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px 8px; color:#000000; font-weight:800; font-size:12px; text-align:center;" />
-                </div>
-              </div>
+        <!-- Linha inferior: filtros -->
+        <div id="analiseGastosFilterRow"
+             style="display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap; justify-content:flex-start; width:100%; margin-top:14px;">
 
-              <!-- Time -->
-              <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 170px; min-width:170px;">
-                <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Time</div>
-                <select id="analiseGastos_selTime"
-                        style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
-                  <option value="">Carregue os filtros...</option>
-                </select>
-              </div>
+          <!-- Ano -->
+          <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 120px; min-width:120px;">
+            <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Ano</div>
+            <select id="analiseGastos_selAno"
+                    style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+              <option value="">Todos</option>
+            </select>
+          </div>
 
-              <!-- Loja -->
-              <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 160px; min-width:160px;">
-                <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Loja</div>
-                <select id="analiseGastos_selLoja"
-                        style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
-                  <option value="">Carregue os filtros...</option>
-                </select>
-              </div>
+          <!-- Mês -->
+          <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 150px; min-width:150px;">
+            <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Mês</div>
+            <select id="analiseGastos_selMes"
+                    style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+              <option value="">Todos</option>
+            </select>
+          </div>
 
-              <!-- Categoria -->
-              <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 200px; min-width:200px;">
-                <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Categoria</div>
-                <select id="analiseGastos_selCategoria"
-                        style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
-                  <option value="">Carregue os filtros...</option>
-                </select>
-              </div>
+          <!-- Período -->
+          <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 auto;">
+            <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Período</div>
 
-              <!-- Botões -->
-                <div id="analiseGastosBtnGroup"
-                    style="display:flex; align-items:flex-end; gap:8px; flex:0 0 auto; margin-left:auto; white-space:nowrap;">
-                  <button id="analiseGastos_btnBuscar" type="button"
-                          style="height:40px; padding:0 16px; border:none; border-radius:10px; font-weight:900; font-size:11px; background:#006b2c; color:#ffffff; cursor:pointer; white-space:nowrap;">
-                    Buscar
-                </button>
-              </div>
+            <div class="analiseGastosPeriodoBox"
+                 style="display:flex; align-items:center; gap:8px; padding:8px 10px; border:1px solid rgba(226,232,240,0.45); border-radius:12px; background:rgba(226,232,240,0.85);">
+              <input id="analiseGastos_dtIni" type="date"
+                     style="width:150px; min-width:150px; max-width:150px; box-sizing:border-box; border:none; outline:none; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px 8px; color:#000000; font-weight:800; font-size:12px; text-align:center;" />
+              <span style="opacity:0.65; min-width:14px; text-align:center;">—</span>
+              <input id="analiseGastos_dtFim" type="date"
+                     style="width:150px; min-width:150px; max-width:150px; box-sizing:border-box; border:none; outline:none; background:rgba(255,255,255,0.06); border-radius:10px; padding:4px 8px; color:#000000; font-weight:800; font-size:12px; text-align:center;" />
             </div>
+          </div>
 
+          <!-- Time -->
+          <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 170px; min-width:170px;">
+            <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Time</div>
+            <select id="analiseGastos_selTime"
+                    style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+              <option value="">Carregue os filtros...</option>
+            </select>
+          </div>
+
+          <!-- Loja -->
+          <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 160px; min-width:160px;">
+            <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Loja</div>
+            <select id="analiseGastos_selLoja"
+                    style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+              <option value="">Carregue os filtros...</option>
+            </select>
+          </div>
+
+          <!-- Categoria -->
+          <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 200px; min-width:200px;">
+            <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Categoria</div>
+            <select id="analiseGastos_selCategoria"
+                    style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+              <option value="">Carregue os filtros...</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -1931,6 +1953,112 @@ display: none;
                 <div class="vektor-spinner"></div>
                 <div style="font-size:12px; font-weight:900; color:#0f172a;">Processando informações, aguarde...</div>
               </div>
+            </div>
+          </div>
+        </div>
+
+                <!-- MODAL: Macro Visões (independente da tela principal) -->
+        <div id="analiseGastos_macroModal"
+             class="hidden"
+             style="position:absolute; inset:0; z-index:70; display:none; background:rgba(2,6,23,0.72);">
+          <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:18px;">
+            <div style="width:min(1180px, 96vw); height:min(86vh, 900px); background:linear-gradient(180deg,#071227 0%, #0b1220 100%); border:1px solid rgba(148,163,184,0.22); border-radius:16px; box-shadow:0 40px 80px rgba(0,0,0,0.45); display:flex; flex-direction:column; overflow:hidden;">
+
+              <!-- Header do modal -->
+              <div style="padding:14px 16px; border-bottom:1px solid rgba(148,163,184,0.16); display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+                <div>
+                  <div style="font-size:16px; font-weight:1000; color:#ffffff;">Macro Visões</div>
+                  <div style="margin-top:4px; font-size:12px; font-weight:800; color:rgba(226,232,240,0.75);">
+                    Séries mensais consolidadas (somatória) com linha de variação percentual. Modal independente dos filtros da página principal.
+                  </div>
+                </div>
+                <button id="analiseGastos_btnMacroFechar" type="button"
+                        style="height:34px; min-width:34px; padding:0 10px; border:1px solid rgba(148,163,184,0.35); border-radius:10px; background:rgba(15,23,42,0.7); color:#fff; font-weight:1000; cursor:pointer;">
+                  ✕
+                </button>
+              </div>
+
+              <!-- Filtros do modal -->
+
+              <div style="padding:12px 16px; border-bottom:1px solid rgba(148,163,184,0.12); display:flex; align-items:flex-end; gap:8px; flex-wrap:wrap;">
+                <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 180px; min-width:180px;">
+                  <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Loja (Macro)</div>
+                  <select id="analiseGastos_macro_selLoja"
+                          style="height:38px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+                    <option value="">Todas</option>
+                  </select>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 240px; min-width:240px;">
+                  <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Categoria (Macro)</div>
+                  <select id="analiseGastos_macro_selCategoria"
+                          style="height:38px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+                    <option value="">Todas</option>
+                  </select>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 160px; min-width:160px;">
+                  <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Ano (Macro)</div>
+                  <select id="analiseGastos_macro_selAno"
+                          style="height:38px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+                    <option value="">Último ano</option>
+                  </select>
+                </div>
+
+                <div style="display:flex; align-items:flex-end; gap:8px; margin-left:auto;">
+                  <button id="analiseGastos_macro_btnAtualizar" type="button"
+                          style="height:38px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:11px; background:#006b2c; color:#fff; cursor:pointer;">
+                    Atualizar Macro Visões
+                  </button>
+                </div>
+              </div>
+
+              <!-- Corpo do modal -->
+              <div style="flex:1; min-height:0; overflow:auto; padding:14px 16px; position:relative;">
+                <div id="analiseGastos_macro_loading"
+                     class="hidden"
+                     style="display:none; position:absolute; inset:14px 16px; z-index:2; background:rgba(2,6,23,0.55); border-radius:14px;">
+                  <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
+                    <div style="background:#ffffff; border:1px solid rgba(226,232,240,1); border-radius:14px; padding:14px 16px; box-shadow:0 24px 50px rgba(0,0,0,0.35);">
+                      <div style="font-size:14px; font-weight:1000; color:#0b1220;">Carregando Macro Visões…</div>
+                      <div style="margin-top:5px; font-size:12px; font-weight:800; color:#475569;">Processando série mensal.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr; gap:14px;">
+                  <!-- Chart 1 -->
+                  <div style="border:1px solid rgba(148,163,184,0.18); border-radius:14px; background:rgba(15,23,42,0.65); padding:12px;">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                      <div>
+                        <div style="font-size:13px; font-weight:1000; color:#fff;">Lojas — Evolução mensal (somatória)</div>
+                        <div id="analiseGastos_macro_hintLojas" style="margin-top:4px; font-size:12px; font-weight:800; color:rgba(226,232,240,0.75);">
+                          —
+                        </div>
+                      </div>
+                    </div>
+                    <div style="margin-top:10px; height:320px; position:relative;">
+                      <canvas id="analiseGastos_macro_chartLojas" style="width:100%; height:100%;"></canvas>
+                    </div>
+                  </div>
+
+                  <!-- Chart 2 -->
+                  <div style="border:1px solid rgba(148,163,184,0.18); border-radius:14px; background:rgba(15,23,42,0.65); padding:12px;">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                      <div>
+                        <div style="font-size:13px; font-weight:1000; color:#fff;">Categorias — Evolução mensal (somatória)</div>
+                        <div id="analiseGastos_macro_hintCategorias" style="margin-top:4px; font-size:12px; font-weight:800; color:rgba(226,232,240,0.75);">
+                          —
+                        </div>
+                      </div>
+                    </div>
+                    <div style="margin-top:10px; height:320px; position:relative;">
+                      <canvas id="analiseGastos_macro_chartCategorias" style="width:100%; height:100%;"></canvas>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -5559,24 +5687,76 @@ window.vektorOpenAnaliseGastos = function () {
   }
 
   // Inicializa apenas uma vez
-  try { vektorAnaliseGastosInitOnce_(); } catch (e) {
+  try {
+    vektorAnaliseGastosInitOnce_();
+  } catch (e) {
     console.error("Erro ao inicializar Análise de Gastos:", e);
+  }
+
+  // ✅ NÃO reaproveitar dataset antigo ao entrar novamente na página
+  try {
+    window.__analiseGastosData = null;
+    window.__analiseGastosTx = [];
+  } catch (_) {}
+
+  // ✅ Reset visual (cards + tabela) sem buscar dados
+  try {
+    const cLoja = document.getElementById("analiseGastos_cardLojaTop");
+    const cLojaSub = document.getElementById("analiseGastos_cardLojaTopSub");
+    const cTot = document.getElementById("analiseGastos_cardTotal");
+    const cTotSub = document.getElementById("analiseGastos_cardTotalSub");
+    const cCat = document.getElementById("analiseGastos_cardCategoriaTop");
+    const cCatSub = document.getElementById("analiseGastos_cardCategoriaTopSub");
+    const cEst = document.getElementById("analiseGastos_cardEstabTop");
+    const cEstSub = document.getElementById("analiseGastos_cardEstabTopSub");
+    const tb = document.getElementById("analiseGastos_tbody");
+
+    if (cLoja) cLoja.textContent = "—";
+    if (cLojaSub) cLojaSub.textContent = "—";
+
+    if (cTot) cTot.textContent = "—";
+    if (cTotSub) cTotSub.textContent = "—";
+
+    if (cCat) cCat.textContent = "—";
+    if (cCatSub) cCatSub.textContent = "—";
+
+    if (cEst) cEst.textContent = "—";
+    if (cEstSub) cEstSub.textContent = "—";
+
+    if (tb) {
+      tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Informe o período e clique em Buscar para consultar os gastos.</td></tr>';
+    }
+  } catch (e) {
+    console.error("Erro ao resetar visual da Análise de Gastos:", e);
+  }
+
+  // ✅ Carrega SOMENTE meta/filtros (ACL), sem buscar dataset
+  try {
+    vektorAnaliseGastosEnsureMeta_(function()
+    {}, { silent: true });
+  } catch (e) {
+    console.error("Erro ao carregar meta da Análise de Gastos:", e);
   }
 };
 
 let __analiseGastos_inited = false;
 
-function vektorAnaliseGastosEnsureMeta_(cb){
+function vektorAnaliseGastosEnsureMeta_(cb, opts){
   if (window.__analiseGastosMeta && window.__analiseGastosMeta.ok) {
     try { cb && cb(); } catch(_) {}
     return;
   }
 
-  vektorAnaliseGastosSetBusy_(true, "Carregando filtros…", "Respeitando permissões do usuário");
+  opts = opts || {};
+  var silent = !!opts.silent;
+
+  if (!silent) {
+    vektorAnaliseGastosSetBusy_(true, "Carregando filtros…", "Respeitando permissões do usuário");
+  }
 
   google.script.run
     .withSuccessHandler(function(res){
-      vektorAnaliseGastosSetBusy_(false);
+      if (!silent) vektorAnaliseGastosSetBusy_(false);
 
       if (!res || !res.ok) {
         const tb = document.getElementById("analiseGastos_tbody");
@@ -5594,12 +5774,20 @@ function vektorAnaliseGastosEnsureMeta_(cb){
       vektorBuildOptions_(selLoja, (res.lojas || []), "Todas");
       vektorBuildOptions_(selCat,  (res.categorias || []), "Todas");
 
+      // Primeiro reconstrói filtros dependentes (se necessário)
       try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
+
+      // ✅ Depois hidrata Ano/Mês (para não ser sobrescrito)
+      try { vektorAnaliseGastosHydrateAnoMes_(res); } catch(e){ console.error(e); }
+
+      // ✅ Depois hidrata filtros do modal Macro
+      try { vektorAnaliseGastosMacroHydrateFilters_(res); } catch(e){ console.error(e); }
 
       try { cb && cb(); } catch(_) {}
     })
     .withFailureHandler(function(err){
-      vektorAnaliseGastosSetBusy_(false);
+      if (!silent) vektorAnaliseGastosSetBusy_(false);
+
       const tb = document.getElementById("analiseGastos_tbody");
       if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
     })
@@ -5607,6 +5795,8 @@ function vektorAnaliseGastosEnsureMeta_(cb){
 }
 
 function vektorAnaliseGastosBuscar_(){
+  // ✅ sincroniza Ano/Mês -> Período antes de validar e buscar
+    try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
   const dtIni = document.getElementById("analiseGastos_dtIni")?.value || "";
   const dtFim = document.getElementById("analiseGastos_dtFim")?.value || "";
 
@@ -5714,6 +5904,16 @@ function vektorAnaliseGastosInitOnce_(){
   const dtIniEl = document.getElementById("analiseGastos_dtIni");
   const dtFimEl = document.getElementById("analiseGastos_dtFim");
 
+  const selAno = document.getElementById("analiseGastos_selAno");
+  const selMes = document.getElementById("analiseGastos_selMes");
+
+  const btnMacro = document.getElementById("analiseGastos_btnMacroVisoes");
+  const btnMacroFechar = document.getElementById("analiseGastos_btnMacroFechar");
+  const btnMacroAtualizar = document.getElementById("analiseGastos_macro_btnAtualizar");
+  const macroSelLoja = document.getElementById("analiseGastos_macro_selLoja");
+  const macroSelCat  = document.getElementById("analiseGastos_macro_selCategoria");
+  const macroSelAno = document.getElementById("analiseGastos_macro_selAno");
+
   // Estado inicial da tabela (sem carregar automaticamente)
   const tb = document.getElementById("analiseGastos_tbody");
   if (tb && !tb.dataset.initMsgDone) {
@@ -5745,9 +5945,44 @@ function vektorAnaliseGastosInitOnce_(){
     });
   }
 
+  if (macroSelAno && !macroSelAno.__bindMacroAnoChange) {
+  macroSelAno.__bindMacroAnoChange = true;
+
+  macroSelAno.addEventListener("change", function(){
+    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+  });
+
+  // fallback para alguns comportamentos de UI/browser
+  macroSelAno.addEventListener("input", function(){
+    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+  });
+}
+
   // mudar datas NÃO busca automático; apenas reaplica local se já houver dataset
-  if (dtIniEl) dtIniEl.addEventListener("change", vektorAnaliseGastosApply_);
-  if (dtFimEl) dtFimEl.addEventListener("change", vektorAnaliseGastosApply_);
+  if (dtIniEl) dtIniEl.addEventListener("change", function(){
+  try { vektorAnaliseGastosClampDateInputs_(); } catch(e){ console.error(e); }
+  vektorAnaliseGastosApply_();
+});
+if (dtFimEl) dtFimEl.addEventListener("change", function(){
+  try { vektorAnaliseGastosClampDateInputs_(); } catch(e){ console.error(e); }
+  vektorAnaliseGastosApply_();
+});
+
+  // ✅ Ano/Mês -> restringe período e aplica localmente (sem buscar automático)
+if (selAno) {
+  selAno.addEventListener("change", function(){
+    try { vektorAnaliseGastosRebuildMesByAno_(); } catch(e){ console.error(e); }
+    try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
+    vektorAnaliseGastosApply_();
+  });
+}
+
+if (selMes) {
+  selMes.addEventListener("change", function(){
+    try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
+    vektorAnaliseGastosApply_();
+  });
+}
 
   // sort thead (bind 1x)
   try {
@@ -5783,6 +6018,48 @@ function vektorAnaliseGastosInitOnce_(){
       vektorAnaliseGastosBuscar_();
     });
   }
+
+  // ✅ abrir Macro Visões (garante meta/ACL carregada)
+if (btnMacro && !btnMacro.__bindMacroOpen) {
+  btnMacro.__bindMacroOpen = true;
+  btnMacro.addEventListener("click", function(){
+    vektorAnaliseGastosEnsureMeta_(function(){
+      try { vektorAnaliseGastosOpenMacroModal_(); } catch(e){ console.error(e); }
+    });
+  });
+}
+
+// ✅ fechar modal Macro
+if (btnMacroFechar && !btnMacroFechar.__bindMacroClose) {
+  btnMacroFechar.__bindMacroClose = true;
+  btnMacroFechar.addEventListener("click", function(){
+    try { vektorAnaliseGastosCloseMacroModal_(); } catch(e){ console.error(e); }
+  });
+}
+
+// ✅ atualizar gráficos do modal Macro
+if (btnMacroAtualizar && !btnMacroAtualizar.__bindMacroLoad) {
+  btnMacroAtualizar.__bindMacroLoad = true;
+  btnMacroAtualizar.addEventListener("click", function(){
+    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+  });
+}
+
+// ✅ auto-update ao trocar filtros do modal
+if (macroSelLoja && !macroSelLoja.__bindMacroChange) {
+  macroSelLoja.__bindMacroChange = true;
+  macroSelLoja.addEventListener("change", function(){
+    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+  });
+}
+
+if (macroSelCat && !macroSelCat.__bindMacroChange) {
+  macroSelCat.__bindMacroChange = true;
+  macroSelCat.addEventListener("change", function(){
+    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+  });
+}
+
 }
 
 /* --------- BACKEND: meta (times/lojas/categorias permitidas) --------- */
@@ -5809,6 +6086,9 @@ function vektorAnaliseGastosLoadMeta_(){
       vektorBuildOptions_(selTime, (res.times || []), "Todos");
       vektorBuildOptions_(selLoja, (res.lojas || []), "Todas");
       vektorBuildOptions_(selCat,  (res.categorias || []), "Todas");
+
+      try { vektorAnaliseGastosHydrateAnoMes_(res); } catch(e){ console.error(e); }
+      try { vektorAnaliseGastosMacroHydrateFilters_(res); } catch(e){ console.error(e); }
 
       // garante que os filtros passem a se respeitar
       vektorAnaliseGastosRebuildFilterOptions_();
@@ -5939,6 +6219,10 @@ function vektorAnaliseGastosApply_(){
   // ✅ faz os filtros se respeitarem entre si (Time x Loja x Categoria)
   try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
 
+  if (!window.__analiseGastosData || !Array.isArray(window.__analiseGastosTx)) {
+  return; // ainda não houve busca; não renderiza cards/tabela
+}
+
   const res = window.__analiseGastosData;
   let tx = Array.isArray(window.__analiseGastosTx) ? window.__analiseGastosTx.slice() : [];
 
@@ -5948,6 +6232,9 @@ function vektorAnaliseGastosApply_(){
   const loja  = document.getElementById("analiseGastos_selLoja")?.value || "";
   const cat   = document.getElementById("analiseGastos_selCategoria")?.value || "";
 
+  const ano   = document.getElementById("analiseGastos_selAno")?.value || "";
+  const mes   = document.getElementById("analiseGastos_selMes")?.value || ""; // "01".."12"
+
   // filtros locais (reforço visual / pós-busca)
   tx = tx.filter(t => {
     const d = String(t.dataISO || "");
@@ -5956,6 +6243,8 @@ function vektorAnaliseGastosApply_(){
     if (time && String(t.time || "") !== String(time)) return false;
     if (loja && String(t.loja || "") !== String(loja)) return false;
     if (cat  && String(t.categoria || "") !== String(cat)) return false;
+    if (ano && String(d).slice(0,4) !== String(ano)) return false;
+    if (mes && String(d).slice(5,7) !== String(mes)) return false;
     return true;
   });
 
@@ -6074,6 +6363,515 @@ function vektorAnaliseGastosRender_(tx, meta){
       </tr>
     `;
   }).join("");
+}
+
+/* =========================================================
+   ANÁLISE DE GASTOS — NOVOS FILTROS (ANO/MÊS) + MACRO VISÕES
+   Inserido após vektorAnaliseGastosRender_()
+========================================================= */
+
+window.__analiseGastosMacroChartLojas = null;
+window.__analiseGastosMacroChartCategorias = null;
+
+function vektorAnaliseGastosMonthLabelPt_(mes){
+  var m = String(mes || "").padStart(2, "0");
+  var map = {
+    "01":"Janeiro","02":"Fevereiro","03":"Março","04":"Abril","05":"Maio","06":"Junho",
+    "07":"Julho","08":"Agosto","09":"Setembro","10":"Outubro","11":"Novembro","12":"Dezembro"
+  };
+  return map[m] || m;
+}
+
+function vektorAnaliseGastosHydrateAnoMes_(meta){
+  meta = meta || {};
+  var selAno = document.getElementById("analiseGastos_selAno");
+  var selMes = document.getElementById("analiseGastos_selMes");
+  if (!selAno || !selMes) return;
+
+  var anos = Array.isArray(meta.anos) ? meta.anos : [];
+  var mesesPorAno = meta.mesesPorAno || {};
+
+  // guarda meta local para rebuild
+  window.__analiseGastosAnoMesMeta = {
+    anos: anos.slice(),
+    mesesPorAno: mesesPorAno
+  };
+
+  var anoAtual = String(selAno.value || "");
+  selAno.innerHTML = `<option value="">Todos</option>` + anos
+    .map(function(a){ return `<option value="${vektorSafe_(a)}">${vektorSafe_(a)}</option>`; })
+    .join("");
+
+  if (anoAtual && anos.indexOf(anoAtual) >= 0) selAno.value = anoAtual;
+
+  vektorAnaliseGastosRebuildMesByAno_();
+  vektorAnaliseGastosSyncPeriodoByAnoMes_();
+}
+
+function vektorAnaliseGastosRebuildMesByAno_(){
+  var selAno = document.getElementById("analiseGastos_selAno");
+  var selMes = document.getElementById("analiseGastos_selMes");
+  if (!selAno || !selMes) return;
+
+  var meta = window.__analiseGastosAnoMesMeta || {};
+  var mesesPorAno = meta.mesesPorAno || {};
+  var ano = String(selAno.value || "");
+  var mesAtual = String(selMes.value || "");
+
+  var meses = [];
+  if (ano) {
+    meses = Array.isArray(mesesPorAno[ano]) ? mesesPorAno[ano] : [];
+  } else {
+    // sem ano: união de todos os meses existentes
+    var union = {};
+    Object.keys(mesesPorAno).forEach(function(a){
+      (mesesPorAno[a] || []).forEach(function(m){ union[String(m)] = true; });
+    });
+    meses = Object.keys(union).sort(function(a,b){ return Number(a) - Number(b); });
+  }
+
+  selMes.innerHTML = `<option value="">Todos</option>` + meses.map(function(m){
+    return `<option value="${vektorSafe_(m)}">${vektorSafe_(vektorAnaliseGastosMonthLabelPt_(m))}</option>`;
+  }).join("");
+
+  if (mesAtual && meses.indexOf(mesAtual) >= 0) {
+    selMes.value = mesAtual;
+  } else {
+    selMes.value = "";
+  }
+}
+
+function vektorAnaliseGastosGetMonthBounds_(ano, mes){
+  ano = String(ano || "").trim();
+  mes = String(mes || "").trim();
+  if (!ano || !mes) return null;
+
+  var y = Number(ano);
+  var m = Number(mes);
+  if (!y || !m) return null;
+
+  var lastDay = new Date(y, m, 0).getDate(); // mês é 1..12 aqui
+  var ini = ano + "-" + String(m).padStart(2,"0") + "-01";
+  var fim = ano + "-" + String(m).padStart(2,"0") + "-" + String(lastDay).padStart(2,"0");
+  return { ini: ini, fim: fim };
+}
+
+function vektorAnaliseGastosGetYearBounds_(ano){
+  ano = String(ano || "").trim();
+  if (!/^\d{4}$/.test(ano)) return null;
+  return { ini: ano + "-01-01", fim: ano + "-12-31" };
+}
+
+function vektorAnaliseGastosClampDateInputs_(){
+  var selAno = document.getElementById("analiseGastos_selAno");
+  var selMes = document.getElementById("analiseGastos_selMes");
+  var dtIniEl = document.getElementById("analiseGastos_dtIni");
+  var dtFimEl = document.getElementById("analiseGastos_dtFim");
+  if (!dtIniEl || !dtFimEl) return;
+
+  var ano = String(selAno && selAno.value || "");
+  var mes = String(selMes && selMes.value || "");
+
+  var bounds = null;
+  if (ano && mes) bounds = vektorAnaliseGastosGetMonthBounds_(ano, mes);
+  else if (ano) bounds = vektorAnaliseGastosGetYearBounds_(ano);
+
+  if (!bounds) {
+    dtIniEl.min = "";
+    dtIniEl.max = "";
+    dtFimEl.min = "";
+    dtFimEl.max = "";
+    return;
+  }
+
+  dtIniEl.min = bounds.ini;
+  dtIniEl.max = bounds.fim;
+  dtFimEl.min = bounds.ini;
+  dtFimEl.max = bounds.fim;
+
+  if (dtIniEl.value && dtIniEl.value < bounds.ini) dtIniEl.value = bounds.ini;
+  if (dtIniEl.value && dtIniEl.value > bounds.fim) dtIniEl.value = bounds.fim;
+  if (dtFimEl.value && dtFimEl.value < bounds.ini) dtFimEl.value = bounds.ini;
+  if (dtFimEl.value && dtFimEl.value > bounds.fim) dtFimEl.value = bounds.fim;
+
+  if (dtIniEl.value && dtFimEl.value && dtIniEl.value > dtFimEl.value) {
+    // mantém coerência sem “quebrar” input
+    dtFimEl.value = dtIniEl.value;
+  }
+}
+
+function vektorAnaliseGastosSyncPeriodoByAnoMes_(){
+  var selAno = document.getElementById("analiseGastos_selAno");
+  var selMes = document.getElementById("analiseGastos_selMes");
+  var dtIniEl = document.getElementById("analiseGastos_dtIni");
+  var dtFimEl = document.getElementById("analiseGastos_dtFim");
+  if (!dtIniEl || !dtFimEl) return;
+
+  var ano = String(selAno && selAno.value || "");
+  var mes = String(selMes && selMes.value || "");
+
+  // Regras:
+  // - sem ano/mes => datas livres (comportamento atual)
+  // - ano selecionado => restringe datas ao ano
+  // - ano+mês => restringe datas ao mês e força período daquele mês se vazio/fora do range
+  if (!ano && !mes) {
+    vektorAnaliseGastosClampDateInputs_();
+    return;
+  }
+
+  // Se o usuário selecionou mês sem ano, inferimos pelo ano do dtIni se existir; se não, limpa mês (inconsistente)
+  if (!ano && mes) {
+    var anoInferido = "";
+    if (dtIniEl.value && /^\d{4}-\d{2}-\d{2}$/.test(dtIniEl.value)) {
+      anoInferido = dtIniEl.value.slice(0,4);
+      if (selAno) selAno.value = anoInferido;
+      ano = anoInferido;
+      try { vektorAnaliseGastosRebuildMesByAno_(); } catch(_) {}
+      if (selMes) selMes.value = mes;
+    } else {
+      if (selMes) selMes.value = "";
+      mes = "";
+    }
+  }
+
+  var bounds = (ano && mes)
+    ? vektorAnaliseGastosGetMonthBounds_(ano, mes)
+    : (ano ? vektorAnaliseGastosGetYearBounds_(ano) : null);
+
+  if (!bounds) {
+    vektorAnaliseGastosClampDateInputs_();
+    return;
+  }
+
+  vektorAnaliseGastosClampDateInputs_();
+
+  // Se mês selecionado, o período deve ficar dentro do mês selecionado
+  if (ano && mes) {
+    if (!dtIniEl.value || dtIniEl.value < bounds.ini || dtIniEl.value > bounds.fim) dtIniEl.value = bounds.ini;
+    if (!dtFimEl.value || dtFimEl.value < bounds.ini || dtFimEl.value > bounds.fim) dtFimEl.value = bounds.fim;
+    if (dtIniEl.value > dtFimEl.value) dtFimEl.value = dtIniEl.value;
+    return;
+  }
+
+  // Se só ano selecionado, restringe mas não obriga preencher (se já houver datas, corrige)
+  if (ano && !mes) {
+    if (dtIniEl.value && (dtIniEl.value < bounds.ini || dtIniEl.value > bounds.fim)) dtIniEl.value = bounds.ini;
+    if (dtFimEl.value && (dtFimEl.value < bounds.ini || dtFimEl.value > bounds.fim)) dtFimEl.value = bounds.fim;
+    if (dtIniEl.value && dtFimEl.value && dtIniEl.value > dtFimEl.value) dtFimEl.value = dtIniEl.value;
+  }
+}
+
+/* =========================
+   MACRO VISÕES (MODAL)
+========================= */
+
+function vektorAnaliseGastosMacroHydrateFilters_(meta){
+  meta = meta || {};
+  var selAno  = document.getElementById("analiseGastos_macro_selAno");
+  var selLoja = document.getElementById("analiseGastos_macro_selLoja");
+  var selCat  = document.getElementById("analiseGastos_macro_selCategoria");
+  if (!selLoja || !selCat) return;
+
+  // Loja/Categoria
+  vektorBuildOptions_(selLoja, (meta.lojas || []), "Todas");
+  vektorBuildOptions_(selCat,  (meta.categorias || []), "Todas");
+
+  // Ano (macro) — usa anos retornados pelo getAnaliseGastosMeta()
+  if (selAno) {
+    var anos = Array.isArray(meta.anos) ? meta.anos.slice() : [];
+    var atual = String(selAno.value || "");
+
+    // ordem desc no modal (mais recente primeiro)
+    anos.sort(function(a,b){ return Number(b) - Number(a); });
+
+    selAno.innerHTML =
+      `<option value="">Último ano</option>` +
+      anos.map(function(a){
+        return `<option value="${vektorSafe_(a)}">${vektorSafe_(a)}</option>`;
+      }).join("");
+
+    if (atual && anos.indexOf(atual) >= 0) selAno.value = atual;
+  }
+}
+
+function vektorAnaliseGastosOpenMacroModal_(){
+  var m = document.getElementById("analiseGastos_macroModal");
+  if (!m) return;
+
+  m.classList.remove("hidden");
+  m.style.display = "block";
+
+  // primeira carga ao abrir
+  vektorAnaliseGastosMacroLoad_();
+}
+
+function vektorAnaliseGastosCloseMacroModal_(){
+  var m = document.getElementById("analiseGastos_macroModal");
+  if (!m) return;
+
+  m.classList.add("hidden");
+  m.style.display = "none";
+}
+
+function vektorAnaliseGastosMacroSetLoading_(on){
+  var el = document.getElementById("analiseGastos_macro_loading");
+  if (!el) return;
+  if (on) {
+    el.classList.remove("hidden");
+    el.style.display = "block";
+  } else {
+    el.classList.add("hidden");
+    el.style.display = "none";
+  }
+}
+
+function vektorAnaliseGastosMacroLoad_(){
+  var selLoja = document.getElementById("analiseGastos_macro_selLoja");
+  var selCat  = document.getElementById("analiseGastos_macro_selCategoria");
+  var selAno = document.getElementById("analiseGastos_macro_selAno");
+  var ano = String(selAno && selAno.value || "");
+  var loja = String(selLoja && selLoja.value || "");
+  var categoria = String(selCat && selCat.value || "");
+
+  vektorAnaliseGastosMacroSetLoading_(true);
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      vektorAnaliseGastosMacroSetLoading_(false);
+
+      if (!res || !res.ok) {
+        vektorAnaliseGastosMacroRenderEmpty_("Falha: " + vektorSafe_(res && res.error ? res.error : "erro desconhecido"));
+        return;
+      }
+
+      var hintL = document.getElementById("analiseGastos_macro_hintLojas");
+      var hintC = document.getElementById("analiseGastos_macro_hintCategorias");
+
+      if (hintL) {
+        hintL.textContent = loja
+          ? ("Recorte aplicado na visão de Lojas: Loja " + loja)
+          : "Acumulado mensal de todas as lojas";
+      }
+      if (hintC) {
+        hintC.textContent = categoria
+          ? ("Recorte aplicado na visão de Categorias: " + categoria)
+          : "Acumulado mensal de todas as categorias";
+      }
+
+      vektorAnaliseGastosMacroRenderChart_(
+        "analiseGastos_macro_chartLojas",
+        res.serieLojas || { labels: [], totais: [], variacoesPct: [] },
+        "__analiseGastosMacroChartLojas"
+      );
+
+      vektorAnaliseGastosMacroRenderChart_(
+        "analiseGastos_macro_chartCategorias",
+        res.serieCategorias || { labels: [], totais: [], variacoesPct: [] },
+        "__analiseGastosMacroChartCategorias"
+      );
+    })
+    .withFailureHandler(function(err){
+      vektorAnaliseGastosMacroSetLoading_(false);
+      vektorAnaliseGastosMacroRenderEmpty_("Falha: " + vektorSafe_(err && err.message ? err.message : err));
+    })
+    .getAnaliseGastosMacroVisoesDataset({
+      ano: ano,
+      loja: loja,
+      categoria: categoria
+    });
+}
+
+function vektorAnaliseGastosMacroRenderEmpty_(msg){
+  msg = String(msg || "Sem dados.");
+  var hL = document.getElementById("analiseGastos_macro_hintLojas");
+  var hC = document.getElementById("analiseGastos_macro_hintCategorias");
+  if (hL) hL.textContent = msg;
+  if (hC) hC.textContent = msg;
+
+  try {
+    if (window.__analiseGastosMacroChartLojas) {
+      window.__analiseGastosMacroChartLojas.destroy();
+      window.__analiseGastosMacroChartLojas = null;
+    }
+  } catch(_) {}
+  try {
+    if (window.__analiseGastosMacroChartCategorias) {
+      window.__analiseGastosMacroChartCategorias.destroy();
+      window.__analiseGastosMacroChartCategorias = null;
+    }
+  } catch(_) {}
+}
+
+function vektorAnaliseGastosMacroRenderChart_(canvasId, serie, chartRefName){
+  var canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  var labels = Array.isArray(serie && serie.labels) ? serie.labels : [];
+  var totais = Array.isArray(serie && serie.totais) ? serie.totais : [];
+  var varsPct = Array.isArray(serie && serie.variacoesPct) ? serie.variacoesPct : [];
+
+  try {
+    if (window[chartRefName]) {
+      window[chartRefName].destroy();
+      window[chartRefName] = null;
+    }
+  } catch(_) {}
+
+  if (!labels.length) return;
+
+  var ctx = canvas.getContext("2d");
+
+  function fmtCompactK_(n){
+    n = Number(n || 0) || 0;
+    var abs = Math.abs(n);
+    if (abs >= 1000000) return Math.round(n / 1000000) + "M";
+    if (abs >= 1000)    return Math.round(n / 1000) + "k";
+    return String(Math.round(n));
+  }
+
+  // ✅ Igual ao "Valores contabilizados": rótulo no centro EXATO da barra (dataset 0)
+  var vektorMacroBarCenterLabelsPlugin = {
+    id: "vektorMacroBarCenterLabels",
+    afterDatasetsDraw: function(chart, args, pluginOptions) {
+      var dsIndex = 0; // barras = dataset 0
+      var meta = chart.getDatasetMeta(dsIndex);
+      if (!meta || meta.hidden) return;
+
+      var data = (chart.data.datasets[dsIndex] && chart.data.datasets[dsIndex].data) || [];
+      var c = chart.ctx;
+
+      c.save();
+      c.fillStyle = (pluginOptions && pluginOptions.color) ? pluginOptions.color : "#ffffff";
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+
+      var fontSize = (pluginOptions && pluginOptions.fontSize) ? pluginOptions.fontSize : 10;
+      var fontWeight = (pluginOptions && pluginOptions.fontWeight) ? pluginOptions.fontWeight : "900";
+      c.font = fontWeight + " " + fontSize + "px Arial";
+
+      for (var i = 0; i < meta.data.length; i++) {
+        var el = meta.data[i];
+        if (!el) continue;
+
+        var v = Number(data[i] || 0) || 0;
+        if (!v) continue;
+        if (Math.abs(v) < 1000) continue; // evita poluição em barras pequenas
+
+        // ✅ centro geométrico da barra vertical
+        var x = el.x;
+        var yTop = el.y;
+        var yBase = el.base;
+        var y = yTop + (yBase - yTop) / 2;
+
+        c.fillText(fmtCompactK_(v), x, y);
+      }
+
+      c.restore();
+    }
+  };
+
+  window[chartRefName] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: "bar",
+          label: "Total (R$)",
+          data: totais,
+          backgroundColor: "rgba(255,255,255,0.22)",
+          borderColor: "rgba(255,255,255,0.55)",
+          borderWidth: 1,
+          barPercentage: 0.8,
+          categoryPercentage: 0.9,
+          order: 1
+        },
+        {
+          type: "line",
+          label: "Variação mensal (%)",
+          data: varsPct,
+          yAxisID: "y2",
+          tension: 0.22,
+          fill: false,
+          borderColor: "#38bdf8",
+          borderWidth: 2,
+          borderDash: [7, 5],
+          pointRadius: 3,
+          pointHoverRadius: 4,
+          order: 2,
+          datalabels: { display: false }
+        }
+      ]
+    },
+    plugins: [
+      ChartDataLabels,               // mantém compatibilidade do projeto
+      vektorMacroBarCenterLabelsPlugin // ✅ rótulo central real
+    ],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      animation: { duration: 700, easing: "easeOutQuart" },
+
+      plugins: {
+        legend: {
+          labels: { color: "rgba(255,255,255,0.85)", font: { weight: "800" } }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx){
+              var v = Number(ctx.raw || 0) || 0;
+              if (ctx.datasetIndex === 0) return ctx.dataset.label + ": " + vektorFmtBRL_(v);
+              return ctx.dataset.label + ": " + v.toFixed(1).replace(".", ",") + "%";
+            }
+          }
+        },
+
+        // ✅ desliga datalabels (rótulo agora é pelo plugin custom)
+        datalabels: {
+          display: false
+        },
+
+        // ✅ opções do plugin custom (nome = id do plugin)
+        vektorMacroBarCenterLabels: {
+          color: "#ffffff",
+          fontSize: 10,
+          fontWeight: "900"
+        }
+      },
+
+      scales: {
+        x: {
+          ticks: { color: "rgba(255,255,255,0.85)" },
+          grid: { color: "rgba(148,163,184,0.14)" }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: "rgba(255,255,255,0.85)",
+            callback: function(v){
+              var n = Number(v || 0) || 0;
+              if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(0) + "M";
+              if (Math.abs(n) >= 1000) return Math.round(n / 1000) + "k";
+              return n;
+            }
+          },
+          grid: { color: "rgba(148,163,184,0.18)" }
+        },
+        y2: {
+          position: "right",
+          ticks: {
+            color: "rgba(56,189,248,0.95)",
+            callback: function(v){
+              var n = Number(v || 0) || 0;
+              return n.toFixed(0) + "%";
+            }
+          },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
 }
 
 // estado local da página
