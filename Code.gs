@@ -14630,8 +14630,8 @@ function getAnaliseGastosMacroVisoesDataset(req){
     req = req || {};
     var fLoja = String(req.loja || "").trim();        // LojaNum (string)
     var fCat  = String(req.categoria || "").trim();   // categoria
-    var fAno = String(req.ano || "").trim(); // "2025", "2026"...
-      if (fAno && !/^\d{4}$/.test(fAno)) fAno = "";
+    var fAno  = String(req.ano || "").trim();         // "2025", "2026"...
+    if (fAno && !/^\d{4}$/.test(fAno)) fAno = "";
 
     var ctx = vektorGetUserRole_();
     var email = (ctx && ctx.email)
@@ -14652,9 +14652,11 @@ function getAnaliseGastosMacroVisoesDataset(req){
     if (lastRow < 2) {
       return {
         ok: true,
-        filtros: { loja: fLoja, categoria: fCat },
+        filtros: { loja: fLoja, categoria: fCat, ano: fAno },
         serieLojas: { labels: [], totais: [], variacoesPct: [] },
-        serieCategorias: { labels: [], totais: [], variacoesPct: [] }
+        serieCategorias: { labels: [], totais: [], variacoesPct: [] },
+        top10Lojas: { labels: [], totais: [] },
+        top10Categorias: { labels: [], totais: [] }
       };
     }
 
@@ -14685,66 +14687,81 @@ function getAnaliseGastosMacroVisoesDataset(req){
       return "";
     }
 
-    function monthKeyToLabel_(ym){
-      // "2026-02" -> "fev/2026"
-      var y = String(ym || "").slice(0,4);
-      var m = String(ym || "").slice(5,7);
-      var map = {
-        "01":"jan","02":"fev","03":"mar","04":"abr","05":"mai","06":"jun",
-        "07":"jul","08":"ago","09":"set","10":"out","11":"nov","12":"dez"
-      };
-      return (map[m] || m) + "/" + y;
-    }
-
     function buildSerie_(monthlyMap, anoBase){
-  var keys = [];
-  var labels = [];
-  var totais = [];
-  var variacoesPct = [];
+      var keys = [];
+      var labels = [];
+      var totais = [];
+      var variacoesPct = [];
 
-  function monthKeyToLabel_(ym){
-    var y = String(ym || "").slice(0,4);
-    var m = String(ym || "").slice(5,7);
-    var map = {
-      "01":"jan","02":"fev","03":"mar","04":"abr","05":"mai","06":"jun",
-      "07":"jul","08":"ago","09":"set","10":"out","11":"nov","12":"dez"
-    };
-    return (map[m] || m) + "/" + y;
-  }
+      function monthKeyToLabel_(ym){
+        var y = String(ym || "").slice(0,4);
+        var m = String(ym || "").slice(5,7);
+        var map = {
+          "01":"jan","02":"fev","03":"mar","04":"abr","05":"mai","06":"jun",
+          "07":"jul","08":"ago","09":"set","10":"out","11":"nov","12":"dez"
+        };
+        return (map[m] || m) + "/" + y;
+      }
 
-  if (anoBase && /^\d{4}$/.test(String(anoBase))) {
-    // força jan..dez do ano selecionado
-    for (var m = 1; m <= 12; m++) {
-      keys.push(String(anoBase) + "-" + String(m).padStart(2, "0"));
+      if (anoBase && /^\d{4}$/.test(String(anoBase))) {
+        // força jan..dez do ano selecionado
+        for (var m = 1; m <= 12; m++) {
+          keys.push(String(anoBase) + "-" + String(m).padStart(2, "0"));
+        }
+      } else {
+        // sem ano -> usa últimos 12 meses disponíveis
+        var all = Object.keys(monthlyMap || {}).sort(); // yyyy-mm
+        keys = all.slice(-12);
+      }
+
+      var prev = null;
+      for (var i = 0; i < keys.length; i++){
+        var ym = keys[i];
+        var total = Number(monthlyMap[ym] || 0) || 0;
+
+        labels.push(monthKeyToLabel_(ym));
+        totais.push(total);
+
+        if (prev === null || prev === 0) {
+          variacoesPct.push(0);
+        } else {
+          variacoesPct.push(((total - prev) / prev) * 100);
+        }
+
+        prev = total;
+      }
+
+      return { labels: labels, totais: totais, variacoesPct: variacoesPct };
     }
-  } else {
-    // sem ano -> usa últimos 12 meses disponíveis
-    var all = Object.keys(monthlyMap).sort(); // yyyy-mm
-    keys = all.slice(-12);
-  }
 
-  var prev = null;
-  for (var i=0; i<keys.length; i++){
-    var ym = keys[i];
-    var total = Number(monthlyMap[ym] || 0) || 0;
+    function buildTopN_(mapObj, topN){
+      topN = Number(topN) || 10;
+      var arr = Object.keys(mapObj || {}).map(function(k){
+        return {
+          nome: String(k || ""),
+          total: Number(mapObj[k] || 0) || 0
+        };
+      });
 
-    labels.push(monthKeyToLabel_(ym));
-    totais.push(total);
+      arr = arr.filter(function(x){ return x.total !== 0; });
 
-    if (prev === null || prev === 0) {
-      variacoesPct.push(0);
-    } else {
-      variacoesPct.push(((total - prev) / prev) * 100);
+      arr.sort(function(a,b){
+        if (b.total !== a.total) return b.total - a.total;
+        return String(a.nome).localeCompare(String(b.nome));
+      });
+
+      arr = arr.slice(0, topN);
+
+      return {
+        labels: arr.map(function(x){ return x.nome; }),
+        totais: arr.map(function(x){ return x.total; })
+      };
     }
-
-    prev = total;
-  }
-
-  return { labels: labels, totais: totais, variacoesPct: variacoesPct };
-}
 
     var monthlyLojas = {};      // série mensal para visão de lojas (opcional filtro de loja)
     var monthlyCats  = {};      // série mensal para visão de categorias (opcional filtro de categoria)
+    var totalByLoja = {};       // top 10 lojas (somatória no período/filtros)
+    var totalByCategoria = {};  // top 10 categorias (somatória no período/filtros)
 
     values.forEach(function(row){
       var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
@@ -14772,6 +14789,16 @@ function getAnaliseGastosMacroVisoesDataset(req){
 
       var valor = Number(row[iValor]) || 0;
 
+      // ✅ Top 10 Lojas e Top 10 Categorias respeitam TODOS os filtros do modal
+      // (ano + loja + categoria)
+      var passaFiltroLoja = (!fLoja || lojaNum === fLoja);
+      var passaFiltroCat  = (!fCat || categoria === fCat);
+
+      if (passaFiltroLoja && passaFiltroCat) {
+        totalByLoja[lojaNum] = (Number(totalByLoja[lojaNum]) || 0) + valor;
+        totalByCategoria[categoria] = (Number(totalByCategoria[categoria]) || 0) + valor;
+      }
+
       // Série Lojas (filtra por loja se informado)
       if (!fLoja || lojaNum === fLoja) {
         monthlyLojas[ym] = (Number(monthlyLojas[ym]) || 0) + valor;
@@ -14785,9 +14812,11 @@ function getAnaliseGastosMacroVisoesDataset(req){
 
     return {
       ok: true,
-      filtros: { loja: fLoja, categoria: fCat },
+      filtros: { loja: fLoja, categoria: fCat, ano: fAno },
       serieLojas: buildSerie_(monthlyLojas, fAno),
-      serieCategorias: buildSerie_(monthlyCats, fAno)
+      serieCategorias: buildSerie_(monthlyCats, fAno),
+      top10Lojas: buildTopN_(totalByLoja, 10),
+      top10Categorias: buildTopN_(totalByCategoria, 10)
     };
 
   } catch (e) {
