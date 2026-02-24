@@ -2351,10 +2351,66 @@ display: none;
             </div>
 
             <div id="analiseGastos_estabModalBody">
-              <div id="analiseGastos_estabPivotWrap">
-                <div id="analiseGastos_estabPivotMsg">Clique no card para carregar os detalhes.</div>
+            <!-- Toolbar -->
+            <div id="analiseGastos_estabPivotToolbar" style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;">
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; min-width:0;">
+                <input
+                  id="analiseGastos_estabPivotSearch"
+                  type="text"
+                  placeholder="Buscar estabelecimento..."
+                  style="
+                    width:min(420px, 78vw);
+                    max-width:100%;
+                    height:38px;
+                    border:1px solid #cbd5e1;
+                    border-radius:10px;
+                    padding:0 12px;
+                    font-size:13px;
+                    font-weight:800;
+                    color:#0f172a;
+                    background:#fff;
+                    outline:none;
+                  "
+                />
+                <button id="analiseGastos_estabPivotSearchClear" type="button" style="
+                  height:38px;
+                  padding:0 12px;
+                  border:1px solid #cbd5e1;
+                  border-radius:10px;
+                  background:#fff;
+                  color:#0f172a;
+                  font-size:12px;
+                  font-weight:900;
+                  cursor:pointer;
+                ">Limpar</button>
+
+                <div id="analiseGastos_estabPivotCount" style="
+                  font-size:12px;
+                  font-weight:900;
+                  color:#475569;
+                  white-space:nowrap;
+                ">—</div>
+              </div>
+
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <button id="analiseGastos_estabPivotExportCsv" type="button" style="
+                  height:38px;
+                  padding:0 12px;
+                  border:1px solid #86efac;
+                  border-radius:10px;
+                  background:#f0fdf4;
+                  color:#14532d;
+                  font-size:12px;
+                  font-weight:1000;
+                  cursor:pointer;
+                ">Exportar CSV</button>
               </div>
             </div>
+
+            <div id="analiseGastos_estabPivotWrap">
+              <div id="analiseGastos_estabPivotMsg">Clique no card para carregar os detalhes.</div>
+            </div>
+          </div>
           </div>
         </div>
 
@@ -6218,6 +6274,10 @@ function vektorAnaliseGastosInitOnce_(){
   const estabModalClose = document.getElementById("analiseGastos_estabModalClose");
   const estabModalBackdrop = document.getElementById("analiseGastos_estabModalBackdrop");
 
+  const estabPivotSearch = document.getElementById("analiseGastos_estabPivotSearch");
+  const estabPivotSearchClear = document.getElementById("analiseGastos_estabPivotSearchClear");
+  const estabPivotExportCsv = document.getElementById("analiseGastos_estabPivotExportCsv");
+
   // Estado inicial da tabela (sem carregar automaticamente)
   const tb = document.getElementById("analiseGastos_tbody");
   if (tb && !tb.dataset.initMsgDone) {
@@ -6394,6 +6454,36 @@ if (estabModalBackdrop && !estabModalBackdrop.__bindEstabPivotClose) {
   estabModalBackdrop.__bindEstabPivotClose = true;
   estabModalBackdrop.addEventListener("click", function(){
     try { vektorAnaliseGastosCloseEstabPivotModal_(); } catch(e){ console.error(e); }
+  });
+}
+
+// ✅ filtro textual da pivot (modal de estabelecimentos)
+if (estabPivotSearch && !estabPivotSearch.__bindPivotSearch) {
+  estabPivotSearch.__bindPivotSearch = true;
+
+  estabPivotSearch.addEventListener("input", function(){
+    try { vektorAnaliseGastosEstabPivotApplySearch_(); } catch(e){ console.error(e); }
+  });
+}
+
+if (estabPivotSearchClear && !estabPivotSearchClear.__bindPivotSearchClear) {
+  estabPivotSearchClear.__bindPivotSearchClear = true;
+
+  estabPivotSearchClear.addEventListener("click", function(){
+    try {
+      var inp = document.getElementById("analiseGastos_estabPivotSearch");
+      if (inp) inp.value = "";
+      vektorAnaliseGastosEstabPivotApplySearch_();
+      if (inp) inp.focus();
+    } catch(e){ console.error(e); }
+  });
+}
+
+// ✅ exportar CSV
+if (estabPivotExportCsv && !estabPivotExportCsv.__bindPivotCsv) {
+  estabPivotExportCsv.__bindPivotCsv = true;
+  estabPivotExportCsv.addEventListener("click", function(){
+    try { vektorAnaliseGastosEstabPivotExportCsv_(); } catch(e){ console.error(e); }
   });
 }
 
@@ -6716,6 +6806,11 @@ function vektorAnaliseGastosOpenEstabPivotModal_(){
   modal.style.display = "block";
   modal.setAttribute("aria-hidden", "false");
 
+  try {
+  var countEl = document.getElementById("analiseGastos_estabPivotCount");
+  if (countEl) countEl.textContent = "Carregando...";
+} catch(_) {}
+
   vektorAnaliseGastosRenderEstabPivotModal_();
 }
 
@@ -6739,6 +6834,21 @@ function vektorAnaliseGastosRenderEstabPivotModal_(){
   if (!tx.length) {
     wrap.innerHTML = `<div id="analiseGastos_estabPivotMsg">Sem dados para os filtros aplicados na página principal.</div>`;
     if (sub) sub.textContent = "Sem dados para os filtros aplicados na página principal.";
+
+    // ✅ limpa estado da pivot quando não há dados
+    try {
+      window.__analiseGastosEstabPivotState = null;
+      window.__analiseGastosEstabPivotStateCurrentView = null;
+    } catch(_) {}
+
+    // ✅ reseta busca/contador do modal
+    try {
+      var inp0 = document.getElementById("analiseGastos_estabPivotSearch");
+      var cnt0 = document.getElementById("analiseGastos_estabPivotCount");
+      if (inp0) inp0.value = "";
+      if (cnt0) cnt0.textContent = "0 estabelecimentos exibidos";
+    } catch(_) {}
+
     return;
   }
 
@@ -6746,11 +6856,6 @@ function vektorAnaliseGastosRenderEstabPivotModal_(){
     var s = String(iso || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "";
     return s.slice(0, 7); // yyyy-mm
-  }
-
-  function ymToMMYYYY_(ym){
-    if (!/^\d{4}-\d{2}$/.test(String(ym || ""))) return String(ym || "");
-    return String(ym).slice(5,7) + "/" + String(ym).slice(0,4);
   }
 
   // maps
@@ -6783,6 +6888,19 @@ function vektorAnaliseGastosRenderEstabPivotModal_(){
   var months = Object.keys(monthSet).sort(); // yyyy-mm crescente
   if (!months.length) {
     wrap.innerHTML = `<div id="analiseGastos_estabPivotMsg">Não foi possível identificar os meses no período filtrado.</div>`;
+
+    try {
+      window.__analiseGastosEstabPivotState = null;
+      window.__analiseGastosEstabPivotStateCurrentView = null;
+    } catch(_) {}
+
+    try {
+      var inp1 = document.getElementById("analiseGastos_estabPivotSearch");
+      var cnt1 = document.getElementById("analiseGastos_estabPivotCount");
+      if (inp1) inp1.value = "";
+      if (cnt1) cnt1.textContent = "0 estabelecimentos exibidos";
+    } catch(_) {}
+
     return;
   }
 
@@ -6809,7 +6927,94 @@ function vektorAnaliseGastosRenderEstabPivotModal_(){
       (perTxt ? ("Período aplicado: " + perTxt.replace(/^(\d{4})-(\d{2})-(\d{2})\s+a\s+(\d{4})-(\d{2})-(\d{2})$/, "$3/$2/$1 a $6/$5/$4")) : "Filtros da página principal");
   } catch(_) {}
 
-  // header
+  // ✅ guarda estado completo da pivot para filtro/export
+  window.__analiseGastosEstabPivotState = {
+    months: months.slice(), // ["2026-01","2026-02",...]
+    rows: estRows.map(function(r){
+      return {
+        estabelecimento: String(r.estabelecimento || ""),
+        total: Number(r.total || 0) || 0,
+        byMonth: Object.assign({}, r.byMonth || {})
+      };
+    }),
+    colTotalsAll: Object.assign({}, colTotals || {}),
+    grandTotalAll: Number(grandTotal || 0) || 0,
+    search: ""
+  };
+
+  // ✅ limpa busca ao abrir novo dataset
+  try {
+    var inpSearch = document.getElementById("analiseGastos_estabPivotSearch");
+    if (inpSearch) inpSearch.value = "";
+  } catch(_) {}
+
+  // ✅ renderiza tabela a partir do estado (necessário para busca + export CSV)
+  if (typeof vektorAnaliseGastosEstabPivotRenderTableFromState_ === "function") {
+    vektorAnaliseGastosEstabPivotRenderTableFromState_();
+  } else {
+    // fallback defensivo (se a função ainda não foi colada)
+    wrap.innerHTML = `<div id="analiseGastos_estabPivotMsg">Tabela pronta, mas a função de renderização da pivot não foi encontrada.</div>`;
+  }
+}
+
+function vektorAnaliseGastosEstabPivotApplySearch_(){
+  var st = window.__analiseGastosEstabPivotState || null;
+  if (!st) return;
+
+  var inp = document.getElementById("analiseGastos_estabPivotSearch");
+  st.search = String((inp && inp.value) || "").trim().toLowerCase();
+
+  vektorAnaliseGastosEstabPivotRenderTableFromState_();
+}
+
+function vektorAnaliseGastosEstabPivotRenderTableFromState_(){
+  var wrap = document.getElementById("analiseGastos_estabPivotWrap");
+  var countEl = document.getElementById("analiseGastos_estabPivotCount");
+  var st = window.__analiseGastosEstabPivotState || null;
+  if (!wrap) return;
+
+  if (!st || !Array.isArray(st.months) || !Array.isArray(st.rows)) {
+    wrap.innerHTML = `<div id="analiseGastos_estabPivotMsg">Estrutura da tabela não disponível.</div>`;
+    if (countEl) countEl.textContent = "0 itens";
+    return;
+  }
+
+  function ymToMMYYYY_(ym){
+    if (!/^\d{4}-\d{2}$/.test(String(ym || ""))) return String(ym || "");
+    return String(ym).slice(5,7) + "/" + String(ym).slice(0,4);
+  }
+
+  var months = st.months.slice();
+  var search = String(st.search || "").trim().toLowerCase();
+
+  var rows = (st.rows || []).filter(function(r){
+    var nome = String((r && r.estabelecimento) || "").toLowerCase();
+    if (!search) return true;
+    return nome.indexOf(search) >= 0;
+  });
+
+  // recalcula totais com base no filtro textual atual
+  var colTotals = {};
+  var grandTotal = 0;
+  months.forEach(function(ym){ colTotals[ym] = 0; });
+
+  rows.forEach(function(r){
+    months.forEach(function(ym){
+      var v = Number((r.byMonth && r.byMonth[ym]) || 0) || 0;
+      colTotals[ym] = (Number(colTotals[ym]) || 0) + v;
+    });
+    grandTotal += Number(r.total || 0) || 0;
+  });
+
+  if (countEl) {
+    countEl.textContent = rows.length + " estabelecimento" + (rows.length === 1 ? "" : "s") + " exibido" + (rows.length === 1 ? "" : "s");
+  }
+
+  if (!rows.length) {
+    wrap.innerHTML = `<div id="analiseGastos_estabPivotMsg">Nenhum estabelecimento encontrado para a busca informada.</div>`;
+    return;
+  }
+
   var thead = `
     <thead>
       <tr>
@@ -6820,25 +7025,23 @@ function vektorAnaliseGastosRenderEstabPivotModal_(){
     </thead>
   `;
 
-  // body
   var tbody = `
     <tbody>
-      ${estRows.map(function(r){
+      ${rows.map(function(r){
         return `
           <tr>
             <td>${vektorSafe_(r.estabelecimento)}</td>
             ${months.map(function(ym){
-              var v = Number(r.byMonth[ym] || 0) || 0;
+              var v = Number((r.byMonth && r.byMonth[ym]) || 0) || 0;
               return `<td class="num">${vektorFmtBRL_(v)}</td>`;
             }).join("")}
-            <td class="num" style="font-weight:1000;">${vektorFmtBRL_(r.total)}</td>
+            <td class="num" style="font-weight:1000;">${vektorFmtBRL_(Number(r.total || 0) || 0)}</td>
           </tr>
         `;
       }).join("")}
     </tbody>
   `;
 
-  // footer (totais por mês + total geral)
   var tfoot = `
     <tfoot>
       <tr>
@@ -6846,7 +7049,7 @@ function vektorAnaliseGastosRenderEstabPivotModal_(){
         ${months.map(function(ym){
           return `<td class="num">${vektorFmtBRL_(Number(colTotals[ym] || 0) || 0)}</td>`;
         }).join("")}
-        <td class="num">${vektorFmtBRL_(grandTotal)}</td>
+        <td class="num">${vektorFmtBRL_(Number(grandTotal || 0) || 0)}</td>
       </tr>
     </tfoot>
   `;
@@ -6858,6 +7061,103 @@ function vektorAnaliseGastosRenderEstabPivotModal_(){
       ${tfoot}
     </table>
   `;
+
+  // ✅ snapshot da visão atual (já filtrada por texto) para export
+  window.__analiseGastosEstabPivotStateCurrentView = {
+    months: months.slice(),
+    rows: rows.map(function(r){
+      return {
+        estabelecimento: String(r.estabelecimento || ""),
+        total: Number(r.total || 0) || 0,
+        byMonth: Object.assign({}, r.byMonth || {})
+      };
+    }),
+    colTotals: Object.assign({}, colTotals || {}),
+    grandTotal: Number(grandTotal || 0) || 0
+  };
+}
+
+function vektorAnaliseGastosEstabPivotBuildExportMatrix_(){
+  var view = window.__analiseGastosEstabPivotStateCurrentView || null;
+  if (!view || !Array.isArray(view.months) || !Array.isArray(view.rows)) return null;
+
+  function ymToMMYYYY_(ym){
+    if (!/^\d{4}-\d{2}$/.test(String(ym || ""))) return String(ym || "");
+    return String(ym).slice(5,7) + "/" + String(ym).slice(0,4);
+  }
+
+  var months = view.months.slice();
+
+  var header = ["Estabelecimento"].concat(
+    months.map(function(ym){ return ymToMMYYYY_(ym); })
+  ).concat(["Total"]);
+
+  var body = view.rows.map(function(r){
+    var row = [String(r.estabelecimento || "")];
+    months.forEach(function(ym){
+      row.push(Number((r.byMonth && r.byMonth[ym]) || 0) || 0);
+    });
+    row.push(Number(r.total || 0) || 0);
+    return row;
+  });
+
+  var totalRow = ["Total geral"].concat(
+    months.map(function(ym){ return Number(view.colTotals && view.colTotals[ym] || 0) || 0; })
+  ).concat([Number(view.grandTotal || 0) || 0]);
+
+  return {
+    header: header,
+    rows: body,
+    footer: totalRow,
+    matrix: [header].concat(body).concat([totalRow])
+  };
+}
+
+function vektorAnaliseGastosEstabPivotExportCsv_(){
+  var data = vektorAnaliseGastosEstabPivotBuildExportMatrix_();
+  if (!data) {
+    alert("Não há dados para exportar.");
+    return;
+  }
+
+  // CSV com separador ; (melhor para Excel pt-BR)
+  var lines = data.matrix.map(function(row){
+    return row.map(function(cell, idx){
+      if (idx === 0) {
+        // texto
+        var s = String(cell == null ? "" : cell);
+        s = s.replace(/"/g, '""');
+        return '"' + s + '"';
+      }
+      // número
+      var n = Number(cell || 0) || 0;
+      // exporta como número com ponto decimal (Excel interpreta corretamente)
+      return String(n);
+    }).join(";");
+  });
+
+  // BOM UTF-8 para acentuação no Excel
+  var csvContent = "\uFEFF" + lines.join("\r\n");
+  var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+
+  var now = new Date();
+  var fn = "analise_gastos_estabelecimentos_pivot_" +
+    now.getFullYear() +
+    String(now.getMonth()+1).padStart(2,"0") +
+    String(now.getDate()).padStart(2,"0") + "_" +
+    String(now.getHours()).padStart(2,"0") +
+    String(now.getMinutes()).padStart(2,"0") + ".csv";
+
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = fn;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){
+    try { document.body.removeChild(a); } catch(_) {}
+    try { URL.revokeObjectURL(url); } catch(_) {}
+  }, 120);
 }
 
 /* =========================================================
