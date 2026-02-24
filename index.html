@@ -7033,7 +7033,7 @@ function vektorAnaliseGastosEstabPivotRenderTableFromState_(){
             <td>${vektorSafe_(r.estabelecimento)}</td>
             ${months.map(function(ym){
               var v = Number((r.byMonth && r.byMonth[ym]) || 0) || 0;
-              return `<td class="num">${vektorFmtBRL_(v)}</td>`;
+              return `<td class="num estabPivotHeatCell" data-v="${v}">${vektorFmtBRL_(v)}</td>`;
             }).join("")}
             <td class="num" style="font-weight:1000;">${vektorFmtBRL_(Number(r.total || 0) || 0)}</td>
           </tr>
@@ -7061,6 +7061,7 @@ function vektorAnaliseGastosEstabPivotRenderTableFromState_(){
       ${tfoot}
     </table>
   `;
+  try { vektorAnaliseGastosApplyEstabPivotHeatmap_(); } catch(e){ console.error(e); }
 
   // ✅ snapshot da visão atual (já filtrada por texto) para export
   window.__analiseGastosEstabPivotStateCurrentView = {
@@ -7075,6 +7076,106 @@ function vektorAnaliseGastosEstabPivotRenderTableFromState_(){
     colTotals: Object.assign({}, colTotals || {}),
     grandTotal: Number(grandTotal || 0) || 0
   };
+}
+
+function vektorAnaliseGastosApplyEstabPivotHeatmap_(){
+  var table = document.getElementById("analiseGastos_estabPivotTable");
+  if (!table) return;
+
+  var tbody = table.querySelector("tbody");
+  if (!tbody) return;
+
+  var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
+  if (!rows.length) return;
+
+  // Descobre quantas colunas existem no tbody
+  // Estrutura esperada:
+  // col 0 = Estabelecimento
+  // col 1..N = meses (heatmap)
+  // última col = Total (sem heatmap)
+  var firstTds = rows[0].querySelectorAll("td");
+  if (!firstTds || firstTds.length < 3) return;
+
+  var totalCols = firstTds.length;
+  var firstMonthColIndex = 1;
+  var lastMonthColIndex = totalCols - 2; // última é "Total"
+
+  // 1) Limpa estilos anteriores das células heatmap (defensivo)
+  rows.forEach(function(tr){
+    var tds = tr.querySelectorAll("td.estabPivotHeatCell");
+    Array.prototype.forEach.call(tds, function(td){
+      td.style.background = "";
+      td.style.color = "";
+      td.style.fontWeight = "900";
+      td.style.textShadow = "none";
+    });
+  });
+
+  // 2) Aplica escala por coluna de mês
+  for (var colIdx = firstMonthColIndex; colIdx <= lastMonthColIndex; colIdx++) {
+    var colCells = [];
+    var positives = [];
+
+    rows.forEach(function(tr){
+      var tds = tr.querySelectorAll("td");
+      var td = tds[colIdx];
+      if (!td) return;
+
+      // Só aplica nas células marcadas como heatmap
+      if (!td.classList.contains("estabPivotHeatCell")) return;
+
+      var v = Number(td.getAttribute("data-v") || 0) || 0;
+      colCells.push({ td: td, v: v });
+
+      if (v > 0) positives.push(v);
+    });
+
+    // Se não há valores positivos nesta coluna, deixa neutro
+    if (!positives.length) {
+      colCells.forEach(function(obj){
+        obj.td.style.background = "rgba(148,163,184,0.06)";
+        obj.td.style.color = "#334155";
+        obj.td.style.fontWeight = "800";
+        obj.td.style.textShadow = "none";
+      });
+      continue;
+    }
+
+    var minV = Math.min.apply(null, positives);
+    var maxV = Math.max.apply(null, positives);
+    var same = (maxV === minV);
+
+    colCells.forEach(function(obj){
+      var td = obj.td;
+      var v = obj.v;
+
+      // zero ou negativo: neutro (mais legível)
+      if (v <= 0) {
+        td.style.background = "rgba(148,163,184,0.06)";
+        td.style.color = "#334155";
+        td.style.fontWeight = "800";
+        td.style.textShadow = "none";
+        return;
+      }
+
+      var t = same ? 1 : ((v - minV) / (maxV - minV)); // escala 0..1 por coluna
+
+      // Verde claro -> verde escuro (por coluna)
+      var alpha = 0.14 + (t * 0.72); // 0.14 até 0.86
+      td.style.background = "rgba(0, 94, 39, " + alpha.toFixed(3) + ")";
+
+      // Legibilidade
+      if (t >= 0.55) {
+        td.style.color = "#ffffff";
+        td.style.fontWeight = "900";
+        td.style.textShadow = "0 1px 1px rgba(0,0,0,0.20)";
+      } else {
+        td.style.color = "#052e16";
+        td.style.fontWeight = "900";
+        td.style.textShadow = "none";
+      }
+    });
+  }
 }
 
 function vektorAnaliseGastosEstabPivotBuildExportMatrix_(){
