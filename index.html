@@ -1751,8 +1751,8 @@ display: none;
   <!-- Rodapé do menu: Versão do Vektor -->
 <div id="vektorSidebarFooterVersion" class="mt-4 px-3 py-3 text-center border-t border-slate-200">
   <div class="text-[11px] text-slate-500 leading-tight">
-    Vektor v1.6.0<br>
-    <span class="text-slate-400">Build 12/01/2026</span>
+    Vektor v1.7.0<br>
+    <span class="text-slate-400">Build 23/02/2026</span>
   </div>
 </div>
   
@@ -2042,10 +2042,13 @@ display: none;
 
       <!-- ✅ OVERLAY IA: FORA da tabela e FORA do grid (não quebra layout) -->
       <div id="cicloResumoAI" style="display:none; position:fixed; inset:0; z-index:120; background:rgba(2,6,23,0.55);">
-        <div style="position:absolute; left:50%; top:12vh; transform:translateX(-50%);
-                    width:min(920px, 94vw); border-radius:18px; overflow:hidden;
-                    border:1px solid rgba(148,163,184,0.55);
-                    box-shadow:0 22px 60px rgba(0,0,0,0.35);">
+        <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:min(920px, 94vw);
+            max-height:86vh;               /* ✅ garante que cabe na tela */
+            border-radius:18px; overflow:hidden;
+            border:1px solid rgba(148,163,184,0.55);
+            box-shadow:0 22px 60px rgba(0,0,0,0.35);
+            display:flex; flex-direction:column;">
           <div style="background:#0b1220; color:#fff; padding:14px 16px; display:flex; justify-content:space-between; align-items:center;">
             <div style="font-weight:1000;">Análise do Ciclo</div>
             <button id="cicloResumoAIClose" type="button"
@@ -2053,7 +2056,11 @@ display: none;
               Fechar
             </button>
           </div>
-          <div id="cicloResumoAIBody" style="background:#fff; padding:14px 16px; color:#0f172a;">
+          <div id="cicloResumoAIBody"
+            style="background:#fff; padding:14px 16px; color:#0f172a;
+            overflow:auto;                 /* ✅ scroll vertical quando precisar */
+            max-height:calc(86vh - 56px);  /* ✅ 56px ≈ header do modal */
+            -webkit-overflow-scrolling:touch;">
             <!-- preenchido via JS -->
           </div>
         </div>
@@ -5581,7 +5588,7 @@ setResumoCicloBusy_(true, "Carregando resumo do ciclo…");
 
       if (!res || !res.ok) {
         if (content) content.style.display = "block";
-        if (tbody) tbody.innerHTML = "<tr><td colspan='7' style='padding:10px;color:#111;'>Falha ao carregar resumo.</td></tr>";
+        if (tbody) tbody.innerHTML = "<tr><td colspan='7' style='padding:10px;color:#111;'>Não disponível para o seu perfil.</td></tr>";
         return;
       }
 
