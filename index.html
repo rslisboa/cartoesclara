@@ -1675,11 +1675,11 @@ display: none;
   <button
     type="button"
     onclick="window.vektorOpenResumoCiclo()"
-    title="Resumo do Ciclo"
+    title="Pendências do Ciclo"
     class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">📌</span>
-    <span class="vektor-nav-label">Resumo do Ciclo</span>
+    <span class="vektor-nav-label">Pendências do Ciclo</span>
   </button>
 
     <button
@@ -1860,7 +1860,7 @@ display: none;
 
           <!-- Esquerda: título + subtítulo -->
           <div style="min-width:240px;">
-            <div style="font-size:18px;font-weight:1000;color:#fff;line-height:1.1;">Resumo do ciclo</div>
+            <div style="font-size:18px;font-weight:1000;color:#fff;line-height:1.1;">Pendências do ciclo</div>
             <div id="cicloResumoSubTitle"
                  style="margin-top:5px;font-size:12px;font-weight:800;color:rgba(226,232,240,0.8);">
               Consolidado das pendências no ciclo atual, considerando transações com status <b>Autorizada</b>.
@@ -3429,9 +3429,6 @@ display: none;
                   <option value="11:30">11:30</option>
                   <option value="16:00">16:00</option>
                 </select>
-                  <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
-                    Se vazio, o Vektor dispara assim que a frequência vencer.
-                  </div>
                 </div>
 
                 <div>
@@ -5318,7 +5315,7 @@ window.vektorLoadResumoCiclo = function (force) {
   const content = document.getElementById("cicloResumoContent");
   const tbody = document.getElementById("cicloResumo_tbody");
 
-setResumoCicloBusy_(true, "Carregando resumo do ciclo…");
+setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
 
   if (tbody) tbody.innerHTML = "";
 
@@ -5340,9 +5337,9 @@ setResumoCicloBusy_(true, "Carregando resumo do ciclo…");
   if (ovTitle) ovTitle.textContent = msg || (isBusy ? "Carregando…" : "");
   if (ovSub) ovSub.textContent = isBusy ? "Aguarde um instante." : "";
 
-  // mensagem / loading (texto “Carregando resumo do ciclo…”)
+  // mensagem / loading (texto “Carregando pendências do ciclo…”)
   if (loading) {
-    loading.textContent = msg || (isBusy ? "Carregando resumo do ciclo… aguarde." : "");
+    loading.textContent = msg || (isBusy ? "Carregando pendências do ciclo… aguarde." : "");
     loading.style.display = isBusy ? "block" : "none";
   }
 
@@ -5584,7 +5581,7 @@ setResumoCicloBusy_(true, "Carregando resumo do ciclo…");
   }, 0);
 }
 
-setResumoCicloBusy_(true, "Carregando resumo do ciclo…");
+setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
 
   google.script.run
     .withSuccessHandler(function (res) {
@@ -11112,11 +11109,6 @@ window.vektorMyAlertsRefresh = function () {
 
             "<div style='display:flex; gap:8px; align-items:flex-start;'>" +
 
-            // Executar (fica sozinho)
-            "<button type='button' data-id='" + a.alertId + "' class='myAl_runBtn' " +
-              "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:#16a34a; color:#04110a; font-weight:900; font-size:12px;'>" +
-              "Executar</button>" +
-
             // Coluna da direita
             "<div style='display:flex; flex-direction:column; gap:6px;'>" +
 
@@ -11138,37 +11130,6 @@ window.vektorMyAlertsRefresh = function () {
 
         card.innerHTML = head;
         list.appendChild(card);
-      });
-
-      // bind botões (não deixe erro aqui derrubar o painel)
-      list.querySelectorAll(".myAl_runBtn").forEach(btn => {
-        btn.onclick = function () {
-          const alertId = btn.getAttribute("data-id");
-          if (!alertId) return;
-
-          if (window.vektorMyAlertsShowLoading_) window.vektorMyAlertsShowLoading_("Executando alerta...", "Aguarde.");
-
-          google.script.run
-            .withSuccessHandler(function (r2) {
-              if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
-
-              if (r2 && r2.ok) {
-                const html = window.vektorRenderTabelaTransacoesEtiquetaAlert_(r2);
-                if (html) renderBotMessage("HTML:" + html);
-                if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Sucesso na execução!", "success");
-                window.vektorMyAlertsRefresh();
-              } else {
-                const msg = "Falha na execução: " + (r2 && r2.error ? r2.error : "erro desconhecido");
-                if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
-              }
-            })
-            .withFailureHandler(function (err) {
-              if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
-              const msg = "Erro na execução: " + (err && err.message ? err.message : err);
-              if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
-            })
-            .executarAlertaEtiquetaVektor({ alertId: alertId, preview: true });
-        };
       });
 
       list.querySelectorAll(".myAl_toggleBtn").forEach(btn => {
