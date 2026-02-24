@@ -1751,7 +1751,7 @@ display: none;
   <!-- Rodapé do menu: Versão do Vektor -->
 <div id="vektorSidebarFooterVersion" class="mt-4 px-3 py-3 text-center border-t border-slate-200">
   <div class="text-[11px] text-slate-500 leading-tight">
-    Vektor v1.7.0<br>
+    Vektor v1.8.0<br>
     <span class="text-slate-400">Build 23/02/2026</span>
   </div>
 </div>
@@ -3421,10 +3421,14 @@ display: none;
 
                 <div>
                   <label style="display:block; color:rgba(226,232,240,0.9); font-size:11px; font-weight:800; margin-bottom:6px;">
-                    Horário do e-mail (opcional)
+                    Horário do e-mail
                   </label>
-                  <input id="myAl_sendAt" type="time"
-                    style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;" />
+                  <select id="myAl_sendAt"
+                  style="width:100%; height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(148,163,184,0.18); padding:0 10px;">
+                  <option value="">Selecione…</option>
+                  <option value="11:30">11:30</option>
+                  <option value="16:00">16:00</option>
+                </select>
                   <div style="margin-top:6px; font-size:11px; color:rgba(226,232,240,0.75);">
                     Se vazio, o Vektor dispara assim que a frequência vencer.
                   </div>
@@ -10590,11 +10594,13 @@ window.vektorMyAlertsRenderStores_ = function (map, time) {
   const box = document.getElementById("myAl_storesBox");
   if (!box) return;
 
-  const lojas = (time && map && map[time]) ? map[time] : [];
-  if (!time) {
+  const lojas = (time && map && Array.isArray(map[time])) ? map[time] : [];
+
+  if (!time || time === "__ALL__") {
     box.innerHTML = "<div style='opacity:0.8; font-size:12px;'>Selecione um time para listar as lojas.</div>";
     return;
   }
+
   if (!lojas.length) {
     box.innerHTML = "<div style='opacity:0.8; font-size:12px;'>Nenhuma loja encontrada para esse time.</div>";
     return;
@@ -10602,51 +10608,85 @@ window.vektorMyAlertsRenderStores_ = function (map, time) {
 
   box.innerHTML = "";
 
-// ✅ Selecionar todas
-const wrapAll = document.createElement("label");
-wrapAll.style.display = "flex";
-wrapAll.style.alignItems = "center";
-wrapAll.style.gap = "8px";
-wrapAll.style.fontSize = "12px";
-wrapAll.style.marginBottom = "10px";
-wrapAll.style.fontWeight = "900";
-wrapAll.innerHTML =
-  "<input type='checkbox' id='myAl_store_all' />" +
-  "<span style='opacity:0.95;'>Selecionar todas</span>";
-box.appendChild(wrapAll);
+  // ✅ Selecionar todas
+  const wrapAll = document.createElement("label");
+  wrapAll.style.display = "flex";
+  wrapAll.style.alignItems = "center";
+  wrapAll.style.gap = "8px";
+  wrapAll.style.fontSize = "12px";
+  wrapAll.style.marginBottom = "10px";
+  wrapAll.style.fontWeight = "900";
 
-const cbAll = wrapAll.querySelector("#myAl_store_all");
-if (cbAll) {
-  cbAll.addEventListener("change", function () {
-    const on = !!cbAll.checked;
-    box.querySelectorAll("input[type='checkbox'][data-loja]").forEach(cb => {
-      cb.checked = on;
+  const cbAllEl = document.createElement("input");
+  cbAllEl.type = "checkbox";
+  cbAllEl.id = "myAl_store_all";
+
+  const cbAllTxt = document.createElement("span");
+  cbAllTxt.style.opacity = "0.95";
+  cbAllTxt.textContent = "Selecionar todas";
+
+  wrapAll.appendChild(cbAllEl);
+  wrapAll.appendChild(cbAllTxt);
+  box.appendChild(wrapAll);
+
+  const cbAll = cbAllEl;
+
+  if (cbAll) {
+    cbAll.addEventListener("change", function () {
+      const on = !!cbAll.checked;
+      box.querySelectorAll("input[type='checkbox'][data-loja]").forEach(function(cb){
+        cb.checked = on;
+      });
+    });
+  }
+
+  // ✅ lista de lojas (aceita string OU objeto {codigo,nome})
+  lojas.forEach(function (l) {
+    var codigo = "";
+    var nome = "";
+
+    if (l && typeof l === "object") {
+      codigo = String(l.codigo || l.loja || l.lojaNum || "").trim();
+      nome = String(l.nome || l.descricao || "").trim();
+    } else {
+      codigo = String(l || "").trim();
+    }
+
+    if (!codigo) return;
+
+    const id = "myAl_store_" + String(codigo).replace(/\W+/g, "_");
+    const row = document.createElement("label");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "8px";
+    row.style.fontSize = "12px";
+    row.style.marginBottom = "6px";
+
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = id;
+    input.setAttribute("data-loja", codigo);
+
+    const span = document.createElement("span");
+    span.style.opacity = "0.95";
+    span.textContent = nome ? (codigo + " — " + nome) : codigo;
+
+    row.appendChild(input);
+    row.appendChild(span);
+    box.appendChild(row);
+  });
+
+  // Se desmarcar qualquer uma, desmarca “todas”
+  box.querySelectorAll("input[type='checkbox'][data-loja]").forEach(function(cb){
+    cb.addEventListener("change", function(){
+      if (!cb.checked && cbAll) cbAll.checked = false;
+      if (cb.checked && cbAll) {
+        const items = box.querySelectorAll("input[type='checkbox'][data-loja]");
+        const allChecked = Array.from(items).every(function(x){ return !!x.checked; });
+        cbAll.checked = allChecked;
+      }
     });
   });
-}
-
-// ✅ lista de lojas
-lojas.forEach(function (l) {
-  const id = "myAl_store_" + String(l).replace(/\W+/g, "_");
-  const row = document.createElement("label");
-  row.style.display = "flex";
-  row.style.alignItems = "center";
-  row.style.gap = "8px";
-  row.style.fontSize = "12px";
-  row.style.marginBottom = "6px";
-  row.innerHTML =
-    "<input type='checkbox' id='" + id + "' data-loja='" + String(l) + "' />" +
-    "<span style='opacity:0.95;'>" + String(l) + "</span>";
-  box.appendChild(row);
-});
-
-// Se desmarcar qualquer uma, desmarca “todas”
-box.querySelectorAll("input[type='checkbox'][data-loja]").forEach(cb => {
-  cb.addEventListener("change", function(){
-    if (!cb.checked && cbAll) cbAll.checked = false;
-  });
-});
-  
 };
 
 window.vektorMyAlertsCreate = function () {
@@ -10666,8 +10706,9 @@ window.vektorMyAlertsCreate = function () {
     // Time / Grupo
     const time = (document.getElementById("myAl_team")?.value || "").trim();
 
-    // Horário (HH:mm)
-    const sendAt = String(document.getElementById("myAl_sendAt")?.value || "").trim();
+    // Horário (HH:mm) - obrigatório e restrito
+    const allowedTimes = ["11:30", "16:00"];
+    const sendAt = String(document.getElementById("myAl_sendAt")?.value || "").trim(); // ✅ FIX
 
     // Tipo de alerta
     const alertType = String(document.getElementById("myAl_alertType")?.value || "TRANSACOES").trim();
@@ -10716,8 +10757,13 @@ window.vektorMyAlertsCreate = function () {
       return;
     }
 
-    if (sendAt && !/^\d{2}:\d{2}$/.test(sendAt)) {
-      setStatus("Horário inválido. Use HH:mm (ex.: 08:30).");
+    // ✅ sendAt obrigatório e restrito
+    if (!sendAt) {
+      setStatus("Selecione o horário do e-mail (11:30 ou 16:00).");
+      return;
+    }
+    if (allowedTimes.indexOf(sendAt) < 0) {
+      setStatus("Horário inválido. Use somente 11:30 ou 16:00.");
       return;
     }
 
@@ -10742,7 +10788,7 @@ window.vektorMyAlertsCreate = function () {
       freq: freq,
       windowDays: windowDays,
       time: time,
-      sendAt: sendAt,
+      sendAt: sendAt,     // ✅ FIX
       lojas: lojas,
 
       // ✅ transações usam etiquetas; pendências sempre vazio
@@ -10796,6 +10842,7 @@ window.vektorMyAlertsCreate = function () {
     if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
     setStatus("Erro inesperado ao salvar alerta.");
     if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Erro inesperado ao salvar alerta.", "error");
+    try { console.error("vektorMyAlertsCreate error:", e); } catch(_) {}
   }
 };
 
