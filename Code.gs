@@ -13015,10 +13015,21 @@ function getLojasOfensorasParaChat(diasJanela) {
 function getResumoCicloPendencias() {
   vektorAssertFunctionAllowed_("getResumoCicloPendencias");
 
+  // ✅ ACL por Emails (mesmo padrão da Análise de Gastos)
+var ctx = vektorGetUserRole_();
+var email = (ctx && ctx.email)
+  ? String(ctx.email).trim().toLowerCase()
+  : String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+
+if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
+
+var allowedLojas = vektorGetAllowedLojasFromEmails_(email); // null => admin, array => lojas permitidas
+
   try {
     // ✅ cache curto (2 min) — evita “demorar pra carregar” em cliques/refresh
     var cache = CacheService.getScriptCache();
-    var cacheKey = "RC_BASECLARA_" + getCicloKey06a05_();
+    var cacheSuffix = (allowedLojas === null) ? "ALL" : email; // admin = ALL, demais = email
+    var cacheKey = "RC_BASECLARA_" + getCicloKey06a05_() + "_" + cacheSuffix;
     var cached = cache.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
@@ -13113,6 +13124,12 @@ function getResumoCicloPendencias() {
 
       var lojaNum = String(Number(dig));
       var loja4 = lojaNum.padStart(4, "0");
+
+      // ✅ aplica ACL por loja (Emails)
+      if (Array.isArray(allowedLojas)) {
+        // allowed pode vir como "1234" ou "0123" dependendo da sua base; checa ambos
+        if (allowedLojas.indexOf(lojaNum) < 0 && allowedLojas.indexOf(loja4) < 0) continue;
+      }
 
       var timeDaLoja = (mapaTime && (mapaTime[loja4] || mapaTime[lojaNum])) ? (mapaTime[loja4] || mapaTime[lojaNum]) : "N/D";
       var valor = parseNumberSafe_(r[idxValorBRL]);
