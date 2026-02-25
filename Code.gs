@@ -14526,7 +14526,10 @@ function vektorGetHistoricoEnviosItensIrregularesResumo_() {
 
   try {
     var sh = vektorGetOrCreateItensIrregLogSheet_();
-    var values = sh.getDataRange().getValues();
+    var range = sh.getDataRange();
+    var values = range.getValues();               // números / datas / etc.
+    var displayValues = range.getDisplayValues(); // texto exatamente como aparece na planilha
+
     if (!values || values.length < 2) return { ok: true, rows: [] };
 
     var hdr = values[0];
@@ -14547,6 +14550,43 @@ function vektorGetHistoricoEnviosItensIrregularesResumo_() {
     var iStatus = idx_("status");
 
     var agg = {}; // lojaKey -> resumo
+
+    function fmtDataBR_(v) {
+      if (!v) return "";
+      try {
+        // 1) Se veio Date real da planilha
+        if (Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime())) {
+          return Utilities.formatDate(v, Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy");
+        }
+
+        var s = String(v).trim();
+        if (!s) return "";
+
+        // 2) Se já está em dd/MM/yyyy, mantém
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s;
+
+        // 3) Se vier ISO date-only (YYYY-MM-DD), NÃO usar new Date(s)
+        //    (evita voltar 1 dia por fuso)
+        var mIso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (mIso) {
+          return mIso[3] + "/" + mIso[2] + "/" + mIso[1];
+        }
+
+        // 4) Se vier ISO com hora, tenta parsear
+        //    Ex.: 2026-02-25T11:59:00-03:00
+        if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+          var dIso = new Date(s);
+          if (!isNaN(dIso.getTime())) {
+            return Utilities.formatDate(dIso, Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy");
+          }
+        }
+
+        // 5) Fallback final
+        return s;
+      } catch (e) {
+        return String(v || "");
+      }
+}
 
     for (var r = 1; r < values.length; r++) {
       var row = values[r] || [];
@@ -14571,7 +14611,8 @@ function vektorGetHistoricoEnviosItensIrregularesResumo_() {
       agg[lojaKey].qtdItens += Number(row[iQtdItens] || 0) || 0;
       agg[lojaKey].valorTotal += Number(row[iValorTotal] || 0) || 0;
 
-      var dt = String(row[iDataEnvioBR] || "").trim();
+      var rowDisp = displayValues[r] || [];
+      var dt = String(rowDisp[iDataEnvioBR] || "").trim(); // usa TEXTO exibido na planilha
       if (dt) agg[lojaKey].ultimoEnvio = dt; // último lido (append)
       if (!agg[lojaKey].time && row[iTime]) agg[lojaKey].time = String(row[iTime]).trim();
     }
@@ -14587,6 +14628,10 @@ function vektorGetHistoricoEnviosItensIrregularesResumo_() {
   } catch (e) {
     return { ok: false, error: String(e && e.message ? e.message : e) };
   }
+}
+
+function vektorGetHistoricoEnviosItensIrregularesResumo() {
+  return vektorGetHistoricoEnviosItensIrregularesResumo_();
 }
 
 function RESETAR_GATE_EMAIL_OFENSORAS_SEMANA() {
