@@ -4908,76 +4908,125 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
   var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
   var hoje = Utilities.formatDate(new Date(), tz, "dd/MM/yyyy");
 
-  var REPLY_TO = "contasateceber@gruposbf.com.br";
-  var CC_FIXO = "contasateceber@gruposbf.com.br";
+  var REPLY_TO = "contasareceber@gruposbf.com.br";
+  var CC_FIXO = "contasareceber@gruposbf.com.br";
   var SENDER_NAME = "Vektor - Grupo SBF";
 
-  // ✅ mesmo mapa do envio de pendências (padrão CE0000)
-  // (no seu projeto ele já é usado em outros envios)
-  var mapEmails = vektorCarregarMapaEmailsLojas_(); // deve retornar { CE0001: { emailGerente, emailGerenteRegional, ... }, ... }
+  // ✅ mapa CE0000 -> e-mails
+  var mapEmails = vektorCarregarMapaEmailsLojas_();
 
   function normLojaKey_(lojaRaw) {
     var s = String(lojaRaw || "").trim().toUpperCase();
     if (!s) return "";
 
-    // se vier "CE0007"
     var m1 = s.match(/^CE\s*0*(\d{1,4})/);
-    if (m1 && m1[1]) {
-      var d1 = ("0000" + m1[1]).slice(-4);
-      return "CE" + d1;
-    }
+    if (m1 && m1[1]) return "CE" + ("0000" + m1[1]).slice(-4);
 
-    // se vier "0062 (Lobos SP)" ou "62" ou "305"
     var m2 = s.match(/(\d{1,4})/);
-    if (m2 && m2[1]) {
-      var d2 = ("0000" + m2[1]).slice(-4);
-      return "CE" + d2;
-    }
+    if (m2 && m2[1]) return "CE" + ("0000" + m2[1]).slice(-4);
 
     return "";
   }
 
   // agrupa por lojaKey
   var grupos = {};
-  rowsSelecionadas.forEach(function(r) {
-    var lk = normLojaKey_(r.loja);
+  rowsSelecionadas.forEach(function (r) {
+    var lk = normLojaKey_(r && r.loja);
     if (!lk) return;
     if (!grupos[lk]) grupos[lk] = [];
-    grupos[lk].push(r);
+    grupos[lk].push(r || {});
   });
 
   var lojaKeys = Object.keys(grupos);
-  if (!lojaKeys.length) return { ok: false, error: "Não foi possível identificar lojas (lojaKey) nas linhas selecionadas." };
+  if (!lojaKeys.length) {
+    return { ok: false, error: "Não foi possível identificar lojas (lojaKey) nas linhas selecionadas." };
+  }
 
-  // helper HTML table (usa badge no estilo do Vektor)
   function esc_(s) {
     return String(s || "")
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
+
   function fmtBRL_(n) {
-    try { return (Number(n || 0)).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }); }
-    catch(e){ return String(n || 0); }
+    try {
+      return (Number(n || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    } catch (e) {
+      return String(n || 0);
+    }
   }
+
   function badgeHtml_(c) {
     var x = String(c || "").toUpperCase();
     var bg = "rgba(255,255,255,0.06)", bd = "rgba(148,163,184,0.25)", tx = "rgba(226,232,240,0.95)";
     if (x === "OK") { bg = "rgba(34,197,94,0.18)"; bd = "rgba(34,197,94,0.35)"; tx = "#14532d"; }
     if (x === "REVISAR") { bg = "rgba(245,158,11,0.20)"; bd = "rgba(245,158,11,0.40)"; tx = "#713f12"; }
     if (x === "ALERTA") { bg = "rgba(248,113,113,0.20)"; bd = "rgba(248,113,113,0.40)"; tx = "#7f1d1d"; }
+
     return '<span style="display:inline-flex; align-items:center; height:22px; padding:0 10px; border-radius:999px;'
       + 'border:1px solid ' + bd + '; background:' + bg + '; color:' + tx + '; font-weight:1000; font-size:11px;">'
       + esc_(x || "—") + '</span>';
   }
 
-  function montarTabelaHtml_(rows) {
+  function montarTabelaHtml_(rows, lojaKey) {
+    function normTxt_(s) {
+      return String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    }
+
+    function isViagemHosp_(r) {
+      var txt = normTxt_((r.item || "") + " " + (r.estabelecimento || "") + " " + (r.motivo || ""));
+      return (
+        txt.indexOf("viagem") !== -1 ||
+        txt.indexOf("hosped") !== -1 ||
+        txt.indexOf("hotel") !== -1 ||
+        txt.indexOf("passagem") !== -1 ||
+        txt.indexOf("aereo") !== -1 ||
+        txt.indexOf("aerea") !== -1
+      );
+    }
+
     var h = '';
     h += '<div style="font-family:Inter,Arial,sans-serif; color:#0f172a;">';
     h += '<div style="font-size:14px; font-weight:900; margin-bottom:10px;">Itens Irregulares</div>';
 
+    var qtd = rows.length;
+    var total = 0;
+    for (var t = 0; t < rows.length; t++) total += Number(rows[t].valor || 0) || 0;
+
+    h += '<div style="font-size:12px; line-height:1.45; margin-bottom:12px;">'
+      + '<div><b>Loja:</b> ' + esc_(lojaKey || "") + '</div>'
+      + '<div><b>Quantidade de itens:</b> ' + esc_(qtd) + '</div>'
+      + '<div><b>Valor total:</b> ' + esc_(fmtBRL_(total)) + '</div>'
+      + '</div>';
+
+      var saudacao = vektorSaudacaoPorHora_();
+
+        h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
+          + 'Olá, ' + esc_(String(saudacao || "").toLowerCase()) 
+          + '</div>';
+
+    var temViagemHosp = false;
+    var temOutrosIrreg = false;
+
+    for (var j = 0; j < rows.length; j++) {
+      if (isViagemHosp_(rows[j] || {})) temViagemHosp = true;
+      else temOutrosIrreg = true;
+    }
+
+    var trechoFinal = 'Solicitamos que nos informem o motivo da compra para evitar o bloqueio do cartão e categoria da compra.';
+
+    if (temViagemHosp && !temOutrosIrreg) {
+      trechoFinal = 'Precisamos que entrem no site onde efetuaram a compra dessas passagens/hospedagem e realizem o cancelamento.';
+    } else if (temViagemHosp && temOutrosIrreg) {
+      trechoFinal = 'Solicitamos que nos informem o motivo da compra para evitar o bloqueio do cartão e categoria da compra, e para a compra de passagens/hospedagem, precisamos que cancelem no site da operadora.';
+    }
+
     h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
-      + 'Identificamos que os itens abaixo foram comprados irregularmente com o cartão da Clara, conforme nossa Política. '
-      + 'Solicitamos que nos informem o motivo da compra para evitar o bloqueio do cartão e categoria da compra.'
+      + 'Identificamos que os itens abaixo, comprados com o cartão da Clara, não estão em conformidade com nossa Política de Uso dos Cartões. '
+      + trechoFinal
       + '</div>';
 
     h += '<div style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">';
@@ -4988,6 +5037,7 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
     h += '<th style="text-align:left; padding:10px; font-size:12px;">Loja</th>';
     h += '<th style="text-align:left; padding:10px; font-size:12px;">Time</th>';
     h += '<th style="text-align:left; padding:10px; font-size:12px;">Item Comprado</th>';
+    h += '<th style="text-align:left; padding:10px; font-size:12px;">Estabelecimento</th>';
     h += '<th style="text-align:left; padding:10px; font-size:12px;">Conformidade</th>';
     h += '<th style="text-align:left; padding:10px; font-size:12px;">Motivo</th>';
     h += '</tr></thead><tbody>';
@@ -5000,12 +5050,25 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
       h += '<td style="padding:10px; font-size:12px;">' + esc_(r.loja || "") + '</td>';
       h += '<td style="padding:10px; font-size:12px;">' + esc_(r.time || "") + '</td>';
       h += '<td style="padding:10px; font-size:12px;">' + esc_(r.item || "") + '</td>';
+      h += '<td style="padding:10px; font-size:12px;">' + esc_(r.estabelecimento || "") + '</td>';
       h += '<td style="padding:10px; font-size:12px;">' + badgeHtml_(r.conformidade || "ALERTA") + '</td>';
       h += '<td style="padding:10px; font-size:12px;">' + esc_(r.motivo || "") + '</td>';
       h += '</tr>';
     }
 
-    h += '</tbody></table></div></div>';
+    h += '</tbody></table></div>';
+
+    h += '<div style="height:16px;"></div>'; // 1ª linha de espaçamento
+    h += '<div style="height:16px;"></div>'; // 2ª linha de espaçamento
+
+    h += '<div style="font-size:12px; line-height:1.5; color:#0f172a;">'
+      + 'Atenciosamente,<br>'
+      + 'Contas a Receber<br>'
+      + 'Grupo SBF<br>'
+      + 'contasareceber@gruposbf.com.br'
+      + '</div>';
+
+    h += '</div>';
     return h;
   }
 
@@ -5013,35 +5076,58 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
   var skipped = [];
   var erros = [];
 
-  lojaKeys.forEach(function(lojaKey) {
+  lojaKeys.forEach(function (lojaKey) {
+    // ✅ declarar fora do try para o catch conseguir usar sem quebrar
+    var pack = [];
+    var to = "";
+    var cc = [];
+    var subject = "";
+
     try {
-      var pack = grupos[lojaKey] || [];
+      pack = Array.isArray(grupos[lojaKey]) ? grupos[lojaKey] : [];
       if (!pack.length) return;
 
       var info = mapEmails ? mapEmails[lojaKey] : null;
 
-      // ✅ mesmos alvos do envio de pendências: gerente (E) e regional (G)
-      var to = info && info.emailGerente ? String(info.emailGerente).trim() : "";
-      var cc = [];
+      // gerente (to) + regional (cc) + contasareceber (cc)
+      to = info && info.emailGerente ? String(info.emailGerente).trim() : "";
+      cc = [];
 
-      if (info && info.emailGerenteRegional) cc.push(String(info.emailGerenteRegional).trim());
+      if (info && info.emailRegional) cc.push(String(info.emailRegional).trim());
       cc.push(CC_FIXO);
 
-      // fallback mínimo para não “sumir” notificação
-      if (!to) {
-        if (info && info.emailGerenteRegional) to = String(info.emailGerenteRegional).trim();
-      }
-      if (!to) {
-        to = CC_FIXO; // último fallback
-      }
+      // fallback
+      if (!to && info && info.emailRegional) to = String(info.emailRegional).trim();
+      if (!to) to = CC_FIXO;
 
-      // limpa duplicados / vazios
-      cc = cc.filter(function(x){ return x && x.indexOf("@") > 0; });
+      // limpa duplicados / inválidos
+      cc = cc.filter(function (x) { return x && x.indexOf("@") > 0; });
+
       var ccUniq = {};
-      cc = cc.filter(function(x){ x = x.toLowerCase(); if (ccUniq[x]) return false; ccUniq[x]=true; return true; });
+      cc = cc.filter(function (x) {
+        var k = String(x || "").toLowerCase();
+        if (!k) return false;
+        if (ccUniq[k]) return false;
+        ccUniq[k] = true;
+        return true;
+      });
 
-      var subject = "[ALERTA CLARA | ITENS] Itens Irregulares | " + hoje;
-      var htmlBody = montarTabelaHtml_(pack);
+      // evita duplicar TO no CC
+      cc = cc.filter(function (x) {
+        return String(x || "").toLowerCase() !== String(to || "").toLowerCase();
+      });
+
+      var qtdItens = pack.length;
+      var totalLoja = pack.reduce(function (acc, r) {
+        return acc + (Number((r || {}).valor || 0) || 0);
+      }, 0);
+
+      subject = "[ALERTA CLARA | ITENS IRREGULARES] "
+        + lojaKey + " | "
+        + qtdItens + " " + (qtdItens === 1 ? "item" : "itens")
+        + " | " + hoje;
+
+      var htmlBody = montarTabelaHtml_(pack, lojaKey);
 
       MailApp.sendEmail({
         to: to,
@@ -5052,18 +5138,112 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
         replyTo: REPLY_TO
       });
 
+      var timeResumo = "";
+      for (var tt = 0; tt < pack.length; tt++) {
+        if (String(pack[tt].time || "").trim()) {
+          timeResumo = String(pack[tt].time || "").trim();
+          break;
+        }
+      }
+
+      var totalLoja2 = pack.reduce(function (acc, r) {
+        return acc + (Number((r || {}).valor || 0) || 0);
+      }, 0);
+
+      vektorLogEnvioItensIrreg_({
+        lojaKey: lojaKey,
+        lojaRaw: (pack[0] && pack[0].loja) ? pack[0].loja : "",
+        time: timeResumo,
+        qtdItens: pack.length,
+        valorTotal: totalLoja2,
+        to: to,
+        cc: cc.join(","),
+        temViagemHosp: pack.some(function (r) {
+          var txt = String(((r || {}).item || "") + " " + ((r || {}).estabelecimento || ""))
+            .toLowerCase();
+          return /viagem|hosped|hotel|passagem|aere/.test(txt);
+        }),
+        assunto: subject,
+        status: "SENT",
+        error: ""
+      });
+
       enviados++;
+
     } catch (e) {
-      erros.push({ lojaKey: lojaKey, error: String(e && e.message ? e.message : e) });
+      var msgErro = String(e && e.message ? e.message : e);
+      erros.push({ lojaKey: lojaKey, error: msgErro });
+
+      try {
+        var packSafe = Array.isArray(pack) ? pack : [];
+        vektorLogEnvioItensIrreg_({
+          lojaKey: lojaKey,
+          lojaRaw: (packSafe[0] && packSafe[0].loja) ? packSafe[0].loja : "",
+          time: (packSafe[0] && packSafe[0].time) ? packSafe[0].time : "",
+          qtdItens: packSafe.length,
+          valorTotal: packSafe.reduce(function (acc, r) {
+            return acc + (Number((r || {}).valor || 0) || 0);
+          }, 0),
+          to: to || "",
+          cc: (cc && cc.join) ? cc.join(",") : "",
+          temViagemHosp: false,
+          assunto: subject || "",
+          status: "FAIL",
+          error: msgErro
+        });
+      } catch (_) {}
     }
   });
 
   if (erros.length) {
-    // Não falha tudo (parte pode ter enviado), mas devolve diagnóstico
     return { ok: true, enviados: enviados, lojas: lojaKeys.length, erros: erros, skipped: skipped };
   }
 
   return { ok: true, enviados: enviados, lojas: lojaKeys.length, skipped: skipped };
+}
+
+var VEKTOR_ITENS_IRREG_LOG_TAB = "Itens Irreg.";
+
+function vektorGetOrCreateItensIrregLogSheet_() {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName(VEKTOR_ITENS_IRREG_LOG_TAB);
+
+  if (!sh) {
+    sh = ss.insertSheet(VEKTOR_ITENS_IRREG_LOG_TAB);
+    sh.appendRow([
+      "sentAt","dataEnvioBR","lojaKey","lojaRaw","time","qtdItens","valorTotal",
+      "to","cc","temViagemHosp","assunto","status","error"
+    ]);
+    sh.getRange(1,1,1,13).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function vektorLogEnvioItensIrreg_(payload) {
+  try {
+    var sh = vektorGetOrCreateItensIrregLogSheet_();
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var now = new Date();
+
+    sh.appendRow([
+      Utilities.formatDate(now, tz, "yyyy-MM-dd HH:mm:ss"),
+      Utilities.formatDate(now, tz, "dd/MM/yyyy"),
+      payload.lojaKey || "",
+      payload.lojaRaw || "",
+      payload.time || "",
+      Number(payload.qtdItens || 0),
+      Number(payload.valorTotal || 0),
+      payload.to || "",
+      payload.cc || "",
+      payload.temViagemHosp ? "SIM" : "NAO",
+      payload.assunto || "",
+      payload.status || "",
+      payload.error || ""
+    ]);
+  } catch (e) {
+    Logger.log("Falha ao logar envio de itens irregulares: " + (e && e.message ? e.message : e));
+  }
 }
 
 // Procura o índice de uma coluna no cabeçalho da BaseClara
@@ -6159,6 +6339,7 @@ function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, 
       }
     }
     var idxDescricao = encontrarIndiceColuna_(header, ["Descrição", "Descricao", "Item", "Histórico", "Historico"]);
+    var idxTransacao = 2;
 
     if (idxData < 0 || idxValor < 0 || idxDescricao < 0) {
       return { ok: false, error: "Não encontrei colunas necessárias (Data / Valor / Descrição) na BaseClara." };
@@ -6235,18 +6416,17 @@ function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, 
     "impressao", "imprimir", "grafica", "plotagem", "encadernacao",
     "banner", "placa", "adesivo", "folder", "panfleto",
     "comunicacao", "comunicacao loja", "sinalizacao", "placas", "cartaz", "cartazes",
-    "papel couche", "couche", "laminacao", "recorte", "vinil", "bobina",
-
+    "papel couche", "couche", "laminacao", "recorte", "vinil", "bobina", "impressão",
     // Água / consumo básico
     "agua", "agua potavel", "potavel", "agua mineral", "galao", "garrafa",
 
     // Lanches / apoio operacional
-    "lanche", "lanches", "coffee", "cafe", "cafezinho", "snack",
+    "lanche", "lanches", "coffee", "cafe", "cafezinho", "snack", "moral",
 
     // Materiais de escritório (comuns)
     "caneta", "lapis", "borracha", "apontador", "marcador", "pilot", "pincel",
     "papel a4", "papel sulfite", "sulfite", "pasta", "arquivo", "etiqueta", "etiquetas",
-    "grampo", "grampeador", "clipes", "cola", "fita adesiva", "tesoura",
+    "grampo", "grampeador", "clipes", "cola", "fita adesiva", "tesoura", "grampos", "grampeadores", "bobina", "bobinas", "cabo", "regua", "régua",
 
     // Materiais de limpeza (comuns)
     "detergente", "sabao", "desinfetante", "alcool", "agua sanitaria",
@@ -6269,7 +6449,7 @@ function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, 
     "uber", "taxi", "corrida", "hospedagem", "hotel", "passagem", "viagem",
     "assinatura", "mensalidade", "streaming",
     "bebida", "alcool", "cerveja", "vinho", "whisky",
-    "presente", "gift"
+    "presente", "gift", "estante", "estantes", "steamer", "stemer", "stemar", "carrinho", "prateleiras", "prateleira", "carregadores", "carregador", "plenária", "plenaria", "cafeteira",
   ];
 
   // =========================
@@ -6403,6 +6583,7 @@ for (var i = 0; i < linhasFiltradas.length; i++) {
 
   var cls = classificarPolitica_(itemNorm);
 
+  var estabOut = (idxTransacao >= 0 ? String(row[idxTransacao] || "") : "");
 
   rows.push({
     data: dataBr,
@@ -6410,6 +6591,8 @@ for (var i = 0; i < linhasFiltradas.length; i++) {
     loja: lojaOut,
     time: timeOut,
     item: itemRaw,
+    transacao: estabOut,
+    estabelecimento: estabOut,
     status: cls.status,
     conformidade: cls.status,
     motivo: cls.motivo,
@@ -6652,6 +6835,7 @@ function getItensIrregularesRadarVisao(params) {
         loja: normLoja_(lojaRaw),
         time: normTime_(timeRaw),
         item: String(r.item || r.descricao || r.itemComprado || ""),
+        estabelecimento: String(r.estabelecimento || r.transacao || r.nomeEstabelecimento || r.merchant || ""),
         conformidade: String(r.conformidade || r.status || ""),
         motivo: String(r.motivo || r.justificativa || "")
       };
@@ -13217,7 +13401,7 @@ function getLojasOfensorasParaChat(diasJanela) {
 }
 
 // ===============================
-// RESUMO DO CICLO (BACKEND) — BASECLARA ONLY
+// PENDENCIAS DO CICLO (BACKEND) — BASECLARA ONLY
 // Fonte única: aba BaseClara
 // Retorna transações pendentes detalhadas + agregações (cards/tabela/análise)
 // ===============================
@@ -13451,7 +13635,7 @@ function getResumoCicloPendencias() {
 }
 
 // =====================================================
-// RESUMO DO CICLO — Detalhe por LOJA (modo "resumo")
+// PENDENCIAS DO CICLO — Detalhe por LOJA (modo "resumo")
 // Regra: aceita Pendências (texto) OU Recibo/Etiqueta/Descrição
 // =====================================================
 function getResumoCicloPendenciasDetalheLojaResumo(loja) {
@@ -14335,6 +14519,74 @@ function buildEmailItensIrregulares_(rows, periodoTxt) {
 
   h += '</tbody></table></div></div>';
   return h;
+}
+
+function vektorGetHistoricoEnviosItensIrregularesResumo_() {
+  vektorAssertFunctionAllowed_("vektorGetHistoricoEnviosItensIrregularesResumo_");
+
+  try {
+    var sh = vektorGetOrCreateItensIrregLogSheet_();
+    var values = sh.getDataRange().getValues();
+    if (!values || values.length < 2) return { ok: true, rows: [] };
+
+    var hdr = values[0];
+
+    function idx_(name) {
+      var n = String(name || "").toLowerCase().trim();
+      for (var i = 0; i < hdr.length; i++) {
+        if (String(hdr[i] || "").toLowerCase().trim() === n) return i;
+      }
+      return -1;
+    }
+
+    var iLojaKey = idx_("lojakey");
+    var iTime = idx_("time");
+    var iQtdItens = idx_("qtditens");
+    var iValorTotal = idx_("valortotal");
+    var iDataEnvioBR = idx_("dataenviobr");
+    var iStatus = idx_("status");
+
+    var agg = {}; // lojaKey -> resumo
+
+    for (var r = 1; r < values.length; r++) {
+      var row = values[r] || [];
+      var st = String(row[iStatus] || "").toUpperCase().trim();
+      if (st && st !== "SENT") continue; // considera só enviados com sucesso
+
+      var lojaKey = String(row[iLojaKey] || "").trim();
+      if (!lojaKey) continue;
+
+      if (!agg[lojaKey]) {
+        agg[lojaKey] = {
+          lojaKey: lojaKey,
+          time: String(row[iTime] || "").trim(),
+          qtdEnvios: 0,
+          qtdItens: 0,
+          valorTotal: 0,
+          ultimoEnvio: ""
+        };
+      }
+
+      agg[lojaKey].qtdEnvios += 1;
+      agg[lojaKey].qtdItens += Number(row[iQtdItens] || 0) || 0;
+      agg[lojaKey].valorTotal += Number(row[iValorTotal] || 0) || 0;
+
+      var dt = String(row[iDataEnvioBR] || "").trim();
+      if (dt) agg[lojaKey].ultimoEnvio = dt; // último lido (append)
+      if (!agg[lojaKey].time && row[iTime]) agg[lojaKey].time = String(row[iTime]).trim();
+    }
+
+    var out = Object.keys(agg).map(function(k){ return agg[k]; });
+
+    out.sort(function(a,b){
+      return (Number(b.qtdEnvios||0) - Number(a.qtdEnvios||0))
+          || (Number(b.valorTotal||0) - Number(a.valorTotal||0));
+    });
+
+    return { ok: true, rows: out };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message ? e.message : e) };
+  }
 }
 
 function RESETAR_GATE_EMAIL_OFENSORAS_SEMANA() {
