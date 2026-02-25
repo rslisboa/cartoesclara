@@ -3004,10 +3004,18 @@ display: none;
         </div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
+
+          <button id="radarBtnHistEnvios" type="button" onclick="window.vektorOpenHistEnviosItensIrreg_()"
+            style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                  background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;
+                  display:inline-flex; align-items:center; justify-content:center;">
+            Histórico de envios
+          </button>
+
           <button id="radarBtnItens" type="button" onclick="window.vektorToggleRadarItensIrregulares()"
             style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(0,0,0,0.25);
                   background:#fde68a; color:#111827; font-weight:1000; font-size:12px;
-                  margin-right:18px;">
+                  margin-right:18px; display:inline-flex; align-items:center; justify-content:center; line-height:1;">
             Itens Irregulares
           </button>
          <button id="radarBtn7d" type="button" onclick="window.vektorOpenRadar('7d')"
@@ -3276,16 +3284,22 @@ display: none;
       <div style="border-radius:12px; border:1px solid rgba(148,163,184,0.18);
             overflow:auto; max-height:65vh; background:rgba(226,232,240,0.92);">
 
-        <table style="width:100%; border-collapse:separate; border-spacing:0; min-width:980px;">
+        <table style="width:100%; border-collapse:separate; border-spacing:0; min-width:1240px;">
           <thead>
             <tr>
-              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
-                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
-                Data
+              <th onclick="window.vektorToggleItensIrregDetSort_('data')"
+                  title="Ordenar por Data"
+                  style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+                        background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;
+                        cursor:pointer; user-select:none;">
+                Data ↕
               </th>
-              <th style="position:sticky; top:0; z-index:5; text-align:right; padding:10px;
-                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
-                Valor (R$)
+              <th onclick="window.vektorToggleItensIrregDetSort_('valor')"
+                  title="Ordenar por Valor"
+                  style="position:sticky; top:0; z-index:5; text-align:right; padding:10px;
+                        background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;
+                        cursor:pointer; user-select:none;">
+                Valor (R$) ↕
               </th>
               <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
                          background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
@@ -3300,6 +3314,10 @@ display: none;
                 Item Comprado
               </th>
               <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+                        background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Estabelecimento
+              </th>
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
                          background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Conformidade
               </th>
@@ -3312,7 +3330,7 @@ display: none;
 
           <tbody id="itensIrregDetTbody">
             <tr>
-              <td colspan="7" style="padding:12px; color:rgba(226,232,240,0.75); font-weight:800; font-size:12px;">
+              <td colspan="8" style="padding:12px; color:rgba(226,232,240,0.75); font-weight:800; font-size:12px;">
                 Clique em “Atualizar” para carregar e depois use “Ver detalhamento”.
               </td>
             </tr>
@@ -3394,6 +3412,55 @@ display: none;
     </div>
   </main>
  </div> <!-- fecha #radarView -->
+
+ <div id="itensIrregHistEnviosModal"
+     style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(2,6,23,0.55);">
+  <div style="width:min(1100px,96vw); margin:4vh auto; background:#ffffff; border-radius:16px;
+              box-shadow:0 20px 50px rgba(2,6,23,0.25); overflow:hidden; border:1px solid #e2e8f0;">
+
+    <div style="display:flex; align-items:center; justify-content:space-between;
+                padding:14px 16px; border-bottom:1px solid #e2e8f0; background:#f8fafc;">
+      <div>
+        <div style="font-size:16px; font-weight:1000; color:#0f172a;">Histórico de envios — Itens Irregulares</div>
+        <div style="font-size:12px; color:#475569; margin-top:4px;">
+          Consolidado por loja (reincidência de alertas enviados)
+        </div>
+      </div>
+
+      <button type="button" onclick="window.vektorCloseHistEnviosItensIrreg_()"
+        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid #cbd5e1;
+               background:#fff; color:#0f172a; font-weight:900; cursor:pointer;">
+        Fechar
+      </button>
+    </div>
+
+    <div style="padding:14px;">
+      <div id="itensIrregHistEnviosLoading" style="display:none; color:#334155; font-weight:900; font-size:12px; margin-bottom:8px;">
+        Carregando histórico...
+      </div>
+
+      <div style="border:1px solid #e2e8f0; border-radius:12px; overflow:auto; max-height:68vh;">
+        <table style="width:100%; min-width:980px; border-collapse:separate; border-spacing:0;">
+          <thead>
+            <tr style="background:#f1f5f9;">
+              <th style="position:sticky; top:0; padding:10px; text-align:left; font-size:12px; font-weight:1000; color:#0f172a;">Loja</th>
+              <th style="position:sticky; top:0; padding:10px; text-align:left; font-size:12px; font-weight:1000; color:#0f172a;">Time</th>
+              <th style="position:sticky; top:0; padding:10px; text-align:right; font-size:12px; font-weight:1000; color:#0f172a;">Qtd. Envios</th>
+              <th style="position:sticky; top:0; padding:10px; text-align:right; font-size:12px; font-weight:1000; color:#0f172a;">Qtd. Itens</th>
+              <th style="position:sticky; top:0; padding:10px; text-align:right; font-size:12px; font-weight:1000; color:#0f172a;">Valor Total</th>
+              <th style="position:sticky; top:0; padding:10px; text-align:left; font-size:12px; font-weight:1000; color:#0f172a;">Último envio</th>
+              <th style="position:sticky; top:0; padding:10px; text-align:left; font-size:12px; font-weight:1000; color:#0f172a;">Status</th>
+            </tr>
+          </thead>
+          <tbody id="itensIrregHistEnviosTbody">
+            <tr><td colspan="7" style="padding:12px; font-size:12px; color:#64748b;">Sem dados.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
 
  <!-- VIEW: MEUS ALERTAS (sobrepõe SOMENTE a área do chat) -->
 <div id="myAlertsView" class="hidden" style="position:absolute; inset:0; z-index:20;">
@@ -9383,28 +9450,37 @@ window.vektorSetRadarViewMode_ = function(mode) {
   const radarContent = document.getElementById("radarContent");
   const itensView = document.getElementById("radarItensView");
   const btnItens = document.getElementById("radarBtnItens");
+  const btnHistEnvios = document.getElementById("radarBtnHistEnvios"); // ✅ novo botão
 
-    // ✅ botões que só fazem sentido no RADAR (devem sumir no modo ITENS)
+  // ✅ botões que só fazem sentido no RADAR (devem sumir no modo ITENS)
   const btn7d = document.getElementById("radarBtn7d");
   const btnCiclo = document.getElementById("radarBtnCiclo");
   const btnFull = document.getElementById("radarBtnFull");
   const btnComo = document.getElementById("radarBtnComoAnalise");
 
-  const showRadarButtons = (window.__radarViewMode === "RADAR");
+  const isRadar = (window.__radarViewMode === "RADAR");
+  const isItens = (window.__radarViewMode === "ITENS");
+
   [btn7d, btnCiclo, btnFull, btnComo].forEach(function(b){
     if (!b) return;
-    b.style.display = showRadarButtons ? "inline-flex" : "none";
+    b.style.display = isRadar ? "inline-flex" : "none";
   });
 
-  if (radarContent) radarContent.style.display = (window.__radarViewMode === "RADAR") ? "grid" : "none";
-  if (itensView) itensView.style.display = (window.__radarViewMode === "ITENS") ? "block" : "none";
+  // ✅ Histórico de envios: só aparece no modo ITENS
+  if (btnHistEnvios) {
+    btnHistEnvios.style.display = isItens ? "inline-flex" : "none";
+  }
+
+  if (radarContent) radarContent.style.display = isRadar ? "grid" : "none";
+  if (itensView) itensView.style.display = isItens ? "block" : "none";
 
   if (btnItens) {
-    btnItens.textContent = (window.__radarViewMode === "ITENS") ? "Radar" : "Itens Irregulares";
-    btnItens.style.background = (window.__radarViewMode === "ITENS") ? "rgba(226,232,240,0.90)" : "#fde68a"; // cinza claro
-    btnItens.style.color = (window.__radarViewMode === "ITENS") ? "#111827" : "#111827"; // texto preto
-    btnItens.style.borderColor = (window.__radarViewMode === "ITENS") ? "rgba(15,23,42,0.25)" : "rgba(0,0,0,0.25)";
-    btnItens.style.fontWeight = (window.__radarViewMode === "ITENS") ? "1000" : "1000";
+    btnItens.textContent = isItens ? "Radar" : "Itens Irregulares";
+    btnItens.style.background = isItens ? "rgba(226,232,240,0.90)" : "#fde68a";
+    btnItens.style.color = "#111827";
+    btnItens.style.borderColor = isItens ? "rgba(15,23,42,0.25)" : "rgba(0,0,0,0.25)";
+    btnItens.style.fontWeight = "1000";
+    btnItens.style.display = "inline-flex"; // garante que o botão principal sempre apareça
   }
 };
 
@@ -9507,7 +9583,7 @@ window.vektorLoadRadarItensIrregulares = function() {
       border:1px solid ${bd}; background:${bg}; color:${tx}; font-weight:1000; font-size:11px;">${x || "—"}</span>`;
   };
 
-  if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; color:rgba(226,232,240,0.75); font-weight:900; font-size:12px;">Carregando…</td></tr>`;
+  if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:12px; color:rgba(226,232,240,0.75); font-weight:900; font-size:12px;">Carregando…</td></tr>`;
   if (aggLoja) aggLoja.innerHTML = "";
   if (aggTime) aggTime.innerHTML = "";
   if (chart) chart.innerHTML = "";
@@ -9704,7 +9780,7 @@ window.vektorOpenItensIrregDetalhamentoModal = function () {
     if (tbody) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="7" style="padding:12px; color:rgba(226,232,240,0.80); font-weight:900; font-size:12px;">
+          <td colspan="8" style="padding:12px; color:rgba(226,232,240,0.80); font-weight:900; font-size:12px;">
             Sem dados para detalhar. Selecione o período e clique em <b>Atualizar</b> primeiro.
           </td>
         </tr>`;
@@ -9719,6 +9795,78 @@ window.vektorOpenItensIrregDetalhamentoModal = function () {
   if (typeof window.vektorRenderItensIrregDetalhamentoFromCache_ === "function") {
     window.vektorRenderItensIrregDetalhamentoFromCache_();
   }
+};
+
+window.vektorOpenHistEnviosItensIrreg_ = function () {
+  const m = document.getElementById("itensIrregHistEnviosModal");
+  const tbody = document.getElementById("itensIrregHistEnviosTbody");
+  const loading = document.getElementById("itensIrregHistEnviosLoading");
+  if (!m || !tbody) return;
+
+  m.style.display = "block";
+  if (loading) loading.style.display = "block";
+  tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; font-size:12px; color:#64748b;">Carregando...</td></tr>`;
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (loading) loading.style.display = "none";
+
+      if (!res || !res.ok) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; font-size:12px; color:#b91c1c; font-weight:900;">
+          ${(res && res.error) ? res.error : "Falha ao carregar histórico."}
+        </td></tr>`;
+        return;
+      }
+
+      const rows = Array.isArray(res.rows) ? res.rows : [];
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; font-size:12px; color:#64748b;">Nenhum envio registrado ainda.</td></tr>`;
+        return;
+      }
+
+      const fmtBRL = (v) => Number(v || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+
+      const badgeStatus = (qtdEnvios) => {
+        if (Number(qtdEnvios || 0) >= 3) {
+          return `<span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px;
+                        border:1px solid #f59e0b; background:#fef3c7; color:#92400e; font-weight:1000; font-size:11px;">
+                    Necessita de treinamento adicional / Envio de Política
+                  </span>`;
+        }
+        return `<span style="display:inline-flex; align-items:center; padding:4px 10px; border-radius:999px;
+                      border:1px solid #cbd5e1; background:#f8fafc; color:#334155; font-weight:1000; font-size:11px;">
+                  Monitorar
+                </span>`;
+      };
+
+      tbody.innerHTML = rows.map((r, i) => {
+        const bg = (i % 2 === 0) ? "#ffffff" : "#f8fafc";
+        return `
+          <tr style="background:${bg};">
+            <td style="padding:10px; border-bottom:1px solid #e2e8f0; font-size:12px; font-weight:900; color:#0f172a;">${r.lojaKey || "—"}</td>
+            <td style="padding:10px; border-bottom:1px solid #e2e8f0; font-size:12px; color:#0f172a;">${r.time || "—"}</td>
+            <td style="padding:10px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:12px; font-weight:900; color:#0f172a;">${Number(r.qtdEnvios || 0)}</td>
+            <td style="padding:10px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:12px; font-weight:900; color:#0f172a;">${Number(r.qtdItens || 0)}</td>
+            <td style="padding:10px; border-bottom:1px solid #e2e8f0; text-align:right; font-size:12px; font-weight:900; color:#0f172a;">${fmtBRL(r.valorTotal || 0)}</td>
+            <td style="padding:10px; border-bottom:1px solid #e2e8f0; font-size:12px; color:#0f172a;">${r.ultimoEnvio || "—"}</td>
+            <td style="padding:10px; border-bottom:1px solid #e2e8f0;">${badgeStatus(r.qtdEnvios)}</td>
+          </tr>
+        `;
+      }).join("");
+    })
+    .withFailureHandler(function(err){
+      if (loading) loading.style.display = "none";
+      const msg = (err && err.message) ? err.message : String(err || "Erro");
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:12px; font-size:12px; color:#b91c1c; font-weight:900;">
+        Falha ao carregar histórico: ${msg}
+      </td></tr>`;
+    })
+    .vektorGetHistoricoEnviosItensIrregularesResumo_();
+};
+
+window.vektorCloseHistEnviosItensIrreg_ = function () {
+  const m = document.getElementById("itensIrregHistEnviosModal");
+  if (m) m.style.display = "none";
 };
 
 window.vektorCloseItensIrregDetalhamentoModal = function () {
@@ -9800,6 +9948,32 @@ window.vektorClearItensIrregDetFilters_ = function() {
   window.vektorRenderItensIrregDetalhamentoFromCache_();
 };
 
+// Estado da ordenação do modal de detalhamento (padrão: Data desc = mais recente primeiro)
+window.__itensIrregDetSort = window.__itensIrregDetSort || {
+  key: "data",
+  dir: "desc" // "asc" | "desc"
+};
+
+window.vektorToggleItensIrregDetSort_ = function(key){
+  key = String(key || "").toLowerCase();
+  if (!key) return;
+
+  const cur = window.__itensIrregDetSort || { key: "data", dir: "desc" };
+
+  if (cur.key === key) {
+    cur.dir = (cur.dir === "asc") ? "desc" : "asc";
+  } else {
+    cur.key = key;
+    // padrão por coluna:
+    // data -> desc (mais recente primeiro)
+    // valor -> desc (maior primeiro)
+    cur.dir = "desc";
+  }
+
+  window.__itensIrregDetSort = cur;
+  window.vektorRenderItensIrregDetalhamentoFromCache_();
+};
+
 window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
   const tbody = document.getElementById("itensIrregDetTbody");
   if (!tbody) return;
@@ -9817,8 +9991,65 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
 
   // ✅ aplica filtros (local, sem backend)
   let rows = baseRows.slice();
+
+  // Ordena por data mais recente -> mais antiga (dd/MM/yyyy)
+  rows.sort(function(a, b){
+    function toTs_(s){
+      const m = String(s || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (!m) return 0;
+      return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime();
+    }
+    const ta = toTs_(a.dataTxt || a.data || "");
+    const tb = toTs_(b.dataTxt || b.data || "");
+    if (tb !== ta) return tb - ta;
+
+    // desempate por valor (maior primeiro)
+    return (Number(b.valor || 0) - Number(a.valor || 0));
+  });
+
   if (selLoja) rows = rows.filter(r => String(r.loja || "").trim() === selLoja);
   if (selTime) rows = rows.filter(r => String(r.time || "").trim() === selTime);
+
+  // ✅ ordenação local (Data / Valor)
+function parseBRDateToTs_(s) {
+  s = String(s || "").trim();
+  // dd/MM/yyyy
+  var m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) {
+    var d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 0, 0, 0, 0);
+    return isNaN(d.getTime()) ? 0 : d.getTime();
+  }
+  // fallback
+  var d2 = new Date(s);
+  return isNaN(d2.getTime()) ? 0 : d2.getTime();
+}
+
+const sortCfg = window.__itensIrregDetSort || { key: "data", dir: "desc" };
+const sortKey = String(sortCfg.key || "data").toLowerCase();
+const sortDir = (String(sortCfg.dir || "desc").toLowerCase() === "asc") ? 1 : -1;
+
+rows.sort(function(a, b){
+  var av = 0, bv = 0;
+
+  if (sortKey === "valor") {
+    av = Number(a && a.valor || 0);
+    bv = Number(b && b.valor || 0);
+  } else {
+    // padrão = data
+    av = parseBRDateToTs_(a && a.dataTxt);
+    bv = parseBRDateToTs_(b && b.dataTxt);
+  }
+
+  if (av < bv) return -1 * sortDir;
+  if (av > bv) return  1 * sortDir;
+
+  // desempate estável: valor desc
+  var av2 = Number(a && a.valor || 0);
+  var bv2 = Number(b && b.valor || 0);
+  if (av2 < bv2) return 1;
+  if (av2 > bv2) return -1;
+  return 0;
+});
 
   const fmtBRL = (v) =>
     Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -9837,7 +10068,7 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
   if (!rows.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="padding:12px; color:rgba(15,23,42,0.75); font-weight:900; font-size:12px;">
+        <td colspan="8" style="padding:12px; color:rgba(15,23,42,0.75); font-weight:900; font-size:12px;">
           Sem itens para os filtros selecionados.
         </td>
       </tr>`;
@@ -9870,6 +10101,8 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
         <td style="${td("font-weight:1000;")}">${r.loja || "—"}</td>
         <td style="${td("font-weight:900;")}">${r.time || "—"}</td>
         <td style="${td("font-weight:900;")}">${r.item || "—"}</td>
+        <td style="${td("font-weight:900; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")}">${r.estabelecimento || "—"}
+</td>
         <td style="${td("font-weight:1000;")}">${badge(r.conformidade || r.status || "")}</td>
         <td style="${td("border-right:none; font-weight:900; color:rgba(15,23,42,0.82);")}">${r.motivo || "—"}</td>
       </tr>
@@ -9930,6 +10163,7 @@ window.vektorEnviarNotificacaoItensIrregularesSelecionados_ = function () {
       valor: r.valor || 0,
       loja: r.loja || "",
       time: r.time || "",
+      estabelecimento: r.estabelecimento || "",
       item: r.item || "",
       conformidade: (r.conformidade || r.status || ""),
       motivo: r.motivo || ""
