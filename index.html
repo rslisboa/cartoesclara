@@ -1173,6 +1173,8 @@ display: none;
 #vektorShell.sidebar-collapsed aside{
   width: 72px !important;      /* “modo ícones” */
   padding: 12px !important;
+  background: #ffffff !important; 
+  border: 1px solid #111827 !important; /* linha preta fina */
 }
 
 #vektorShell.sidebar-collapsed aside h1,
@@ -1239,6 +1241,30 @@ display: none;
   position: relative;
 }
 
+/* =========================
+   MENU RECOLHIDO - clarear botões para destacar emojis
+   ========================= */
+/* ✅ Clareia apenas os botões de navegação (não pega a seta/toggle) */
+#vektorShell.sidebar-collapsed .vektor-nav-btn{
+  background: #111827 !important;
+  border: 1px solid rgba(148,163,184,0.22) !important;
+  color: #f8fafc !important;
+}
+
+#vektorShell.sidebar-collapsed .vektor-nav-btn:hover{
+  background: #1f2937 !important;
+  border-color: rgba(181,255,32,0.35) !important;
+  box-shadow: 0 0 0 1px rgba(181,255,32,0.10) inset;
+}
+
+/* emoji mais visível no recolhido */
+#vektorShell.sidebar-collapsed .vektor-nav-ico{
+  font-size: 1.15rem !important; /* aumenta um pouco */
+  line-height: 1 !important;
+  filter: saturate(1.15) brightness(1.12); /* melhora contraste */
+  text-shadow: 0 0 6px rgba(255,255,255,0.10);
+}
+
 #vektorShell.sidebar-collapsed aside button:hover::after{
   content: attr(title);
   position: absolute;
@@ -1255,6 +1281,94 @@ display: none;
   line-height: 1.2;
   z-index: 9999;
   pointer-events: none;
+}
+
+#vektorShell.sidebar-collapsed .vektor-nav-btn{
+  min-height: 44px !important;
+}
+
+/* =========================
+   HOME HERO - BORDA ANIMADA (CONTORNO REAL via SVG)
+   Só aparece com menu expandido
+   ========================= */
+
+/* garante referência para overlay */
+#homeView{
+  position: absolute; /* já está inline; mantido por segurança */
+  isolation: isolate;
+}
+
+/* SVG ocupa a Home inteira sem alterar tamanho da imagem */
+#homeBorderFx{
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .22s ease;
+}
+
+/* mostra somente quando menu está EXPANDIDO */
+#vektorShell:not(.sidebar-collapsed) #homeBorderFx{
+  opacity: 1;
+}
+
+/* esconde quando menu está recolhido */
+#vektorShell.sidebar-collapsed #homeBorderFx{
+  opacity: 0;
+}
+
+/* estilos das linhas do SVG */
+#homeBorderFx .hb-base,
+#homeBorderFx .hb-runner{
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+/* borda fixa (um pouco mais grossa, discreta) */
+#homeBorderFx .hb-base{
+  stroke: rgba(181,255,32,0.70);
+  stroke-width: 1.6; /* espessura visual no viewBox (escala bem) */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 4px rgba(181,255,32,0.22));
+}
+
+/* segmento que "viaja" exatamente pelo contorno */
+#homeBorderFx .hb-runner{
+  stroke: #B5FF20;
+  stroke-width: 2.2; /* um pouco mais grosso que a base */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+
+  /* pathLength=100 => facilita controlar o segmento */
+  /* segmento brilhante curto + resto invisível */
+  stroke-dasharray: 7 93;
+  stroke-dashoffset: 0;
+
+  filter:
+    drop-shadow(0 0 3px rgba(181,255,32,0.85))
+    drop-shadow(0 0 8px rgba(181,255,32,0.35));
+
+  animation: homeBorderRunnerLoop 2.8s linear infinite;
+}
+
+/* animação apenas com menu expandido */
+#vektorShell.sidebar-collapsed #homeBorderFx .hb-runner{
+  animation: none;
+}
+
+/* loop contínuo no contorno */
+@keyframes homeBorderRunnerLoop{
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -100; }
+}
+
+/* acessibilidade */
+@media (prefers-reduced-motion: reduce){
+  #homeBorderFx .hb-runner{ animation: none !important; }
 }
 
 </style>
@@ -1774,15 +1888,29 @@ display: none;
 
 <!-- HOME (aparece ao carregar o sistema) -->
 <div id="homeView"
-     style="position:absolute; inset:0; display:flex; flex-direction:column;
-            opacity:0; filter:blur(10px);
-            transition:opacity 900ms ease, filter 900ms ease;">
-    <img
-    id="homeHeroImg"
-    src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b4a53c6c2516825897ee0080048ddab3f57c0964/sys_vek_2.png"
-    alt="Vektor"
-    style="width:100%; height:100%; object-fit:cover; display:block;"
-  />
+     style="position:absolute; inset:0; width:100%; height:100%; display:flex; align-items:stretch; justify-content:stretch; overflow:hidden; opacity:0; filter:blur(10px); transition:opacity 900ms ease, filter 900ms ease; z-index:1;">
+  <img id="homeHeroImg"
+       src="https://raw.githubusercontent.com/rslisboa/cartoesclara/b4a53c6c2516825897ee0080048ddab3f57c0964/sys_vek_2.png"
+       alt="Vektor"
+       style="width:100%; height:100%; object-fit:cover; object-position:center center; display:block;"/>
+
+         <!-- Overlay SVG da borda animada da Home (somente menu expandido via CSS) -->
+  <svg id="homeBorderFx"
+       viewBox="0 0 100 100"
+       preserveAspectRatio="none"
+       aria-hidden="true">
+    <!-- borda base (fixa) -->
+    <rect class="hb-base"
+          x="1.2" y="1.2" width="97.6" height="97.6"
+          rx="2.2" ry="2.2"
+          pathLength="100" />
+    <!-- segmento animado (ponto/trilha viajando pelo contorno) -->
+    <rect class="hb-runner"
+          x="1.2" y="1.2" width="97.6" height="97.6"
+          rx="2.2" ry="2.2"
+          pathLength="100" />
+  </svg> 
+
 </div>
 
 <!-- BODY -->
@@ -4615,12 +4743,32 @@ document.addEventListener("DOMContentLoaded", function () {
     const KEY = "VEKTOR_SIDEBAR_COLLAPSED";
 
     function apply_(collapsed){
-      shell.classList.toggle("sidebar-collapsed", !!collapsed);
-      const icon = document.getElementById("vektorSidebarToggleIcon");
-        if (icon) {
-          icon.textContent = collapsed ? "⫸" : "⫷";
-        }
+  shell.classList.toggle("sidebar-collapsed", !!collapsed);
+
+  const icon = document.getElementById("vektorSidebarToggleIcon");
+  if (icon) {
+    icon.textContent = collapsed ? "⫸" : "⫷";
+  }
+
+  // Ajuste da imagem da Home (sem faixa preta)
+  const homeHeroImg = document.getElementById("homeHeroImg");
+  const homeView = document.getElementById("homeView");
+
+  if (homeView) {
+    homeView.style.background = "transparent";
+  }
+
+  if (homeHeroImg) {
+    homeHeroImg.style.objectFit = "cover";
+
+    if (collapsed) {
+      // prioriza topo/esquerda no menu recolhido (ajuste fino da arte)
+      homeHeroImg.style.objectPosition = "18% 1%"; // teste também "left top"
+    } else {
+      homeHeroImg.style.objectPosition = "center 40%";
     }
+  }
+}
 
     // aplica estado salvo
     let saved = null;
