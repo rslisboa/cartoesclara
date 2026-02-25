@@ -3284,7 +3284,7 @@ display: none;
       <div style="border-radius:12px; border:1px solid rgba(148,163,184,0.18);
             overflow:auto; max-height:65vh; background:rgba(226,232,240,0.92);">
 
-        <table style="width:100%; border-collapse:separate; border-spacing:0; min-width:1240px;">
+        <table style="width:100%; border-collapse:separate; border-spacing:0; min-width:1480px;">
           <thead>
             <tr>
               <th onclick="window.vektorToggleItensIrregDetSort_('data')"
@@ -3296,7 +3296,7 @@ display: none;
               </th>
               <th onclick="window.vektorToggleItensIrregDetSort_('valor')"
                   title="Ordenar por Valor"
-                  style="position:sticky; top:0; z-index:5; text-align:right; padding:10px;
+                  style="position:sticky; top:0; z-index:5; text-align:right; padding:10px; width:100px; min-width:100px;
                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;
                         cursor:pointer; user-select:none;">
                 Valor (R$) ↕
@@ -3305,7 +3305,7 @@ display: none;
                          background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Loja
               </th>
-              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px; width:180px; min-width:180px;
                          background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Time
               </th>
@@ -3321,7 +3321,7 @@ display: none;
                          background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Conformidade
               </th>
-              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
+              <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px; width:320px; min-width:320px;
                          background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Motivo
               </th>
@@ -10097,14 +10097,14 @@ rows.sort(function(a, b){
           <span style="vertical-align:middle;">${r.dataTxt || "—"}</span>
         </td>
 
-        <td style="${td("text-align:right; font-weight:1000;")}">${fmtBRL(r.valor)}</td>
+        <td style="${td("text-align:right; font-weight:1000; width:100px; min-width:100px;")}">${fmtBRL(r.valor)}</td>
         <td style="${td("font-weight:1000;")}">${r.loja || "—"}</td>
-        <td style="${td("font-weight:900;")}">${r.time || "—"}</td>
+        <td style="${td("font-weight:900; width:180px; min-width:180px;")}">${r.time || "—"}</td>
         <td style="${td("font-weight:900;")}">${r.item || "—"}</td>
         <td style="${td("font-weight:900; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")}">${r.estabelecimento || "—"}
 </td>
         <td style="${td("font-weight:1000;")}">${badge(r.conformidade || r.status || "")}</td>
-        <td style="${td("border-right:none; font-weight:900; color:rgba(15,23,42,0.82);")}">${r.motivo || "—"}</td>
+        <td style="${td("border-right:none; font-weight:900; color:rgba(15,23,42,0.82); width:320px; min-width:320px;")}">${r.motivo || "—"}</td>
       </tr>
     `;
   }).join("");
