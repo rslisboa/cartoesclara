@@ -1431,9 +1431,6 @@ display: none;
   font-weight: 900;
   font-size: 13px;
   letter-spacing: .2px;
-
-  animation: hpsItemGlow .55s ease forwards;
-  animation-delay: var(--d);
 }
 
 /* caixa */
@@ -1456,9 +1453,6 @@ display: none;
   transform: scaleY(0);
   transform-origin: bottom;
   opacity: 0.95;
-
-  animation: hpsFill .35s ease forwards;
-  animation-delay: calc(var(--d) + .10s);
 }
 
 /* check */
@@ -1474,9 +1468,6 @@ display: none;
   transform: rotate(45deg) scale(0);
   transform-origin: center;
   opacity: 0.95;
-
-  animation: hpsCheck .28s ease forwards;
-  animation-delay: calc(var(--d) + .28s);
 }
 
 @keyframes hpsFill{
@@ -1487,6 +1478,7 @@ display: none;
   from { transform: rotate(45deg) scale(0); opacity: 0; }
   to   { transform: rotate(45deg) scale(1); opacity: 1; }
 }
+
 @keyframes hpsItemGlow{
   from { color: rgba(255,255,255,0.70); }
   to   { color: rgba(255,255,255,0.98); text-shadow: 0 0 10px rgba(181,255,32,0.20); }
@@ -1501,8 +1493,6 @@ display: none;
 
   opacity: 0;
   transform: translateX(48px);
-  animation: hpsFinalSlideIn 1.8s cubic-bezier(.2,.9,.2,1) forwards;
-  animation-delay: 6.1s;
 
   margin-left: 10px;
 
@@ -1519,6 +1509,58 @@ display: none;
 @keyframes hpsFinalSlideIn{
   from { opacity: 0; transform: translateX(48px); }
   to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ======================================================
+   ANIMAÇÕES SÓ QUANDO O STRIP ESTIVER "ARMADO" (.hps-run)
+   (mantém seus tempos atuais)
+   ====================================================== */
+
+#vektorPremiumStrip.hps-run .hps-item{
+  animation: hpsItemGlow .55s ease forwards;
+  animation-delay: var(--d);
+}
+
+#vektorPremiumStrip.hps-run .hps-box::before{
+  animation: hpsFill .35s ease forwards;
+  animation-delay: calc(var(--d) + .02s);
+}
+
+#vektorPremiumStrip.hps-run .hps-box::after{
+  animation: hpsCheck .28s ease forwards;
+  animation-delay: calc(var(--d) + .14s);
+}
+
+#vektorPremiumStrip.hps-run .hps-final{
+  animation: hpsFinalSlideIn 1.8s cubic-bezier(.2,.9,.2,1) forwards;
+  animation-delay: 2.9s;
+}
+
+/* ======================================================
+   ESTADO FINAL "CONGELADO" (não reanima ao recolher/expandir)
+   ====================================================== */
+#vektorPremiumStrip.hps-done .hps-item{
+  animation: none !important;
+  color: rgba(255,255,255,0.98);
+  text-shadow: 0 0 10px rgba(181,255,32,0.20);
+}
+
+#vektorPremiumStrip.hps-done .hps-box::before{
+  animation: none !important;
+  transform: scaleY(1) !important;   /* preenchido */
+  opacity: 0.95 !important;
+}
+
+#vektorPremiumStrip.hps-done .hps-box::after{
+  animation: none !important;
+  transform: rotate(45deg) scale(1) !important; /* check visível */
+  opacity: 1 !important;
+}
+
+#vektorPremiumStrip.hps-done .hps-final{
+  animation: none !important;
+  opacity: 1 !important;
+  transform: translateX(0) !important;
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -1574,10 +1616,10 @@ display: none;
     <div id="vektorPremiumStrip" class="w-full flex items-center justify-center" style="display:none;">
       <div class="hps-top-inner">
         <div class="hps-steps">
-          <div class="hps-item" style="--d:2.5s"><span class="hps-box"></span><span class="hps-label">Segurança</span></div>
-          <div class="hps-item" style="--d:3.4s"><span class="hps-box"></span><span class="hps-label">Governança</span></div>
-          <div class="hps-item" style="--d:4.3s"><span class="hps-box"></span><span class="hps-label">Autonomia</span></div>
-          <div class="hps-item" style="--d:5.2s"><span class="hps-box"></span><span class="hps-label">Tecnologia</span></div>
+          <div class="hps-item" style="--d:0s"><span class="hps-box"></span><span class="hps-label">Segurança</span></div>
+          <div class="hps-item" style="--d:.6s"><span class="hps-box"></span><span class="hps-label">Controle</span></div>
+          <div class="hps-item" style="--d:1.2s"><span class="hps-box"></span><span class="hps-label">Autonomia</span></div>
+          <div class="hps-item" style="--d:1.8s"><span class="hps-box"></span><span class="hps-label">Tecnologia</span></div>
         </div>
 
         <div class="hps-final">
@@ -4903,6 +4945,16 @@ function hideMaintenance_() {
     btn.textContent = on ? "Validando..." : "Entrar";
   }
 
+    // ✅ Reinicia TODAS as animações do strip (inclui ::before/::after)
+  function vektorRestartPremiumStrip_(){
+    const strip = document.getElementById("vektorPremiumStrip");
+    if (!strip) return;
+
+    strip.classList.remove("hps-run");
+    void strip.offsetWidth; // reflow
+    strip.classList.add("hps-run");
+  }
+
   function attempt_() {
   setError_("");
   var email = (byId("vektorLoginEmail") && byId("vektorLoginEmail").value ? byId("vektorLoginEmail").value : "").trim();
@@ -4930,6 +4982,13 @@ function hideMaintenance_() {
         }
         closeModal_();
         showApp_();
+        if (window.vektorPlayTopbarPremiumStrip) {
+          requestAnimationFrame(function(){
+            requestAnimationFrame(function(){
+              window.vektorPlayTopbarPremiumStrip();
+            });
+          });
+        }
         return;
       }
 
@@ -5040,51 +5099,83 @@ document.addEventListener("DOMContentLoaded", function () {
   // - NÃO mostra se banner de feriado estiver ativo/visível
   // =========================
   (function initTopbarPremiumStrip_(){
-    const shell  = document.getElementById("vektorShell");           // existe (linha ~1733)
-    const home   = document.getElementById("homeView");              // existe (linha ~1890)
-    const strip  = document.getElementById("vektorPremiumStrip");    // novo (topbar)
-    const banner = document.getElementById("vektor-holiday-banner"); // existe (linha ~1392)
-    if (!shell || !home || !strip || !banner) return;
+  const shell  = document.getElementById("vektorShell");           // existe (linha ~1733)
+  const home   = document.getElementById("homeView");              // existe (linha ~1890)
+  const strip  = document.getElementById("vektorPremiumStrip");    // topbar
+  const banner = document.getElementById("vektor-holiday-banner"); // existe (linha ~1392)
+  if (!shell || !home || !strip || !banner) return;
 
-    function isShown_(el){
-      if (!el) return false;
-      if (el.classList.contains("hidden")) return false;
-      const ds = (el.style && el.style.display) ? el.style.display : "";
-      if (ds === "none") return false;
-      return true;
-    }
+  function isShown_(el){
+    if (!el) return false;
+    if (el.classList.contains("hidden")) return false;
+    const ds = (el.style && el.style.display) ? el.style.display : "";
+    if (ds === "none") return false;
+    return true;
+  }
 
-    function isHolidayOn_(){
-      // banner precisa estar visível E ter texto
-      if (!isShown_(banner)) return false;
-      return !!String(banner.textContent || "").trim();
-    }
+  function isHolidayOn_(){
+    if (!isShown_(banner)) return false;
+    return !!String(banner.textContent || "").trim();
+  }
 
-    function update_(){
-      const menuCollapsed = shell.classList.contains("sidebar-collapsed");
-      const holidayOn     = isHolidayOn_();
-      const shouldShow = !menuCollapsed && !holidayOn;
-      strip.style.display = shouldShow ? "flex" : "none";
+  // ✅ reinicia TODAS as animações do strip (inclui ::before/::after)
+  function restartStrip_(){
+  // limpa estado final congelado
+  strip.classList.remove("hps-done");
 
-      // reinicia animação toda vez que voltar a aparecer
-      if (shouldShow) {
-        strip.style.animation = "none";
-        strip.offsetHeight; // reflow
-        strip.style.animation = "";
-      }
-    }
+  // reinicia timeline
+  strip.classList.remove("hps-run");
+  void strip.offsetWidth; // reflow
+  strip.classList.add("hps-run");
+}
 
-    // Observa mudanças: colapso do menu, mostrar/esconder home e ativação do feriado
-    try {
-      const obs = new MutationObserver(update_);
-      obs.observe(shell,  { attributes:true, attributeFilter:["class"] });
-      obs.observe(home,   { attributes:true, attributeFilter:["class","style"] });
-      obs.observe(banner, { attributes:true, attributeFilter:["class","style"] });
-      obs.observe(banner, { childList:true, subtree:true, characterData:true });
-    } catch(e){}
+  // ✅ trava: só anima quando "armed" = true (ex.: após login)
+  let armed_ = false;
 
-    update_();
-  })();
+  function update_(){
+  const menuCollapsed = shell.classList.contains("sidebar-collapsed");
+  const holidayOn     = isHolidayOn_();
+  const shouldShow    = !menuCollapsed && !holidayOn;
+
+  strip.style.display = shouldShow ? "flex" : "none";
+
+  // 🔒 só anima UMA vez quando o login arma
+  if (shouldShow && armed_) {
+    restartStrip_();
+    armed_ = false;
+
+    // ✅ após terminar, congela no estado final e remove hps-run
+    // tempo total (baseado no seu timing):
+    // último item começa em 5.2s; frase começa em 6.1s e dura 1.8s => ~8.1s
+    window.clearTimeout(window.__hpsDoneTmr);
+    window.__hpsDoneTmr = window.setTimeout(function(){
+      strip.classList.remove("hps-run");
+      strip.classList.add("hps-done");
+    }, 8200);
+  }
+
+  // ✅ não mexe em hps-run/hps-done ao recolher/expandir
+  // (assim não reanima e não some)
+}
+
+  // ✅ função pública: chame isto SOMENTE no login OK
+  window.vektorPlayTopbarPremiumStrip = function(){
+    armed_ = true;   // arma para o próximo update
+    update_();       // executa imediatamente
+  };
+
+  // Observa mudanças: colapso do menu e ativação do feriado
+  // (home pode continuar aqui, mas não reinicia mais na navegação)
+  try {
+    const obs = new MutationObserver(update_);
+    obs.observe(shell,  { attributes:true, attributeFilter:["class"] });
+    obs.observe(home,   { attributes:true, attributeFilter:["class","style"] });
+    obs.observe(banner, { attributes:true, attributeFilter:["class","style"] });
+    obs.observe(banner, { childList:true, subtree:true, characterData:true });
+  } catch(e){}
+
+  update_();
+})();
 
     // ✅ Logout (volta para tela de login)
       byId("vektorLogoutBtn")?.addEventListener("click", function () {
@@ -5136,6 +5227,13 @@ document.addEventListener("DOMContentLoaded", function () {
         if (res && res.ok) {
           // sessão válida: libera sem modal
           showApp_();
+          if (window.vektorPlayTopbarPremiumStrip) {
+            requestAnimationFrame(function(){
+              requestAnimationFrame(function(){
+                window.vektorPlayTopbarPremiumStrip();
+              });
+            });
+          }
           closeModal_();
           scheduleAutoLogout_();
           return;
