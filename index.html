@@ -1264,6 +1264,33 @@ display: none;
   white-space: nowrap;
 }
 
+/* ✅ Ordenação no modal (Medianas) */
+#analiseGastos_medTable thead th[data-sort]{
+  cursor: pointer;
+  user-select: none;
+}
+
+/* indicador neutro ao passar o mouse */
+#analiseGastos_medTable thead th[data-sort]::after{
+  content:" ⇅";
+  opacity:0;
+  transition: opacity .15s ease;
+  margin-left:6px;
+}
+#analiseGastos_medTable thead th[data-sort]:hover::after{
+  opacity:0.75;
+}
+
+/* setas quando estiver ordenado */
+#analiseGastos_medTable thead th[data-sort].asc::after{
+  content:" ▲";
+  opacity:0.95;
+}
+#analiseGastos_medTable thead th[data-sort].desc::after{
+  content:" ▼";
+  opacity:0.95;
+}
+
 #analiseGastos_medTable tbody td{
   border-right: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
@@ -1759,7 +1786,7 @@ display: none;
 
 #vektorPremiumStrip.hps-run .hps-final{
   animation: hpsFinalSlideIn 1.8s cubic-bezier(.2,.9,.2,1) forwards;
-  animation-delay: 2.9s;
+  animation-delay: 5.5s;
 }
 
 /* ======================================================
@@ -1842,10 +1869,10 @@ display: none;
     <div id="vektorPremiumStrip" class="w-full flex items-center justify-center" style="display:none;">
       <div class="hps-top-inner">
         <div class="hps-steps">
-          <div class="hps-item" style="--d:0s"><span class="hps-box"></span><span class="hps-label">Segurança</span></div>
-          <div class="hps-item" style="--d:.6s"><span class="hps-box"></span><span class="hps-label">Controle</span></div>
-          <div class="hps-item" style="--d:1.2s"><span class="hps-box"></span><span class="hps-label">Autonomia</span></div>
-          <div class="hps-item" style="--d:1.8s"><span class="hps-box"></span><span class="hps-label">Tecnologia</span></div>
+          <div class="hps-item" style="--d:2.1s"><span class="hps-box"></span><span class="hps-label">Segurança</span></div>
+          <div class="hps-item" style="--d:3s"><span class="hps-box"></span><span class="hps-label">Controle</span></div>
+          <div class="hps-item" style="--d:3.9s"><span class="hps-box"></span><span class="hps-label">Autonomia</span></div>
+          <div class="hps-item" style="--d:4.8s"><span class="hps-box"></span><span class="hps-label">Tecnologia</span></div>
         </div>
 
         <div class="hps-final">
@@ -2966,11 +2993,11 @@ display: none;
         <table id="analiseGastos_medTable">
           <thead>
             <tr>
-              <th>Loja</th>
-              <th>Categoria</th>
-              <th>Valor (mediana)</th>
-              <th>Maior valor</th>
-              <th>Menor valor</th>
+              <th data-sort="loja">Loja</th>
+              <th data-sort="categoria">Categoria</th>
+              <th data-sort="mediana">Valor (mediana)</th>
+              <th data-sort="max">Maior valor</th>
+              <th data-sort="min">Menor valor</th>
             </tr>
           </thead>
           <tbody id="analiseGastos_medTbody">
@@ -7752,6 +7779,111 @@ function vektorAnaliseGastosRender_(tx, meta){
   }).join("");
 }
 
+// =========================
+// Modal (Medianas) - Sort state
+// =========================
+window.__analiseGastosMedSort = window.__analiseGastosMedSort || { col: "mediana", dir: "desc" };
+window.__analiseGastosMedRows = window.__analiseGastosMedRows || [];
+
+// bind 1x no thead do modal
+function vektorAnaliseGastosMedBindSort_(){
+  const thead = document.querySelector("#analiseGastos_medTable thead");
+  if (!thead || thead.__bindSortMed) return;
+  thead.__bindSortMed = true;
+
+  thead.addEventListener("click", function(ev){
+    const th = ev.target && ev.target.closest ? ev.target.closest("th[data-sort]") : null;
+    if (!th) return;
+
+    const col = String(th.getAttribute("data-sort") || "").trim();
+    if (!col) return;
+
+    window.__analiseGastosMedSort = window.__analiseGastosMedSort || { col: "mediana", dir: "desc" };
+
+    if (window.__analiseGastosMedSort.col === col) {
+      window.__analiseGastosMedSort.dir = (window.__analiseGastosMedSort.dir === "desc") ? "asc" : "desc";
+    } else {
+      window.__analiseGastosMedSort.col = col;
+      window.__analiseGastosMedSort.dir = "desc";
+    }
+
+    vektorAnaliseGastosMedUpdateSortIcons_();
+    vektorAnaliseGastosMedApplySortAndRender_();
+  });
+
+  // aplica ícones iniciais
+  vektorAnaliseGastosMedUpdateSortIcons_();
+}
+
+function vektorAnaliseGastosMedUpdateSortIcons_(){
+  try {
+    const ths = document.querySelectorAll("#analiseGastos_medTable thead th[data-sort]");
+    if (!ths) return;
+
+    ths.forEach(x => x.classList.remove("asc","desc"));
+
+    const st = window.__analiseGastosMedSort || { col:"mediana", dir:"desc" };
+    const active = document.querySelector(`#analiseGastos_medTable thead th[data-sort="${st.col}"]`);
+    if (active) active.classList.add(st.dir);
+  } catch(_) {}
+}
+
+function vektorAnaliseGastosMedApplySortAndRender_(){
+  const tb = document.getElementById("analiseGastos_medTbody");
+  if (!tb) return;
+
+  const rows0 = Array.isArray(window.__analiseGastosMedRows) ? window.__analiseGastosMedRows.slice() : [];
+  if (!rows0.length) {
+    tb.innerHTML = `<tr><td colspan="5" id="analiseGastos_medMsg">Sem dados para o período/filtros.</td></tr>`;
+    return;
+  }
+
+  const st = window.__analiseGastosMedSort || { col:"mediana", dir:"desc" };
+  const dirMul = (st.dir === "asc") ? 1 : -1;
+
+  function num_(v){
+    const n = Number(v);
+    return isFinite(n) ? n : 0;
+  }
+
+  rows0.sort(function(a,b){
+    let va, vb;
+
+    switch (st.col) {
+      case "loja":
+        // tenta numérico primeiro (loja costuma ser número)
+        va = num_(a.loja); vb = num_(b.loja);
+        if (va !== vb) return (va - vb) * dirMul;
+        return String(a.loja||"").localeCompare(String(b.loja||""), "pt-BR") * dirMul;
+
+      case "categoria":
+        return String(a.categoria||"").localeCompare(String(b.categoria||""), "pt-BR") * dirMul;
+
+      case "max":
+        return (num_(a.max) - num_(b.max)) * dirMul;
+
+      case "min":
+        return (num_(a.min) - num_(b.min)) * dirMul;
+
+      case "mediana":
+      default:
+        return (num_(a.mediana) - num_(b.mediana)) * dirMul;
+    }
+  });
+
+  tb.innerHTML = rows0.map(function(r){
+    return `
+      <tr>
+        <td style="text-align:center;font-weight:1000;">${vektorSafe_(r.loja || "—")}</td>
+        <td style="text-align:left;font-weight:900;">${vektorSafe_(r.categoria || "—")}</td>
+        <td class="num">${vektorFmtBRL_(r.mediana || 0)}</td>
+        <td class="num">${vektorFmtBRL_(r.max || 0)}</td>
+        <td class="num">${vektorFmtBRL_(r.min || 0)}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
 function vektorAnaliseGastosOpenMedianaModal_(){
   var modal = document.getElementById("analiseGastos_medModal");
   if (!modal) return;
@@ -7759,6 +7891,8 @@ function vektorAnaliseGastosOpenMedianaModal_(){
   modal.classList.remove("hidden");
   modal.style.display = "block";
   modal.setAttribute("aria-hidden", "false");
+
+  try { vektorAnaliseGastosMedBindSort_(); } catch(e){ console.error(e); }
 
   // mensagem inicial
   var tb = document.getElementById("analiseGastos_medTbody");
@@ -7831,21 +7965,36 @@ function vektorAnaliseGastosRenderMedianas_(res){
   if (!tb) return;
 
   if (!rows.length) {
+    // ✅ limpa cache e mantém msg
+    window.__analiseGastosMedRows = [];
     tb.innerHTML = `<tr><td colspan="5" id="analiseGastos_medMsg">Sem dados para o período/filtros.</td></tr>`;
     return;
   }
 
-  tb.innerHTML = rows.map(r=>{
-    return `
-      <tr>
-        <td style="text-align:center;font-weight:1000;">${vektorSafe_(r.loja || "—")}</td>
-        <td style="text-align:left;font-weight:900;">${vektorSafe_(r.categoria || "—")}</td>
-        <td class="num">${vektorFmtBRL_(r.mediana || 0)}</td>
-        <td class="num">${vektorFmtBRL_(r.max || 0)}</td>
-        <td class="num">${vektorFmtBRL_(r.min || 0)}</td>
-      </tr>
-    `;
-  }).join("");
+  // ✅ cache das linhas + aplica ordenação atual (clique no header)
+  window.__analiseGastosMedRows = rows.slice();
+
+  try { vektorAnaliseGastosMedBindSort_(); } catch(_) {}
+  try { vektorAnaliseGastosMedUpdateSortIcons_(); } catch(_) {}
+
+  // ✅ render pela rotina de sort (evita duplicação de lógica)
+  try {
+    vektorAnaliseGastosMedApplySortAndRender_();
+  } catch(e) {
+    // fallback: render direto sem sort se algo falhar
+    console.error(e);
+    tb.innerHTML = rows.map(r=>{
+      return `
+        <tr>
+          <td style="text-align:center;font-weight:1000;">${vektorSafe_(r.loja || "—")}</td>
+          <td style="text-align:left;font-weight:900;">${vektorSafe_(r.categoria || "—")}</td>
+          <td class="num">${vektorFmtBRL_(r.mediana || 0)}</td>
+          <td class="num">${vektorFmtBRL_(r.max || 0)}</td>
+          <td class="num">${vektorFmtBRL_(r.min || 0)}</td>
+        </tr>
+      `;
+    }).join("");
+  }
 }
 
 function vektorAnaliseGastosOpenEstabPivotModal_(){
