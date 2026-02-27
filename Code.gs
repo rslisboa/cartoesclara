@@ -14994,9 +14994,14 @@ function getAnaliseGastosDataset(req){
     req = req || {};
     var dtIni = String(req.dtIni || "").trim();   // yyyy-mm-dd
     var dtFim = String(req.dtFim || "").trim();   // yyyy-mm-dd
-    var fTime = String(req.time || "").trim();
-    var fLoja = String(req.loja || "").trim();    // LojaNum (número em string)
-    var fCat  = String(req.categoria || "").trim();
+    
+    var fTimeArr = Array.isArray(req.time) ? req.time.map(String) : (req.time ? [String(req.time)] : []);
+    var fLojaArr = Array.isArray(req.loja) ? req.loja.map(String) : (req.loja ? [String(req.loja)] : []);
+    var fCatArr  = Array.isArray(req.categoria) ? req.categoria.map(String) : (req.categoria ? [String(req.categoria)] : []);
+
+    fTimeArr = fTimeArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+    fLojaArr = fLojaArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+    fCatArr  = fCatArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
 
     if (!dtIni || !dtFim) throw new Error("Informe dtIni e dtFim.");
     if (dtIni > dtFim) throw new Error("Período inválido: dtIni > dtFim.");
@@ -15098,9 +15103,9 @@ function getAnaliseGastosDataset(req){
       var valor = Number(row[iValor]) || 0;
 
       // filtro Loja (agora é LojaNum)
-      if (fTime && time !== fTime) return;
-      if (fLoja && lojaNum !== fLoja) return;
-      if (fCat && categoria !== fCat) return;
+      if (fTimeArr.length && fTimeArr.indexOf(time) < 0) return;
+      if (fLojaArr.length && fLojaArr.indexOf(lojaNum) < 0) return;
+      if (fCatArr.length  && fCatArr.indexOf(categoria) < 0) return;
 
       // Exibição: se quiser mostrar alias junto, você pode concatenar
       // var lojaAlias = String(row[iLojaAlias] || "").trim();
@@ -15129,6 +15134,173 @@ function getAnaliseGastosDataset(req){
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+/**
+ * Medianas por Loja x Categoria
+ * req: {dtIni, dtFim, time:[], loja:[], categoria:[]}
+ * Retorna:
+ * - rows: [{loja,categoria,mediana,max,min}]
+ * - metrics: {median, mean, normalization, min, max, countTx}
+ */
+function getAnaliseGastosMedianas(req){
+  vektorAssertFunctionAllowed_("getAnaliseGastosMedianas");
+
+  try {
+    req = req || {};
+    var dtIni = String(req.dtIni || "").trim();
+    var dtFim = String(req.dtFim || "").trim();
+
+    if (!dtIni || !dtFim) throw new Error("Informe dtIni e dtFim.");
+    if (dtIni > dtFim) throw new Error("Período inválido: dtIni > dtFim.");
+
+    var fTimeArr = Array.isArray(req.time) ? req.time.map(String) : (req.time ? [String(req.time)] : []);
+    var fLojaArr = Array.isArray(req.loja) ? req.loja.map(String) : (req.loja ? [String(req.loja)] : []);
+    var fCatArr  = Array.isArray(req.categoria) ? req.categoria.map(String) : (req.categoria ? [String(req.categoria)] : []);
+
+    fTimeArr = fTimeArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+    fLojaArr = fLojaArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+    fCatArr  = fCatArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+
+    var ctx = vektorGetUserRole_();
+    var email = (ctx && ctx.email)
+      ? String(ctx.email).trim().toLowerCase()
+      : String(Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+
+    if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
+
+    // null => admin; array => lojas permitidas
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email);
+
+    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+    var sh = ss.getSheetByName("BaseClara");
+    if (!sh) throw new Error('Aba "BaseClara" não encontrada.');
+
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 2) {
+      return { ok:true, rows:[], metrics:{ median:0, mean:0, normalization:0, min:0, max:0, countTx:0 } };
+    }
+
+    var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+    // índices BaseClara (0-based)
+    var iData      = 0;   // A
+    var iValor     = 5;   // F
+    var iCategoria = 13;  // N
+    var iTime      = 17;  // R
+    var iLojaNum   = 21;  // V
+
+    function toISODate_(v){
+      if (v instanceof Date) {
+        var y = v.getFullYear();
+        var m = String(v.getMonth() + 1).padStart(2, "0");
+        var d = String(v.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + d;
+      }
+      var s = String(v || "").trim();
+      if (!s) return "";
+      var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m1) return m1[3] + "-" + m1[2] + "-" + m1[1];
+      var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) return s;
+      return "";
+    }
+
+    function median_(arr){
+      var a = (arr || []).slice().map(function(x){ return Number(x)||0; }).sort(function(x,y){ return x-y; });
+      if (!a.length) return 0;
+      var mid = Math.floor(a.length / 2);
+      if (a.length % 2) return a[mid];
+      return (a[mid-1] + a[mid]) / 2;
+    }
+
+    var groups = {}; // key loja||cat -> {loja,categoria,vals:[],min,max}
+    var allVals = [];
+
+    values.forEach(function(row){
+      var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
+      if (!lojaNum) return;
+      lojaNum = String(lojaNum);
+
+      // ACL
+      if (Array.isArray(allowedLojas)) {
+        if (allowedLojas.indexOf(lojaNum) < 0) return;
+      }
+
+      var dataISO = toISODate_(row[iData]);
+      if (!dataISO) return;
+      if (dataISO < dtIni || dataISO > dtFim) return;
+
+      var time = String(row[iTime] || "").trim();
+      if (!time) time = "N/D";
+
+      var categoria = String(row[iCategoria] || "").trim();
+      if (!categoria) categoria = "Sem categoria";
+
+      var valor = Number(row[iValor]) || 0;
+
+      // filtros multi
+      if (fTimeArr.length && fTimeArr.indexOf(time) < 0) return;
+      if (fLojaArr.length && fLojaArr.indexOf(lojaNum) < 0) return;
+      if (fCatArr.length  && fCatArr.indexOf(categoria) < 0) return;
+
+      var key = lojaNum + "||" + categoria;
+      if (!groups[key]) {
+        groups[key] = { loja: lojaNum, categoria: categoria, vals: [], min: null, max: null };
+      }
+
+      groups[key].vals.push(valor);
+      allVals.push(valor);
+
+      if (groups[key].min === null || valor < groups[key].min) groups[key].min = valor;
+      if (groups[key].max === null || valor > groups[key].max) groups[key].max = valor;
+    });
+
+    var rows = Object.keys(groups).map(function(k){
+      var g = groups[k];
+      return {
+        loja: g.loja,
+        categoria: g.categoria,
+        mediana: median_(g.vals),
+        max: Number(g.max || 0),
+        min: Number(g.min || 0)
+      };
+    });
+
+    // ordena: maior mediana primeiro
+    rows.sort(function(a,b){ return (Number(b.mediana||0) - Number(a.mediana||0)); });
+
+    // métricas gerais
+    var globalMedian = median_(allVals);
+    var globalMean = 0;
+    if (allVals.length) {
+      var sum = allVals.reduce(function(s,x){ return s + (Number(x)||0); }, 0);
+      globalMean = sum / allVals.length;
+    }
+    var globalMin = allVals.length ? Math.min.apply(null, allVals) : 0;
+    var globalMax = allVals.length ? Math.max.apply(null, allVals) : 0;
+
+    var norm = 0;
+    var denom = (globalMax - globalMin);
+    if (denom > 0) norm = (globalMedian - globalMin) / denom;
+
+    return {
+      ok: true,
+      rows: rows,
+      metrics: {
+        median: globalMedian,
+        mean: globalMean,
+        normalization: norm,
+        min: globalMin,
+        max: globalMax,
+        countTx: allVals.length
+      }
+    };
+
+  } catch (e) {
+    return { ok:false, error:(e && e.message) ? e.message : String(e) };
   }
 }
 
@@ -15317,13 +15489,13 @@ function getAnaliseGastosMacroVisoesDataset(req){
         totalByCategoria[categoria] = (Number(totalByCategoria[categoria]) || 0) + valor;
       }
 
-      // Série Lojas (filtra por loja se informado)
-      if (!fLoja || lojaNum === fLoja) {
+      // Série Lojas (deve respeitar loja E categoria do modal)
+      if ((!fLoja || lojaNum === fLoja) && (!fCat || categoria === fCat)) {
         monthlyLojas[ym] = (Number(monthlyLojas[ym]) || 0) + valor;
       }
 
-      // Série Categorias (filtra por categoria se informado)
-      if (!fCat || categoria === fCat) {
+      // Série Categorias (deve respeitar categoria E loja do modal)
+      if ((!fCat || categoria === fCat) && (!fLoja || lojaNum === fLoja)) {
         monthlyCats[ym] = (Number(monthlyCats[ym]) || 0) + valor;
       }
     });
