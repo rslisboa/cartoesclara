@@ -1318,6 +1318,122 @@ display: none;
 }
 
 /* =========================
+   Modal full-screen - Fluxograma detalhado (SVG)
+   ========================= */
+#vektor_fluxoDetModal{
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+}
+#vektor_fluxoDetModal.hidden{ display:none !important; }
+
+#vektor_fluxoDetBackdrop{
+  position:absolute;
+  inset:0;
+  background: rgba(2,6,23,0.78);
+  backdrop-filter: blur(2px);
+}
+
+#vektor_fluxoDetPanel{
+  position:absolute;
+  inset: 16px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0b1220;
+  border: 1px solid rgba(148,163,184,0.22);
+  box-shadow: 0 28px 70px rgba(0,0,0,0.55);
+  display:flex;
+  flex-direction:column;
+}
+
+#vektor_fluxoDetHeader{
+  padding: 12px 14px;
+  background: #061a3a;
+  color: #fff;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+#vektor_fluxoDetTitle{
+  font-size: 14px;
+  font-weight: 1100;
+  letter-spacing: 0.2px;
+}
+#vektor_fluxoDetSub{
+  margin-top:2px;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+#vektor_fluxoDetActions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.vektor_fluxoDetBtn{
+  height:36px;
+  padding:0 12px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color:#fff;
+  font-weight: 1000;
+  font-size: 12px;
+  cursor:pointer;
+}
+.vektor_fluxoDetBtn:hover{ background: rgba(255,255,255,0.12); }
+
+#vektor_fluxoDetClose{
+  height:36px;
+  width:42px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color:#fff;
+  font-weight:1100;
+  font-size:18px;
+  cursor:pointer;
+}
+
+#vektor_fluxoDetBody{
+  flex:1;
+  min-height:0;
+  overflow:auto;
+  background:
+    radial-gradient(1000px 700px at 15% 0%, rgba(181,255,32,0.10), transparent 55%),
+    radial-gradient(900px 650px at 90% 30%, rgba(0,94,39,0.18), transparent 58%),
+    #07110c;
+  padding: 16px;
+}
+
+/* Stage de zoom (escala do SVG) */
+#vektor_fluxoDetStageWrap{
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+}
+#vektor_fluxoDetStage{
+  transform-origin: top center;
+  will-change: transform;
+}
+
+/* SVG responsivo e “premium” */
+#vektor_fluxoDetSvg{
+  width: min(1700px, 96vw);
+  height: auto;
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,0.22);
+  box-shadow: 0 16px 42px rgba(0,0,0,0.45);
+}
+
+/* =========================
    STATUS (Estado Operacional) - background blur
    ========================= */
 .vektor-status-card{
@@ -4529,6 +4645,16 @@ display: none;
             </div>
           </div>
         </div>
+
+        <!-- Ações do header (direita) -->
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button"
+                  onclick="vektorOpenFluxogramaDetalhado_()"
+                  style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(181,255,32,0.45); background:rgba(2,6,23,0.35); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
+            Ver fluxograma detalhado
+          </button>
+        </div>
+
       </div>
 
       <!-- Conteúdo -->
@@ -4573,7 +4699,7 @@ display: none;
 <div style="display:flex; justify-content:flex-start;">
   <div id="fgStep1" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
     <div style="font-weight:1000; letter-spacing:0.2px;">1) Fontes (entrada)</div>
-    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+    <div style="margin-top:6px; font-size:13px; color:rgba(226,232,240,0.88); line-height:1.35;">
       • <b>API CLara</b>: Em desenvolvimento<br/>
       • <b>Google Sheets</b>: Base de transações da Clara + consultas auxiliares<br/>
       • <b>BigQuery</b>: consultas e validações (deduplicação, agregações e cruzamentos quando aplicável)<br/>
@@ -4590,7 +4716,7 @@ display: none;
 <div style="display:flex; justify-content:flex-end;">
   <div id="fgStep2" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(34,197,94,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
     <div style="font-weight:1000; letter-spacing:0.2px;">2) Orquestração (jobs & gatilhos)</div>
-    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+    <div style="margin-top:6px; font-size:13px; color:rgba(226,232,240,0.88); line-height:1.35;">
       • <b>Triggers</b>: agendadores (ex.: execução periódica para alertas, monitoramento e rotinas)<br/>
       • <b>Jobs</b>: consolidação, verificação de consistência, enriquecimento e atualização de sinais operacionais<br/>
       • <b>APIs/Serviços</b>: Drive, Sheets, BigQuery, MailApp (chamadas conforme necessidade do fluxo)<br/>
@@ -4606,11 +4732,12 @@ display: none;
 <div style="display:flex; justify-content:flex-start;">
   <div id="fgStep3" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
     <div style="font-weight:1000; letter-spacing:0.2px;">3) Motor de regras (governança & inteligência)</div>
-    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+    <div style="margin-top:6px; font-size:13px; color:rgba(226,232,240,0.88); line-height:1.35;">
       • <b>Regras de pendência</b>: etiqueta vazia, recibo = “Não”, descrição vazia<br/>
       • <b>Classificações e alertas</b>: padrões, exceções, limites, lojas ofensoras e possíveis irregularidades (quando aplicável)<br/>
       • <b>Normalização</b>: datas, valores, textos, lojas (CE####), times e filtros consistentes<br/>
-      • <b>Consolidações</b>: métricas por Loja, Time, período e tipo (Etiqueta / NF / Descrição)
+      • <b>Consolidações</b>: métricas por Loja, Time, período e tipo (Etiqueta / NF / Descrição)<br/>
+      • <b>Detecção de duplicidade e fraude “simples”</b>: transações repetidas (mesmo valor/estabelecimento/data/loja), split de compras (várias transações pequenas em sequência), categorias incompatíveis.
     </div>
   </div>
 </div>
@@ -4622,11 +4749,12 @@ display: none;
 <div style="display:flex; justify-content:flex-end;">
   <div id="fgStep4" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(34,197,94,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
     <div style="font-weight:1000; letter-spacing:0.2px;">4) Produtos (saídas visíveis)</div>
-    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+    <div style="margin-top:6px; font-size:13px; color:rgba(226,232,240,0.88); line-height:1.35;">
       • <b>Chat</b>: consultas, tabelas, rankings e resumos com explicação de “como foi calculado”<br/>
       • <b>Alertas Programados</b>: Transações e Pendências (histórico + execução programada por e-mail)<br/>
       • <b>Alertas Operacionais</b>: limites de cartões, lojas ofensoras, irregularidades e monitoramentos (quando aplicável)<br/>
       • <b>Disparo de Pendências</b>: Envio de e-mails alertando sobre pendencias, procedimento automtizado via Script<br/>
+       • <b>Indicadores de Uso</b>: Visão detalhada sobre gastos, mapeando as transações por diferentes critérios de filtros<br/>
       • <b>Radar</b>: indicadores e ranking de risco (admin, quando aplicável)<br/>
       • <b>Exportações</b>: CSV/XLSX e evidências conforme necessidade do processo
     </div>
@@ -4640,11 +4768,12 @@ display: none;
 <div style="display:flex; justify-content:flex-start;">
   <div id="fgStep5" style="position:relative; z-index:2; width:min(520px, 92%); border-radius:16px; padding:12px 14px; background:#000; color:#fff; border:1px solid rgba(181,255,32,0.55); box-shadow:0 10px 26px rgba(0,0,0,0.35);">
     <div style="font-weight:1000; letter-spacing:0.2px;">5) Evidências, auditoria & governança</div>
-    <div style="margin-top:6px; font-size:12px; color:rgba(226,232,240,0.88); line-height:1.35;">
+    <div style="margin-top:6px; font-size:13px; color:rgba(226,232,240,0.88); line-height:1.35;">
       • <b>E-mail (MailApp)</b>: envio com <b>anexo</b> (CSV/XLSX) e corpo consolidado (quando aplicável)<br/>
       • <b>Logs de execução</b>: rastreabilidade por job/alerta/rodada/quantidade de linhas e período<br/>
       • <b>RBAC</b>: controle de acesso por role/whitelist (sem expor dados indevidos)<br/>
-      • <b>Confiabilidade</b>: validações, consistência e histórico para suporte e auditoria
+      • <b>Confiabilidade</b>: validações, consistência e histórico para suporte e auditoria<br/>
+      • <b>Snapshot/Imutabilidade</b>: registro “congelado” da rodada (txKeys + hash do dataset/anexo) para prova de evidência
     </div>
   </div>
 </div>
@@ -4658,6 +4787,232 @@ display: none;
   </main>
 
 </div> <!-- fecha #fluxogramaView -->
+
+<!-- Modal full-screen: Fluxograma detalhado (SVG) -->
+<div id="vektor_fluxoDetModal" class="hidden" aria-hidden="true">
+  <div id="vektor_fluxoDetBackdrop"></div>
+
+  <div id="vektor_fluxoDetPanel" role="dialog" aria-modal="true">
+    <div id="vektor_fluxoDetHeader">
+      <div>
+        <div id="vektor_fluxoDetTitle">Fluxograma detalhado — Arquitetura Vektor</div>
+        <div id="vektor_fluxoDetSub">Use +/– para zoom.</div>
+      </div>
+
+      <div id="vektor_fluxoDetActions">
+        <button type="button" class="vektor_fluxoDetBtn" onclick="vektorFluxoDetZoom_(-0.15)">–</button>
+        <button type="button" class="vektor_fluxoDetBtn" onclick="vektorFluxoDetZoom_(+0.15)">+</button>
+        <button type="button" class="vektor_fluxoDetBtn" onclick="vektorFluxoDetZoomReset_()">100%</button>
+        <button id="vektor_fluxoDetClose" type="button" onclick="vektorCloseFluxogramaDetalhado_()" title="Fechar">×</button>
+      </div>
+    </div>
+
+    <div id="vektor_fluxoDetBody">
+      <div id="vektor_fluxoDetStageWrap">
+        <div id="vektor_fluxoDetStage">
+          <!-- SVG do fluxograma detalhado (vetorial / sem imagem externa) -->
+          <svg id="vektor_fluxoDetSvg" viewBox="0 0 1600 1300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Fluxograma detalhado do Vektor">
+            <defs>
+              <style>
+                .tTitle{ font: 800 16px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill:#0b1220; }
+                .tSub{ font: 700 12px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill:#334155; }
+                .tTxt{ font: 700 12px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill:#0f172a; }
+                .tSmall{ font: 700 11px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill:#0f172a; }
+                .box{ rx:16; ry:16; fill:#ffffff; stroke:#cbd5e1; stroke-width:1.2; }
+                .boxDark{ rx:16; ry:16; fill:#0b1220; stroke:#0b1220; stroke-width:1.2; }
+                .capBlue{ fill:#061a3a; }
+                .capOrange{ fill:#c2410c; }
+                .capGreen{ fill:#166534; }
+                .capLime{ fill:#b5ff20; }
+                .capTxt{ font: 1000 12px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill:#ffffff; }
+                .capTxtDark{ font: 1000 12px system-ui, -apple-system, Segoe UI, Roboto, Arial; fill:#0b1220; }
+                .line{ stroke:#0f172a; stroke-width:2; fill:none; opacity:.75; }
+                .lineG{ stroke:#16a34a; stroke-width:2.4; fill:none; opacity:.85; }
+              </style>
+
+              <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                <path d="M0,0 L9,3 L0,6 Z" fill="#0f172a"/>
+              </marker>
+              <marker id="arrG" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                <path d="M0,0 L9,3 L0,6 Z" fill="#16a34a"/>
+              </marker>
+            </defs>
+
+            <!-- ========= TOPO: Usuário ========= -->
+            <circle cx="800" cy="70" r="28" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.2"/>
+            <text x="800" y="76" text-anchor="middle" class="tTxt">Usuário</text>
+
+            <!-- ========= BLOCO: Entrada e Navegação ========= -->
+            <rect x="120" y="130" width="560" height="190" class="box"/>
+            <rect x="120" y="130" width="560" height="34" rx="16" ry="16" class="capBlue"/>
+            <text x="140" y="152" class="capTxt">Entrada e Navegação</text>
+
+            <rect x="140" y="184" width="180" height="50" rx="12" ry="12" fill="#0b3a7a" opacity="0.95"/>
+            <text x="230" y="214" text-anchor="middle" class="capTxt">Entrada do Usuário</text>
+
+            <rect x="340" y="178" width="320" height="132" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <text x="360" y="202" class="tSmall">• Chat (consulta + comandos)</text>
+            <text x="360" y="222" class="tSmall">• Páginas dedicadas (Alertas / Pendências)</text>
+            <text x="360" y="242" class="tSmall">• Filtros (período, loja, regional)</text>
+            <text x="360" y="262" class="tSmall">• Ações guiadas (botões + modais)</text>
+            <text x="360" y="282" class="tSmall">• Perfil de acesso (admin / usuário)</text>
+
+            <!-- ========= BLOCO: Arquitetura GAS ========= -->
+            <rect x="920" y="130" width="560" height="270" class="box"/>
+            <rect x="920" y="130" width="560" height="34" rx="16" ry="16" class="capBlue"/>
+            <text x="940" y="152" class="capTxt">Arquitetura GAS</text>
+
+            <rect x="980" y="190" width="180" height="44" rx="12" ry="12" fill="#0b3a7a" opacity="0.95"/>
+            <text x="1070" y="218" text-anchor="middle" class="capTxt">Backend Apps Script</text>
+
+            <rect x="1220" y="190" width="200" height="44" rx="12" ry="12" fill="#0b3a7a" opacity="0.95"/>
+            <text x="1320" y="218" text-anchor="middle" class="capTxt">Chamada ao Backend</text>
+
+            <rect x="980" y="250" width="440" height="124" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <text x="1000" y="274" class="tSmall">• Validação / RBAC</text>
+            <text x="1000" y="294" class="tSmall">• Orquestração (jobs, envios, exportações)</text>
+            <text x="1000" y="314" class="tSmall">• Logs e rastreabilidade</text>
+            <text x="1000" y="344" class="tSmall">• Contrato controlado: google.script.run</text>
+
+            <!-- ========= BLOCO: Camada de Aplicação ========= -->
+            <rect x="520" y="370" width="560" height="180" class="box"/>
+            <rect x="520" y="370" width="560" height="34" rx="16" ry="16" class="capBlue"/>
+            <text x="540" y="392" class="capTxt">Camada de Aplicação (Web App)</text>
+
+            <rect x="540" y="424" width="160" height="46" rx="12" ry="12" fill="#0b3a7a" opacity="0.95"/>
+            <text x="620" y="452" text-anchor="middle" class="capTxt">Frontend Web App</text>
+
+            <rect x="720" y="424" width="340" height="106" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <text x="740" y="448" class="tSmall">• Normalização e parsing</text>
+            <text x="740" y="468" class="tSmall">• Controle de estado (views/modais)</text>
+            <text x="740" y="488" class="tSmall">• Renderização (KPIs, gráficos, tabelas)</text>
+            <text x="740" y="508" class="tSmall">• Confirmação explícita prévia (envios)</text>
+
+            <!-- ========= BLOCO: Fontes de Dados e Históricos ========= -->
+            <rect x="120" y="600" width="820" height="370" class="box"/>
+            <rect x="120" y="600" width="820" height="34" rx="16" ry="16" class="capBlue"/>
+            <text x="140" y="622" class="capTxt">Fontes de Dados & Históricos</text>
+
+            <rect x="150" y="670" width="220" height="50" rx="12" ry="12" fill="#0b3a7a" opacity="0.95"/>
+            <text x="260" y="700" text-anchor="middle" class="capTxt">Fontes de Dados</text>
+
+            <rect x="150" y="740" width="260" height="120" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <text x="170" y="766" class="tSmall">• Fonte operacional + histórico</text>
+
+            <rect x="150" y="880" width="260" height="80" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <text x="170" y="906" class="tSmall">Operacional (AS-IS)</text>
+            <text x="170" y="928" class="tSmall">• BaseClara (Sheets)</text>
+            <text x="170" y="950" class="tSmall">• Acessos / mapeamentos</text>
+
+            <rect x="440" y="880" width="260" height="80" rx="14" ry="14" fill="#fff7ed" stroke="#fdba74"/>
+            <text x="460" y="906" class="tSmall">Escalabilidade (TO-BE)</text>
+            <text x="460" y="928" class="tSmall">• BigQuery / API Clara</text>
+            <text x="460" y="950" class="tSmall">• Consolidação / trilhas</text>
+
+            <rect x="720" y="880" width="200" height="80" rx="14" ry="14" fill="#ecfdf5" stroke="#86efac"/>
+            <text x="740" y="906" class="tSmall">Históricos / Logs</text>
+            <text x="740" y="928" class="tSmall">• HIST_* / auditoria</text>
+            <text x="740" y="950" class="tSmall">• Execuções / envios</text>
+
+            <!-- ========= BLOCO: Camada Transacional ========= -->
+            <rect x="980" y="600" width="500" height="170" class="box"/>
+            <rect x="980" y="600" width="500" height="34" rx="16" ry="16" class="capOrange"/>
+            <text x="1000" y="622" class="capTxt">Camada Transacional</text>
+
+            <rect x="1010" y="660" width="180" height="44" rx="12" ry="12" fill="#c2410c" opacity="0.95"/>
+            <text x="1100" y="688" text-anchor="middle" class="capTxt">Ações Transacionais</text>
+
+            <rect x="1210" y="650" width="250" height="110" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <text x="1230" y="676" class="tSmall">• Envio e-mails (loja/regional/CC)</text>
+            <text x="1230" y="696" class="tSmall">• Alertas programados (rotinas)</text>
+            <text x="1230" y="716" class="tSmall">• Histórico / auditoria (logs)</text>
+
+            <!-- ========= BLOCO: Camada Analítica ========= -->
+            <rect x="980" y="800" width="500" height="160" class="box"/>
+            <rect x="980" y="800" width="500" height="34" rx="16" ry="16" class="capOrange"/>
+            <text x="1000" y="822" class="capTxt">Camada Analítica</text>
+
+            <rect x="1010" y="860" width="220" height="44" rx="12" ry="12" fill="#c2410c" opacity="0.95"/>
+            <text x="1120" y="888" text-anchor="middle" class="capTxt">Motor Analítico (det.)</text>
+
+            <rect x="1240" y="850" width="230" height="110" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <text x="1260" y="876" class="tSmall">• Elegibilidade e classificação</text>
+            <text x="1260" y="896" class="tSmall">• Cruzamento multidimensional</text>
+            <text x="1260" y="916" class="tSmall">• Indicadores + séries temporais</text>
+            <text x="1260" y="936" class="tSmall">• Regras explícitas auditáveis</text>
+
+                        <!-- ========= BLOCO: Governança Operacional ========= -->
+            <rect x="1010" y="950" width="470" height="108" class="box"/>
+            <rect x="1010" y="950" width="470" height="34" rx="16" ry="16" class="capGreen"/>
+            <text x="1030" y="972" class="capTxt">Governança Operacional</text>
+
+            <rect x="1040" y="998" width="220" height="48" rx="12" ry="12" fill="#b5ff20" opacity="0.95"/>
+            <text x="1150" y="1028" text-anchor="middle" class="capTxtDark">Governança (prévia)</text>
+
+            <rect x="1280" y="990" width="175" height="58" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <text x="1298" y="1014" class="tSmall">• Prévia analítica</text>
+            <text x="1298" y="1034" class="tSmall">• Seleção + registro</text>
+
+            <!-- ========= BLOCO: Saída / Visualização ========= -->
+            <rect x="250" y="1090" width="1230" height="185" class="box"/>
+            <rect x="250" y="1090" width="1230" height="34" rx="16" ry="16" class="capGreen"/>
+            <text x="270" y="1112" class="capTxt">Saída / Renderização</text>
+
+            <!-- UI / Visual -->
+            <rect x="285" y="1140" width="360" height="102" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <rect x="305" y="1154" width="185" height="36" rx="12" ry="12" fill="#16a34a" opacity="0.95"/>
+            <text x="397" y="1177" text-anchor="middle" class="capTxt">UI / Visual</text>
+            <text x="305" y="1206" class="tSmall">• KPIs e cards (ciclo, pendências, irregularidades)</text>
+            <text x="305" y="1224" class="tSmall">• Tabelas interativas + drilldown por loja/time/estab.</text>
+
+            <!-- Operacional -->
+            <rect x="685" y="1140" width="390" height="102" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <rect x="705" y="1154" width="190" height="36" rx="12" ry="12" fill="#16a34a" opacity="0.95"/>
+            <text x="800" y="1177" text-anchor="middle" class="capTxt">Operacional</text>
+            <text x="705" y="1206" class="tSmall">• Filtros persistentes + macro visões + aplicar/salvar</text>
+            <text x="705" y="1224" class="tSmall">• Alertas, disparos assistidos e escalonamento por SLA</text>
+
+            <!-- Evidências / Auditoria -->
+            <rect x="1115" y="1140" width="330" height="102" rx="14" ry="14" fill="#f8fafc" stroke="#e2e8f0"/>
+            <rect x="1135" y="1154" width="205" height="36" rx="12" ry="12" fill="#16a34a" opacity="0.95"/>
+            <text x="1237" y="1177" text-anchor="middle" class="capTxt">Evidências / Auditoria</text>
+            <text x="1135" y="1206" class="tSmall">• Exports, rodadas, histórico, logs e notificações</text>
+            <text x="1135" y="1224" class="tSmall">• Status, acesso, trilha e auditoria operacional</text>
+
+            <!-- Linha-resumo inferior -->
+            <text x="285" y="1260" class="tSmall">Inclui: período/loja/time/categoria, registro de quem disparou/quando/quantidade/resultado, histórico SENT/FAIL, destinatários, anexos e evidências vinculadas à rodada.</text>
+
+            <!-- ========= CONEXÕES (setas) ========= -->
+            <!-- Usuário -> Entrada e Navegação -->
+            <path d="M800,98 L800,120 L400,120 L400,130" class="line" marker-end="url(#arr)"/>
+            <!-- Usuário -> Arquitetura GAS -->
+            <path d="M800,98 L800,120 L1200,120 L1200,130" class="line" marker-end="url(#arr)"/>
+
+            <!-- Entrada -> App -->
+            <path d="M680,240 L760,240 L760,370" class="lineG" marker-end="url(#arrG)"/>
+            <!-- GAS -> App -->
+            <path d="M1200,400 L1200,450 L1080,450" class="lineG" marker-end="url(#arrG)"/>
+
+            <!-- Fontes -> GAS -->
+            <path d="M410,920 L760,920 L760,520 L980,520 L980,250" class="line" marker-end="url(#arr)"/>
+
+            <!-- App -> Transacional -->
+            <path d="M1080,550 L1080,600" class="lineG" marker-end="url(#arrG)"/>
+
+            <!-- App -> Analítica -->
+            <path d="M1000,550 L1340,550 L1340,800" class="lineG" marker-end="url(#arrG)"/>
+
+            <!-- Governança -> Saída -->
+            <path d="M1150,1058 L1150,1090" class="lineG" marker-end="url(#arrG)"/>
+
+            <!-- Transacional -> Históricos -->
+            <path d="M1100,770 L1100,880 L920,880" class="line" marker-end="url(#arr)"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
  <!-- Modal: Como acontece a análise? (Radar) -->
 <div id="radarAnaliseModal"
@@ -6124,6 +6479,69 @@ function vektorShowFluxogramaView_() {
 
   if (radarView) radarView.classList.remove("is-open");
 }
+
+// =========================
+// Fluxograma detalhado (modal full-screen / SVG / zoom)
+// =========================
+window.__vektorFluxoDetZoom = window.__vektorFluxoDetZoom || 1;
+
+function vektorFluxoDetApplyZoom_(){
+  const st = document.getElementById("vektor_fluxoDetStage");
+  if (!st) return;
+  st.style.transform = `scale(${window.__vektorFluxoDetZoom || 1})`;
+}
+
+function vektorFluxoDetZoom_(delta){
+  window.__vektorFluxoDetZoom = Math.max(0.45, Math.min(2.8, (window.__vektorFluxoDetZoom || 1) + delta));
+  vektorFluxoDetApplyZoom_();
+}
+
+function vektorFluxoDetZoomReset_(){
+  window.__vektorFluxoDetZoom = 1;
+  vektorFluxoDetApplyZoom_();
+}
+
+function vektorOpenFluxogramaDetalhado_(){
+  const m = document.getElementById("vektor_fluxoDetModal");
+  if (!m) return;
+
+  m.classList.remove("hidden");
+  m.style.display = "block";
+  m.setAttribute("aria-hidden", "false");
+
+  // sempre abre em 100% (para UX previsível)
+  try { vektorFluxoDetZoomReset_(); } catch(_) {}
+}
+
+function vektorCloseFluxogramaDetalhado_(){
+  const m = document.getElementById("vektor_fluxoDetModal");
+  if (!m) return;
+
+  m.classList.add("hidden");
+  m.style.display = "none";
+  m.setAttribute("aria-hidden", "true");
+}
+
+// backdrop fecha
+(function bindFluxoDetBackdropOnce_(){
+  const b = document.getElementById("vektor_fluxoDetBackdrop");
+  if (!b || b.__bound) return;
+  b.__bound = true;
+  b.addEventListener("click", function(){ vektorCloseFluxogramaDetalhado_(); });
+})();
+
+// ESC fecha
+(function bindFluxoDetEscOnce_(){
+  if (window.__vektorFluxoDetEscBound) return;
+  window.__vektorFluxoDetEscBound = true;
+
+  document.addEventListener("keydown", function(ev){
+    if (ev && ev.key === "Escape") {
+      const m = document.getElementById("vektor_fluxoDetModal");
+      if (m && !m.classList.contains("hidden")) vektorCloseFluxogramaDetalhado_();
+    }
+  });
+})();
 
 // ===============================
 // ENVIO DE PENDÊNCIAS (view + modal + fluxo)
