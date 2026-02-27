@@ -625,6 +625,22 @@ display: none;
   text-align: center !important;
 }
 
+/* ✅ Multi-select: opções com texto branco e fundo preto */
+#analiseGastos_selTime option,
+#analiseGastos_selLoja option,
+#analiseGastos_selCategoria option{
+  color:#ffffff !important;
+  background:#020f2b !important;
+}
+
+/* ✅ Opção selecionada: realce para ficar legível */
+#analiseGastos_selTime option:checked,
+#analiseGastos_selLoja option:checked,
+#analiseGastos_selCategoria option:checked{
+  background:#0b2a5a !important;  /* azul escuro (realce) */
+  color:#ffffff !important;
+}
+
 /* cards */
 .analiseGastosCard{
   position: relative;
@@ -1057,6 +1073,216 @@ display: none;
 }
 
 #analiseGastos_estabPivotMsg{
+  padding: 18px;
+  text-align:center;
+  font-size:13px;
+  font-weight:900;
+  color:#475569;
+}
+
+/* =========================
+   Modal claro - Mediana por Categoria (Análise de Gastos)
+   ========================= */
+#analiseGastos_medModal{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+
+  /* ✅ garante que o painel centralizado não “estoure” */
+  padding: 0;
+}
+
+#analiseGastos_medModal.hidden{ display:none !important; }
+
+#analiseGastos_medModalBackdrop{
+  position:absolute;
+  inset:0;
+  background: rgba(15,23,42,0.45);
+  backdrop-filter: blur(2px);
+}
+
+#analiseGastos_medModalPanel{
+  position: absolute;
+  left: 50%;
+  top: 76px;
+  transform: translateX(-50%);
+
+  width: min(980px, calc(100vw - 32px));
+  max-height: calc(100vh - 140px);
+
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 18px;
+  box-shadow: 0 28px 60px rgba(2,6,23,0.28);
+
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+#analiseGastos_medModalHeader{
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid #e2e8f0;
+  padding: 12px 14px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+#analiseGastos_medModalTitle{
+  font-size: 16px;
+  font-weight: 1000;
+  color:#0f172a;
+  line-height:1.15;
+}
+#analiseGastos_medModalSub{
+  margin-top:4px;
+  font-size:12px;
+  font-weight:800;
+  color:#475569;
+  line-height:1.25;
+}
+
+#analiseGastos_medModalClose{
+  border:1px solid #cbd5e1;
+  background:#fff;
+  color:#0f172a;
+  border-radius:12px;
+  min-width:40px;
+  height:40px;
+  font-size:22px;
+  font-weight:900;
+  line-height:1;
+  cursor:pointer;
+}
+#analiseGastos_medModalClose:hover{
+  border-color:#93c5fd;
+  background:#eff6ff;
+}
+
+#analiseGastos_medModalBody{
+  padding: 12px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-height:0;
+  flex:1;
+}
+
+#analiseGastos_medCards{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap:12px;
+}
+@media (max-width: 920px){
+  #analiseGastos_medCards{ grid-template-columns: 1fr; }
+}
+
+.analiseGastosMedCard{
+  background:#ffffff;
+  border:1px solid #e2e8f0;
+  border-radius:14px;
+  box-shadow:0 10px 22px rgba(0,0,0,0.06);
+  padding:12px;
+  overflow:hidden;
+  position: relative;
+}
+.analiseGastosMedCard::before{
+  content:"";
+  position:absolute;
+  inset:auto -10% -10% -10%;
+  height:62%;
+  background:
+    radial-gradient(120% 90% at 0% 100%, rgba(181,255,32,0.20) 0%, rgba(181,255,32,0.08) 42%, rgba(181,255,32,0.00) 70%);
+  pointer-events:none;
+  z-index:0;
+}
+.analiseGastosMedCard > *{ position:relative; z-index:1; }
+
+.analiseGastosMedCardValue{
+  margin-top:6px;
+  font-size:20px;
+  font-weight:1100;
+  color:#0b1220;
+}
+.analiseGastosMedCardHint{
+  margin-top:6px;
+  font-size:12px;
+  font-weight:800;
+  color:#475569;
+  line-height:1.25;
+}
+
+.analiseGastosMedCard{ padding:10px; }
+#analiseGastos_medCards{ gap:10px; }
+#analiseGastos_medModalBody{ gap:10px; }
+
+.analiseGastosMedCardHead{
+  background:#061a3a;      /* azul marinho */
+  color:#ffffff;           /* texto branco */
+  border-radius:12px;
+  padding:8px 10px;
+  font-size:12px;
+  font-weight:1100;
+  letter-spacing:0.2px;
+}
+
+#analiseGastos_medTableWrap{
+  flex:1;
+  min-height:0;
+  border:1px solid #cbd5e1;
+  border-radius:14px;
+  background:#ffffff;
+  overflow:auto;
+}
+
+#analiseGastos_medTable{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  color:#0f172a;
+  background:#fff;
+}
+
+#analiseGastos_medTable thead th{
+  position: sticky;
+  top: 0;
+  z-index: 2;
+
+  background: #061a3a;     /* azul marinho */
+  color: #ffffff;          /* texto branco */
+
+  border-bottom: 2px solid rgba(181,255,32,0.55);
+  border-right: 1px solid rgba(255,255,255,0.08);
+
+  padding: 10px 10px;
+  font-size: 12px;
+  font-weight: 1000;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#analiseGastos_medTable tbody td{
+  border-right: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 9px 10px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+#analiseGastos_medTable tbody tr:nth-child(even) td{
+  background:#f8fafc;
+}
+
+#analiseGastos_medTable td.num{
+  text-align:right;
+  font-weight:900;
+  white-space: nowrap;
+}
+
+#analiseGastos_medMsg{
   padding: 18px;
   text-align:center;
   font-size:13px;
@@ -2462,6 +2688,10 @@ display: none;
 
           <!-- Direita superior: botões -->
           <div style="display:flex; align-items:flex-start; gap:8px; margin-left:auto;">
+            <button id="analiseGastos_btnMediana" type="button"
+                  style="height:36px; padding:0 14px; border:1px solid rgba(148,163,184,0.35); border-radius:10px; font-weight:900; font-size:12px; background:rgba(255,255,255,0.06); color:#ffffff; cursor:pointer; white-space:nowrap;">
+            Média de Gastos
+          </button>
             <button id="analiseGastos_btnBuscar" type="button"
                     style="height:36px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:12px; background:#006b2c; color:#ffffff; cursor:pointer; white-space:nowrap;">
               Buscar
@@ -2513,7 +2743,7 @@ display: none;
           <!-- Time -->
           <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 170px; min-width:170px;">
             <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Time</div>
-            <select id="analiseGastos_selTime"
+            <select id="analiseGastos_selTime" multiple size="1"
                     style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
               <option value="">Carregue os filtros...</option>
             </select>
@@ -2522,7 +2752,7 @@ display: none;
           <!-- Loja -->
           <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 160px; min-width:160px;">
             <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Loja</div>
-            <select id="analiseGastos_selLoja"
+            <select id="analiseGastos_selLoja" multiple size="1"
                     style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
               <option value="">Carregue os filtros...</option>
             </select>
@@ -2531,7 +2761,7 @@ display: none;
           <!-- Categoria -->
           <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 200px; min-width:200px;">
             <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Categoria</div>
-            <select id="analiseGastos_selCategoria"
+            <select id="analiseGastos_selCategoria" multiple size="1"
                     style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
               <option value="">Carregue os filtros...</option>
             </select>
@@ -2691,6 +2921,66 @@ display: none;
             </div>
           </div>
         </div>
+
+        <!-- Modal: Mediana por Categoria (respeita filtros e período) -->
+<div id="analiseGastos_medModal" class="hidden" aria-hidden="true">
+  <div id="analiseGastos_medModalBackdrop"></div>
+
+  <div id="analiseGastos_medModalPanel" role="dialog" aria-modal="true" aria-labelledby="analiseGastos_medModalTitle">
+    <div id="analiseGastos_medModalHeader">
+      <div>
+        <div id="analiseGastos_medModalTitle">Resumo Estatístico de Gastos</div>
+        <div id="analiseGastos_medModalSub">
+          Considera período e filtros (Time/Loja/Categoria) aplicados na tela principal.
+        </div>
+      </div>
+
+      <button id="analiseGastos_medModalClose" type="button" title="Fechar">×</button>
+    </div>
+
+    <div id="analiseGastos_medModalBody">
+      <!-- Cards premium -->
+
+      <div id="analiseGastos_medCards">
+        <div class="analiseGastosMedCard">
+          <div class="analiseGastosMedCardHead">Mediana</div>
+          <div id="analiseGastos_medCardMedian" class="analiseGastosMedCardValue">—</div>
+          <div class="analiseGastosMedCardHint">Valor “típico” do período: metade das compras fica acima e metade abaixo.</div>
+        </div>
+
+        <div class="analiseGastosMedCard">
+          <div class="analiseGastosMedCardHead">Média</div>
+          <div id="analiseGastos_medCardMean" class="analiseGastosMedCardValue">—</div>
+          <div class="analiseGastosMedCardHint">Total dividido pela quantidade de compras (pode subir muito com compras muito altas).</div>
+        </div>
+
+        <div class="analiseGastosMedCard">
+          <div class="analiseGastosMedCardHead">Normalização</div>
+          <div id="analiseGastos_medCardNorm" class="analiseGastosMedCardValue">—</div>
+          <div class="analiseGastosMedCardHint">Mostra a mediana numa escala de 0 a 1 usando o menor e o maior valor do período.</div>
+        </div>
+      </div>
+
+      <!-- Tabela -->
+      <div id="analiseGastos_medTableWrap">
+        <table id="analiseGastos_medTable">
+          <thead>
+            <tr>
+              <th>Loja</th>
+              <th>Categoria</th>
+              <th>Valor (mediana)</th>
+              <th>Maior valor</th>
+              <th>Menor valor</th>
+            </tr>
+          </thead>
+          <tbody id="analiseGastos_medTbody">
+            <tr><td colspan="5" id="analiseGastos_medMsg">Carregando…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
 
         <!-- Modal: Detalhe de Estabelecimentos (pivot mensal) -->
         <div id="analiseGastos_estabModal" class="hidden" aria-hidden="true">
@@ -6707,7 +6997,8 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
 
 function vektorAnaliseGastosBuscar_(){
   // ✅ sincroniza Ano/Mês -> Período antes de validar e buscar
-    try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
+  try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
+
   const dtIni = document.getElementById("analiseGastos_dtIni")?.value || "";
   const dtFim = document.getElementById("analiseGastos_dtFim")?.value || "";
 
@@ -6727,9 +7018,14 @@ function vektorAnaliseGastosBuscar_(){
   vektorAnaliseGastosEnsureMeta_(function(){
     try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
 
-    const time = document.getElementById("analiseGastos_selTime")?.value || "";
-    const loja = document.getElementById("analiseGastos_selLoja")?.value || "";
-    const cat  = document.getElementById("analiseGastos_selCategoria")?.value || "";
+    const selTime = document.getElementById("analiseGastos_selTime");
+    const selLoja = document.getElementById("analiseGastos_selLoja");
+    const selCat  = document.getElementById("analiseGastos_selCategoria");
+
+    // ✅ MULTI: lê seleção como array (vazio = "Todos/Todas")
+    const time = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selTime) : [];
+    const loja = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selLoja) : [];
+    const cat  = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selCat)  : [];
 
     vektorAnaliseGastosSetBusy_(true, "Buscando dados…", "Aplicando permissões e filtros");
 
@@ -6758,9 +7054,9 @@ function vektorAnaliseGastosBuscar_(){
       .getAnaliseGastosDataset({
         dtIni: dtIni,
         dtFim: dtFim,
-        time: time,
-        loja: loja,
-        categoria: cat
+        time: time,           // ✅ array
+        loja: loja,           // ✅ array
+        categoria: cat        // ✅ array
       });
   });
 }
@@ -6795,11 +7091,60 @@ function vektorSafe_(s){
 
 function vektorBuildOptions_(selectEl, values, allLabel){
   if (!selectEl) return;
-  const vAtual = selectEl.value || "";
-  selectEl.innerHTML = `<option value="">${allLabel}</option>` + (values || [])
-    .map(v => `<option value="${vektorSafe_(v)}">${vektorSafe_(v)}</option>`)
-    .join("");
-  if (vAtual && (values || []).includes(vAtual)) selectEl.value = vAtual;
+
+  const isMulti = !!selectEl.multiple;
+  const prevSelected = isMulti
+    ? Array.from(selectEl.selectedOptions || []).map(o=>String(o.value||"")).filter(v=>v!=="")
+    : [String(selectEl.value || "")].filter(v=>v!=="");
+
+  selectEl.innerHTML =
+    `<option value="">${allLabel}</option>` +
+    (values || []).map(v => `<option value="${vektorSafe_(v)}">${vektorSafe_(v)}</option>`).join("");
+
+  if (isMulti) {
+    // se nada selecionado antes, mantém "Todos" selecionado
+    if (!prevSelected.length) {
+      selectEl.value = "";
+    } else {
+      // re-seleciona o que ainda existir
+      Array.from(selectEl.options).forEach(opt=>{
+        opt.selected = (opt.value === "") ? false : prevSelected.includes(opt.value);
+      });
+    }
+  } else {
+    const vAtual = prevSelected[0] || "";
+    if (vAtual && (values || []).includes(vAtual)) selectEl.value = vAtual;
+    else selectEl.value = "";
+  }
+}
+
+function vektorGetMultiValues_(sel){
+  if (!sel) return [];
+  if (!sel.multiple) {
+    const v = String(sel.value || "").trim();
+    return v ? [v] : [];
+  }
+  const vals = Array.from(sel.selectedOptions || [])
+    .map(o => String(o.value || "").trim())
+    .filter(v => v !== "");
+  return vals;
+}
+
+// regra do "Todos" no multi:
+// - se selecionou algo (não vazio), desmarca o ""
+// - se ficou sem nada, marca ""
+function vektorNormalizeMultiAll_(sel){
+  if (!sel || !sel.multiple) return;
+  const picked = Array.from(sel.selectedOptions || []).map(o=>String(o.value||""));
+  const hasNonAll = picked.some(v => v !== "");
+  if (hasNonAll) {
+    Array.from(sel.options).forEach(opt=>{
+      if (opt.value === "") opt.selected = false;
+    });
+  } else {
+    // garante "Todos" marcado
+    sel.value = "";
+  }
 }
 
 function vektorAnaliseGastosInitOnce_(){
@@ -6807,6 +7152,11 @@ function vektorAnaliseGastosInitOnce_(){
   __analiseGastos_inited = true;
 
   const btnBuscar = document.getElementById("analiseGastos_btnBuscar");
+
+  const btnMediana = document.getElementById("analiseGastos_btnMediana");
+  const medModal = document.getElementById("analiseGastos_medModal");
+  const medModalClose = document.getElementById("analiseGastos_medModalClose");
+  const medModalBackdrop = document.getElementById("analiseGastos_medModalBackdrop");
 
   const selTime = document.getElementById("analiseGastos_selTime");
   const selLoja = document.getElementById("analiseGastos_selLoja");
@@ -6938,6 +7288,28 @@ if (selMes) {
       vektorAnaliseGastosBuscar_();
     });
   }
+
+  // ✅ botão "Média de Gastos" (modal de MEDIANA)
+if (btnMediana && !btnMediana.__bindMedianaOpen) {
+  btnMediana.__bindMedianaOpen = true;
+  btnMediana.addEventListener("click", function(){
+    try { vektorAnaliseGastosOpenMedianaModal_(); } catch(e){ console.error(e); }
+  });
+}
+
+// ✅ fechar modal de mediana
+if (medModalClose && !medModalClose.__bindMedianaClose) {
+  medModalClose.__bindMedianaClose = true;
+  medModalClose.addEventListener("click", function(){
+    try { vektorAnaliseGastosCloseMedianaModal_(); } catch(e){ console.error(e); }
+  });
+}
+if (medModalBackdrop && !medModalBackdrop.__bindMedianaClose) {
+  medModalBackdrop.__bindMedianaClose = true;
+  medModalBackdrop.addEventListener("click", function(){
+    try { vektorAnaliseGastosCloseMedianaModal_(); } catch(e){ console.error(e); }
+  });
+}
 
   // ✅ abrir Macro Visões (garante meta/ACL carregada)
 if (btnMacro && !btnMacro.__bindMacroOpen) {
@@ -7155,46 +7527,72 @@ function vektorAnaliseGastosRebuildFilterOptions_(){
 
   if (!selTime || !selLoja || !selCat) return;
 
-  var curTime = String(selTime.value || "");
-  var curLoja = String(selLoja.value || "");
-  var curCat  = String(selCat.value || "");
+  // normaliza "Todos" no multi
+  try { vektorNormalizeMultiAll_(selTime); } catch(_) {}
+  try { vektorNormalizeMultiAll_(selLoja); } catch(_) {}
+  try { vektorNormalizeMultiAll_(selCat); } catch(_) {}
 
-  // 1) opções possíveis de LOJA respeitando Time e Categoria selecionados
+  var curTimes = vektorGetMultiValues_(selTime); // [] = todos
+  var curLojas = vektorGetMultiValues_(selLoja);
+  var curCats  = vektorGetMultiValues_(selCat);
+
+  function inSet_(arr, v){
+    if (!arr || !arr.length) return true; // vazio = todos
+    return arr.indexOf(String(v||"")) >= 0;
+  }
+
+  // 1) LOJAS possíveis respeitando Times e Cats selecionados
   var lojasSet = {};
   combos.forEach(function(c){
-    if (curTime && String(c.time || "") !== curTime) return;
-    if (curCat  && String(c.categoria || "") !== curCat) return;
+    if (!inSet_(curTimes, c.time)) return;
+    if (!inSet_(curCats,  c.categoria)) return;
     lojasSet[String(c.loja || "")] = true;
   });
-  var lojas = Object.keys(lojasSet).filter(Boolean).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); });
+  var lojas = Object.keys(lojasSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
 
-  // 2) opções possíveis de TIME respeitando Loja e Categoria selecionados
+  // 2) TIMES possíveis respeitando Lojas e Cats selecionados
   var timesSet = {};
   combos.forEach(function(c){
-    if (curLoja && String(c.loja || "") !== curLoja) return;
-    if (curCat  && String(c.categoria || "") !== curCat) return;
+    if (!inSet_(curLojas, c.loja)) return;
+    if (!inSet_(curCats,  c.categoria)) return;
     timesSet[String(c.time || "")] = true;
   });
-  var times = Object.keys(timesSet).filter(Boolean).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); });
+  var times = Object.keys(timesSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
 
-  // 3) opções possíveis de CATEGORIA respeitando Time e Loja selecionados
+  // 3) CATEGORIAS possíveis respeitando Times e Lojas selecionados
   var catsSet = {};
   combos.forEach(function(c){
-    if (curTime && String(c.time || "") !== curTime) return;
-    if (curLoja && String(c.loja || "") !== curLoja) return;
+    if (!inSet_(curTimes, c.time)) return;
+    if (!inSet_(curLojas, c.loja)) return;
     catsSet[String(c.categoria || "")] = true;
   });
-  var cats = Object.keys(catsSet).filter(Boolean).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); });
+  var cats = Object.keys(catsSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
 
-  // Rebuild preservando seleção se ainda existir
+  // rebuild preservando o que ainda existir
   vektorBuildOptions_(selTime, times, "Todos");
   vektorBuildOptions_(selLoja, lojas, "Todas");
-  vektorBuildOptions_(selCat, cats, "Todas");
+  vektorBuildOptions_(selCat,  cats,  "Todas");
 
-  // Se a seleção antiga ficou inválida, limpa
-  if (curTime && times.indexOf(curTime) < 0) selTime.value = "";
-  if (curLoja && lojas.indexOf(curLoja) < 0) selLoja.value = "";
-  if (curCat  && cats.indexOf(curCat) < 0) selCat.value = "";
+  // remove seleções inválidas (multi)
+  function dropInvalid_(sel, allowed){
+    if (!sel || !sel.multiple) return;
+    const allowedSet = {};
+    allowed.forEach(v=>allowedSet[String(v)] = true);
+
+    let any = false;
+    Array.from(sel.options).forEach(opt=>{
+      if (opt.value === "") return;
+      if (opt.selected && !allowedSet[opt.value]) opt.selected = false;
+      if (opt.selected) any = true;
+    });
+
+    // se não sobrou nada, volta para "Todos"
+    if (!any) sel.value = "";
+  }
+
+  dropInvalid_(selTime, times);
+  dropInvalid_(selLoja, lojas);
+  dropInvalid_(selCat,  cats);
 }
 
 /* --------- Apply (filtros locais + sort + render cards/tabela) --------- */
@@ -7211,9 +7609,9 @@ function vektorAnaliseGastosApply_(){
 
   const dtIni = document.getElementById("analiseGastos_dtIni")?.value || "";
   const dtFim = document.getElementById("analiseGastos_dtFim")?.value || "";
-  const time  = document.getElementById("analiseGastos_selTime")?.value || "";
-  const loja  = document.getElementById("analiseGastos_selLoja")?.value || "";
-  const cat   = document.getElementById("analiseGastos_selCategoria")?.value || "";
+  const time = vektorGetMultiValues_(document.getElementById("analiseGastos_selTime"));
+  const loja = vektorGetMultiValues_(document.getElementById("analiseGastos_selLoja"));
+  const cat  = vektorGetMultiValues_(document.getElementById("analiseGastos_selCategoria"));
 
   const ano   = document.getElementById("analiseGastos_selAno")?.value || "";
   const mes   = document.getElementById("analiseGastos_selMes")?.value || ""; // "01".."12"
@@ -7223,9 +7621,9 @@ function vektorAnaliseGastosApply_(){
     const d = String(t.dataISO || "");
     if (dtIni && d < dtIni) return false;
     if (dtFim && d > dtFim) return false;
-    if (time && String(t.time || "") !== String(time)) return false;
-    if (loja && String(t.loja || "") !== String(loja)) return false;
-    if (cat  && String(t.categoria || "") !== String(cat)) return false;
+    if (time.length && time.indexOf(String(t.time||"")) < 0) return false;
+    if (loja.length && loja.indexOf(String(t.loja||"")) < 0) return false;
+    if (cat.length  && cat.indexOf(String(t.categoria||"")) < 0) return false;
     if (ano && String(d).slice(0,4) !== String(ano)) return false;
     if (mes && String(d).slice(5,7) !== String(mes)) return false;
     return true;
@@ -7349,6 +7747,102 @@ function vektorAnaliseGastosRender_(tx, meta){
         <td style="text-align:left;">${vektorSafe_(t.estabelecimento||"—")}</td>
         <td style="text-align:right;font-weight:900;">${vektorFmtBRL_(t.valor||0)}</td>
         <td style="text-align:left;">${vektorSafe_(t.descricao||"—")}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function vektorAnaliseGastosOpenMedianaModal_(){
+  var modal = document.getElementById("analiseGastos_medModal");
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  modal.style.display = "block";
+  modal.setAttribute("aria-hidden", "false");
+
+  // mensagem inicial
+  var tb = document.getElementById("analiseGastos_medTbody");
+  if (tb) tb.innerHTML = `<tr><td colspan="5" id="analiseGastos_medMsg">Carregando…</td></tr>`;
+
+  vektorAnaliseGastosLoadMedianas_();
+}
+
+function vektorAnaliseGastosCloseMedianaModal_(){
+  var modal = document.getElementById("analiseGastos_medModal");
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  modal.style.display = "none";
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function vektorAnaliseGastosLoadMedianas_(){
+  const dtIni = document.getElementById("analiseGastos_dtIni")?.value || "";
+  const dtFim = document.getElementById("analiseGastos_dtFim")?.value || "";
+
+  if (!dtIni || !dtFim || dtIni > dtFim) {
+    var tb = document.getElementById("analiseGastos_medTbody");
+    if (tb) tb.innerHTML = `<tr><td colspan="5" id="analiseGastos_medMsg">Defina um período válido na tela principal.</td></tr>`;
+    return;
+  }
+
+  const time = vektorGetMultiValues_(document.getElementById("analiseGastos_selTime"));
+  const loja = vektorGetMultiValues_(document.getElementById("analiseGastos_selLoja"));
+  const cat  = vektorGetMultiValues_(document.getElementById("analiseGastos_selCategoria"));
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.ok) {
+        var tb = document.getElementById("analiseGastos_medTbody");
+        if (tb) tb.innerHTML = `<tr><td colspan="5" id="analiseGastos_medMsg" style="color:#b91c1c;">Falha: ${vektorSafe_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
+        return;
+      }
+      vektorAnaliseGastosRenderMedianas_(res);
+    })
+    .withFailureHandler(function(err){
+      var tb = document.getElementById("analiseGastos_medTbody");
+      if (tb) tb.innerHTML = `<tr><td colspan="5" id="analiseGastos_medMsg" style="color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
+    })
+    .getAnaliseGastosMedianas({
+      dtIni: dtIni,
+      dtFim: dtFim,
+      time: time,
+      loja: loja,
+      categoria: cat
+    });
+}
+
+function vektorAnaliseGastosRenderMedianas_(res){
+  const rows = Array.isArray(res.rows) ? res.rows : [];
+  const m = res.metrics || {};
+
+  const elMed = document.getElementById("analiseGastos_medCardMedian");
+  const elAvg = document.getElementById("analiseGastos_medCardMean");
+  const elNor = document.getElementById("analiseGastos_medCardNorm");
+
+  if (elMed) elMed.textContent = vektorFmtBRL_(m.median || 0);
+  if (elAvg) elAvg.textContent = vektorFmtBRL_(m.mean || 0);
+
+  // normalização 0..1 (render como % também)
+  const norm = Number(m.normalization || 0);
+  if (elNor) elNor.textContent = (isFinite(norm) ? (norm.toFixed(3) + " (" + Math.round(norm*100) + "%)") : "—");
+
+  const tb = document.getElementById("analiseGastos_medTbody");
+  if (!tb) return;
+
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="5" id="analiseGastos_medMsg">Sem dados para o período/filtros.</td></tr>`;
+    return;
+  }
+
+  tb.innerHTML = rows.map(r=>{
+    return `
+      <tr>
+        <td style="text-align:center;font-weight:1000;">${vektorSafe_(r.loja || "—")}</td>
+        <td style="text-align:left;font-weight:900;">${vektorSafe_(r.categoria || "—")}</td>
+        <td class="num">${vektorFmtBRL_(r.mediana || 0)}</td>
+        <td class="num">${vektorFmtBRL_(r.max || 0)}</td>
+        <td class="num">${vektorFmtBRL_(r.min || 0)}</td>
       </tr>
     `;
   }).join("");
@@ -8053,8 +8547,14 @@ function vektorAnaliseGastosOpenMacroModal_(){
   m.classList.remove("hidden");
   m.style.display = "block";
 
-  // primeira carga ao abrir
-  vektorAnaliseGastosMacroLoad_();
+  // ✅ só carrega se ainda não houver resultado anterior
+  // (evita “carregamento” desnecessário ao reabrir)
+  if (!window.__analiseGastosMacroLastRes && !window.__analiseGastosMacroLoading) {
+    vektorAnaliseGastosMacroLoad_();
+  } else {
+    // garante overlay desligado ao reabrir
+    try { vektorAnaliseGastosMacroSetLoading_(false); } catch(_) {}
+  }
 }
 
 function vektorAnaliseGastosCloseMacroModal_(){
@@ -8068,6 +8568,7 @@ function vektorAnaliseGastosCloseMacroModal_(){
 function vektorAnaliseGastosMacroSetLoading_(on){
   var el = document.getElementById("analiseGastos_macro_loading");
   if (!el) return;
+  window.__analiseGastosMacroLoading = !!on;
   if (on) {
     el.classList.remove("hidden");
     el.style.display = "block";
@@ -8095,6 +8596,9 @@ function vektorAnaliseGastosMacroLoad_(){
         vektorAnaliseGastosMacroRenderEmpty_("Falha: " + vektorSafe_(res && res.error ? res.error : "erro desconhecido"));
         return;
       }
+
+      // ✅ cache do último resultado para não recarregar ao reabrir modal
+      window.__analiseGastosMacroLastRes = res;
 
       var hintL = document.getElementById("analiseGastos_macro_hintLojas");
       var hintC = document.getElementById("analiseGastos_macro_hintCategorias");
