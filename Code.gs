@@ -795,10 +795,6 @@ function vektorVertexGetUsageSummary_() {
   }
 }
 
-// ✅ Ajuste manual da cotação USD->BRL (não vou chutar valor real)
-// Defina aqui (ex.: 5.00) ou, se preferir, busque de uma fonte e grave em Properties.
-var VEKTOR_USD_BRL_FX = 5.00;
-
 function vektorFmtBrlFromUsd_(usd){
   usd = Number(usd || 0);
 
@@ -806,13 +802,18 @@ function vektorFmtBrlFromUsd_(usd){
   var fx = vektorFxGetUsdBrl_();
   if (!fx) return "R$ —";
 
-  var brl = usd * fx;
-  return "R$ " + brl.toFixed(4);
+  var s = (brl < 0.01) ? brl.toFixed(4) : brl.toFixed(2);
+  s = s.replace(/0+$/,"").replace(/\.$/,"");
+  return "R$ " + s;
 }
 
 function vektorFmtUsd_(value) {
-  value = Number(value || 0);
-  return "US$ " + value.toFixed(4);
+  var v = Number(value || 0);
+  if (v === 0) return "US$ 0";
+  // < 1 centavo: mostra até 4 casas sem trailing zeros
+  var s = (v < 0.01) ? v.toFixed(4) : v.toFixed(2);
+  s = s.replace(/0+$/,"").replace(/\.$/,"");
+  return "US$ " + s;
 }
 
 // ===============================
@@ -909,12 +910,12 @@ function vektorFmtUsdWithBrl_(usdValue){
 // -----------------------------
 function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
   var systemText =
-    "Você é a Assistente da Política de Cartões Clara do Grupo SBF.\n" +
+    "Você é o Assistente da Política de Cartões Clara do Grupo SBF.\n" +
     "Responda SOMENTE com base nos trechos fornecidos da política.\n" +
     "Se a pergunta não estiver coberta com clareza, diga explicitamente que não encontrou base suficiente na política.\n" +
     "Não invente regras, exceções, prazos ou permissões.\n" +
     "Responda em português do Brasil, de forma natural, clara e objetiva.\n" +
-    "Quando fizer sentido, mencione de forma curta em qual tópico da política a resposta se apoia.";
+    "Quando fizer sentido, mencione de forma curta em qual tópico da política a resposta se apoia, informando o item e subitem.";
 
   var userText =
     "PERGUNTA DO USUÁRIO:\n" + String(question || "").trim() + "\n\n" +
