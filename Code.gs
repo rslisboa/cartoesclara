@@ -486,6 +486,533 @@ try {
   .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 
+// =====================================================
+// ✅ VERTEX AI — Assistente Política Clara
+// =====================================================
+
+const VEKTOR_VERTEX_PROJECT_ID = "genai4sap-data-lake";
+const VEKTOR_VERTEX_LOCATION   = "us-central1";
+const VEKTOR_VERTEX_MODEL      = "gemini-2.5-flash"; // alternativa: "gemini-2.5-pro"
+
+// -----------------------------
+// Entrada principal chamada pelo front
+// -----------------------------
+function vektorPolicyAssistantAsk(question, history) {
+  vektorAssertFunctionAllowed_("vektorPolicyAssistantAsk");
+
+  try {
+    question = String(question || "").trim();
+    if (!question) {
+      return { ok: false, error: "Pergunta vazia." };
+    }
+
+    var policyText = vektorPolicyLoadText_();
+    if (!policyText) {
+      return { ok: false, error: "Não consegui ler o documento da política." };
+    }
+
+    // chunking simples
+    var chunks = vektorPolicyChunkText_(policyText, 1200);
+
+    // recuperação simples dos trechos mais relevantes
+    var topChunks = vektorPolicyPickTopChunks_(question, chunks, 5);
+
+    // fallback defensivo
+    if (!topChunks || !topChunks.length) {
+      topChunks = [policyText.substring(0, 3500)];
+    }
+
+    // 🔹 gera resposta
+    var answer = vektorVertexGeneratePolicyAnswer_(question, topChunks, history || []);
+
+    // 🔹 (opcional, mas robusto) prefixa assinatura SEMPRE no backend
+    var sig = "gemini-2.5-flash";
+    return { ok: true, answer: sig + "\n" + String(answer || "") };
+
+  } catch (e) {
+    // ✅ no erro, não inventa answer; devolve erro corretamente
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+// -----------------------------
+// Lê o Google Doc convertido da política
+// -----------------------------
+function vektorPolicyLoadText_() {
+  var html = HtmlService.createHtmlOutputFromFile("policy_clara_source").getContent();
+
+  var m = html.match(/<textarea[^>]*id=["']policy-clara-text["'][^>]*>([\s\S]*?)<\/textarea>/i);
+  if (!m || !m[1]) return "";
+
+  var text = String(m[1] || "");
+
+  text = text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  return text.trim();
+}
+
+// -----------------------------
+// Quebra texto em blocos
+// -----------------------------
+function vektorPolicyChunkText_(text, chunkSize) {
+  text = String(text || "").replace(/\r/g, "").trim();
+  chunkSize = Math.max(500, Number(chunkSize || 1200));
+
+  if (!text) return [];
+
+  // quebra primeiro por linhas em branco, se possível
+  var rawBlocks = text.split(/\n\s*\n+/).map(function (s) {
+    return String(s || "").trim();
+  }).filter(Boolean);
+
+  var out = [];
+  var acc = "";
+
+  rawBlocks.forEach(function (block) {
+    if (!acc) {
+      acc = block;
+      return;
+    }
+
+    if ((acc.length + 2 + block.length) <= chunkSize) {
+      acc += "\n\n" + block;
+    } else {
+      out.push(acc.trim());
+      acc = block;
+    }
+  });
+
+  if (acc) out.push(acc.trim());
+
+  // fallback: se algum bloco ficou gigante, fatia por tamanho bruto
+  var finalOut = [];
+  out.forEach(function (piece) {
+    if (piece.length <= chunkSize) {
+      finalOut.push(piece);
+      return;
+    }
+    for (var i = 0; i < piece.length; i += chunkSize) {
+      var sub = piece.substring(i, i + chunkSize).trim();
+      if (sub) finalOut.push(sub);
+    }
+  });
+
+  return finalOut;
+}
+
+// -----------------------------
+// Ranking simples por relevância
+// -----------------------------
+function vektorPolicyPickTopChunks_(question, chunks, topK) {
+  topK = Math.max(3, Number(topK || 5));
+
+  var stop = {
+    "de":1,"da":1,"do":1,"das":1,"dos":1,"a":1,"o":1,"e":1,"ou":1,"em":1,"no":1,"na":1,"nos":1,"nas":1,
+    "para":1,"por":1,"com":1,"sem":1,"uma":1,"um":1,"as":1,"os":1,"que":1,"como":1,"qual":1,"quais":1
+  };
+
+  var tokens = String(question || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .split(/[^a-z0-9]+/g)
+    .map(function (t) { return String(t || "").trim(); })
+    .filter(function (t) { return t && t.length >= 3 && !stop[t]; });
+
+  var scored = chunks.map(function (chunk, idx) {
+    var base = String(chunk || "")
+      .toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    var score = 0;
+    tokens.forEach(function (tok) {
+      if (base.indexOf(tok) >= 0) score += 1;
+    });
+
+    // bônus leve para blocos com palavras típicas da política
+    if (/(restric|responsab|prestac|gasto|cartao|cartão|limite|fraude|auditoria|consequenc)/i.test(chunk)) {
+      score += 0.5;
+    }
+
+    return {
+      idx: idx,
+      chunk: chunk,
+      score: score
+    };
+  });
+
+  scored.sort(function (a, b) {
+    return (b.score - a.score) || (a.idx - b.idx);
+  });
+
+  return scored.slice(0, topK).map(function (x) { return x.chunk; });
+}
+
+// =====================================================
+// ✅ Vertex usage tracking (tokens + custo estimado)
+// Cole ACIMA de vektorVertexGeneratePolicyAnswer_
+// =====================================================
+
+function vektorVertexGetMonthKey_() {
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  return Utilities.formatDate(new Date(), tz, "yyyyMM");
+}
+
+function vektorVertexGetUsagePropKey_() {
+  return "VEKTOR_VERTEX_USAGE_" + vektorVertexGetMonthKey_();
+}
+
+function vektorVertexEstimateUsd_(modelName, promptTokens, outputTokens) {
+  modelName = String(modelName || "").toLowerCase();
+  promptTokens = Number(promptTokens || 0);
+  outputTokens = Number(outputTokens || 0);
+
+  // Preços oficiais (estimativa por token)
+  // gemini-2.5-flash: input US$ 0.30 / 1M | output US$ 2.50 / 1M
+  // gemini-2.5-pro:   input US$ 1.25 / 1M | output US$ 10.00 / 1M
+  var inputPerM = 0.30;
+  var outputPerM = 2.50;
+
+  if (modelName.indexOf("2.5-pro") >= 0) {
+    inputPerM = 1.25;
+    outputPerM = 10.00;
+  }
+
+  var inUsd = (promptTokens / 1000000) * inputPerM;
+  var outUsd = (outputTokens / 1000000) * outputPerM;
+
+  return {
+    inputUsd: inUsd,
+    outputUsd: outUsd,
+    totalUsd: inUsd + outUsd
+  };
+}
+
+function vektorVertexTrackUsage_(payload) {
+  try {
+    payload = payload || {};
+
+    var props = PropertiesService.getScriptProperties();
+    var key = vektorVertexGetUsagePropKey_();
+
+    var raw = props.getProperty(key);
+    var acc = raw ? JSON.parse(raw) : {
+      monthKey: vektorVertexGetMonthKey_(),
+      calls: 0,
+      promptTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      estimatedUsd: 0,
+      lastModel: "",
+      lastModelVersion: "",
+      lastPromptTokens: 0,
+      lastOutputTokens: 0,
+      lastTotalTokens: 0,
+      lastEstimatedUsd: 0,
+      lastAt: "",
+      lastUserEmail: ""
+    };
+
+    var promptTokens = Number(payload.promptTokens || 0);
+    var outputTokens = Number(payload.outputTokens || 0);
+    var totalTokens = Number(payload.totalTokens || (promptTokens + outputTokens));
+    var model = String(payload.model || "");
+    var modelVersion = String(payload.modelVersion || "");
+    var userEmail = String(payload.userEmail || "");
+
+    var usd = vektorVertexEstimateUsd_(modelVersion || model, promptTokens, outputTokens);
+
+    acc.calls += 1;
+    acc.promptTokens += promptTokens;
+    acc.outputTokens += outputTokens;
+    acc.totalTokens += totalTokens;
+    acc.estimatedUsd += usd.totalUsd;
+
+    acc.lastModel = model;
+    acc.lastModelVersion = modelVersion;
+    acc.lastPromptTokens = promptTokens;
+    acc.lastOutputTokens = outputTokens;
+    acc.lastTotalTokens = totalTokens;
+    acc.lastEstimatedUsd = usd.totalUsd;
+    acc.lastAt = new Date().toISOString();
+    acc.lastUserEmail = userEmail;
+
+    props.setProperty(key, JSON.stringify(acc));
+  } catch (e) {
+    // não quebra o chat por falha de métrica
+    Logger.log("Falha ao registrar uso Vertex: " + (e && e.message ? e.message : String(e)));
+  }
+}
+
+function vektorVertexGetUsageSummary_() {
+  var props = PropertiesService.getScriptProperties();
+  var key = vektorVertexGetUsagePropKey_();
+  var raw = props.getProperty(key);
+
+  if (!raw) {
+    return {
+      monthKey: vektorVertexGetMonthKey_(),
+      calls: 0,
+      promptTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      estimatedUsd: 0,
+      lastModel: VEKTOR_VERTEX_MODEL,
+      lastModelVersion: VEKTOR_VERTEX_MODEL,
+      lastPromptTokens: 0,
+      lastOutputTokens: 0,
+      lastTotalTokens: 0,
+      lastEstimatedUsd: 0,
+      lastAt: "",
+      lastUserEmail: ""
+    };
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return {
+      monthKey: vektorVertexGetMonthKey_(),
+      calls: 0,
+      promptTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      estimatedUsd: 0,
+      lastModel: VEKTOR_VERTEX_MODEL,
+      lastModelVersion: VEKTOR_VERTEX_MODEL,
+      lastPromptTokens: 0,
+      lastOutputTokens: 0,
+      lastTotalTokens: 0,
+      lastEstimatedUsd: 0,
+      lastAt: "",
+      lastUserEmail: ""
+    };
+  }
+}
+
+// ✅ Ajuste manual da cotação USD->BRL (não vou chutar valor real)
+// Defina aqui (ex.: 5.00) ou, se preferir, busque de uma fonte e grave em Properties.
+var VEKTOR_USD_BRL_FX = 5.00;
+
+function vektorFmtBrlFromUsd_(usd){
+  usd = Number(usd || 0);
+
+  // usa cotação automática (BCB) com cache diário
+  var fx = vektorFxGetUsdBrl_();
+  if (!fx) return "R$ —";
+
+  var brl = usd * fx;
+  return "R$ " + brl.toFixed(4);
+}
+
+function vektorFmtUsd_(value) {
+  value = Number(value || 0);
+  return "US$ " + value.toFixed(4);
+}
+
+// ===============================
+// FX USD->BRL (automático + cache diário)
+// ===============================
+
+function vektorFxKeyToday_(){
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  return Utilities.formatDate(new Date(), tz, "yyyyMMdd");
+}
+
+function vektorFxFetchUsdBrlFromBCB_(dateObj){
+  // PTAX - Banco Central (OData)
+  // A API pode não ter cotação no fim de semana/feriado (por isso faremos fallback de dias).
+  var mm = ("0" + (dateObj.getMonth() + 1)).slice(-2);
+  var dd = ("0" + dateObj.getDate()).slice(-2);
+  var yyyy = String(dateObj.getFullYear());
+  var dateParam = mm + "-" + dd + "-" + yyyy; // MM-DD-YYYY
+
+  var url =
+    "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/" +
+    "CotacaoDolarDia(dataCotacao=@dataCotacao)?@dataCotacao='" + dateParam + "'&$format=json";
+
+  var resp = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+  if (resp.getResponseCode() < 200 || resp.getResponseCode() >= 300) return null;
+
+  var json = JSON.parse(resp.getContentText() || "{}");
+  var arr = (json && json.value) ? json.value : [];
+  if (!arr || !arr.length) return null;
+
+  // Usa cotacaoVenda (mais conservador pra “custo”)
+  var venda = Number(arr[0].cotacaoVenda || 0);
+  if (!isFinite(venda) || venda <= 0) return null;
+
+  return venda;
+}
+
+function vektorFxGetUsdBrl_(){
+  var props = PropertiesService.getScriptProperties();
+  var key = "VEKTOR_FX_USD_BRL_" + vektorFxKeyToday_();
+
+  // 1) cache do dia
+  var cached = props.getProperty(key);
+  if (cached) {
+    var v = Number(cached);
+    if (isFinite(v) && v > 0) return v;
+  }
+
+  // 2) tenta hoje e volta até 7 dias (fim de semana/feriado)
+  var d = new Date();
+  d.setHours(0,0,0,0);
+
+  var fx = null;
+  for (var i = 0; i < 7; i++) {
+    fx = vektorFxFetchUsdBrlFromBCB_(d);
+    if (fx) break;
+    d.setDate(d.getDate() - 1);
+  }
+
+  if (fx) {
+    props.setProperty(key, String(fx));
+    return fx;
+  }
+
+  // 3) fallback: procura a última cotação gravada (até 30 dias)
+  for (var j = 1; j <= 30; j++) {
+    var dj = new Date();
+    dj.setDate(dj.getDate() - j);
+    dj.setHours(0,0,0,0);
+
+    var k2 = "VEKTOR_FX_USD_BRL_" + Utilities.formatDate(dj, Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyyMMdd");
+    var c2 = props.getProperty(k2);
+    if (c2) {
+      var v2 = Number(c2);
+      if (isFinite(v2) && v2 > 0) return v2;
+    }
+  }
+
+  return null; // sem cotação disponível
+}
+
+function vektorFmtUsdWithBrl_(usdValue){
+  var usd = Number(usdValue || 0);
+  var fx = vektorFxGetUsdBrl_();
+  if (!fx) return vektorFmtUsd_(usd) + " | R$ —";
+
+  var brl = usd * fx;
+  // 4 casas pra ficar coerente com seu US$
+  return vektorFmtUsd_(usd) + " | R$ " + brl.toFixed(4);
+}
+
+// -----------------------------
+// Chamada ao Vertex Gemini
+// -----------------------------
+function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
+  var systemText =
+    "Você é a Assistente da Política de Cartões Clara do Grupo SBF.\n" +
+    "Responda SOMENTE com base nos trechos fornecidos da política.\n" +
+    "Se a pergunta não estiver coberta com clareza, diga explicitamente que não encontrou base suficiente na política.\n" +
+    "Não invente regras, exceções, prazos ou permissões.\n" +
+    "Responda em português do Brasil, de forma natural, clara e objetiva.\n" +
+    "Quando fizer sentido, mencione de forma curta em qual tópico da política a resposta se apoia.";
+
+  var userText =
+    "PERGUNTA DO USUÁRIO:\n" + String(question || "").trim() + "\n\n" +
+    "TRECHOS DA POLÍTICA:\n\n" +
+    topChunks.map(function (t, i) {
+      return "Trecho " + (i + 1) + ":\n" + t;
+    }).join("\n\n");
+
+  var url =
+    "https://" + VEKTOR_VERTEX_LOCATION + "-aiplatform.googleapis.com/v1/" +
+    "projects/" + VEKTOR_VERTEX_PROJECT_ID +
+    "/locations/" + VEKTOR_VERTEX_LOCATION +
+    "/publishers/google/models/" + VEKTOR_VERTEX_MODEL +
+    ":generateContent";
+
+  var payload = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: systemText + "\n\n" + userText }
+        ]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      topP: 0.9,
+      maxOutputTokens: 3072,
+      candidateCount: 1
+    }
+  };
+
+  var resp = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      Authorization: "Bearer " + ScriptApp.getOAuthToken()
+    },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  });
+
+  var code = resp.getResponseCode();
+  var body = resp.getContentText() || "";
+
+  if (code < 200 || code >= 300) {
+    throw new Error("Vertex erro HTTP " + code + ": " + body);
+  }
+
+  var json = JSON.parse(body);
+
+// Junta TODAS as parts de texto (evita resposta truncada)
+var parts =
+  json &&
+  json.candidates &&
+  json.candidates[0] &&
+  json.candidates[0].content &&
+  json.candidates[0].content.parts;
+
+var answer = "";
+if (Array.isArray(parts) && parts.length) {
+  answer = parts.map(function (p) {
+    return String((p && p.text) || "");
+  }).join("\n").trim();
+}
+
+if (!answer) {
+  throw new Error("Vertex retornou resposta vazia.");
+}
+
+// usageMetadata oficial do Vertex
+var usage = (json && json.usageMetadata) ? json.usageMetadata : {};
+var promptTokens = Number(usage.promptTokenCount || 0);
+var outputTokens = Number(usage.candidatesTokenCount || 0);
+var totalTokens = (promptTokens + outputTokens);
+var modelVersion = String((json && json.modelVersion) || VEKTOR_VERTEX_MODEL);
+
+// usuário atual (se disponível)
+var email = "";
+try {
+  var ctx = vektorGetUserRole_();
+  email = String((ctx && ctx.email) || "");
+} catch (_) {}
+
+// registra consumo do mês
+vektorVertexTrackUsage_({
+  model: VEKTOR_VERTEX_MODEL,
+  modelVersion: modelVersion,
+  promptTokens: promptTokens,
+  outputTokens: outputTokens,
+  totalTokens: totalTokens,
+  userEmail: email
+});
+
+return answer;
+
+}
+
 // ✅ ID da planilha de métricas do Vektor
 // (a planilha que você mandou)
 const VEKTOR_METRICAS_SHEET_ID = '18yAuYoAR33JOagqapxgwHh86F1WeD0mZcj9AIJym07k';
@@ -14732,17 +15259,33 @@ try {
   bqTxt = "Falha BigQuery: " + (eBQ && eBQ.message ? eBQ.message : String(eBQ));
 }
 
+  // ===== Vertex AI: resumo de uso do mês =====
+  var vertex = vektorVertexGetUsageSummary_();
+  var vertexTxt = vertex.calls > 0
+    ? ("OK | " + vertex.calls + " chamadas no mês")
+    : "Sem uso registrado no mês";
+
   // Admin: retorna completo
   return {
-    baseClara: baseClaraTxt,
-    jobs: "Executados com sucesso",
+  baseClara: baseClaraTxt,
+  jobs: "Executados com sucesso",
+  google: googleTxt,
+  bigquery: bqTxt,
+  alertas: "Ativos",
+  usuariosAtivosHoje: vektorGetActiveUsersTodayCount_(Session.getScriptTimeZone()),
+  geral: "Em operação",
 
-    // ajuste conforme o que você já implementou
-    google: googleTxt,
-    bigquery: bqTxt,
-    alertas: "Ativos",
-    usuariosAtivosHoje: vektorGetActiveUsersTodayCount_(Session.getScriptTimeZone()),
-    geral: "Em operação"
+  // Vertex AI
+  vertexStatus: vertexTxt,
+  vertexCallsMes: vertex.calls || 0,
+  vertexPromptTokensMes: vertex.promptTokens || 0,
+  vertexOutputTokensMes: vertex.outputTokens || 0,
+  vertexTotalTokensMes: vertex.totalTokens || 0,
+  vertexEstimatedUsdMes: vektorFmtUsdWithBrl_(vertex.estimatedUsd || 0),
+  vertexLastModel: vertex.lastModelVersion || vertex.lastModel || VEKTOR_VERTEX_MODEL,
+  vertexLastTokens: vertex.lastTotalTokens || 0,
+  vertexLastEstimatedUsd: vektorFmtUsdWithBrl_(vertex.lastEstimatedUsd || 0),
+  vertexLastAt: vertex.lastAt || "—"
   };
 }
 
@@ -15512,4 +16055,18 @@ function getAnaliseGastosMacroVisoesDataset(req){
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
+}
+
+ // ==========TESTES===============//
+
+function TESTAR_POLITICA() {
+  var txt = vektorPolicyLoadText_();
+  Logger.log("Tamanho: " + txt.length);
+  Logger.log(txt.substring(0, 1000));
+}
+
+function TESTE_MIME_TYPE() {
+  var file = DriveApp.getFileById("1Lj4i5he1kKDSBbXJSwyw51SszCYu8KOB");
+  Logger.log("Nome: " + file.getName());
+  Logger.log("MimeType: " + file.getMimeType());
 }
