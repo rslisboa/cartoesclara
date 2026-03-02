@@ -2357,6 +2357,7 @@ display: none;
   <!-- Apresentação Vektor desativada -->
   <!-- Relatório Clara (Looker Studio) desativado -->
 
+<!-- <? if (userRole === "Administrador") { ?>
   <button
     id="navChatBtn"
     type="button"
@@ -2367,6 +2368,18 @@ display: none;
     <span class="vektor-nav-ico" aria-hidden="true">💬</span>
     <span class="vektor-nav-label">Chat</span>
   </button>
+<? } ?> -->
+
+<button
+  id="navPolicyAssistantBtn"
+  type="button"
+  onclick="window.vektorOpenPolicyAssistant()"
+  title="Assistente Política Clara"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+>
+  <span class="vektor-nav-ico" aria-hidden="true">📘</span>
+  <span class="vektor-nav-label">Assistente Política Clara</span>
+</button>
 
   <button
     type="button"
@@ -4641,7 +4654,7 @@ display: none;
           <div>
             <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Fluxograma do Vektor</div>
             <div style="color:rgba(226,232,240,0.9); font-size:14px; margin-top:2px;">
-              Visão interna do funcionamento (bases, jobs, consultas e entregas)
+              Visão interna do funcionamento (bases, jobs, consultas e entregas) • <b>IA (Política Clara / Vertex AI)</b>
             </div>
           </div>
         </div>
@@ -4720,6 +4733,7 @@ display: none;
       • <b>Triggers</b>: agendadores (ex.: execução periódica para alertas, monitoramento e rotinas)<br/>
       • <b>Jobs</b>: consolidação, verificação de consistência, enriquecimento e atualização de sinais operacionais<br/>
       • <b>APIs/Serviços</b>: Drive, Sheets, BigQuery, MailApp (chamadas conforme necessidade do fluxo)<br/>
+      • <b>IA (Vertex AI / Gemini)</b>: Assistente de Política Clara (RAG: chunking + top-chunks + geração)<br/>
       • <b>Logs</b>: registro de execução (sucesso/erro), auditoria e rastreabilidade operacional
     </div>
   </div>
@@ -4854,7 +4868,7 @@ display: none;
             <text x="360" y="202" class="tSmall">• Chat (consulta + comandos)</text>
             <text x="360" y="222" class="tSmall">• Páginas dedicadas (Alertas / Pendências)</text>
             <text x="360" y="242" class="tSmall">• Filtros (período, loja, regional)</text>
-            <text x="360" y="262" class="tSmall">• Ações guiadas (botões + modais)</text>
+            <text x="360" y="262" class="tSmall">• Ações guiadas (botões + modais) + IA (Política Clara)</text>
             <text x="360" y="282" class="tSmall">• Perfil de acesso (admin / usuário)</text>
 
             <!-- ========= BLOCO: Arquitetura GAS ========= -->
@@ -5237,6 +5251,15 @@ display: none;
       <li><b>Usuários ativos hoje:</b> <span id="status-ativos-hoje">—</span></li>
       <li><b>Serviços Google (Apps Script / E-mail):</b> <span id="status-google">—</span></li>
       <li><b>BigQuery:</b> <span id="status-bigquery">—</span></li>
+      <li><b>Vertex AI:</b> <span id="status-vertex">—</span></li>
+      <li><b>Modelo (última chamada):</b> <span id="status-vertex-model">—</span></li>
+      <li><b>Chamadas no mês:</b> <span id="status-vertex-calls">—</span></li>
+      <li><b>Tokens de entrada no mês:</b> <span id="status-vertex-prompt">—</span></li>
+      <li><b>Tokens de saída no mês:</b> <span id="status-vertex-output">—</span></li>
+      <li><b>Total de tokens no mês:</b> <span id="status-vertex-total">—</span></li>
+      <li><b>Custo estimado no mês:</b> <span id="status-vertex-cost">—</span></li>
+      <li><b>Última chamada:</b> <span id="status-vertex-last">—</span></li>
+      <li><b>Últimos tokens / custo:</b> <span id="status-vertex-last-metrics">—</span></li>
       <!-- <li><b>Manutenção:</b> <span id="status-manutencao">—</span></li>-->
     <? } ?>
   </ul>
@@ -6323,6 +6346,44 @@ function openStatusVektorModal() {
       const bigQueryStatus = data && (data.bigquery ?? data.bigQuery ?? data.bigQueryStatus);
       setText("status-bigquery", bigQueryStatus || "Indisponível");
 
+            // Vertex AI (somente admin; só preenche se existir no DOM)
+      setText("status-vertex", data && data.vertexStatus);
+      setText("status-vertex-model", data && data.vertexLastModel);
+      setText("status-vertex-calls", data && data.vertexCallsMes);
+      setText("status-vertex-prompt", data && data.vertexPromptTokensMes);
+      setText("status-vertex-output", data && data.vertexOutputTokensMes);
+      setText("status-vertex-total", data && data.vertexTotalTokensMes);
+      setText("status-vertex-cost", data && data.vertexEstimatedUsdMes);
+
+        (function(){
+          var raw = data && data.vertexLastAt;
+          var txt = "—";
+
+          if (raw) {
+            var d = new Date(raw);
+            if (!isNaN(d.getTime())) {
+              var dd = String(d.getDate()).padStart(2, "0");
+              var mm = String(d.getMonth() + 1).padStart(2, "0");
+              var yyyy = d.getFullYear();
+              var hh = String(d.getHours()).padStart(2, "0");
+              var mi = String(d.getMinutes()).padStart(2, "0");
+              var ss = String(d.getSeconds()).padStart(2, "0");
+
+              txt = dd + "/" + mm + "/" + yyyy + " - " + hh + ":" + mi + ":" + ss;
+            }
+          }
+
+          setText("status-vertex-last", txt);
+        })();
+
+      var lastMetrics = "—";
+      if (data) {
+        var lt = data.vertexLastTokens != null ? data.vertexLastTokens : "—";
+        var lc = data.vertexLastEstimatedUsd != null ? data.vertexLastEstimatedUsd : "—";
+        lastMetrics = lt + " tokens | " + lc;
+      }
+      setText("status-vertex-last-metrics", lastMetrics);
+
     })
     .withFailureHandler(function (err) {
       const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
@@ -6331,10 +6392,66 @@ function openStatusVektorModal() {
     .vektorStatusSistema();
 }
 
+window.__vektorChatMode = window.__vektorChatMode || "default"; 
+// "default" | "policy"
+
+window.vektorApplyChatMode_ = function () {
+  const greetingEl = document.getElementById("vektorGreeting");
+  const inputEl = document.getElementById("userInput");
+  const attachBtn = document.getElementById("attachBtn");
+
+  const isPolicy = window.__vektorChatMode === "policy";
+
+  if (greetingEl) {
+    if (isPolicy) {
+      greetingEl.innerHTML =
+        `Olá! Este é o <b>Assistente de Política Clara</b>. ` +
+        `Pergunte sobre uso permitido, restrições, limites, prestação de contas e responsabilidades.`;
+    } else {
+      const saudacao =
+        (typeof getSaudacaoPorHorario_ === "function")
+          ? getSaudacaoPorHorario_()
+          : "olá";
+
+      const nome =
+        (typeof FIRST_NAME !== "undefined" && FIRST_NAME)
+          ? FIRST_NAME
+          : (typeof displayName !== "undefined" ? displayName : "");
+
+      const prefixo = nome ? `Olá ${nome}, ${saudacao}!` : `Olá, ${saudacao}!`;
+
+      greetingEl.innerHTML =
+        `${prefixo} Esse é o <b>Vektor</b>, <b>Plataforma de Governança Financeira do Cartão Clara</b>.`;
+    }
+  }
+
+  if (inputEl) {
+    inputEl.placeholder = isPolicy
+      ? "Pergunte algo sobre a Política Clara..."
+      : "Digite aqui.";
+  }
+
+  // opcional: esconde anexo no modo política
+  if (attachBtn) {
+    attachBtn.style.display = isPolicy ? "none" : "inline-flex";
+  }
+};
+
+window.vektorOpenPolicyAssistant = function () {
+  window.__vektorChatMode = "policy";
+  window.vektorShowChatView();
+  window.vektorApplyChatMode_();
+};
+
 // ===============================
 // VIEW CONTROL (Chat <-> Radar)
 // ===============================
 window.vektorShowChatView = function () {
+    if (typeof USER_ROLE_REPLACED !== "undefined" &&
+      USER_ROLE_REPLACED !== "Administrador" &&
+      window.__vektorChatMode !== "policy") {
+    return;
+  }
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
   const feedbackView = document.getElementById("feedbackView");
@@ -6377,6 +6494,15 @@ window.vektorShowChatView = function () {
     chatView.classList.remove("hidden"); 
     chatView.classList.add("is-open");
     chatView.style.display = "flex";
+  }
+
+    try {
+    if (!window.__vektorChatMode) {
+      window.__vektorChatMode = "default";
+    }
+    window.vektorApplyChatMode_();
+  } catch (e) {
+    console.warn("Falha ao aplicar modo do chat:", e);
   }
 
   // ✅ abrir modal "Como usar o Vektor?" apenas 1x por dia (por navegador)
@@ -14666,12 +14792,81 @@ document.addEventListener("DOMContentLoaded", () => {
     return "boa noite";
   }
 
-  function renderSaudacaoVektor_() {
+  window.__vektorChatMode = window.__vektorChatMode || "policy";
+// "legacy" | "policy"
+
+window.vektorApplyChatMode_ = function () {
+  const greetingEl = document.getElementById("vektorGreeting");
+  const inputEl = document.getElementById("userInput");
+  const attachBtn = document.getElementById("attachBtn");
+
+  const isPolicy = window.__vektorChatMode === "policy";
+
+  if (greetingEl) {
+    if (isPolicy) {
+      greetingEl.innerHTML =
+        "Olá! Eu sou o <b>Assistente da Política Clara</b>. " +
+        "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências.";
+    } else {
+      const saudacao = getSaudacaoPorHorario_();
+      const nome = (typeof FIRST_NAME !== "undefined" && FIRST_NAME)
+        ? FIRST_NAME
+        : (typeof displayName !== "undefined" ? displayName : "");
+
+      const prefixo = nome ? `Olá ${nome}, ${saudacao}!` : `Olá, ${saudacao}!`;
+      greetingEl.innerHTML =
+        `${prefixo} Esse é o <b>Vektor</b>, <b>Plataforma de Governança Financeira do Cartão Clara</b>.`;
+    }
+  }
+
+  if (inputEl) {
+    inputEl.placeholder = isPolicy
+      ? "Pergunte algo sobre a Política Clara..."
+      : "Digite aqui.";
+  }
+
+  // no modo política, esconde o botão de anexo
+  if (attachBtn) {
+    attachBtn.style.display = isPolicy ? "none" : "inline-flex";
+  }
+};
+
+window.vektorOpenLegacyChat = function () {
+  window.__vektorChatMode = "legacy";
+  window.vektorShowChatView();
+};
+
+window.vektorOpenPolicyAssistant = function () {
+  window.__vektorChatMode = "policy";
+  window.vektorShowChatView();
+};
+
+window.vektorSendPolicyQuestion_ = function (pergunta) {
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.ok) {
+        renderBotMessage("Falha ao consultar a política: " + (res && res.error ? res.error : "erro desconhecido"));
+        return;
+      }
+      renderBotMessage(String(res.answer || ""));
+    })
+    .withFailureHandler(function (err) {
+      var msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+      renderBotMessage("Erro ao chamar a IA da política: " + msg);
+    })
+    .vektorPolicyAssistantAsk(pergunta, []);
+};
+
+function renderSaudacaoVektor_() {
+  if (typeof window.vektorApplyChatMode_ === "function") {
+    window.vektorApplyChatMode_();
+    return;
+  }
+
   const el = document.getElementById("vektorGreeting");
   if (!el) return;
 
   const saudacao = getSaudacaoPorHorario_();
-
   const nome = (typeof FIRST_NAME !== "undefined" && FIRST_NAME)
     ? FIRST_NAME
     : (typeof displayName !== "undefined" ? displayName : "");
@@ -14688,21 +14883,6 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("DOMContentLoaded", renderSaudacaoVektor_);
 
   renderSaudacaoVektor_();
-    
-// 🔹 Mensagem inicial: CTA para abrir o guia "Como usar o Vektor"
-renderBotMessage(
-  "HTML:" +
-  "<div class='text-sm text-slate-700' style='margin-top:8px'>" +
-    "<div style='margin-bottom:8px; font-weight:800; color:#0f172a;'>Quer ver o guia rápido do Vektor?</div>" +
-    "<button type='button' onclick='openAjudaVektorModal()' " +
-      "style='width:100%; display:flex; align-items:center; justify-content:center; gap:8px;" +
-      "padding:10px 12px; border-radius:12px; border:1px solid rgba(181,255,32,0.9);" +
-      "background:#0b1220; color:#fff; font-weight:900; cursor:pointer;'>" +
-      "Como usar o Vektor ❓" +
-    "</button>" +
-    "<div style='margin-top:8px; font-size:12px; color:#475569;'>Clique para abrir exemplos e procedimentos.</div>" +
-  "</div>"
-);
 
 // 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
 // ✅ Só para NÃO Administrador
@@ -29803,8 +29983,59 @@ if (isCmdLojasOfensoras) {
   return; // ⛔ importante
 }
 
-    // ✅ Agora sim: gera a resposta (e então usa ACOES)
-    const resposta = gerarRespostaDoBot(texto);
+   // =====================================================
+// NOVO: desvio para Assistente Política Clara
+// =====================================================
+
+    // ✅ Assistente Política Clara (Gemini)
+    if (window.__vektorChatMode === "policy") {
+      google.script.run
+        .withSuccessHandler(function(res){
+          if (!res || !res.ok) {
+            renderBotMessage(
+              "HTML:<p class='text-sm text-red-700'><b>Falha ao consultar a política:</b> " +
+              (res && res.error ? vektorSafe_(res.error) : "erro desconhecido") +
+              "</p>"
+            );
+            return;
+          }
+
+          var full = String(res.answer || "");
+          var firstNl = full.indexOf("\n");
+          var sig = (firstNl > 0) ? full.slice(0, firstNl).trim() : "";
+          var body = (firstNl > 0) ? full.slice(firstNl + 1) : full;
+
+          renderBotMessage(
+            "HTML:" +
+              "<div>" +
+                "<div style='font-size:10px; line-height:1.1; color:#94a3b8; font-weight:500; margin-bottom:7px; letter-spacing:.2px; text-transform:uppercase;'>" +
+                  vektorSafe_(sig || "gemini-2.5-flash") +
+                "</div>" +
+                "<div class='text-sm text-slate-800 whitespace-pre-line'>" +
+                  vektorSafe_(body || "") +
+                "</div>" +
+              "</div>"
+          );
+
+        })
+        .withFailureHandler(function(err){
+          const msg = (err && err.message) ? err.message : JSON.stringify(err);
+          renderBotMessage(
+            "HTML:<p class='text-sm text-red-700'><b>Erro ao chamar IA:</b> " +
+            vektorSafe_(msg) +
+            "</p>"
+          );
+        })
+        .vektorPolicyAssistantAsk(texto, []);
+
+      return;
+    }
+
+// fluxo legado
+const resposta = gerarRespostaDoBot(texto);
+if (resposta) {
+  renderBotMessage(resposta);
+}
 
    // ✅ Gastos por etiquetas -> abre calendário + tabela
     if (resposta === "ACAO_GASTOS_ETIQUETAS_CLARA") {
@@ -29891,6 +30122,7 @@ let vektorJaPerguntouInfoIniciais = false;
 
 window.vektorPerguntarInformacoesIniciais = function () {
   try {
+    if (window.__vektorChatMode === "policy") return;
     // Só pergunta para Administrador
     if (USER_ROLE_CLEAN !== "Administrador") return;
 
@@ -29898,25 +30130,9 @@ window.vektorPerguntarInformacoesIniciais = function () {
     if (vektorJaPerguntouInfoIniciais) return;
     vektorJaPerguntouInfoIniciais = true;
 
-    const html =
-      "HTML:" +
-      "<div class='text-sm text-slate-700'>" +
-        "<p>" +
-          "Se você quer ver um resumo das principais informações de utilização do cartão Clara " +
-          "(maiores transações, times com mais pendências, estabelecimentos mais usados, categorias de gasto e últimas faturas), clique no botão abaixo" +
-        "</p>" +
-        "<div class='mt-2 flex gap-2'>" +
-          "<button type='button' " +
-                  "class='px-3 py-1 rounded bg-emerald-600 text-white text-xs' " +
-                  "onclick=\"window.vektorRespostaInfoIniciais('sim')\">" +
-            "Mostrar resumo" +
-
-          "</button>" +
-        "</div>" +
-      "</div>";
-
     renderBotMessage(html);
-  } catch (e) {
+  } 
+  catch (e) {
     console.error("Erro ao perguntar info iniciais:", e);
   }
 };
