@@ -15230,6 +15230,14 @@ function vektorRenderSugestoes(lista) {
 vektorInput.addEventListener("input", function () {
   const raw = vektorInput.value || "";
 
+  // 🔒 desativa sugestões (intenções/lojas/times) no Assistente de Política
+    if (window.__vektorChatMode === "policy") {
+      vektorBox.style.display = "none";
+      vektorCurrentSuggestions = [];
+      vektorSelectedIndex = -1;
+      return;
+    }
+
   // Se o campo está vazio, limpa e sai
   if (!raw.trim()) {
     vektorBox.style.display = "none";
