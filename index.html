@@ -25517,17 +25517,21 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
   partes.push(
     "<div class='text-sm text-slate-700' style='max-width:1000px;margin:12px auto 0;'>",
       "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>",
-      // NOVA linha de orientação
-    "<p style='margin-bottom:8px;text-align:center;font-size:13px;color:#000000;'>" +
-      "Clique na linha da fatura para verificar o valor detalhado por times." +  
-     "</p>" +  
-     
-     "<p style='margin-bottom:8px;text-align:center;font-size:13px;color:#000000;'>" +
-  "E clique em <b>Extrair dados</b> para verificar o relatório de transações da fatura." +
-    "</p>",
-      "<div style='overflow-x:auto;'>",
+
+      "<p style='margin-bottom:8px;text-align:center;font-size:13px;color:#000000;'>" +
+        "Clique na linha da fatura para verificar o valor detalhado por times." +
+      "</p>" +
+
+      "<p style='margin-bottom:8px;text-align:center;font-size:13px;color:#000000;'>" +
+        "E clique em <b>Extrair dados</b> para verificar o relatório de transações da fatura." +
+      "</p>",
+
+      // ✅ WRAPPER COM ROLAGEM (vertical + horizontal)
+      "<div style='max-height: calc(100vh - 260px); overflow:auto; border:2px double #000; border-radius:12px;'>",
+
         "<table border='1' cellspacing='0' cellpadding='8' " +
-        "style='border-collapse:collapse;width:100%;font-size:13px;border:2px double #000;'>",
+        "style='border-collapse:collapse;width:100%;font-size:13px;border:0;'>",
+
           "<thead>",
             "<tr style='background:#0F172A;color:#fff;'>",
               "<th style='border:2px double #000;padding:6px;text-align:center;'>Fatura (período / extrato da conta)</th>",
@@ -25542,7 +25546,6 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
   var somaTotal = 0;
   var valorAnterior = null;
 
-  // ─ Insights: vamos guardar a MAIOR ALTA e a MAIOR QUEDA de uma fatura para a seguinte
   var maiorAumento = null; // { faturaAtual, variacao }
   var maiorQueda   = null; // { faturaAtual, variacao }
 
@@ -25555,7 +25558,6 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
       currency: "BRL"
     });
 
-    // Calcula variação em relação à fatura anterior
     var variacaoTexto = "—";
     if (valorAnterior !== null && valorAnterior !== 0) {
       var variacao = ((valor - valorAnterior) / valorAnterior) * 100;
@@ -25567,93 +25569,73 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
         variacaoTexto = variacaoFmt;
       }
 
-      // Atualiza maior aumento
       if (!maiorAumento || variacao > maiorAumento.variacao) {
-        maiorAumento = {
-          faturaAtual: f,
-          variacao: variacao
-        };
+        maiorAumento = { faturaAtual: f, variacao: variacao };
       }
-
-      // Atualiza maior queda
       if (!maiorQueda || variacao < maiorQueda.variacao) {
-        maiorQueda = {
-          faturaAtual: f,
-          variacao: variacao
-        };
+        maiorQueda = { faturaAtual: f, variacao: variacao };
       }
     }
 
-    // 🔽 linha clicável para drilldown por time (usando EXTRATO e período)
-
-    // dentro do forEach das faturas, onde você faz partes.push("<tr ...>", "<td>...</td>", ...)
-
     partes.push(
-  "<tr onclick=\"window.vektorDrillTimesFatura(this)\" " +
-      "style='cursor:pointer;' " +
-      "data-extrato-fatura='" + (f.extrato || "") + "' " +
-      "data-inicio-fatura='" + (f.dataInicioIso || "") + "' " +
-      "data-fim-fatura='" + (f.dataFimIso || "") + "'>",
+      "<tr onclick=\"window.vektorDrillTimesFatura(this)\" " +
+          "style='cursor:pointer;' " +
+          "data-extrato-fatura='" + (f.extrato || "") + "' " +
+          "data-inicio-fatura='" + (f.dataInicioIso || "") + "' " +
+          "data-fim-fatura='" + (f.dataFimIso || "") + "'>",
 
-    // TD 1 (com tooltip)
-    "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
-        "style='border:2px double #000;padding:6px;text-align:center;'>" +
-      (f.extrato || "") +
-    "</td>",
+        "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
+            "style='border:2px double #000;padding:6px;text-align:center;'>" +
+          (f.extrato || "") +
+        "</td>",
 
-    // TD 2 (com tooltip)
-    "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
-        "style='border:2px double #000;padding:6px;text-align:center;'>" +
-      valorFmt +
-    "</td>",
+        "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
+            "style='border:2px double #000;padding:6px;text-align:center;'>" +
+          valorFmt +
+        "</td>",
 
-    // TD 3 (com tooltip)
-    "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
-        "style='border:2px double #000;padding:6px;text-align:center;'>" +
-      variacaoTexto +
-    "</td>",
+        "<td title=\"Clique para detalhar esta fatura por time, respeitando o período desse extrato.\" " +
+            "style='border:2px double #000;padding:6px;text-align:center;'>" +
+          variacaoTexto +
+        "</td>",
 
-    // TD 4 (SEM tooltip e SEM string quebrável)
-"<td style='border:2px double #000;padding:6px;text-align:center;'>" +
-  "<a href='#' title='' " +
-     "data-extrato=\"" + encodeURIComponent(String(f.extrato || "")) + "\" " +
-     "onclick=\"return window.vektorBaixarTransacoesFaturaLink(event, this); return false;\" " +
-     "style='color:#005E27;font-weight:700;text-decoration:underline;'>" +
-    "Extrair dados" +
-  "</a>" +
-"</td>",
+        "<td style='border:2px double #000;padding:6px;text-align:center;'>" +
+          "<a href='#' title='' " +
+             "data-extrato=\"" + encodeURIComponent(String(f.extrato || "")) + "\" " +
+             "onclick=\"return window.vektorBaixarTransacoesFaturaLink(event, this); return false;\" " +
+             "style='color:#005E27;font-weight:700;text-decoration:underline;'>" +
+            "Extrair dados" +
+          "</a>" +
+        "</td>",
 
-
-  "</tr>"
-);
+      "</tr>"
+    );
 
     valorAnterior = valor;
   });
 
-  // Linha de TOTAL
   var somaFmt = somaTotal.toLocaleString("pt-BR", {
     style: "currency",
     currency: "BRL"
   });
 
   partes.push(
-  "<tr style='background:#f1f5f9;font-weight:bold;'>",
-    "<td style='border:2px double #000;padding:6px;text-align:center;'>TOTAL</td>",
-    "<td style='border:2px double #000;padding:6px;text-align:center;'>" + somaFmt + "</td>",
-    "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
-    "<td style='border:2px double #000;padding:6px;text-align:center;'></td>", // ✅ nova coluna
-  "</tr>",
-  "</tbody>",
-  "</table>",
-  "</div>"
-);
+    "<tr style='background:#f1f5f9;font-weight:bold;'>",
+      "<td style='border:2px double #000;padding:6px;text-align:center;'>TOTAL</td>",
+      "<td style='border:2px double #000;padding:6px;text-align:center;'>" + somaFmt + "</td>",
+      "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
+      "<td style='border:2px double #000;padding:6px;text-align:center;'></td>",
+    "</tr>",
 
-  // ─────────────────────────────────────────────────────────────
-  // BLOCO NOVO: comentários automáticos (insights) sobre as faturas
-  // ─────────────────────────────────────────────────────────────
+    "</tbody>",
+    "</table>",
+
+    // ✅ FECHA WRAPPER DE ROLAGEM
+    "</div>"
+  );
+
   var comentarios = [];
 
-  // Só faz sentido falar de variação se tiver pelo menos 2 faturas
   if (faturas.length >= 2) {
     if (maiorAumento && maiorAumento.variacao > 0) {
       var pctAlta = Math.abs(maiorAumento.variacao).toFixed(1).replace(".", ",") + "%";
@@ -25693,7 +25675,6 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
     );
   }
 
-  // Botão de Exportar CSV (já existia)
   partes.push(
     "<div style='margin-top:8px;text-align:right;'>",
       "<button type='button' " +
@@ -30716,6 +30697,16 @@ function vektorCarregarInformacoesIniciais() {
     const dataInicioIso = ini.toISOString();
     const dataFimIso    = fim.toISOString();
 
+    // Helper: detecta se estamos na página "Consultas Auxiliares"
+    function isAuxConsultasOpen_() {
+      const v = document.getElementById("consultasAuxView");
+      if (!v) return false;
+      // se está visível (não hidden e não display none)
+      const hiddenByClass = v.classList && v.classList.contains("hidden");
+      const hiddenByStyle = (v.style && String(v.style.display).toLowerCase() === "none");
+      return !hiddenByClass && !hiddenByStyle;
+    }
+
     // 1) Maiores transações individuais
     try {
       google.script.run
@@ -30730,25 +30721,25 @@ function vektorCarregarInformacoesIniciais() {
     }
 
     // 2) Pendências por time (últimos 30 dias)
-          setTimeout(function () {
+    setTimeout(function () {
+      try {
+        google.script.run
+          .withSuccessHandler(function (res) {
             try {
-              google.script.run
-                .withSuccessHandler(function (res) {
-                  try {
-                    const htmlTabela = vektorRenderTabelaPendenciasPorTime(res, dataInicioIso, dataFimIso);
-                    renderBotMessage("HTML:" + htmlTabela);
-                  } catch (e) {
-                    console.error("Erro ao renderizar Pendências por time (inicial):", e);
-                  }
-                })
-                .withFailureHandler(function (err) {
-                  console.error("Erro Apps Script Pendências por time (inicial):", err);
-                })
-                .getResumoPendenciasPorTime(dataInicioIso, dataFimIso, "");
+              const htmlTabela = vektorRenderTabelaPendenciasPorTime(res, dataInicioIso, dataFimIso);
+              renderBotMessage("HTML:" + htmlTabela);
             } catch (e) {
-              console.error("Falha geral ao chamar Pendências por time (inicial):", e);
+              console.error("Erro ao renderizar Pendências por time (inicial):", e);
             }
-          }, 3000);
+          })
+          .withFailureHandler(function (err) {
+            console.error("Erro Apps Script Pendências por time (inicial):", err);
+          })
+          .getResumoPendenciasPorTime(dataInicioIso, dataFimIso, "");
+      } catch (e) {
+        console.error("Falha geral ao chamar Pendências por time (inicial):", e);
+      }
+    }, 3000);
 
     // 3) Estabelecimentos mais usados (Top 10)
     setTimeout(function () {
@@ -30769,18 +30760,18 @@ function vektorCarregarInformacoesIniciais() {
           })
           .withFailureHandler(err => console.error("Erro Apps Script Estabelecimentos (inicial):", err))
           .getResumoTransacoesPorEstabelecimento(
-            dataInicioIso,   // <– CORRIGIDO
-            dataFimIso,      // <– CORRIGIDO
-            tipo,            // "valor"
-            "",              // grupo
-            ""               // loja
+            dataInicioIso,
+            dataFimIso,
+            tipo,
+            "",
+            ""
           );
       } catch (e) {
         console.error("Falha geral ao chamar Estabelecimentos (inicial):", e);
       }
     }, 6000);
 
-    // 4) Categorias (já estava ok)
+    // 4) Categorias
     setTimeout(function () {
       try {
         const tipo = "valor";
@@ -30803,7 +30794,7 @@ function vektorCarregarInformacoesIniciais() {
       }
     }, 9000);
 
-    // 5) Últimas 6 faturas (já estava ok)
+    // 5) Faturas
     setTimeout(function () {
       try {
         google.script.run
@@ -30812,6 +30803,42 @@ function vektorCarregarInformacoesIniciais() {
               const todas = (res && res.faturas) || [];
               if (!todas.length) return;
 
+              // ✅ Se estamos em Consultas Auxiliares: renderiza TODAS + no container da página (não no chat)
+              if (isAuxConsultasOpen_()) {
+                const box = document.getElementById("auxFaturasConteudo");
+                if (!box) {
+                  console.warn("auxFaturasConteudo não encontrado; não foi possível renderizar faturas na página Aux.");
+                  return;
+                }
+
+                // (opcional) ordena por dataInicioIso crescente para não “pular” períodos
+                const faturasOrdenadas = todas.slice().sort(function (a, b) {
+                  const da = a && a.dataInicioIso ? Date.parse(a.dataInicioIso) : 0;
+                  const db = b && b.dataInicioIso ? Date.parse(b.dataInicioIso) : 0;
+                  return da - db;
+                });
+
+                const titulo = "TODAS AS FATURAS (BaseClara)";
+                const htmlTabela = vektorMontarTabelaFaturas_(titulo, faturasOrdenadas);
+
+                box.innerHTML = htmlTabela;
+
+                // Insights para todas as faturas pode virar texto longo.
+                // Se quiser manter, ok; se ficar pesado, remova.
+                try {
+                  const htmlInsights = analisarFaturas(faturasOrdenadas);
+                  if (htmlInsights) {
+                    // anexa abaixo
+                    box.insertAdjacentHTML("beforeend", "<div style='margin-top:10px;'>" + htmlInsights + "</div>");
+                  }
+                } catch (e) {
+                  console.error("Erro ao gerar insights de faturas (aux):", e);
+                }
+
+                return; // não segue para o fluxo do chat
+              }
+
+              // ✅ Caso contrário: mantém o comportamento antigo (últimas 6) no chat
               const selecionadas = vektorFiltrarFaturasPeloModo_(todas, "ultimas", 6);
               if (!selecionadas.length) return;
 
@@ -30838,8 +30865,6 @@ function vektorCarregarInformacoesIniciais() {
     console.error("Erro geral em vektorCarregarInformacoesIniciais:", e);
   }
 }
-
-
 
 userInput.addEventListener("keydown", (e) => {
     const boxVisivel   = vektorBox && vektorBox.style.display === "block";
