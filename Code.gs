@@ -502,35 +502,108 @@ function vektorPolicyAssistantAsk(question, history) {
 
   try {
     question = String(question || "").trim();
-    if (!question) {
-      return { ok: false, error: "Pergunta vazia." };
+    if (!question) return { ok: false, error: "Pergunta vazia." };
+
+    // ✅ small talk: não chama RAG/Vertex
+    var qLow = question.toLowerCase();
+    if (
+      qLow === "obrigado" || qLow === "obrigada" ||
+      qLow === "valeu" || qLow === "vlw" ||
+      qLow === "ok" || qLow === "beleza" ||
+      qLow === "show" || qLow === "perfeito" ||
+      qLow === "obg" || qLow === "brigado" || qLow === "brigada"
+    ) {
+      return { ok: true, answer: "De nada! Se quiser, me diga sua dúvida sobre a política." };
     }
 
     var policyText = vektorPolicyLoadText_();
-    if (!policyText) {
-      return { ok: false, error: "Não consegui ler o documento da política." };
-    }
+    if (!policyText) return { ok: false, error: "Não consegui ler o documento da política." };
 
-    // chunking simples
+    // ✅ chunking por seção (vale pra política toda)
     var chunks = vektorPolicyChunkText_(policyText, 1200);
 
-    // recuperação simples dos trechos mais relevantes
-    var topChunks = vektorPolicyPickTopChunks_(question, chunks, 5);
+    // ------------------------------
+    // ✅ roteamento genérico por intenção
+    // ------------------------------
+    function routeSectionIds_(q) {
+      var s = String(q || "").toLowerCase();
 
-    // fallback defensivo
-    if (!topChunks || !topChunks.length) {
-      topChunks = [policyText.substring(0, 3500)];
+      var wantsPermission = /(pode|posso|permitid|proibid|autorizad|restriç|restric)/.test(s);
+      var wantsAccountability = /(nota|comprovante|cupom|recibo|etiqueta|descri|prestação|prestacao|48\s*h|bloque)/.test(s);
+      var wantsLimit = /(limite|aumento|ciclo|dia\s*06|fatura|reestabelec)/.test(s);
+      var wantsFraud = /(fraude|auditoria|monitoramento|canal|denúnc|denunc)/.test(s);
+      var wantsRoles = /(responsabil|portador|financeiro|contas a receber|gerente|líder|lider|supervisor)/.test(s);
+      var wantsDefs = /(defini|sigla|o que é|o que e|conceito)/.test(s);
+      var wantsServicenow = /(servicenow|chamado|abertura de chamado|fluxo|solicita)/.test(s);
+      var wantsStoreChange =
+  /(trocar de loja|troca de loja|troca de gerente|mudan[cç]a entre lojas|mudar de loja|transfer[êe]ncia|transferir|loja anterior|loja nova)/.test(s);
+
+      var sec = [];
+      // Regras principais por tema
+      if (wantsPermission) sec.push("9");                  // Restrições de uso
+      if (wantsAccountability) sec.push("8", "8.1");       // Prestação / Bloqueio
+      if (wantsLimit) sec.push("7");                       // Limite dos cartões
+      if (wantsFraud) sec.push("10", "10.1");              // Monitoramento / Canal
+      if (wantsRoles) sec.push("5");                       // Responsabilidades
+      if (wantsDefs) sec.push("4");                        // Definições
+      if (wantsServicenow) sec.push("Anexo II");           // Solicitações no ServiceNow
+      if (wantsStoreChange) sec.push("Anexo II", "5");
+
+      // fallback: se nada casou, não força seção (deixa ranker escolher)
+      return sec;
     }
 
-    // 🔹 gera resposta
-    var answer = vektorVertexGeneratePolicyAnswer_(question, topChunks, history || []);
+    var wanted = routeSectionIds_(question);
 
-    // 🔹 (opcional, mas robusto) prefixa assinatura SEMPRE no backend
+    // ------------------------------
+    // ✅ índice simples por seção (a partir do prefixo "§ <id> | <título>")
+    // ------------------------------
+    var byId = {};
+    (chunks || []).forEach(function(c){
+      var m = String(c || "").match(/^§\s*([^\|]+)\|\s*(.+?)\s*\n/);
+      if (!m) return;
+      var id = String(m[1] || "").trim();
+      if (!id) return;
+      if (!byId[id]) byId[id] = c;
+    });
+
+    // ------------------------------
+    // ✅ seleciona seeds por seção roteada
+    // ------------------------------
+    var seed = [];
+    (wanted || []).forEach(function(id){
+      if (byId[id]) seed.push(byId[id]);
+    });
+
+    // ------------------------------
+    // ✅ ranker para completar com os mais relevantes
+    // ------------------------------
+    var topK = 5; // limite final que você já usa
+    var ranked = vektorPolicyPickTopChunks_(question, chunks, topK);
+
+    // monta lista final sem duplicar: seeds + ranked
+    var finalChunks = [];
+    seed.forEach(function(c){
+      if (finalChunks.indexOf(c) < 0) finalChunks.push(c);
+    });
+    ranked.forEach(function(c){
+      if (finalChunks.indexOf(c) < 0) finalChunks.push(c);
+    });
+
+    // corta no máximo 5 para não explodir tokens
+    finalChunks = finalChunks.slice(0, 5);
+
+    // fallback defensivo
+    if (!finalChunks.length) finalChunks = [policyText.substring(0, 3500)];
+
+    // gera resposta
+    var answer = vektorVertexGeneratePolicyAnswer_(question, finalChunks, history || []);
+
+    // prefixa assinatura (como você já está fazendo)
     var sig = "gemini-2.5-flash";
     return { ok: true, answer: sig + "\n" + String(answer || "") };
 
   } catch (e) {
-    // ✅ no erro, não inventa answer; devolve erro corretamente
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
 }
@@ -561,49 +634,113 @@ function vektorPolicyLoadText_() {
 // Quebra texto em blocos
 // -----------------------------
 function vektorPolicyChunkText_(text, chunkSize) {
+  // chunkSize agora vira apenas "limite de segurança", mas chunking é por SEÇÃO
   text = String(text || "").replace(/\r/g, "").trim();
-  chunkSize = Math.max(500, Number(chunkSize || 1200));
-
+  var maxLen = Math.max(2500, Number(chunkSize || 1200) * 3); // limite por chunk (segurança)
   if (!text) return [];
 
-  // quebra primeiro por linhas em branco, se possível
-  var rawBlocks = text.split(/\n\s*\n+/).map(function (s) {
-    return String(s || "").trim();
-  }).filter(Boolean);
+  var lines = text.split("\n");
 
+  function isHeaderLine_(ln){
+    var s = String(ln || "").trim();
+
+    // Seções principais: "1.\tObjetivo", "9.\tRestrições de Uso", etc
+    if (/^\d+\.\s+/.test(s) || /^\d+\.\t/.test(s)) return true;
+
+    // Subitens: "8.1.\t Bloqueio...", "9.3.\t Utilização..."
+    if (/^\d+\.\d+\.\s+/.test(s) || /^\d+\.\d+\.\t/.test(s)) return true;
+
+    // Anexos: "Anexo I – ..." / "Anexo II – ..."
+    if (/^Anexo\s+[IVXLC]+\s*[\-–—]/i.test(s) || /^Anexo\s+[IVXLC]+\b/i.test(s)) return true;
+
+    return false;
+  }
+
+  function parseHeader_(ln){
+    var s = String(ln || "").trim();
+
+    // Anexo I/II etc
+    var ma = s.match(/^Anexo\s+([IVXLC]+)\s*[\-–—]?\s*(.+)?$/i);
+    if (ma) {
+      var roman = String(ma[1] || "").trim().toUpperCase();
+      var titleA = String(ma[2] || "").trim();
+      var idA = "Anexo " + roman;
+      return { id: idA, title: (titleA ? (idA + " – " + titleA) : idA) };
+    }
+
+    // Subitem 9.1., 8.4.1., etc
+    var ms = s.match(/^(\d+\.\d+(?:\.\d+)*)\.\s*(.+)?$/);
+    if (ms) {
+      return { id: String(ms[1]), title: String(ms[2] || "").trim() };
+    }
+
+    // Seção principal 9.
+    var mm = s.match(/^(\d+)\.\s*(.+)?$/);
+    if (mm) {
+      return { id: String(mm[1]), title: String(mm[2] || "").trim() };
+    }
+
+    return null;
+  }
+
+  // 1) encontra todos os headers
+  var headers = [];
+  for (var i = 0; i < lines.length; i++) {
+    if (!isHeaderLine_(lines[i])) continue;
+    var h = parseHeader_(lines[i]);
+    if (!h || !h.id) continue;
+    headers.push({ idx: i, id: h.id, title: h.title || "" });
+  }
+
+  // se não achou headers, cai no chunking antigo por tamanho (para não quebrar)
+  if (!headers.length) {
+    var outFallback = [];
+    for (var k = 0; k < text.length; k += Math.max(500, Number(chunkSize || 1200))) {
+      var sub = text.substring(k, k + Math.max(500, Number(chunkSize || 1200))).trim();
+      if (sub) outFallback.push(sub);
+    }
+    return outFallback;
+  }
+
+  // 2) cria chunks por seção/subseção/anexo
   var out = [];
-  var acc = "";
+  for (var j = 0; j < headers.length; j++) {
+    var start = headers[j].idx;
+    var end = (j + 1 < headers.length) ? headers[j + 1].idx : lines.length;
 
-  rawBlocks.forEach(function (block) {
-    if (!acc) {
-      acc = block;
-      return;
-    }
+    var id = headers[j].id;
+    var title = headers[j].title || "";
 
-    if ((acc.length + 2 + block.length) <= chunkSize) {
-      acc += "\n\n" + block;
+    var body = lines.slice(start, end).join("\n").trim();
+    if (!body) continue;
+
+    // prefixo para permitir roteamento por seção
+    var prefix = "§ " + id + " | " + (title || "") + "\n";
+    var chunk = prefix + body;
+
+    // 3) se ficar enorme, quebra internamente por blocos em branco, mas mantém o prefixo
+    if (chunk.length <= maxLen) {
+      out.push(chunk);
     } else {
-      out.push(acc.trim());
-      acc = block;
-    }
-  });
+      var blocks = body.split(/\n\s*\n+/).map(function(s){ return String(s||"").trim(); }).filter(Boolean);
 
-  if (acc) out.push(acc.trim());
-
-  // fallback: se algum bloco ficou gigante, fatia por tamanho bruto
-  var finalOut = [];
-  out.forEach(function (piece) {
-    if (piece.length <= chunkSize) {
-      finalOut.push(piece);
-      return;
+      var acc = "";
+      for (var b = 0; b < blocks.length; b++) {
+        var blk = blocks[b];
+        if (!acc) {
+          acc = blk;
+        } else if ((acc.length + 2 + blk.length) <= (maxLen - prefix.length)) {
+          acc += "\n\n" + blk;
+        } else {
+          out.push(prefix + acc.trim());
+          acc = blk;
+        }
+      }
+      if (acc) out.push(prefix + acc.trim());
     }
-    for (var i = 0; i < piece.length; i += chunkSize) {
-      var sub = piece.substring(i, i + chunkSize).trim();
-      if (sub) finalOut.push(sub);
-    }
-  });
+  }
 
-  return finalOut;
+  return out;
 }
 
 // -----------------------------
@@ -614,43 +751,84 @@ function vektorPolicyPickTopChunks_(question, chunks, topK) {
 
   var stop = {
     "de":1,"da":1,"do":1,"das":1,"dos":1,"a":1,"o":1,"e":1,"ou":1,"em":1,"no":1,"na":1,"nos":1,"nas":1,
-    "para":1,"por":1,"com":1,"sem":1,"uma":1,"um":1,"as":1,"os":1,"que":1,"como":1,"qual":1,"quais":1
+    "para":1,"por":1,"com":1,"sem":1,"uma":1,"um":1,"as":1,"os":1,"que":1,"como":1,"qual":1,"quais":1,
+    "é":1,"ser":1,"são":1,"sao":1,"tem":1,"ter":1,"vai":1,"pode":1,"posso":1
   };
 
-  var tokens = String(question || "")
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .split(/[^a-z0-9]+/g)
-    .map(function (t) { return String(t || "").trim(); })
-    .filter(function (t) { return t && t.length >= 3 && !stop[t]; });
-
-  var scored = chunks.map(function (chunk, idx) {
-    var base = String(chunk || "")
+  function norm_(s){
+    return String(s || "")
       .toLowerCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  }
+
+  var qNorm = norm_(question);
+
+  var tokens = qNorm
+    .split(/[^a-z0-9]+/g)
+    .map(function(t){ return String(t||"").trim(); })
+    .filter(function(t){ return t && t.length >= 3 && !stop[t]; });
+
+  // bigramas simples para melhorar match (ex.: "prestacao contas", "bloqueio preventivo")
+  var bigrams = [];
+  for (var i = 0; i < tokens.length - 1; i++) {
+    bigrams.push(tokens[i] + " " + tokens[i+1]);
+  }
+
+  // pergunta de permissão? aumenta peso de linguagem normativa
+  var isPermissionQ = /(pode|posso|permitid|proibid|autorizad|restric)/.test(qNorm);
+
+  var scored = (chunks || []).map(function(chunk, idx){
+    var base = norm_(chunk);
 
     var score = 0;
-    tokens.forEach(function (tok) {
+
+    // 1) overlap por token
+    tokens.forEach(function(tok){
       if (base.indexOf(tok) >= 0) score += 1;
     });
 
-    // bônus leve para blocos com palavras típicas da política
-    if (/(restric|responsab|prestac|gasto|cartao|cartão|limite|fraude|auditoria|consequenc)/i.test(chunk)) {
-      score += 0.5;
+    // 2) overlap por bigram (mais forte)
+    bigrams.forEach(function(bg){
+      if (base.indexOf(bg) >= 0) score += 3;
+    });
+
+    // 3) boost normativo (genérico para toda política)
+    // (fica mais forte quando a pergunta é "pode/não pode")
+    function addIf_(needle, pts){
+      if (base.indexOf(needle) >= 0) score += pts;
     }
 
-    return {
-      idx: idx,
-      chunk: chunk,
-      score: score
-    };
+    addIf_("restricoes de uso", isPermissionQ ? 35 : 15);
+    addIf_("e proibido",       isPermissionQ ? 28 : 12);
+    addIf_("proibido",         isPermissionQ ? 18 : 8);
+    addIf_("nao autorizado",   isPermissionQ ? 18 : 8);
+    addIf_("nao e permitido",  isPermissionQ ? 18 : 8);
+    addIf_("deve",             4);
+    addIf_("obrigatorio",      8);
+    addIf_("prazo",            6);
+    addIf_("48 horas",         10);
+    addIf_("bloqueio preventivo", 14);
+    addIf_("prestacao de contas", 14);
+    addIf_("servicenow",       10);
+    addIf_("troca de gerente", 18);
+    addIf_("mudanca entre lojas", 18);
+    addIf_("mudar de loja", 14);
+    addIf_("trocar de loja", 14);
+    addIf_("loja anterior", 12);
+    addIf_("loja nova", 12);
+    addIf_("cartao fisico deve ser levado", 18);
+
+    // 4) leve boost se o chunk é uma seção “alta” (tem prefixo §)
+    if (/^§\s*/.test(String(chunk || ""))) score += 2;
+
+    return { idx: idx, chunk: chunk, score: score };
   });
 
-  scored.sort(function (a, b) {
+  scored.sort(function(a,b){
     return (b.score - a.score) || (a.idx - b.idx);
   });
 
-  return scored.slice(0, topK).map(function (x) { return x.chunk; });
+  return scored.slice(0, topK).map(function(x){ return x.chunk; });
 }
 
 // =====================================================
@@ -907,7 +1085,8 @@ function vektorFmtUsdWithBrl_(usdValue){
 
 // -----------------------------
 // Chamada ao Vertex Gemini
-// -----------------------------
+// 
+
 function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
   var systemText =
   "Você é o Assistente da Política de Cartões Clara do Grupo SBF.\n" +
@@ -916,24 +1095,49 @@ function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
   "Não invente regras, exceções, prazos, valores, permissões ou interpretações.\n" +
   "Responda em português do Brasil, de forma natural, clara, objetiva e sem enrolação.\n" +
   "\n" +
+  "IMPORTANTE SOBRE OS TRECHOS:\n" +
+  "• Cada trecho começa com um cabeçalho no formato: \"§ <SEÇÃO> | <TÍTULO>\".\n" +
+  "• Use esse <SEÇÃO> como referência (ex.: § 9, § 8.1, § Anexo II).\n" +
+  "\n" +
   "Regras de exatidão:\n" +
-  "• Use linguagem determinística: \"deve\", \"não deve\", \"pode\", \"não pode\" apenas quando isso estiver explícito nos trechos.\n" +
-  "• Sempre que afirmar uma regra, cite a base no final: \"Base: Trecho X (item/subitem)\".\n" +
+  "• Use linguagem determinística (\"deve\", \"não deve\", \"pode\", \"não pode\") apenas quando isso estiver explícito nos trechos.\n" +
+  "• Sempre que afirmar uma regra, cite a base no final: \"Base: Trecho X — § <SEÇÃO>\".\n" +
   "• Se houver conflito entre trechos, sinalize o conflito e peça validação do time de Compliance.\n" +
   "\n" +
   "Formato da resposta:\n" +
   "1) Resposta direta em 1–2 parágrafos curtos.\n" +
   "2) Se existir exceção/condição, descreva como: \"Condição:\" / \"Exceção:\" / \"Ação:\".\n" +
-  "3) Final obrigatório: \"Base: Trecho X — item/subitem\" (ou \"Base insuficiente nos trechos fornecidos\").\n" +
+  "3) Final obrigatório: \"Base: Trecho X — § <SEÇÃO>\" (ou \"Base insuficiente nos trechos fornecidos\").\n" +
   "\n" +
   "Pergunta de esclarecimento (somente se necessário):\n" +
-  "• Se faltar um dado essencial para aplicar a regra (ex.: tipo de gasto, contexto, prazo), faça APENAS 1 pergunta objetiva.\n" +
+  "• Se faltar um dado essencial para aplicar a regra, faça APENAS 1 pergunta objetiva.\n" +
   "• Não gere hipóteses. Não responda com suposições.\n";
 
+  // ============================
+  // ✅ Histórico curto (para resolver “isso/isso aí”)
+  // ============================
+  function vektorPolicyFmtHistory_(hist) {
+    if (!Array.isArray(hist) || !hist.length) return "";
+    // usa só os últimos 2 itens (1 turno) para economizar tokens
+    var last = hist.slice(-2);
+    var out = last.map(function(h){
+      var role = String((h && h.role) || "").toLowerCase();
+      var text = String((h && h.text) || "");
+      // corta para não inflar tokens (ajuste se quiser)
+      if (text.length > 600) text = text.substring(0, 600) + "…";
+      if (role === "assistant") return "ASSISTENTE (anterior): " + text;
+      return "USUÁRIO (anterior): " + text;
+    }).join("\n");
+    return out ? ("CONTEXTO DA CONVERSA (último turno):\n" + out + "\n\n") : "";
+  }
+
+  var histText = vektorPolicyFmtHistory_(history);
+
   var userText =
-    "PERGUNTA DO USUÁRIO:\n" + String(question || "").trim() + "\n\n" +
+    histText +
+    "PERGUNTA DO USUÁRIO (atual):\n" + String(question || "").trim() + "\n\n" +
     "TRECHOS DA POLÍTICA:\n\n" +
-    topChunks.map(function (t, i) {
+    (topChunks || []).map(function (t, i) {
       return "Trecho " + (i + 1) + ":\n" + t;
     }).join("\n\n");
 
@@ -980,51 +1184,50 @@ function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
 
   var json = JSON.parse(body);
 
-// Junta TODAS as parts de texto (evita resposta truncada)
-var parts =
-  json &&
-  json.candidates &&
-  json.candidates[0] &&
-  json.candidates[0].content &&
-  json.candidates[0].content.parts;
+  // Junta TODAS as parts de texto
+  var parts =
+    json &&
+    json.candidates &&
+    json.candidates[0] &&
+    json.candidates[0].content &&
+    json.candidates[0].content.parts;
 
-var answer = "";
-if (Array.isArray(parts) && parts.length) {
-  answer = parts.map(function (p) {
-    return String((p && p.text) || "");
-  }).join("\n").trim();
-}
+  var answer = "";
+  if (Array.isArray(parts) && parts.length) {
+    answer = parts.map(function (p) {
+      return String((p && p.text) || "");
+    }).join("\n").trim();
+  }
 
-if (!answer) {
-  throw new Error("Vertex retornou resposta vazia.");
-}
+  if (!answer) {
+    throw new Error("Vertex retornou resposta vazia.");
+  }
 
-// usageMetadata oficial do Vertex
-var usage = (json && json.usageMetadata) ? json.usageMetadata : {};
-var promptTokens = Number(usage.promptTokenCount || 0);
-var outputTokens = Number(usage.candidatesTokenCount || 0);
-var totalTokens = (promptTokens + outputTokens);
-var modelVersion = String((json && json.modelVersion) || VEKTOR_VERTEX_MODEL);
+  // usageMetadata oficial do Vertex
+  var usage = (json && json.usageMetadata) ? json.usageMetadata : {};
+  var promptTokens = Number(usage.promptTokenCount || 0);
+  var outputTokens = Number(usage.candidatesTokenCount || 0);
+  var totalTokens = (promptTokens + outputTokens);
+  var modelVersion = String((json && json.modelVersion) || VEKTOR_VERTEX_MODEL);
 
-// usuário atual (se disponível)
-var email = "";
-try {
-  var ctx = vektorGetUserRole_();
-  email = String((ctx && ctx.email) || "");
-} catch (_) {}
+  // usuário atual (se disponível)
+  var email = "";
+  try {
+    var ctx = vektorGetUserRole_();
+    email = String((ctx && ctx.email) || "");
+  } catch (_) {}
 
-// registra consumo do mês
-vektorVertexTrackUsage_({
-  model: VEKTOR_VERTEX_MODEL,
-  modelVersion: modelVersion,
-  promptTokens: promptTokens,
-  outputTokens: outputTokens,
-  totalTokens: totalTokens,
-  userEmail: email
-});
+  // registra consumo do mês
+  vektorVertexTrackUsage_({
+    model: VEKTOR_VERTEX_MODEL,
+    modelVersion: modelVersion,
+    promptTokens: promptTokens,
+    outputTokens: outputTokens,
+    totalTokens: totalTokens,
+    userEmail: email
+  });
 
-return answer;
-
+  return answer;
 }
 
 // ✅ ID da planilha de métricas do Vektor
