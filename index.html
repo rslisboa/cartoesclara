@@ -14982,7 +14982,15 @@ window.vektorOpenPolicyAssistant = function () {
   window.vektorShowChatView();
 };
 
+window.__vektorPolicyHistory = window.__vektorPolicyHistory || [];
+
 window.vektorSendPolicyQuestion_ = function (pergunta) {
+  // guarda pergunta no histórico do modo policy (não mistura com chat legacy)
+  window.__vektorPolicyHistory.push({ role: "user", text: String(pergunta || "") });
+
+  // envia só os últimos 4 itens (2 turnos) pra não estourar tokens
+  var hist = window.__vektorPolicyHistory.slice(-4);
+
   google.script.run
     .withSuccessHandler(function (res) {
       if (!res || !res.ok) {
@@ -14990,12 +14998,15 @@ window.vektorSendPolicyQuestion_ = function (pergunta) {
         return;
       }
       renderBotMessage(String(res.answer || ""));
+
+      // guarda resposta no histórico
+      window.__vektorPolicyHistory.push({ role: "assistant", text: String(res.answer || "") });
     })
     .withFailureHandler(function (err) {
       var msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
       renderBotMessage("Erro ao chamar a IA da política: " + msg);
     })
-    .vektorPolicyAssistantAsk(pergunta, []);
+    .vektorPolicyAssistantAsk(pergunta, hist);
 };
 
 function renderSaudacaoVektor_() {
