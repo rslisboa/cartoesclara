@@ -3611,8 +3611,7 @@ function getUltimasDemissoesGerentes() {
         FORMAT_DATE('%d/%m/%Y', dat_afastamento_date) AS dat_afastamento
       FROM base
       WHERE dat_afastamento_date IS NOT NULL
-        AND dat_afastamento_date >= DATE_TRUNC(CURRENT_DATE("America/Sao_Paulo"), MONTH)
-        AND dat_afastamento_date < DATE_ADD(DATE_TRUNC(CURRENT_DATE("America/Sao_Paulo"), MONTH), INTERVAL 1 MONTH)
+        AND dat_afastamento_date >= DATE("2025-12-01")
       ORDER BY dat_afastamento_date DESC
     `;
 
