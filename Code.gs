@@ -530,24 +530,25 @@ function vektorPolicyAssistantAsk(question, history) {
 
       var wantsPermission = /(pode|posso|permitid|proibid|autorizad|restriç|restric)/.test(s);
       var wantsAccountability = /(nota|comprovante|cupom|recibo|etiqueta|descri|prestação|prestacao|48\s*h|bloque)/.test(s);
-      var wantsLimit = /(limite|aumento|ciclo|dia\s*06|fatura|reestabelec)/.test(s);
+      var wantsLimit = /(limite|aumento de limite|aumentar limite|alterar limite|mudan[cç]a de limite|consultar limite|ver o limite|limite dispon[ií]vel|dia\s*06|fatura|reestabelec)/.test(s);
       var wantsFraud = /(fraude|auditoria|monitoramento|canal|denúnc|denunc)/.test(s);
       var wantsRoles = /(responsabil|portador|financeiro|contas a receber|gerente|líder|lider|supervisor)/.test(s);
       var wantsDefs = /(defini|sigla|o que é|o que e|conceito)/.test(s);
       var wantsServicenow = /(servicenow|chamado|abertura de chamado|fluxo|solicita)/.test(s);
-      var wantsStoreChange =
-  /(trocar de loja|troca de loja|troca de gerente|mudan[cç]a entre lojas|mudar de loja|transfer[êe]ncia|transferir|loja anterior|loja nova)/.test(s);
+      var wantsStoreChange = /(trocar de loja|troca de loja|troca de gerente|mudan[cç]a entre lojas|mudar de loja|transfer[êe]ncia|transferir|loja anterior|loja nova)/.test(s);
+      var wantsLabels = /(etiqueta|etiquetas|rotul|r[oó]tulo|classific|sap|quadro de etiquetas|anexo i)/.test(s);
 
       var sec = [];
       // Regras principais por tema
       if (wantsPermission) sec.push("9");                  // Restrições de uso
       if (wantsAccountability) sec.push("8", "8.1");       // Prestação / Bloqueio
-      if (wantsLimit) sec.push("7");                       // Limite dos cartões
+      if (wantsLimit) sec.push("7", "Anexo II");           // Limite dos cartões
       if (wantsFraud) sec.push("10", "10.1");              // Monitoramento / Canal
       if (wantsRoles) sec.push("5");                       // Responsabilidades
       if (wantsDefs) sec.push("4");                        // Definições
       if (wantsServicenow) sec.push("Anexo II");           // Solicitações no ServiceNow
       if (wantsStoreChange) sec.push("Anexo II", "5");
+      if (wantsLabels) sec.push("Anexo I", "8");
 
       // fallback: se nada casou, não força seção (deixa ranker escolher)
       return sec;
@@ -817,6 +818,20 @@ function vektorPolicyPickTopChunks_(question, chunks, topK) {
     addIf_("loja anterior", 12);
     addIf_("loja nova", 12);
     addIf_("cartao fisico deve ser levado", 18);
+    addIf_("limite", 10);
+    addIf_("aumento de limite", 18);
+    addIf_("solicitacao de aumento de limite", 22);
+    addIf_("servicenow", 12);
+    addIf_("limite disponivel", 12);
+    addIf_("dia 06", 10);
+    addIf_("ciclo de faturamento", 12);
+    addIf_("anexo i", 18);
+    addIf_("quadro de etiquetas", 24);
+    addIf_("etiqueta", 16);
+    addIf_("codigo sap", 14);
+    addIf_("agua potavel", 22);
+    addIf_("agua potavel", 22); // (se você usa normalize sem acento, basta 1)
+    addIf_("agua potavel", 22);
 
     // 4) leve boost se o chunk é uma seção “alta” (tem prefixo §)
     if (/^§\s*/.test(String(chunk || ""))) score += 2;
@@ -1096,19 +1111,24 @@ function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
   "Responda em português do Brasil, de forma natural, clara, objetiva e sem enrolação.\n" +
   "\n" +
   "IMPORTANTE SOBRE OS TRECHOS:\n" +
+  "• O <TÍTULO> é o texto após a barra \"|\" no cabeçalho do trecho.\n" +
   "• Cada trecho começa com um cabeçalho no formato: \"§ <SEÇÃO> | <TÍTULO>\".\n" +
   "• Use esse <SEÇÃO> como referência (ex.: § 9, § 8.1, § Anexo II).\n" +
   "\n" +
   "Regras de exatidão:\n" +
   "• Use linguagem determinística (\"deve\", \"não deve\", \"pode\", \"não pode\") apenas quando isso estiver explícito nos trechos.\n" +
-  "• Sempre que afirmar uma regra, cite a base no final: \"Base: Trecho X — § <SEÇÃO>\".\n" +
+  "• Sempre que afirmar uma regra, cite a base no final usando a seção e o título: \"Base: § <SEÇÃO> — <TÍTULO>\".\n" +
   "• Se houver conflito entre trechos, sinalize o conflito e peça validação do time de Compliance.\n" +
   "\n" +
   "Formato da resposta:\n" +
   "1) Resposta direta em 1–2 parágrafos curtos.\n" +
   "2) Se existir exceção/condição, descreva como: \"Condição:\" / \"Exceção:\" / \"Ação:\".\n" +
-  "3) Final obrigatório: \"Base: Trecho X — § <SEÇÃO>\" (ou \"Base insuficiente nos trechos fornecidos\").\n" +
+  "3) Final obrigatório: \"Base: § <SEÇÃO> — <TÍTULO>\" (ou \"Base insuficiente nos trechos fornecidos\").\n" +
   "\n" +
+  "Regras para consultas de ETIQUETAS (Anexo I):\n" +
+  "• Se o usuário pedir a lista completa de etiquetas, NÃO cole a tabela inteira.\n" +
+  "• Responda com um resumo curto (ex.: 5–10 exemplos) e oriente que a lista completa está no Anexo I.\n" +
+  "• Se o usuário perguntar por um item específico (ex.: água potável), indique diretamente a etiqueta correspondente.\n" +
   "Pergunta de esclarecimento (somente se necessário):\n" +
   "• Se faltar um dado essencial para aplicar a regra, faça APENAS 1 pergunta objetiva.\n" +
   "• Não gere hipóteses. Não responda com suposições.\n";
@@ -1134,12 +1154,21 @@ function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
   var histText = vektorPolicyFmtHistory_(history);
 
   var userText =
-    histText +
-    "PERGUNTA DO USUÁRIO (atual):\n" + String(question || "").trim() + "\n\n" +
-    "TRECHOS DA POLÍTICA:\n\n" +
-    (topChunks || []).map(function (t, i) {
-      return "Trecho " + (i + 1) + ":\n" + t;
-    }).join("\n\n");
+  histText +
+  "PERGUNTA DO USUÁRIO (atual):\n" + String(question || "").trim() + "\n\n" +
+  "TRECHOS DA POLÍTICA:\n\n" +
+  (topChunks || []).map(function (t, i) {
+    var s = String(t || "");
+    // Cabeçalho esperado no início do chunk: "§ <SEÇÃO> | <TÍTULO>\n"
+    var m = s.match(/^§\s*([^\|]+)\|\s*([^\n]+)\n/);
+    var sec = m ? String(m[1] || "").trim() : "";
+    var ttl = m ? String(m[2] || "").trim() : "";
+
+    // Exibe o nome da seção/título para facilitar citação na "Base"
+    var head = (sec || ttl) ? ("§ " + sec + " — " + ttl) : ("Trecho " + (i + 1));
+
+    return "Trecho " + (i + 1) + " (" + head + "):\n" + s;
+  }).join("\n\n");
 
   var url =
     "https://" + VEKTOR_VERTEX_LOCATION + "-aiplatform.googleapis.com/v1/" +
