@@ -4674,7 +4674,7 @@ display: none;
 
   <!-- MODAL: TIMES DA FATURA -->
   <div id="auxTimesModal" class="hidden"
-       style="position:absolute; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:18px;">
+     style="position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:18px;">
     <div style="width:min(980px, 96vw); max-height:86vh; overflow:hidden; background:#fff; border-radius:16px; border:1px solid rgba(148,163,184,0.25); display:flex; flex-direction:column;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid rgba(148,163,184,0.22); background:#0b1220;">
         <div>
@@ -6633,9 +6633,10 @@ function vektorShowRadarView_() {
   const envPendModal = document.getElementById("envPendModal");
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
+  const consultasAuxView = document.getElementById("consultasAuxView");
 
   // fecha TODAS
-  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView].forEach(v => {
+  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -6657,6 +6658,7 @@ function vektorShowFeedbackView_() {
   const feedbackView = document.getElementById("feedbackView");
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
+  const consultasAuxView = document.getElementById("consultasAuxView");
 
   // fecha as demais páginas
   if (chatView) chatView.classList.add("hidden");
@@ -6669,6 +6671,7 @@ function vektorShowFeedbackView_() {
 
   // opcional: garante estado do radar
   if (radarView) radarView.classList.remove("is-open");
+  if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
 }
 
 function vektorShowFluxogramaView_() {
@@ -6682,8 +6685,9 @@ function vektorShowFluxogramaView_() {
   const envPendModal = document.getElementById("envPendModal");
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
+  const consultasAuxView = document.getElementById("consultasAuxView");
 
-  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView, consultasAuxView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -6776,8 +6780,9 @@ function vektorShowEnvioPendenciasView_() {
   const envPendModal = document.getElementById("envPendModal");
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
+  const consultasAuxView = document.getElementById("consultasAuxView");
 
-  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView, consultasAuxView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7499,8 +7504,9 @@ function vektorShowAnaliseGastosView_() {
   const cicloResumoView = document.getElementById("cicloResumoView");
   const homeView = document.getElementById("homeView");
   const analiseGastosView = document.getElementById("analiseGastosView");
+  const consultasAuxView = document.getElementById("consultasAuxView");
 
-  [chatView, radarView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -12381,8 +12387,9 @@ function vektorShowMyAlertsView_() {
   const envPendModal = document.getElementById("envPendModal");
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
+  const consultasAuxView = document.getElementById("consultasAuxView");
 
-  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView].forEach(v => {
+  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView, consultasAuxView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -14412,6 +14419,7 @@ window.vektorShowResumoCicloView_ = function () {
   const envView = document.getElementById("envioPendView");
   const cicloView = document.getElementById("cicloResumoView");
   const analiseGastosView = document.getElementById("analiseGastosView");
+  const consultasAuxView = document.getElementById("consultasAuxView");
 
   // ✅ fecha outras views (hidden + display none)
   if (chatView) { chatView.classList.add("hidden"); chatView.style.display = "none"; }
@@ -14421,6 +14429,7 @@ window.vektorShowResumoCicloView_ = function () {
   if (fluxView) { fluxView.classList.add("hidden"); fluxView.style.display = "none"; }
   if (envView) { envView.classList.add("hidden"); envView.style.display = "none"; }
   if (analiseGastosView) { analiseGastosView.classList.add("hidden"); analiseGastosView.style.display = "none"; }
+  if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
 
   // ✅ abre resumo do ciclo
   if (cicloView) {
