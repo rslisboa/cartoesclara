@@ -2463,6 +2463,16 @@ display: none;
       <span class="vektor-nav-label">Envio de Pendências</span>
     </button>
 
+    <button
+  type="button"
+  onclick="window.vektorOpenConsultasAuxiliares()"
+  title="Consultas Auxiliares"
+  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+>
+  <span class="vektor-nav-ico" aria-hidden="true">🧾</span>
+  <span class="vektor-nav-label">Consultas Auxiliares</span>
+</button>
+
   <? } ?>
 
 </div>
@@ -4599,6 +4609,89 @@ display: none;
 
     </div>
   </main>
+</div>
+
+<!-- VIEW: CONSULTAS AUXILIARES (sobrepõe SOMENTE a área do chat) -->
+<div id="consultasAuxView" class="hidden" style="position:absolute; inset:0; z-index:20;">
+
+  <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column;">
+
+      <!-- Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid rgba(226,232,240,1); background:#0b1220;">
+        <div>
+          <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Consultas Auxiliares</div>
+          <div style="color:rgba(226,232,240,0.9); font-size:12px; margin-top:2px;">
+            Faturas (BaseClara) + Desligamentos de Gerentes (BigQuery)
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button"
+                  onclick="window.vektorAuxShowDemissoes()"
+                  style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                         background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+            Analisar Dem.
+          </button>
+
+          <button id="auxBtnVoltarFaturas" type="button"
+                  onclick="window.vektorAuxShowFaturas()"
+                  style="display:none; height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                         background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+            Voltar p/ Faturas
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div style="flex:1; background:#0b1220; padding:14px 16px; overflow:auto; display:flex; flex-direction:column; gap:12px;">
+
+        <!-- PAINEL: FATURAS (default) -->
+        <section id="auxFaturasPanel" style="background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
+          <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
+            <div style="font-weight:900; color:#0f172a;">Faturas (BaseClara)</div>
+            <div style="font-weight:700; color:#64748b; font-size:12px;">
+              Clique na linha da fatura para ver detalhamento por time (modal). “Extrair dados” abre o relatório de transações.
+            </div>
+          </div>
+          <div id="auxFaturasConteudo" style="padding:12px;"></div>
+        </section>
+
+        <!-- PAINEL: DEMISSÕES (hidden por default) -->
+        <section id="auxDemPanel" style="display:none; background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
+          <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
+            <div style="font-weight:900; color:#0f172a;">Gerentes demitidos (BigQuery)</div>
+            <div style="font-weight:700; color:#64748b; font-size:12px;">
+              Lista do mês atual (Senior/RH).
+            </div>
+          </div>
+          <div id="auxDemConteudo" style="padding:12px;"></div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- MODAL: TIMES DA FATURA -->
+  <div id="auxTimesModal" class="hidden"
+       style="position:absolute; inset:0; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; padding:18px;">
+    <div style="width:min(980px, 96vw); max-height:86vh; overflow:hidden; background:#fff; border-radius:16px; border:1px solid rgba(148,163,184,0.25); display:flex; flex-direction:column;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid rgba(148,163,184,0.22); background:#0b1220;">
+        <div>
+          <div id="auxTimesModalTitle" style="color:#fff; font-weight:1000;">Times da fatura</div>
+          <div id="auxTimesModalSub" style="color:rgba(226,232,240,0.9); font-size:12px; font-weight:800;"></div>
+        </div>
+        <button type="button" onclick="window.vektorAuxCloseTimesModal()"
+                style="height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                       background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+          Fechar
+        </button>
+      </div>
+
+      <div id="auxTimesModalBody" style="padding:12px; overflow:auto;"></div>
+    </div>
+  </div>
+
 </div>
 
  <!-- VIEW: FEEDBACK (sobrepõe SOMENTE a área do chat) -->
@@ -12304,6 +12397,43 @@ function vektorShowMyAlertsView_() {
 
   if (radarView) radarView.classList.remove("is-open");
 }
+
+function vektorShowConsultasAuxView_(){
+  const ids = [
+    "chatView",
+    "radarView",
+    "feedbackView",
+    "myAlertsView",
+    "fluxogramaView",
+    "envioPendView",
+    "cicloResumoView",
+    "homeView",
+    "analiseGastosView",
+    "consultasAuxView"
+  ];
+
+  ids.forEach(function(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add("hidden");
+    el.style.display = "none";
+  });
+
+  const v = document.getElementById("consultasAuxView");
+  if (v) {
+    v.classList.remove("hidden");
+    v.style.display = "block";
+  }
+
+  const radarView = document.getElementById("radarView");
+  if (radarView) radarView.classList.remove("is-open");
+}
+
+window.vektorOpenConsultasAuxiliares = function(){
+  vektorShowConsultasAuxView_();
+  window.vektorAuxShowFaturas();     // default: faturas visíveis
+  window.vektorAuxLoadFaturas();     // carrega tabela na abertura
+};
 
 window.vektorOpenMyAlerts = function () {
   vektorShowMyAlertsView_();
@@ -25580,6 +25710,134 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
   return partes.join("");
 }
 
+window.vektorAuxLoadFaturas = function(){
+  const box = document.getElementById("auxFaturasConteudo");
+  if (!box) return;
+
+  box.innerHTML =
+    "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Carregando faturas (BaseClara)…</span></div>";
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      try {
+        if (!res || !res.ok || !Array.isArray(res.faturas)) {
+          box.innerHTML = "<p class='text-sm text-slate-700'>Não consegui consultar as faturas agora.</p>";
+          return;
+        }
+
+        const faturas = res.faturas || [];
+        // tabela “igual ao chat”
+        const htmlTabela = vektorMontarTabelaFaturas_("Tabela completa de faturas (BaseClara)", faturas);
+
+        // insights (igual ao chat) — se você quiser manter
+        let htmlInsights = "";
+        try {
+          htmlInsights = analisarFaturas(faturas) || "";
+        } catch(_) {}
+
+        box.innerHTML =
+          "<div>" +
+            htmlTabela +
+            (htmlInsights ? ("<div class='mt-2'>" + htmlInsights + "</div>") : "") +
+          "</div>";
+
+      } catch (e) {
+        console.error("Erro ao renderizar faturas (aux):", e);
+        box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao renderizar tabela de faturas.</p>";
+      }
+    })
+    .withFailureHandler(function(err){
+      console.error("Erro Apps Script (getResumoFaturasClara):", err);
+      const msg = (err && err.message) ? err.message : String(err || "");
+      box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao consultar faturas: " + msg + "</p>";
+    })
+    .getResumoFaturasClara();
+};
+
+window.vektorAuxShowFaturas = function(){
+  const pFat = document.getElementById("auxFaturasPanel");
+  const pDem = document.getElementById("auxDemPanel");
+  const btnV = document.getElementById("auxBtnVoltarFaturas");
+
+  if (pFat) pFat.style.display = "block";
+  if (pDem) pDem.style.display = "none";
+  if (btnV) btnV.style.display = "none";
+};
+
+window.vektorAuxShowDemissoes = function(){
+  const pFat = document.getElementById("auxFaturasPanel");
+  const pDem = document.getElementById("auxDemPanel");
+  const btnV = document.getElementById("auxBtnVoltarFaturas");
+
+  if (pFat) pFat.style.display = "none";
+  if (pDem) pDem.style.display = "block";
+  if (btnV) btnV.style.display = "inline-flex";
+
+  window.vektorAuxLoadDemissoes();
+};
+
+window.vektorAuxLoadDemissoes = function(){
+  const box = document.getElementById("auxDemConteudo");
+  if (!box) return;
+
+  box.innerHTML =
+    "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Consultando desligamentos (BigQuery)…</span></div>";
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      try {
+        if (!res || !res.ok || !Array.isArray(res.rows)) {
+          box.innerHTML = "<p class='text-sm text-slate-700'>Não consegui consultar as demissões agora.</p>";
+          return;
+        }
+
+        const rows = res.rows || [];
+        if (!rows.length) {
+          box.innerHTML = "<p class='text-sm text-slate-700'>Nenhuma demissão encontrada no mês atual.</p>";
+          return;
+        }
+
+        let html = "";
+        html += "<div style='overflow:auto; border:1px solid #e2e8f0; border-radius:12px;'>";
+        html += "<table style='width:100%; border-collapse:separate; border-spacing:0; font-size:12px;'>";
+        html += "<thead><tr style='background:#0b1220; color:#fff;'>";
+        html += "<th style='padding:8px; text-align:left;'>Matrícula</th>";
+        html += "<th style='padding:8px; text-align:left;'>E-mail</th>";
+        html += "<th style='padding:8px; text-align:left;'>Cargo</th>";
+        html += "<th style='padding:8px; text-align:left;'>Filial</th>";
+        html += "<th style='padding:8px; text-align:left;'>Status</th>";
+        html += "<th style='padding:8px; text-align:left;'>Data</th>";
+        html += "</tr></thead><tbody>";
+
+        rows.forEach(function(r){
+          html += "<tr>";
+          html += "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + (r.matricula || "") + "</td>";
+          html += "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + (r.des_email_corporativo || "") + "</td>";
+          html += "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + (r.des_titulo_cargo || "") + "</td>";
+          html += "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + (r.nom_apelido_filial || "") + "</td>";
+          html += "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + (r.nom_afastamento || "") + "</td>";
+          html += "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + (r.dat_afastamento || "") + "</td>";
+          html += "</tr>";
+        });
+
+        html += "</tbody></table></div>";
+        html += "<p class='mt-2 text-sm text-slate-700'><b>Atenção:</b> Verifique bloqueio/cancelamento do cartão e desabilite o perfil na Clara.</p>";
+
+        box.innerHTML = html;
+
+      } catch(e){
+        console.error("Erro ao renderizar demissões (aux):", e);
+        box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao renderizar tabela de demissões.</p>";
+      }
+    })
+    .withFailureHandler(function(err){
+      console.error("Erro Apps Script (getUltimasDemissoesGerentes):", err);
+      const msg = (err && err.message) ? err.message : String(err || "");
+      box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao consultar demissões: " + msg + "</p>";
+    })
+    .getUltimasDemissoesGerentes();
+};
+
 // ===================================================================
 // TÓPICO 3 – Insights automáticos: TIMES
 // ===================================================================
@@ -25969,83 +26227,128 @@ function vektorGerarInsightsPendenciasLojas(linhas) {
   return html;
 }
 
-// Drilldown: ao clicar numa fatura, detalha por TIME
+window.vektorAuxCloseTimesModal = function(){
+  const m = document.getElementById("auxTimesModal");
+  if (m) { m.classList.add("hidden"); m.style.display = "none"; }
+};
+
+window.vektorAuxOpenTimesModal = function(titulo, subtitulo, innerHtml){
+  const m = document.getElementById("auxTimesModal");
+  const t = document.getElementById("auxTimesModalTitle");
+  const s = document.getElementById("auxTimesModalSub");
+  const b = document.getElementById("auxTimesModalBody");
+
+  if (t) t.textContent = titulo || "Times da fatura";
+  if (s) s.textContent = subtitulo || "";
+  if (b) b.innerHTML = innerHtml || "";
+
+  if (m) { m.classList.remove("hidden"); m.style.display = "flex"; }
+};
+
+// Drilldown: ao clicar numa fatura, detalha por TIME (AGORA EM MODAL)
 window.vektorDrillTimesFatura = function (tr) {
   try {
     if (!tr) return;
+
+    const auxView = document.getElementById("consultasAuxView");
+    const auxAtivo = auxView && !auxView.classList.contains("hidden") && (auxView.style.display !== "none");
+
+    // Se não estiver na página Aux, mantém o comportamento antigo (não quebra o resto do sistema)
+    if (!auxAtivo) {
+      // ---- fallback (se você quiser zerar o chat de vez, apague este bloco) ----
+      var extratoOld = tr.getAttribute("data-extrato-fatura") || "";
+      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Abra a página <b>Consultas Auxiliares</b> para detalhar faturas por time.</p>");
+      return;
+    }
 
     var extrato = tr.getAttribute("data-extrato-fatura") || "";
     var dataInicioIso = tr.getAttribute("data-inicio-fatura") || "";
     var dataFimIso = tr.getAttribute("data-fim-fatura") || "";
 
-    extrato = extrato.trim();
-
-    if (!extrato) {
-      renderBotMessage(
-        "HTML:<p class='text-sm text-slate-700'>Não consegui identificar o extrato dessa fatura para detalhar por time.</p>"
-      );
-      return;
-    }
-
     var periodoTexto = "";
-    if (dataInicioIso || dataFimIso) {
-      var ini = dataInicioIso ? new Date(dataInicioIso).toLocaleDateString("pt-BR") : "";
-      var fim = dataFimIso ? new Date(dataFimIso).toLocaleDateString("pt-BR") : "";
-      if (ini || fim) {
-        periodoTexto = "Período: " + ini + (fim ? " até " + fim : "");
-      }
-    }
+    try {
+      const ini = dataInicioIso ? new Date(dataInicioIso).toLocaleDateString("pt-BR") : "";
+      const fim = dataFimIso ? new Date(dataFimIso).toLocaleDateString("pt-BR") : "";
+      if (ini || fim) periodoTexto = "Período: " + ini + (fim ? " até " + fim : "");
+    } catch(_) {}
 
-    // Mensagem de contexto no chat
-    renderBotMessage(
-      "HTML:<p class='text-sm text-slate-700'>" +
-        "Detalhando a fatura <b>" + extrato +
-        "</b> por <b>time</b>, considerando o mesmo ciclo do 'Extrato da conta'." +
-        (periodoTexto ? "<br><span class='text-xs text-slate-500'>" + periodoTexto + "</span>" : "") +
-      "</p>"
+    window.vektorAuxOpenTimesModal(
+      "Times da fatura",
+      (extrato ? ("Fatura: " + extrato + (periodoTexto ? (" | " + periodoTexto) : "")) : (periodoTexto || "")),
+      "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Carregando times…</span></div>"
     );
 
     google.script.run
       .withSuccessHandler(function (res) {
-        if (!res || !res.ok || !Array.isArray(res.times) || !res.times.length) {
-          renderBotMessage(
-            "HTML:<p class='text-sm text-slate-700'>Não encontrei transações por time para essa fatura.</p>"
-          );
-          return;
-        }
+        try {
+          if (!res || !res.ok || !Array.isArray(res.times) || !res.times.length) {
+            window.vektorAuxOpenTimesModal(
+              "Times da fatura",
+              (extrato ? ("Fatura: " + extrato) : ""),
+              "<p class='text-sm text-slate-700'>Não encontrei transações por time para essa fatura.</p>"
+            );
+            return;
+          }
 
-        // Reaproveita o renderizador padrão de resumo por time
-        renderResumoTransacoesPorTime(res, {
-          titulo: "Times dessa fatura",
-          periodoTexto: periodoTexto
-        });
+          // res.times esperado: [{time, total, valorTotal}, ...]
+          const linhas = res.times.slice();
+
+          // ordena por valorTotal desc
+          linhas.sort(function(a,b){
+            return (Number(b.valorTotal)||0) - (Number(a.valorTotal)||0);
+          });
+
+          let html = "";
+          html += "<div style='overflow:auto; border:1px solid #e2e8f0; border-radius:12px;'>";
+          html += "<table style='width:100%; border-collapse:separate; border-spacing:0; font-size:12px;'>";
+          html += "<thead><tr style='background:#0b1220; color:#fff;'>";
+          html += "<th style='padding:8px; text-align:left;'>Time</th>";
+          html += "<th style='padding:8px; text-align:right;'>Valor (R$)</th>";
+          html += "<th style='padding:8px; text-align:right;'>Qtd</th>";
+          html += "</tr></thead><tbody>";
+
+          linhas.forEach(function(x){
+            const nome = String(x.time || x.grupo || x.nome || "—");
+            const val  = Number(x.valorTotal || x.valor || 0);
+            const qtd  = Number(x.total || x.qtd || 0);
+
+            const valFmt = val.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+            html += "<tr>";
+            html += "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + nome + "</td>";
+            html += "<td style='padding:8px; border-top:1px solid #e2e8f0; text-align:right;'>" + valFmt + "</td>";
+            html += "<td style='padding:8px; border-top:1px solid #e2e8f0; text-align:right;'>" + qtd.toLocaleString("pt-BR") + "</td>";
+            html += "</tr>";
+          });
+
+          html += "</tbody></table></div>";
+
+          window.vektorAuxOpenTimesModal(
+            "Times da fatura",
+            (extrato ? ("Fatura: " + extrato + (periodoTexto ? (" | " + periodoTexto) : "")) : (periodoTexto || "")),
+            html
+          );
+
+        } catch (e) {
+          console.error("Erro render modal times fatura:", e);
+          window.vektorAuxOpenTimesModal(
+            "Times da fatura",
+            (extrato ? ("Fatura: " + extrato) : ""),
+            "<p class='text-sm text-slate-700'>Erro ao renderizar detalhamento por time.</p>"
+          );
+        }
       })
       .withFailureHandler(function (err) {
         console.error("Erro ao detalhar fatura por time:", err);
-
-              vektorRegistrarContexto({
-                  ultimaIntencao: "fatura_times",
-                  ultimoPeriodo: {
-                    dataInicioIso: dataInicioIso || "",
-                    dataFimIso: dataFimIso || ""
-                  },
-                  ultimaLoja: null,
-                  ultimaAcaoExplicavel: {
-                    tipo: "tabela_times_fatura",
-                    meta: {
-                      extrato: extrato,
-                      periodoTexto: periodoTexto
-                    }
-                  }
-                });
-
-        renderBotMessage(
-          "HTML:<p class='text-sm text-slate-700'>Ocorreu um erro ao buscar o detalhamento por time para essa fatura.</p>"
+        window.vektorAuxOpenTimesModal(
+          "Times da fatura",
+          (extrato ? ("Fatura: " + extrato) : ""),
+          "<p class='text-sm text-slate-700'>Ocorreu um erro ao buscar o detalhamento por time para essa fatura.</p>"
         );
       })
-      .getResumoTransacoesPorTimeExtrato(extrato, "valor");  // usa EXTRATO
+      .getResumoTransacoesPorTimeExtrato(extrato, "valor");
+
   } catch (e) {
-    console.error("Erro em vektorDrillTimesFatura:", e);
+    console.error("Erro em vektorDrillTimesFatura (modal):", e);
   }
 };
 
