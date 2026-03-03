@@ -2377,7 +2377,7 @@ display: none;
   title="Assistente Política Clara"
   class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
 >
-  <span class="vektor-nav-ico" aria-hidden="true">📘</span>
+  <span class="vektor-nav-ico" aria-hidden="true">🤖</span>
   <span class="vektor-nav-label">Assistente Política Clara</span>
 </button>
 
@@ -4622,7 +4622,7 @@ display: none;
         <div>
           <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Consultas Auxiliares</div>
           <div style="color:rgba(226,232,240,0.9); font-size:12px; margin-top:2px;">
-            Faturas (BaseClara) + Desligamentos de Gerentes (BigQuery)
+            Faturas + Desligamentos de Gerentes (BigQuery)
           </div>
         </div>
 
@@ -4649,7 +4649,7 @@ display: none;
         <!-- PAINEL: FATURAS (default) -->
         <section id="auxFaturasPanel" style="background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
           <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
-            <div style="font-weight:900; color:#0f172a;">Faturas (BaseClara)</div>
+            <div style="font-weight:900; color:#0f172a;">Faturas (Base de Transações Clara)</div>
             <div style="font-weight:700; color:#64748b; font-size:12px;">
               Clique na linha da fatura para ver detalhamento por time (modal). “Extrair dados” abre o relatório de transações.
             </div>
@@ -25707,7 +25707,7 @@ window.vektorAuxLoadFaturas = function(){
   if (!box) return;
 
   box.innerHTML =
-    "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Carregando faturas (BaseClara)…</span></div>";
+    "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Carregando faturas…</span></div>";
 
   google.script.run
     .withSuccessHandler(function(res){
@@ -25719,7 +25719,7 @@ window.vektorAuxLoadFaturas = function(){
 
         const faturas = res.faturas || [];
         // tabela “igual ao chat”
-        const htmlTabela = vektorMontarTabelaFaturas_("Tabela completa de faturas (BaseClara)", faturas);
+        const htmlTabela = vektorMontarTabelaFaturas_("Tabela completa de faturas", faturas);
 
         // insights (igual ao chat) — se você quiser manter
         let htmlInsights = "";
