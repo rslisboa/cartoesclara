@@ -4674,12 +4674,19 @@ display: none;
         </div>
 
         <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button"
-                  onclick="window.vektorAuxShowDemissoes()"
-                  style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                         background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
-            Analisar Dem.
-          </button>
+         <button id="auxBtnDem" type="button"
+        onclick="window.vektorAuxShowDemissoes()"
+        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+               background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+          Analisar Dem.
+        </button>
+
+          <button id="auxBtnSaldos" type="button"
+        onclick="window.vektorAuxShowSaldos && window.vektorAuxShowSaldos()"
+        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+               background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+          Consulta de Saldos
+        </button>
 
           <button id="auxBtnVoltarFaturas" type="button"
                   onclick="window.vektorAuxShowFaturas()"
@@ -4715,6 +4722,19 @@ display: none;
           <div id="auxDemConteudo" style="padding:12px;"></div>
         </section>
 
+        <!-- PAINEL: SALDOS (hidden por default) -->
+        <section id="auxSaldosPanel" style="display:none; background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
+          <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
+            <div style="font-weight:900; color:#0f172a;">Consulta de Saldos (cartões)</div>
+            <div style="font-weight:700; color:#64748b; font-size:12px;">
+              Filtre por Time, Loja e Motivo (Ação). Clique na coluna <b>Loja</b> para ver as transações do período aberto (06 → hoje).
+            </div>
+          </div>
+
+          <!-- filtros (front) + tabela -->
+          <div id="auxSaldosConteudo" style="padding:12px;"></div>
+        </section>
+
       </div>
     </div>
   </main>
@@ -4738,6 +4758,26 @@ display: none;
       <div id="auxTimesModalBody" style="padding:12px; overflow:auto;"></div>
     </div>
   </div>
+
+  <!-- MODAL: TRANSAÇÕES (SALDOS) -->
+<div id="auxSaldosTxModal" class="hidden"
+     style="position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; padding:18px;">
+  <div style="width:min(980px, 96vw); max-height:86vh; overflow:hidden; background:#fff; border-radius:16px; border:1px solid rgba(148,163,184,0.25); display:flex; flex-direction:column;">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1px solid rgba(148,163,184,0.22); background:#0b1220;">
+      <div>
+        <div id="auxSaldosTxModalTitle" style="color:#fff; font-weight:1000;">Transações</div>
+        <div id="auxSaldosTxModalSub" style="color:rgba(226,232,240,0.9); font-size:12px; font-weight:800;"></div>
+      </div>
+      <button type="button" onclick="window.vektorAuxCloseSaldosTxModal && window.vektorAuxCloseSaldosTxModal()"
+              style="height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                     background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+        Fechar
+      </button>
+    </div>
+
+    <div id="auxSaldosTxModalBody" style="padding:12px; overflow:auto;"></div>
+  </div>
+</div>
 
 </div>
 
@@ -25860,26 +25900,95 @@ window.vektorAuxLoadFaturas = function(){
     .getResumoFaturasClara();
 };
 
-window.vektorAuxShowFaturas = function(){
+// ================================
+// CONSULTAS AUXILIARES -> VIEW CONTROL (FIX)
+// Regras:
+// - só 1 painel visível por vez
+// - botão do painel ativo some (fica só os outros 2)
+// ================================
+function vektorAuxSetView_(mode){
+  // mode: "FATURAS" | "DEM" | "SALDOS"
+  mode = String(mode || "").toUpperCase();
+
   const pFat = document.getElementById("auxFaturasPanel");
   const pDem = document.getElementById("auxDemPanel");
-  const btnV = document.getElementById("auxBtnVoltarFaturas");
+  const pSal = document.getElementById("auxSaldosPanel");
 
-  if (pFat) pFat.style.display = "block";
+  const bDem = document.getElementById("auxBtnDem");
+  const bSal = document.getElementById("auxBtnSaldos");
+  const bVol = document.getElementById("auxBtnVoltarFaturas");
+
+  // 1) zera tudo (painéis)
+  if (pFat) pFat.style.display = "none";
   if (pDem) pDem.style.display = "none";
-  if (btnV) btnV.style.display = "none";
+  if (pSal) pSal.style.display = "none";
+
+  // 2) mostra apenas o painel ativo
+  if (mode === "DEM") {
+    if (pDem) pDem.style.display = "block";
+  } else if (mode === "SALDOS") {
+    if (pSal) pSal.style.display = "block";
+  } else {
+    // default
+    mode = "FATURAS";
+    if (pFat) pFat.style.display = "block";
+  }
+
+  // 3) botões: some o ativo
+  // default: mostra os dois "atalhos" e esconde voltar
+  if (bDem) bDem.style.display = "inline-flex";
+  if (bSal) bSal.style.display = "inline-flex";
+  if (bVol) bVol.style.display = "none";
+
+  if (mode === "FATURAS") {
+    // fica: Dem + Saldos (Voltar escondido)
+    if (bVol) bVol.style.display = "none";
+    if (bDem) bDem.style.display = "inline-flex";
+    if (bSal) bSal.style.display = "inline-flex";
+  }
+
+  if (mode === "DEM") {
+    // fica: Saldos + Voltar
+    if (bDem) bDem.style.display = "none";
+    if (bSal) bSal.style.display = "inline-flex";
+    if (bVol) bVol.style.display = "inline-flex";
+  }
+
+  if (mode === "SALDOS") {
+    // fica: Dem + Voltar
+    if (bSal) bSal.style.display = "none";
+    if (bDem) bDem.style.display = "inline-flex";
+    if (bVol) bVol.style.display = "inline-flex";
+  }
+
+  // guarda estado
+  window.__auxViewMode = mode;
+}
+
+window.vektorAuxShowFaturas = function(){
+  vektorAuxSetView_("FATURAS");
+  // opcional: se quiser recarregar faturas ao voltar
+  // window.vektorAuxLoadFaturas && window.vektorAuxLoadFaturas();
 };
 
 window.vektorAuxShowDemissoes = function(){
-  const pFat = document.getElementById("auxFaturasPanel");
-  const pDem = document.getElementById("auxDemPanel");
-  const btnV = document.getElementById("auxBtnVoltarFaturas");
+  vektorAuxSetView_("DEM");
+  window.vektorAuxLoadDemissoes && window.vektorAuxLoadDemissoes();
+};
 
-  if (pFat) pFat.style.display = "none";
-  if (pDem) pDem.style.display = "block";
-  if (btnV) btnV.style.display = "inline-flex";
+window.vektorAuxShowSaldos = function(){
+  // 🔒 ROLE (front) — mantém sua trava atual
+  try {
+    const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "");
+    const isAdmin = (roleTxt.trim().toLowerCase() === "administrador");
+    if (!isAdmin) {
+      alert("Acesso restrito: Consulta de Saldos disponível apenas para Administrador.");
+      return;
+    }
+  } catch (_) {}
 
-  window.vektorAuxLoadDemissoes();
+  vektorAuxSetView_("SALDOS");
+  window.vektorAuxLoadSaldos && window.vektorAuxLoadSaldos();
 };
 
 window.vektorAuxLoadDemissoes = function(){
@@ -25943,6 +26052,445 @@ window.vektorAuxLoadDemissoes = function(){
     })
     .getUltimasDemissoesGerentes();
 };
+
+window.vektorAuxLoadSaldos = function () {
+  const box = document.getElementById("auxSaldosConteudo");
+  if (!box) return;
+
+  box.innerHTML =
+    "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Consultando relação de saldos…</span></div>";
+
+  // mesma regra que você usa no chat: D-2 (mensagem informativa)
+  try {
+    const d = new Date();
+    d.setDate(d.getDate() - 2);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const dataLimite = `${dd}/${mm}/${yyyy}`;
+
+    box.innerHTML =
+      "<div style='margin-bottom:10px; font-size:12px; font-weight:900; color:#334155;'>" +
+      "Análise até <b>" + dataLimite + "</b> (transações sempre com status <b>Aprovada</b>).</div>" +
+      box.innerHTML;
+  } catch (_) {}
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      try {
+        if (!res || !res.ok) {
+          box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao consultar saldos.</p>";
+          return;
+        }
+
+        // guarda dataset bruto para filtros + drilldown
+        window.__auxSaldosData = {
+          ok: true,
+          rows: Array.isArray(res.rows) ? res.rows.slice() : [],
+          periodo: res.periodo || {}
+        };
+
+        vektorAuxSaldosRender_();
+      } catch (e) {
+        console.error("Erro ao renderizar saldos (aux):", e);
+        box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao renderizar tabela de saldos.</p>";
+      }
+    })
+    .withFailureHandler(function (err) {
+      console.error("Erro Apps Script (getRelacaoSaldosClara):", err);
+      const msg = (err && err.message) ? err.message : String(err || "");
+      box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao consultar saldos: " + msg + "</p>";
+    })
+    .getRelacaoSaldosClara("geral", "");
+};
+
+function vektorAuxSaldosBuildMaps_(rows) {
+  const mapTimeToLojas = {};
+  const mapLojaToTimes = {};
+
+  rows.forEach(function (r) {
+    const time = String((r && r.time) || "").trim() || "—";
+    // Loja: tenta r.loja, senão cai no alias (nomeCartao) porque no seu legado “loja = alias”
+    const loja = String((r && (r.loja || r.nomeCartao)) || "").trim() || "—";
+
+    if (!mapTimeToLojas[time]) mapTimeToLojas[time] = {};
+    mapTimeToLojas[time][loja] = true;
+
+    if (!mapLojaToTimes[loja]) mapLojaToTimes[loja] = {};
+    mapLojaToTimes[loja][time] = true;
+  });
+
+  function keysSorted(obj) {
+    return Object.keys(obj || {}).sort(function (a, b) { return a.localeCompare(b, "pt-BR"); });
+  }
+
+  return {
+    times: keysSorted(mapTimeToLojas),
+    lojas: keysSorted(mapLojaToTimes),
+    mapTimeToLojas: mapTimeToLojas,
+    mapLojaToTimes: mapLojaToTimes
+  };
+}
+
+function vektorAuxSaldosRender_() {
+  const box = document.getElementById("auxSaldosConteudo");
+  if (!box) return;
+
+  const payload = window.__auxSaldosData || {};
+  const rowsAll = Array.isArray(payload.rows) ? payload.rows.slice() : [];
+  const periodo = payload.periodo || {};
+
+  if (!rowsAll.length) {
+    box.innerHTML = "<p class='text-sm text-slate-700'>Sem dados para o período.</p>";
+    return;
+  }
+
+  const maps = vektorAuxSaldosBuildMaps_(rowsAll);
+
+  // estado (seleções atuais)
+  window.__auxSaldosState = window.__auxSaldosState || { time: "", loja: "", acao: "" };
+
+  // filtros (HTML)
+  const filtersHtml = `
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:10px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="font-size:12px; font-weight:1000; color:#0f172a;">Time</div>
+        <select id="auxSaldos_selTime"
+                style="height:32px; border:1px solid #cbd5e1; border-radius:10px; padding:0 10px; font-size:12px; font-weight:800;">
+          <option value="">Todos</option>
+          ${maps.times.map(t => `<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join("")}
+        </select>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="font-size:12px; font-weight:1000; color:#0f172a;">Loja</div>
+        <select id="auxSaldos_selLoja"
+                style="height:32px; border:1px solid #cbd5e1; border-radius:10px; padding:0 10px; font-size:12px; font-weight:800;">
+          <option value="">Todas</option>
+          ${maps.lojas.map(l => `<option value="${l.replace(/"/g,'&quot;')}">${l}</option>`).join("")}
+        </select>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="font-size:12px; font-weight:1000; color:#0f172a;">Motivo (Ação)</div>
+        <select id="auxSaldos_selAcao"
+                style="height:32px; border:1px solid #cbd5e1; border-radius:10px; padding:0 10px; font-size:12px; font-weight:800;">
+          <option value="">Todas</option>
+          <option value="Reduzir">Reduzir</option>
+          <option value="Aumentar">Aumentar</option>
+          <option value="Manter">Manter</option>
+        </select>
+      </div>
+
+      <button type="button" id="auxSaldos_btnClear"
+              style="height:32px; padding:0 12px; border-radius:10px; border:1px solid #0f172a;
+                     background:#0f172a; color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+        Limpar
+      </button>
+
+      <div style="margin-left:auto; font-size:12px; font-weight:900; color:#334155;">
+        Período: <b>${String(periodo.inicio || "—")}</b> a <b>${String(periodo.fim || "—")}</b>
+      </div>
+    </div>
+
+    <div id="auxSaldos_tableWrap"></div>
+  `;
+
+  box.innerHTML = filtersHtml;
+
+  // set seleção atual (persistência)
+  const selTime = document.getElementById("auxSaldos_selTime");
+  const selLoja = document.getElementById("auxSaldos_selLoja");
+  const selAcao = document.getElementById("auxSaldos_selAcao");
+  const btnClr  = document.getElementById("auxSaldos_btnClear");
+
+  if (selTime) selTime.value = window.__auxSaldosState.time || "";
+  if (selLoja) selLoja.value = window.__auxSaldosState.loja || "";
+  if (selAcao) selAcao.value = window.__auxSaldosState.acao || "";
+
+  // bind (1x por render)
+  if (selTime) selTime.onchange = function () {
+    window.__auxSaldosState.time = selTime.value || "";
+    // ao escolher time, restringe lojas possíveis
+    vektorAuxSaldosRebuildLojaOptions_();
+    vektorAuxSaldosApply_();
+  };
+
+  if (selLoja) selLoja.onchange = function () {
+    window.__auxSaldosState.loja = selLoja.value || "";
+    // ao escolher loja, restringe times possíveis
+    vektorAuxSaldosRebuildTimeOptions_();
+    vektorAuxSaldosApply_();
+  };
+
+  if (selAcao) selAcao.onchange = function () {
+    window.__auxSaldosState.acao = selAcao.value || "";
+    vektorAuxSaldosApply_();
+  };
+
+  if (btnClr) btnClr.onclick = function () {
+    window.__auxSaldosState = { time: "", loja: "", acao: "" };
+    vektorAuxSaldosRender_(); // re-render total (restaura combos)
+  };
+
+  // primeira aplicação (com opções respeitando seleção atual)
+  vektorAuxSaldosRebuildLojaOptions_();
+  vektorAuxSaldosRebuildTimeOptions_();
+  vektorAuxSaldosApply_();
+}
+
+function vektorAuxSaldosRebuildLojaOptions_() {
+  const payload = window.__auxSaldosData || {};
+  const rowsAll = Array.isArray(payload.rows) ? payload.rows.slice() : [];
+  const maps = vektorAuxSaldosBuildMaps_(rowsAll);
+
+  const selTime = document.getElementById("auxSaldos_selTime");
+  const selLoja = document.getElementById("auxSaldos_selLoja");
+  if (!selLoja) return;
+
+  const time = String((selTime && selTime.value) || "").trim();
+  const prev = selLoja.value || "";
+
+  let lojas = maps.lojas.slice();
+  if (time) {
+    const set = maps.mapTimeToLojas[time] || {};
+    lojas = Object.keys(set).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  }
+
+  selLoja.innerHTML =
+    `<option value="">Todas</option>` +
+    lojas.map(l => `<option value="${l.replace(/"/g,'&quot;')}">${l}</option>`).join("");
+
+  if (prev && lojas.indexOf(prev) >= 0) selLoja.value = prev;
+  else if (prev) { selLoja.value = ""; window.__auxSaldosState.loja = ""; }
+}
+
+function vektorAuxSaldosRebuildTimeOptions_() {
+  const payload = window.__auxSaldosData || {};
+  const rowsAll = Array.isArray(payload.rows) ? payload.rows.slice() : [];
+  const maps = vektorAuxSaldosBuildMaps_(rowsAll);
+
+  const selTime = document.getElementById("auxSaldos_selTime");
+  const selLoja = document.getElementById("auxSaldos_selLoja");
+  if (!selTime) return;
+
+  const loja = String((selLoja && selLoja.value) || "").trim();
+  const prev = selTime.value || "";
+
+  let times = maps.times.slice();
+  if (loja) {
+    const set = maps.mapLojaToTimes[loja] || {};
+    times = Object.keys(set).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  }
+
+  selTime.innerHTML =
+    `<option value="">Todos</option>` +
+    times.map(t => `<option value="${t.replace(/"/g,'&quot;')}">${t}</option>`).join("");
+
+  if (prev && times.indexOf(prev) >= 0) selTime.value = prev;
+  else if (prev) { selTime.value = ""; window.__auxSaldosState.time = ""; }
+}
+
+function vektorAuxSaldosApply_() {
+  const wrap = document.getElementById("auxSaldos_tableWrap");
+  if (!wrap) return;
+
+  const payload = window.__auxSaldosData || {};
+  let rows = Array.isArray(payload.rows) ? payload.rows.slice() : [];
+
+  const st = window.__auxSaldosState || { time:"", loja:"", acao:"" };
+  const timeSel = String(st.time || "").trim();
+  const lojaSel = String(st.loja || "").trim();
+  const acaoSel = String(st.acao || "").trim();
+
+  if (timeSel) rows = rows.filter(r => String((r && r.time) || "").trim() === timeSel);
+
+  if (lojaSel) {
+    rows = rows.filter(r => {
+      const loja = String((r && (r.loja || r.nomeCartao)) || "").trim();
+      return loja === lojaSel;
+    });
+  }
+
+  if (acaoSel) {
+    rows = rows.filter(r => {
+      const raw = String((r && r.acao) || "").trim().toLowerCase();
+      if (!raw) return false;
+      if (raw.indexOf("aumentar") === 0) return acaoSel === "Aumentar";
+      if (raw.indexOf("reduzir") === 0) return acaoSel === "Reduzir";
+      if (raw.indexOf("manter") === 0) return acaoSel === "Manter";
+      return false;
+    });
+  }
+
+  // render tabela (colunas do seu requisito)
+  function money(n) {
+    const v = Number(n) || 0;
+    try { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+    catch(_) { return "R$ " + String(v); }
+  }
+
+  let html = "";
+  html += `<div style="overflow:auto; border:1px solid #e2e8f0; border-radius:12px; max-height:60vh;">`;
+  html += `<table style="width:max-content; min-width:1100px; border-collapse:collapse; font-size:12px;">`;
+  html += `<thead><tr style="background:#0b1220; color:#fff;">`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:left;">Loja</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:left;">Time</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:left;">Cartão</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:right;">Limite</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:right;">Utilizado</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:right;">Saldo</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:right;">Projeção</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:right;">% Projeção</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:left;">Ação</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px; text-align:left;">Motivo</th>`;
+  html += `</tr></thead><tbody>`;
+
+  if (!rows.length) {
+    html += `<tr><td colspan="10" style="padding:12px; border-top:1px solid #e2e8f0; font-weight:900; color:#334155;">
+      Sem resultados para os filtros aplicados.
+    </td></tr>`;
+  } else {
+    rows.forEach(function (r) {
+      const lojaTxt  = String((r && (r.loja || r.nomeCartao)) || "").trim();
+      const timeTxt  = String((r && r.time) || "").trim();
+      const cardTxt  = String((r && r.nomeCartao) || "").trim();
+
+      const limite   = Number(r && r.limite) || 0;
+      const usado    = Number(r && r.utilizado) || 0;
+      const saldo    = (Number.isFinite(Number(r && r.saldo)) ? Number(r && r.saldo) : (limite - usado));
+      const proj     = Number(r && r.projecao) || 0;
+
+      const pctProj  = (proj > 0 ? ((usado / proj) * 100) : null);
+      const pctTxt   = (pctProj === null ? "—" : (pctProj.toFixed(1) + "%"));
+
+      const acaoTxt  = String((r && r.acao) || "").trim();
+      const motivoTxt= String((r && r.motivo) || "").trim();
+
+      // 🔑 drilldown: usa alias/cartão porque seu backend existente já resolve por alias
+      const aliasArg = cardTxt
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/</g, "&lt;");
+
+      html += `<tr>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; white-space:nowrap;">
+        <a href="javascript:void(0)"
+           title="Clique para ver transações do período aberto (06 → hoje)"
+           onclick="window.vektorAuxOpenSaldosTx && window.vektorAuxOpenSaldosTx('${aliasArg}')"
+           style="color:#005E27; font-weight:900; text-decoration:underline; cursor:pointer;">
+          ${lojaTxt.replace(/</g,"&lt;")}
+        </a>
+      </td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; white-space:nowrap;">${timeTxt.replace(/</g,"&lt;")}</td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; white-space:nowrap;">${cardTxt.replace(/</g,"&lt;")}</td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; text-align:right; white-space:nowrap;">${money(limite)}</td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; text-align:right; white-space:nowrap;">${money(usado)}</td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; text-align:right; white-space:nowrap;">${money(saldo)}</td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; text-align:right; white-space:nowrap;">${money(proj)}</td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; text-align:right; white-space:nowrap;">${pctTxt}</td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; white-space:nowrap;">${acaoTxt.replace(/</g,"&lt;")}</td>`;
+      html += `<td style="padding:8px; border-top:1px solid #e2e8f0; min-width:260px;">${motivoTxt.replace(/</g,"&lt;")}</td>`;
+      html += `</tr>`;
+    });
+  }
+
+  html += `</tbody></table></div>`;
+  wrap.innerHTML = html;
+}
+
+// -----------------------------
+// MODAL (transações do período)
+// -----------------------------
+window.vektorAuxOpenSaldosTx = function (aliasLoja) {
+  aliasLoja = String(aliasLoja || "").trim();
+  if (!aliasLoja) return;
+
+  const modal = document.getElementById("auxSaldosTxModal");
+  const title = document.getElementById("auxSaldosTxModalTitle");
+  const sub   = document.getElementById("auxSaldosTxModalSub");
+  const body  = document.getElementById("auxSaldosTxModalBody");
+
+  if (!modal || !body) return;
+
+  if (title) title.textContent = "Transações";
+  if (sub) sub.textContent = "Consultando transações do período aberto (06 → hoje)…";
+
+  modal.classList.remove("hidden");
+  modal.style.display = "flex";
+  modal.setAttribute("aria-hidden", "false");
+
+  body.innerHTML =
+    "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Buscando BaseClara…</span></div>";
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      vektorAuxRenderSaldosTx_(res, aliasLoja);
+    })
+    .withFailureHandler(function (err) {
+      const msg = (err && err.message) ? err.message : String(err || "");
+      body.innerHTML = "<p class='text-sm' style='color:#b91c1c; font-weight:900;'>Falha ao consultar transações: " + msg + "</p>";
+    })
+    .getTransacoesLojaPeriodoAberto(aliasLoja);
+};
+
+window.vektorAuxCloseSaldosTxModal = function () {
+  const modal = document.getElementById("auxSaldosTxModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.style.display = "none";
+  modal.setAttribute("aria-hidden", "true");
+};
+
+function vektorAuxRenderSaldosTx_(res, aliasLoja) {
+  const title = document.getElementById("auxSaldosTxModalTitle");
+  const sub   = document.getElementById("auxSaldosTxModalSub");
+  const body  = document.getElementById("auxSaldosTxModalBody");
+  if (!body) return;
+
+  if (!res || !res.ok) {
+    body.innerHTML = "<p class='text-sm text-slate-700'>Não foi possível montar a tabela.</p>";
+    return;
+  }
+
+  const rows = Array.isArray(res.rows) ? res.rows : [];
+  const meta = res.meta || {};
+
+  if (title) title.textContent = "Transações";
+  if (sub) sub.textContent =
+    "Loja/Alias: " + String(meta.alias || aliasLoja || "—") +
+    " | Período: " + String(meta.inicio || "—") + " até " + String(meta.fim || "—");
+
+  if (!rows.length) {
+    body.innerHTML = "<p class='text-sm text-slate-700'>Sem transações para o período.</p>";
+    return;
+  }
+
+  function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  let html = "";
+  html += `<div style="overflow:auto; border:1px solid #e2e8f0; border-radius:12px; max-height:62vh;">`;
+  html += `<table style="width:max-content; border-collapse:collapse; font-size:12px;">`;
+  html += `<thead><tr style="background:#0b1220; color:#fff;">`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px;text-align:left;">Data</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px;text-align:right;">Valor</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px;text-align:left;">Loja</th>`;
+  html += `<th style="position:sticky;top:0;z-index:2;padding:8px;text-align:left;">Item</th>`;
+  html += `</tr></thead><tbody>`;
+
+  rows.forEach(function(r){
+    const v = (Number(r.valor)||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+    html += `<tr>`;
+    html += `<td style="padding:8px;border-top:1px solid #e2e8f0;white-space:nowrap;">${esc(r.data||"")}</td>`;
+    html += `<td style="padding:8px;border-top:1px solid #e2e8f0;text-align:right;white-space:nowrap;">R$ ${v}</td>`;
+    html += `<td style="padding:8px;border-top:1px solid #e2e8f0;white-space:nowrap;">${esc(r.loja||"")}</td>`;
+    html += `<td style="padding:8px;border-top:1px solid #e2e8f0;min-width:520px;">${esc(r.item||"")}</td>`;
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table></div>`;
+  body.innerHTML = html;
+}
 
 // ===================================================================
 // TÓPICO 3 – Insights automáticos: TIMES
