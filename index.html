@@ -2589,6 +2589,53 @@ display: none;
   </footer>
 </div> <!-- fecha #chatView -->
 
+<!-- =========================
+     MODAL: Histórico Assistente de Política
+========================= -->
+<div id="policyHistModal" class="hidden" style="position:fixed; inset:0; z-index:99999; display:none;">
+  <div id="policyHistModalBackdrop" style="position:absolute; inset:0; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px);"></div>
+
+  <div style="position:absolute; left:50%; top:64px; transform:translateX(-50%);
+              width:min(1050px, calc(100vw - 28px)); max-height:calc(100vh - 120px);
+              background:#f8fafc; border:1px solid #dbeafe; border-radius:18px;
+              box-shadow:0 28px 60px rgba(2,6,23,0.28); overflow:hidden; display:flex; flex-direction:column;">
+    <div style="padding:12px 14px; background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);
+                border-bottom:1px solid #e2e8f0; display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+      <div>
+        <div style="font-size:16px; font-weight:1000; color:#0f172a; line-height:1.15;">Histórico — Assistente de Política</div>
+        <div id="policyHistSub" style="margin-top:4px; font-size:12px; font-weight:800; color:#475569; line-height:1.25;">
+          Carregando...
+        </div>
+      </div>
+
+      <button id="policyHistCloseBtn"
+              style="border:1px solid #cbd5e1; background:#fff; color:#0f172a;
+                     border-radius:12px; min-width:40px; height:40px; font-size:22px; font-weight:900; cursor:pointer;">
+        ×
+      </button>
+    </div>
+
+    <div style="padding:12px; display:flex; flex-direction:column; gap:10px; min-height:0; flex:1;">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input id="policyHistSearch" type="text"
+               placeholder="Buscar no histórico (pergunta/resposta)..."
+               style="flex:1; min-width:220px; border:1px solid #cbd5e1; border-radius:12px; padding:10px 12px;
+                      font-size:13px; font-weight:800; color:#0f172a; outline:none; background:#fff;" />
+        <select id="policyHistAssunto"
+                style="min-width:220px; border:1px solid #cbd5e1; border-radius:12px; padding:10px 12px;
+                       font-size:13px; font-weight:900; color:#0f172a; outline:none; background:#fff;">
+          <option value="">Todos os assuntos</option>
+        </select>
+      </div>
+
+      <div id="policyHistList"
+           style="flex:1; min-height:0; overflow:auto; border:1px solid #cbd5e1; border-radius:14px; background:#ffffff;">
+        <!-- lista -->
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- VIEW: RESUMO DO CICLO -->
 <div id="cicloResumoView"
      class="hidden"
@@ -5366,116 +5413,6 @@ display: none;
   </div>
 </div>
 
-<!-- Modal do Como Usar o Vektor -->
-<div id="ajudaVektorModal"
-     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
-  <div class="bg-white p-5 rounded-xl shadow-lg max-w-[720px] w-[95%]">
-    <h2 class="text-base font-semibold text-slate-800 mb-2">
-      Como usar o Vektor ❓
-    </h2>
-    <p class="text-xs text-slate-500 mb-3">
-      Guia rápido dos principais procedimentos e exemplos de uso.
-    </p>
-
-    <!-- Conteúdo com scroll (para não estourar a tela) -->
-    <div class="text-sm text-slate-700 space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-
-      <p>
-        O Vektor é a plataforma de governança financeira do cartão Clara, onde é possível, entre outras coisas: consultar bases, aplicar regras padronizadas e criar ações para reduzir pendências.
-      </p>
-
-      <div>
-        <p class="font-semibold text-slate-800">Principais procedimentos:</p>
-        <ul style="margin-left:14px; line-height:1.55; margin-top:6px;">
-          <li>
-            <b>1) Pendências e regularização</b><br/>
-            • Consultar pendências por loja/time e exibir tabela detalhada.<br/>
-            <i>Exemplos:</i> “pendências da loja 0297”, “lojas com mais pendências”, “pendências do time Furacão Sul”.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>2) Relatório Gerencial</b><br/>
-            • Relatório Looker Studio com as principais métricas de uso do cartão.<br/>
-            <i>Exemplos:</i> “Abrir relatório gerencial da Clara”.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>3) Faturas e comparativos</b><br/>
-            • Consulta valores, extrai informações e compara com fatura anterior.<br/>
-            <i>Exemplos:</i> “valor da fatura atual”, “valor das últimas 3 faturas”, "Comparar fatura atual vs anterior", “qual é o ciclo da fatura?”.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>4) Rankings e análises gerenciais</b><br/>
-            • Rankings por loja/time/categoria/estabelecimento e comparativos por período.<br/>
-            <i>Exemplos:</i> “ranking de lojas com maior valor”, “categorias com maior valor”, “estabelecimentos mais usados”.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>5) Estornos</b><br/>
-            • Exibe tabelas de estornos quando disponível no seu perfil.<br/>
-            <i>Exemplos:</i> “tabela de estornos”, “tabela de estornos do time”.
-          </li>
-
-                    <li style="margin-top:10px;">
-            <b>6) Alertas Programados (e-mail)</b><br/>
-            • Permite cadastrar alertas recorrentes, com envio automático por e-mail e anexo (CSV/XLSX), conforme filtros configurados.<br/>
-            • Existem 2 tipos: <b>Transações</b> (por Lojas/Times/Tags) e <b>Pendências</b> (por Lojas/Times e Tipos de pendências).<br/>
-            <i>Como acessar:</i> Menu → “⏱️ Alertas Programados”.<br/>
-            <i>Dicas:</i> use “Executar” para testar o alerta imediatamente no chat; o envio por e-mail segue a frequência/horário configurados.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>7) Possível uso irregular</b><br/>
-            • Apoia investigação e leitura objetiva do que disparou o alerta.<br/>
-            <i>Exemplo:</i> “possível uso irregular”.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>8) Cartão (bloqueio, perda, suporte e direcionamento)</b><br/>
-            • Orienta o procedimento e encaminha para o canal correto (ex.: ServiceNow).<br/>
-            <i>Exemplos:</i> “perdi meu cartão”, “cartão bloqueado, como resolver?”, “servicenow”.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>9) Listagem de Itens Comprados</b><br/>
-            • Relatórios com análises dos itens adquirido pela lojas (levando em consideração o campo descrição das transações).<br/>
-            <i>Exemplos:</i> “Itens comprados no geral”, “Itens comprados para o time xxxxxxxx”, “Itens comprados para a loja xxxx”.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>10) Limite dos cartões</b><br/>
-            • Demonstra o saldo dos cartões, probabilidade de uso, possibilidade de aumento ou redução de limite.<br/>
-            <i>Exemplos:</i> “Relação de saldos geral”, “Relação de saldos do time xxxxxxxx”.
-          </li>
-
-          <li style="margin-top:10px;">
-            <b>11) Termo de responsabilidade</b><br/>
-            • Anexar o termo pelo botão de clipe e concluir com nome completo.<br/>
-            <i>Exemplo:</i> “termo de responsabilidade Clara”.
-          </li>
-        </ul>
-      </div>
-
-      <div>
-        <p class="font-semibold text-slate-800">⚠️ Regras importantes ⚠️</p>
-        <ul style="margin-left:14px; line-height:1.55; margin-top:6px;">
-          <li><b>Padronização:</b> respostas seguem política/processo (não “opinião do Vektor”).</li>
-          <li><b>Perfil de acesso:</b> algumas visões são restritas ao perfil de Administrador.</li>
-          <li><b>Boas práticas:</b> informe a loja e time para consultas especificas; inclua período quando fizer sentido (nesse mes, nessa semana, semana passada, mes passado, nesse trtimestre, periodo de datas etc); sempre use as orientações de texto que aparecem no chat pra completar sua dúvida ou solicitação.</li>
-        </ul>
-      </div>
-
-    </div>
-
-    <button type="button"
-            onclick="closeAjudaVektorModal()"
-            class="mt-4 w-full bg-slate-800 text-white py-2 rounded-lg text-sm font-semibold">
-      Fechar
-    </button>
-  </div>
-</div>
-
 <? if ((userRole || "") === "Administrador") { ?>
 
 <!-- Modal: Alertas Recentes -->
@@ -6484,51 +6421,6 @@ function openStatusVektorModal() {
     })
     .vektorStatusSistema();
 }
-
-window.__vektorChatMode = window.__vektorChatMode || "default"; 
-// "default" | "policy"
-
-window.vektorApplyChatMode_ = function () {
-  const greetingEl = document.getElementById("vektorGreeting");
-  const inputEl = document.getElementById("userInput");
-  const attachBtn = document.getElementById("attachBtn");
-
-  const isPolicy = window.__vektorChatMode === "policy";
-
-  if (greetingEl) {
-    if (isPolicy) {
-      greetingEl.innerHTML =
-        `Olá! Este é o <b>Assistente de Política Clara</b>. ` +
-        `Pergunte sobre uso permitido, restrições, limites, prestação de contas e responsabilidades.`;
-    } else {
-      const saudacao =
-        (typeof getSaudacaoPorHorario_ === "function")
-          ? getSaudacaoPorHorario_()
-          : "olá";
-
-      const nome =
-        (typeof FIRST_NAME !== "undefined" && FIRST_NAME)
-          ? FIRST_NAME
-          : (typeof displayName !== "undefined" ? displayName : "");
-
-      const prefixo = nome ? `Olá ${nome}, ${saudacao}!` : `Olá, ${saudacao}!`;
-
-      greetingEl.innerHTML =
-        `${prefixo} Esse é o <b>Vektor</b>, <b>Plataforma de Governança Financeira do Cartão Clara</b>.`;
-    }
-  }
-
-  if (inputEl) {
-    inputEl.placeholder = isPolicy
-      ? "Pergunte algo sobre a Política Clara..."
-      : "Digite aqui.";
-  }
-
-  // opcional: esconde anexo no modo política
-  if (attachBtn) {
-    attachBtn.style.display = isPolicy ? "none" : "inline-flex";
-  }
-};
 
 window.vektorOpenPolicyAssistant = function () {
   window.__vektorChatMode = "policy";
@@ -14947,7 +14839,14 @@ window.vektorApplyChatMode_ = function () {
     if (isPolicy) {
       greetingEl.innerHTML =
         "Olá! Eu sou o <b>Assistente da Política Clara</b>. " +
-        "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências.";
+        "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências." +
+        "<div style='margin-top:10px;'>" +
+          "<button id='policyHistOpenBtn' " +
+            "style='border:1px solid rgba(0,94,39,0.35); background:#ecfdf5; color:#065f46;" +
+                   "padding:8px 10px; border-radius:12px; font-weight:1000; font-size:12px; cursor:pointer;'>" +
+            "Quer ver o que já conversou por aqui?" +
+          "</button>" +
+        "</div>";
     } else {
       const saudacao = getSaudacaoPorHorario_();
       const nome = (typeof FIRST_NAME !== "undefined" && FIRST_NAME)
@@ -15008,6 +14907,173 @@ window.vektorSendPolicyQuestion_ = function (pergunta) {
     })
     .vektorPolicyAssistantAsk(pergunta, hist);
 };
+
+// ===============================
+// HISTÓRICO (Policy) — Modal
+// ===============================
+window.vektorPolicyHistOpen_ = function(){
+  const modal = document.getElementById("policyHistModal");
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  modal.style.display = "block";
+
+  const sub = document.getElementById("policyHistSub");
+  if (sub) sub.textContent = "Carregando seu histórico...";
+
+  const email = (typeof USER_EMAIL_REPLACED !== "undefined") ? String(USER_EMAIL_REPLACED||"").trim() : "";
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.ok) {
+        if (sub) sub.textContent = "Falha ao carregar histórico: " + (res && res.error ? res.error : "erro desconhecido");
+        vektorPolicyHistRender_([]);
+        vektorPolicyHistHydrateAssuntos_([]);
+        return;
+      }
+      const rows = Array.isArray(res.rows) ? res.rows : [];
+      if (sub) sub.textContent = (rows.length ? `Mostrando ${rows.length} registro(s).` : "Nenhum registro ainda.");
+      window.__vektorPolicyHistRows = rows;
+      vektorPolicyHistHydrateAssuntos_(rows);
+      vektorPolicyHistApplyFilters_();
+    })
+    .withFailureHandler(function(err){
+      const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+      if (sub) sub.textContent = "Erro ao carregar histórico: " + msg;
+      vektorPolicyHistRender_([]);
+      vektorPolicyHistHydrateAssuntos_([]);
+    })
+    .vektorPolicyHistGet(email, 200);
+};
+
+window.vektorPolicyHistClose_ = function(){
+  const modal = document.getElementById("policyHistModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.style.display = "none";
+};
+
+function vektorPolicyHistBindOnce_(){
+  const btn = document.getElementById("policyHistOpenBtn");
+  if (btn && !btn.__bind) {
+    btn.__bind = true;
+    btn.addEventListener("click", function(){
+      try { window.vektorPolicyHistOpen_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  const closeBtn = document.getElementById("policyHistCloseBtn");
+  if (closeBtn && !closeBtn.__bind) {
+    closeBtn.__bind = true;
+    closeBtn.addEventListener("click", window.vektorPolicyHistClose_);
+  }
+
+  const backdrop = document.getElementById("policyHistModalBackdrop");
+  if (backdrop && !backdrop.__bind) {
+    backdrop.__bind = true;
+    backdrop.addEventListener("click", window.vektorPolicyHistClose_);
+  }
+
+  const search = document.getElementById("policyHistSearch");
+  if (search && !search.__bind) {
+    search.__bind = true;
+    search.addEventListener("input", vektorPolicyHistApplyFilters_);
+  }
+
+  const assuntoSel = document.getElementById("policyHistAssunto");
+  if (assuntoSel && !assuntoSel.__bind) {
+    assuntoSel.__bind = true;
+    assuntoSel.addEventListener("change", vektorPolicyHistApplyFilters_);
+  }
+}
+
+// chama no DOM ready (idempotente)
+document.addEventListener("DOMContentLoaded", function(){
+  try { vektorPolicyHistBindOnce_(); } catch(e){ console.error(e); }
+});
+
+// importante: quando troca para modo policy, o botão nasce via innerHTML.
+// então: depois de aplicar o modo, tenta bindar de novo.
+const __vektorApplyChatModeOriginal = window.vektorApplyChatMode_;
+window.vektorApplyChatMode_ = function(){
+  try { __vektorApplyChatModeOriginal(); } catch(e){ console.error(e); }
+  try { vektorPolicyHistBindOnce_(); } catch(e){ console.error(e); }
+};
+
+function vektorPolicyHistHydrateAssuntos_(rows){
+  const sel = document.getElementById("policyHistAssunto");
+  if (!sel) return;
+
+  const atuais = {};
+  Array.from(sel.options).forEach(op => { if (op.value) atuais[op.value] = true; });
+
+  const set = {};
+  (rows||[]).forEach(r=>{
+    const a = String(r.assunto||"").trim();
+    if (a) set[a] = true;
+  });
+
+  const assuntos = Object.keys(set).sort((a,b)=> a.localeCompare(b, "pt-BR"));
+  sel.innerHTML = `<option value="">Todos os assuntos</option>` + assuntos.map(a=>`<option value="${a.replace(/"/g,'&quot;')}">${a}</option>`).join("");
+}
+
+function vektorPolicyHistApplyFilters_(){
+  const rows = window.__vektorPolicyHistRows || [];
+  const q = String(document.getElementById("policyHistSearch")?.value || "").trim().toLowerCase();
+  const assunto = String(document.getElementById("policyHistAssunto")?.value || "").trim();
+
+  const out = rows.filter(r=>{
+    if (assunto && String(r.assunto||"").trim() !== assunto) return false;
+    if (!q) return true;
+    const hay = (String(r.question||"") + "\n" + String(r.answer||"")).toLowerCase();
+    return hay.includes(q);
+  });
+
+  vektorPolicyHistRender_(out);
+}
+
+function vektorPolicyHistRender_(rows){
+  const box = document.getElementById("policyHistList");
+  if (!box) return;
+
+  if (!rows.length) {
+    box.innerHTML = `<div style="padding:16px; text-align:center; font-weight:900; color:#475569;">Nenhum item encontrado.</div>`;
+    return;
+  }
+
+  box.innerHTML = rows.map((r, idx)=>{
+    const ts = String(r.createdAt || "—");
+    const assunto = String(r.assunto || "—");
+    const q = String(r.question || "");
+    const a = String(r.answer || "");
+
+    const qShort = q.length > 140 ? (q.slice(0, 139) + "…") : q;
+
+    return `
+      <details style="border-bottom:1px solid #e2e8f0;">
+        <summary style="list-style:none; cursor:pointer; padding:12px 12px; display:flex; align-items:flex-start; gap:10px;">
+          <div style="flex:1;">
+            <div style="font-size:12px; font-weight:1000; color:#0f172a; line-height:1.2;">
+              ${assunto} <span style="font-weight:900; color:#64748b;">· ${ts}</span>
+            </div>
+            <div style="margin-top:6px; font-size:13px; font-weight:900; color:#334155;">
+              ${qShort.replace(/</g,"&lt;").replace(/>/g,"&gt;")}
+            </div>
+          </div>
+          <div style="font-size:18px; font-weight:1000; color:#94a3b8; padding-top:2px;">⌄</div>
+        </summary>
+
+        <div style="padding:0 12px 12px 12px;">
+          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:10px 12px;">
+            <div style="font-size:12px; font-weight:1000; color:#0f172a;">Pergunta</div>
+            <div style="margin-top:6px; font-size:13px; font-weight:800; color:#334155; white-space:pre-wrap;">${q.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+            <div style="margin-top:10px; font-size:12px; font-weight:1000; color:#0f172a;">Resposta</div>
+            <div style="margin-top:6px; font-size:13px; font-weight:800; color:#334155; white-space:pre-wrap;">${a.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+          </div>
+        </div>
+      </details>
+    `;
+  }).join("");
+}
 
 function renderSaudacaoVektor_() {
   if (typeof window.vektorApplyChatMode_ === "function") {
@@ -15083,18 +15149,19 @@ setTimeout(function () {
     /* ========= ELEMENTOS UI ========= */
     const chatWindow = document.getElementById("chatWindow");
     const chatForm   = document.getElementById("chatForm");
+
     const userInput  = document.getElementById("userInput");
-    const attachBtn = document.getElementById("attachBtn");
+    const attachBtnEl = document.getElementById("attachBtn");
     const fileInputTermo = document.getElementById("fileTermo");
 
         // ===== Upload do Termo de Responsabilidade =====
-    if (attachBtn && fileInputTermo) {
+    if (attachBtnEl && fileInputTermo) {
 
         // Garante que o input aceite apenas os formatos liberados
         fileInputTermo.accept = ".pdf,.jpg,.jpeg,.png,.heic,.HEIC";
 
         // Ao clicar no botão 📎, abre o seletor de arquivos
-        attachBtn.addEventListener("click", () => {
+        attachBtnEl.addEventListener("click", () => {
             fileInputTermo.click();
         });
 
