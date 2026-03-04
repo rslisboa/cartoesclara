@@ -2698,11 +2698,11 @@ function executarAlertaEtiquetaVektor(req) {
         var attachment = buildAlertAttachmentSmart_(alertId, periodo, rows);
 
         if (ownerEmail) {
-          MailApp.sendEmail({
+          GmailApp.sendEmail(ownerEmail, assunto, " ", {
+            from: "vektor@gruposbf.com.br",
             name: "Vektor - Grupo SBF",
-            to: ownerEmail,
-            subject: assunto,
             htmlBody: htmlBody,
+            cc: "contasareceber@gruposbf.com.br",
             attachments: [attachment]
           });
         } else {
@@ -4445,11 +4445,10 @@ if (emailUsuario.toLowerCase() !== emailDestino.toLowerCase()) {
       + "<br/><br/>"
       + "<p><b>Agente Vektor - Contas a Receber</b></p>";
 
-    MailApp.sendEmail({
-      to: emailDestino,
-      cc: "rodrigo.lisboa@gruposbf.com.br",//"contasareceber@gruposbf.com.br",
-      subject: assunto,
-      replyto: "contasareceber@gruposbf.com.br",
+    GmailApp.sendEmail(emailDestino, assunto, " ", {
+      from: "vektor@gruposbf.com.br",
+      cc: "rodrigo.lisboa@gruposbf.com.br",
+      replyTo: "contasareceber@gruposbf.com.br",
       htmlBody: corpoHtml,
       name: "Vektor Grupo SBF"
     });
@@ -5742,12 +5741,11 @@ function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFi
       var corpo = vektorMontarCorpoEmailPendenciasClara_(saudacao, tabela, tipos);
 
       try {
-        MailApp.sendEmail({
+        GmailApp.sendEmail(toList, assunto, " ", {
+          from: "vektor@gruposbf.com.br",
           name: "Vektor - Grupo SBF",
-          to: toList,
           cc: VEKTOR_CC_CONTAS_A_RECEBER,
           replyTo: VEKTOR_CC_CONTAS_A_RECEBER,
-          subject: assunto,
           htmlBody: corpo
         });
 
@@ -6043,11 +6041,10 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
 
       var htmlBody = montarTabelaHtml_(pack, lojaKey);
 
-      MailApp.sendEmail({
-        to: to,
-        cc: cc.join(","),
-        subject: subject,
+      GmailApp.sendEmail(to, subject, " ", {
         htmlBody: htmlBody,
+        cc: (cc && cc.length ? cc.join(",") : undefined),
+        from: "vektor@gruposbf.com.br",   // precisa existir como “Enviar e-mail como” na conta executora
         name: SENDER_NAME,
         replyTo: REPLY_TO
       });
@@ -8858,11 +8855,10 @@ if (typeof res.periodo === "string") {
   var destinatarios = getAdminEmails_();
   if (!destinatarios.length) return { ok: false, error: "Lista de admins vazia." };
 
-  MailApp.sendEmail({
-    to: destinatarios.join(","),
-    subject: assunto,
-    htmlBody: html,
-    name: "Vektor – Grupo SBF"
+  GmailApp.sendEmail(destinatarios.join(","), assunto, " ", {
+  from: "vektor@gruposbf.com.br",
+  htmlBody: html,
+  name: "Vektor – Grupo SBF"
   });
 
   // Após MailApp.sendEmail(...)
@@ -9271,9 +9267,8 @@ function enviarEmailOfensorasPendenciasClara(diasJanela) {
 var html = montarEmailOfensorasPendencias_(rel);
 
 
-    MailApp.sendEmail({
-      to: destinatarios.join(","),
-      subject: assunto,
+    GmailApp.sendEmail(destinatarios.join(","), assunto, " ", {
+      from: "vektor@gruposbf.com.br",
       htmlBody: html,
       name: "Vektor - Grupo SBF"
     });
@@ -9580,9 +9575,8 @@ function enviarEmailUsoIrregularClara_(rel) {
     // Tabela HTML (resumo)
     var html = montarEmailUsoIrregular_(rel);
 
-    MailApp.sendEmail({
-      to: destinatarios.join(","),
-      subject: assunto,
+    GmailApp.sendEmail(destinatarios.join(","), assunto, " ", {
+      from: "vektor@gruposbf.com.br",
       htmlBody: html,
       name: "Vektor - Grupo SBF"
     });
@@ -11464,11 +11458,10 @@ function enviarResumoPorEmail(grupo) {
   <br/>
   <p><i>Gerado automaticamente pelo Assistente Vektor</i></p>`;
 
-    MailApp.sendEmail({
-      to: emailDestino,
-      subject: `Resumo de transações | ${resumo.grupo}`,
+    GmailApp.sendEmail(emailDestino, `Resumo de transações | ${resumo.grupo}`, " ", {
+      from: "vektor@gruposbf.com.br",
       htmlBody: corpo,
-      name: "Assistente Vektor"
+      name: "Vektor - Grupo SBF"
     });
 
     return { ok: true };
@@ -11968,9 +11961,8 @@ function enviarLojasComPendenciasCicloAtualEmail() {
         "<p style='color:#64748b; font-size:12px;'>Enviado automaticamente pelo Vektor.</p>" +
       "</div>";
 
-    MailApp.sendEmail({
-      to: to,
-      subject: subject,
+    GmailApp.sendEmail(to, subject, " ", {
+      from: "vektor@gruposbf.com.br",
       htmlBody: htmlBody,
       attachments: [blob],
       name: "Vektor - Grupo SBF"
@@ -14192,10 +14184,8 @@ function salvarTermoResponsabilidade(payload) {
         "Link no Drive: " + file.getUrl() + "\n\n" +
         "Por favor, valide o conteúdo e o aceite desse termo.";
 
-      MailApp.sendEmail({
-        to: "rodrigo.lisboa@gruposbf.com.br",
-        subject: assunto,
-        body: corpo,
+      GmailApp.sendEmail("contasareceber@gruposbf.com.br", assunto, corpo, {
+        from: "vektor@gruposbf.com.br",
         name: "Vektor Grupo SBF",
         attachments: [file.getBlob()]
       });
@@ -15331,11 +15321,10 @@ function DISPARAR_EMAIL_ITENS_IRREGULARES_SEMANA() {
   var periodoTxt = Utilities.formatDate(ini, tz, "dd/MM/yyyy") + " → " + Utilities.formatDate(fim, tz, "dd/MM/yyyy");
   var html = buildEmailItensIrregulares_(rows, periodoTxt);
 
-  MailApp.sendEmail({
-    to: to,
-    subject: "Vektor — Possíveis itens irregulares (ALERTA) — " + periodoTxt,
-    htmlBody: html
-  });
+  GmailApp.sendEmail(to, "Vektor — Possíveis itens irregulares (ALERTA) — " + periodoTxt, " ", {
+      from: "vektor@gruposbf.com.br",
+      htmlBody: html
+    });
 
   // ✅ registra no log para aparecer no modal “Disparo de Ocorrências”
   try {
@@ -16456,4 +16445,15 @@ function TESTE_MIME_TYPE() {
   var file = DriveApp.getFileById("1Lj4i5he1kKDSBbXJSwyw51SszCYu8KOB");
   Logger.log("Nome: " + file.getName());
   Logger.log("MimeType: " + file.getMimeType());
+}
+
+function debug_sendAs() {
+  Logger.log(Session.getActiveUser().getEmail()); // quem está executando
+  Logger.log(GmailApp.getAliases());              // aliases disponíveis p/ envio nessa conta
+
+  GmailApp.sendEmail("rodrigo.lisboa@gruposbf.com.br", "Teste sendAs", " ", {
+    htmlBody: "<b>teste</b>",
+    from: "vektor@gruposbf.com.br",
+    name: "Vektor"
+  });
 }
