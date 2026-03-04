@@ -179,6 +179,26 @@
         cursor:pointer;
     }
 
+    /* Consultas Auxiliares - botões do header */
+.aux-topbtn{
+  height:34px;
+  padding:0 12px;
+  border-radius:10px;
+  border:1px solid rgba(0,0,0,0.25);
+  background:#B5FF20;
+  color:#000;
+  font-weight:1000;
+  font-size:12px;
+  cursor:pointer;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  line-height:34px;     /* força centralização vertical */
+  padding-top:0;
+  padding-bottom:0;
+}
+
     /* scrollbar do histórico */
     .chat-body::-webkit-scrollbar { width:6px; }
     .chat-body::-webkit-scrollbar-track { background:transparent; }
@@ -4669,33 +4689,31 @@ display: none;
         <div>
           <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing:0.2px;">Consultas Auxiliares</div>
           <div style="color:rgba(226,232,240,0.9); font-size:12px; margin-top:2px;">
-            Faturas + Desligamentos de Gerentes (BigQuery)
+            Faturas + Desligamentos de Gerentes (BigQuery) + Consulta de Saldos
           </div>
         </div>
 
         <div style="display:flex; align-items:center; gap:10px;">
          <button id="auxBtnDem" type="button"
         onclick="window.vektorAuxShowDemissoes()"
-        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-               background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+        class="aux-topbtn">
           Analisar Dem.
         </button>
 
-          <button id="auxBtnSaldos" type="button"
-        onclick="window.vektorAuxShowSaldos && window.vektorAuxShowSaldos()"
-        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-               background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+        <button id="auxBtnSaldos" type="button"
+                onclick="window.vektorAuxShowSaldos && window.vektorAuxShowSaldos()"
+                class="aux-topbtn">
           Consulta de Saldos
         </button>
 
-          <button id="auxBtnVoltarFaturas" type="button"
-                  onclick="window.vektorAuxShowFaturas()"
-                  style="display:none; height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-                         background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
-            Voltar p/ Faturas
-          </button>
+        <button id="auxBtnVoltarFaturas" type="button"
+                onclick="window.vektorAuxShowFaturas()"
+                class="aux-topbtn"
+                style="display:none;">
+          Voltar p/ Faturas
+        </button>
         </div>
-      </div>
+        </div>
 
       <!-- Conteúdo -->
       <div style="flex:1; background:#0b1220; padding:14px 16px; overflow:auto; display:flex; flex-direction:column; gap:12px;">
@@ -4716,7 +4734,7 @@ display: none;
           <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
             <div style="font-weight:900; color:#0f172a;">Gerentes demitidos (BigQuery)</div>
             <div style="font-weight:700; color:#64748b; font-size:12px;">
-              Lista do mês atual (Senior/RH).
+              Lista originada da tabela do Senior/RH.
             </div>
           </div>
           <div id="auxDemConteudo" style="padding:12px;"></div>
