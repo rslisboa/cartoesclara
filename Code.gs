@@ -598,14 +598,149 @@ function vektorPolicyAssistantAsk(question, history) {
     if (!finalChunks.length) finalChunks = [policyText.substring(0, 3500)];
 
     // gera resposta
-    var answer = vektorVertexGeneratePolicyAnswer_(question, finalChunks, history || []);
+      var answer = vektorVertexGeneratePolicyAnswer_(question, finalChunks, history || []);
 
-    // prefixa assinatura (como você já está fazendo)
-    var sig = "gemini-2.5-flash";
-    return { ok: true, answer: sig + "\n" + String(answer || "") };
+      // prefixa assinatura
+      var sig = "gemini-2.5-flash";
+      var finalAnswer = sig + "\n" + String(answer || "");
+
+      // ✅ LOG na VEKTOR_POLICY_HIST (antes do return)
+      try {
+        var userEmail = "";
+        try { userEmail = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase(); } catch(_) {}
+        var sectionsCsv = (wanted || []).map(String).join(",");
+        var assunto = vektorPolicyAssuntoFromSections_(wanted);
+
+        vektorPolicyHistAppend_({
+          userEmail: userEmail,
+          assunto: assunto,
+          sectionsCsv: sectionsCsv,
+          question: question,
+          answer: finalAnswer,
+          model: sig
+        });
+      } catch (eLog) {
+        // não quebra resposta por erro de log
+      }
+
+      // retorna
+      return { ok: true, answer: finalAnswer };
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+// =======================================
+// POLICY HIST (Sheets): grava + consulta
+// =======================================
+var VEKTOR_POLICY_HIST_SS_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI";
+var VEKTOR_POLICY_HIST_TAB   = "VEKTOR_POLICY_HIST";
+
+function vektorPolicyHistGetSheet_(){
+  var ss = SpreadsheetApp.openById(VEKTOR_POLICY_HIST_SS_ID);
+  var sh = ss.getSheetByName(VEKTOR_POLICY_HIST_TAB);
+  if (!sh) throw new Error("Aba '" + VEKTOR_POLICY_HIST_TAB + "' não encontrada na planilha do histórico.");
+  return sh;
+}
+
+function vektorPolicyHistEnsureHeader_(){
+  var sh = vektorPolicyHistGetSheet_();
+  var lastCol = Math.max(sh.getLastColumn(), 1);
+  var hdr = sh.getRange(1, 1, 1, lastCol).getValues()[0] || [];
+  var hdrTxt = hdr.map(function(x){ return String(x||"").trim(); });
+
+  // header esperado
+  var exp = ["createdAt","userEmail","assunto","sectionsCsv","question","answer","model"];
+  var ok = exp.every(function(name){ return hdrTxt.indexOf(name) >= 0; });
+
+  if (!ok) {
+    // Se a planilha está vazia ou header diferente, sobrescreve a linha 1 com o padrão.
+    sh.getRange(1,1,1,exp.length).setValues([exp]);
+    sh.getRange(1,1,1,exp.length).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function vektorPolicyAssuntoFromSections_(wanted){
+  // wanted vem do routeSectionIds_(question) (ex: ["Anexo I","8","Anexo II","5"])
+  var s = (wanted || []).map(String);
+
+  // heurística bem “seca” (sem inventar):
+  if (s.indexOf("8") >= 0) return "Etiquetas / Regras de uso";
+  if (s.indexOf("5") >= 0) return "Solicitações / ServiceNow";
+  if (s.indexOf("Anexo II") >= 0) return "Solicitações";
+  if (s.indexOf("Anexo I") >= 0) return "Política / Regras";
+  return "Geral";
+}
+
+function vektorPolicyHistAppend_(payload){
+  payload = payload || {};
+  var sh = vektorPolicyHistEnsureHeader_();
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var ts = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss");
+
+  var userEmail = String(payload.userEmail || "").trim().toLowerCase();
+  var assunto = String(payload.assunto || "").trim();
+  var sectionsCsv = String(payload.sectionsCsv || "").trim();
+  var question = String(payload.question || "").trim();
+  var answer = String(payload.answer || "").trim();
+  var model = String(payload.model || "").trim();
+
+  // grava
+  sh.appendRow([ts, userEmail, assunto, sectionsCsv, question, answer, model]);
+}
+
+/**
+ * Front chama: vektorPolicyHistGet(email, limit)
+ * Retorna últimos registros do usuário (mais recentes primeiro).
+ */
+function vektorPolicyHistGet(email, limit){
+  vektorAssertFunctionAllowed_("vektorPolicyHistGet");
+
+  try {
+    limit = Number(limit) || 200;
+    if (limit < 1) limit = 1;
+    if (limit > 500) limit = 500;
+
+    email = String(email || "").trim().toLowerCase();
+    if (!email) {
+      // fallback: tenta pegar do contexto do Apps Script
+      try { email = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase(); } catch(_) {}
+    }
+    if (!email) return { ok:false, error:"Email do usuário não identificado." };
+
+    var sh = vektorPolicyHistEnsureHeader_();
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return { ok:true, rows: [] };
+
+    var values = sh.getRange(2, 1, lastRow - 1, 7).getValues(); // 7 cols fixas do header esperado
+    // [createdAt,userEmail,assunto,sectionsCsv,question,answer,model]
+
+    var out = [];
+    for (var i = values.length - 1; i >= 0; i--) { // mais recentes primeiro
+      var r = values[i];
+      var rEmail = String(r[1] || "").trim().toLowerCase();
+      if (rEmail !== email) continue;
+
+      out.push({
+        createdAt: String(r[0] || ""),
+        userEmail: String(r[1] || ""),
+        assunto: String(r[2] || ""),
+        sectionsCsv: String(r[3] || ""),
+        question: String(r[4] || ""),
+        answer: String(r[5] || ""),
+        model: String(r[6] || "")
+      });
+
+      if (out.length >= limit) break;
+    }
+
+    return { ok:true, rows: out };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
   }
 }
 
@@ -1110,6 +1245,13 @@ function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
   "Não invente regras, exceções, prazos, valores, permissões ou interpretações.\n" +
   "Responda em português do Brasil, de forma natural, clara, objetiva e sem enrolação.\n" +
   "\n" +
+  "Estilo e fluidez (sem perder rigor):\n" +
+  "• Responda como um assistente humano: frases curtas, conectivos naturais (\"Neste caso\", \"Por isso\", \"Assim\").\n" +
+  "• Evite jargão desnecessário e evite repetir instruções.\n" +
+  "• Se a regra estiver explícita, comece com a conclusão (\"Pode\" / \"Não pode\" / \"Deve\" / \"Não deve\") e depois explique.\n" +
+  "• Se não houver base clara, diga de forma natural: \"Não encontrei base suficiente nos trechos para afirmar com segurança.\" (sem dramatizar).\n" +
+  "• Não use linguagem dura/punitiva; seja objetivo e cordial.\n" +
+  "\n"
   "IMPORTANTE SOBRE OS TRECHOS:\n" +
   "• O <TÍTULO> é o texto após a barra \"|\" no cabeçalho do trecho.\n" +
   "• Cada trecho começa com um cabeçalho no formato: \"§ <SEÇÃO> | <TÍTULO>\".\n" +
