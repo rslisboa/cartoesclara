@@ -1,0 +1,2 @@
+Me informe com detalhes e referencias (na função tal, antes trecho de código de tal, depois do trecho de código tal, antes de tal trecho de código, depois de tal
+trecho de código, depois de, acima de, etc) como e onde alterar isso nos arquivo, com exatidão!! Sem suposições pois vc está com os arquivos aqui.
