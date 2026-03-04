@@ -15031,6 +15031,42 @@ function vektorPolicyHistApplyFilters_(){
   vektorPolicyHistRender_(out);
 }
 
+function vektorPolicyHistFmtTs_(v){
+  if (!v) return "—";
+
+  // se já vier no formato certo, retorna direto
+  const s0 = String(v).trim();
+  if (/^\d{2}\/\d{2}\/\d{4}\s*-\s*\d{2}:\d{2}:\d{2}$/.test(s0)) return s0;
+
+  let d = null;
+
+  // caso venha como Date mesmo
+  if (Object.prototype.toString.call(v) === "[object Date]") {
+    d = v;
+  } else {
+    // tenta parse geral (pega: "Wed Mar 04 2026 09:14:05 GMT-0300 ..." e ISO)
+    const t1 = Date.parse(s0);
+    if (!isNaN(t1)) d = new Date(t1);
+
+    // tenta parse do seu padrão "yyyy-MM-dd HH:mm:ss"
+    if (!d) {
+      const m = s0.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})$/);
+      if (m) d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+    }
+  }
+
+  if (!d || isNaN(d.getTime())) return s0; // fallback: mostra como veio
+
+  const dd = String(d.getDate()).padStart(2,"0");
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2,"0");
+  const mi = String(d.getMinutes()).padStart(2,"0");
+  const ss = String(d.getSeconds()).padStart(2,"0");
+
+  return `${dd}/${mm}/${yyyy} - ${hh}:${mi}:${ss}`;
+}
+
 function vektorPolicyHistRender_(rows){
   const box = document.getElementById("policyHistList");
   if (!box) return;
@@ -15041,7 +15077,7 @@ function vektorPolicyHistRender_(rows){
   }
 
   box.innerHTML = rows.map((r, idx)=>{
-    const ts = String(r.createdAt || "—");
+    const ts = vektorPolicyHistFmtTs_(r.createdAt);
     const assunto = String(r.assunto || "—");
     const q = String(r.question || "");
     const a = String(r.answer || "");
