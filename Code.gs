@@ -483,7 +483,7 @@ try {
   return template
   .evaluate()
   .setTitle('Grupo SBF | Vektor')
-  .setFaviconUrl('https://raw.githubusercontent.com/rslisboa/cartoesclara/8c9550fd97b31cc7e418401572c28c7af8ed71c1/Logo_Vektor_0503.png')
+  .setFaviconUrl('https://raw.githubusercontent.com/rslisboa/cartoesclara/ce030011860b128fc826cd763582f60c0d68890c/Logo_Vektor_0503_2.png')
   .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
   }
@@ -581,7 +581,155 @@ function vektorPolicyAssistantAsk(question, history) {
     // ------------------------------
     // ✅ ranker para completar com os mais relevantes
     // ------------------------------
-    var topK = 5; // limite final que você já usa
+    var topK = 10; // limite final que você já usa
+
+    // ============================================
+// ✅ SEED FORÇADO POR TEMA (anti “base insuficiente”)
+// Cole antes do ranker: vektorPolicyPickTopChunks_(...)
+// ============================================
+function vektorNormNoAcc_(s){
+  s = String(s || "").toLowerCase();
+  try { s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch(_){}
+  return s;
+}
+
+function vektorSeedWindow_(policyText, anchor, win){
+  var p = vektorNormNoAcc_(policyText);
+  var a = vektorNormNoAcc_(anchor);
+  var idx = p.indexOf(a);
+  if (idx < 0) return null;
+
+  // calcula janela em cima do texto original (mantém maiúsculas etc)
+  var ini = Math.max(0, idx - win);
+  var fim = Math.min(policyText.length, idx + win);
+  return policyText.substring(ini, fim);
+}
+
+function vektorSeedPushUnique_(arr, chunk){
+  if (!chunk) return;
+  if (arr.indexOf(chunk) < 0) arr.push(chunk);
+}
+
+// --- Detecta tema da pergunta
+var qn = vektorNormNoAcc_(question);
+
+// janela padrão (equilíbrio)
+var FORCE_WINDOW = 1600;
+
+// Map de temas -> regex -> anchors
+var TOPIC_SEEDS = [
+  // 5.2 / 4.12 (férias, afastamento, demissão)
+  {
+    re: /\b(ferias|afastamento|licenca|ausencia|portador temporario|temporario|substituto|substituicao|demissao|desligamento)\b/,
+    anchors: [
+      "5.2.", "procedimento em casos de afastamento", "demissao do gerente",
+      "4.12.", "portador temporario", "nos afastamentos temporarios"
+    ]
+  },
+
+  // 7 (limite mensal/diário, ciclo 06)
+  {
+    re: /\b(limite|mensal|diario|por dia|por mes|ciclo|06|faturamento|aumento de limite)\b/,
+    anchors: [
+      "7.", "7. limite dos cartoes",
+      "importante destacar que o limite disponivel e mensal", // frase assinatura
+      "o limite e reestabelecido", "todo dia 06",
+      "solicitacoes de aumento de limite", "servicenow"
+    ]
+  },
+
+  // 8 (prestação de contas / 48h / comprovante / etiqueta / descrição)
+  {
+    re: /\b(prestacao de contas|prestar contas|comprovante|nota fiscal|recibo|etiqueta|descricao|48 horas|prazo)\b/,
+    anchors: [
+      "8.", "8. prestacao de contas",
+      "48 horas", "8.1.", "bloqueio preventivo do cartao",
+      "inserir etiqueta", "anexar o comprovante fiscal", "preencher o campo \"descricao\""
+    ]
+  },
+
+  // 8.1 bloqueio + desbloqueio via ServiceNow (Anexo II)
+  {
+    re: /\b(bloqueio|desbloqueio|cartao bloqueado|bloqueado preventivamente|regularizacao|servicenow)\b/,
+    anchors: [
+      "8.1.", "bloqueio preventivo do cartao",
+      "o desbloqueio devera ser solicitado", "servicenow",
+      "anexo ii", "solicitacao de desbloqueio de cartao"
+    ]
+  },
+
+  // contestação (prazo 2 dias úteis) – aparece na seção de prestação/contestação
+  {
+    re: /\b(contestacao|contestar|chargeback|disputa|compra irregular|suporte da clara)\b/,
+    anchors: [
+      "contestacao", "suporte da clara", "2 dias uteis", "contato@clara.com"
+    ]
+  },
+
+  // 9 – restrições de uso: saques, cashback, milhas, familiares etc.
+  {
+    re: /\b(restricao|proibido|vedado|nao pode|saque|dinheiro|cashback|milhas|fidelidade|cpf|familiares|conflito de interesses)\b/,
+    anchors: [
+      "9.", "9. restricoes de uso",
+      "nao e permitido realizar adiantamentos", "saques",
+      "cashback", "milhas", "cpf",
+      "conflito de interesses"
+    ]
+  },
+
+  // 9.1 – despesas pessoais / ressarcimento (prazo 2 dias úteis)
+  {
+    re: /\b(despesa pessoal|uso indevido|ressarcimento|reembolsar|devolver|pix|transferencia)\b/,
+    anchors: [
+      "9.1.", "utilizacao indevida do cartao", "despesas pessoais",
+      "ressarcimento", "2 dias uteis",
+      "despesa pessoal - uso indevido"
+    ]
+  },
+
+  // 9.2 – patrimonial / itens de valor elevado (obrigatório compras)
+  {
+    re: /\b(patrimonial|infraestrutura|valor elevado|eletrodomestico|eletronico|notebook|celular|impressora|moveis|mobiliario|geladeira|micro-ondas|compras)\b/,
+    anchors: [
+      "9.2.", "aquisição de itens patrimoniais", "valor elevado",
+      "obrigatoria a solicitacao via area de compras"
+    ]
+  },
+
+  // 10 – monitoramento / auditoria / fraudes (típico)
+  {
+    re: /\b(auditoria|monitoramento|fraude|fiscalizacao|compliance|medidas disciplinares|medidas corretivas)\b/,
+    anchors: [
+      "10.", "monitoramento", "auditoria", "fraudes",
+      "medidas disciplinares", "medidas corretivas"
+    ]
+  },
+
+  // Anexos: etiquetas / ServiceNow
+  {
+    re: /\b(etiquetas|codigo sap|anexo i|anexo ii|servicenow|chamado)\b/,
+    anchors: [
+      "anexo i", "quadro de etiquetas", "codigo sap",
+      "anexo ii", "solicitacoes no servicenow"
+    ]
+  }
+];
+
+// Aplica: se match no tema, injeta janelas ao redor das âncoras no seed
+for (var t = 0; t < TOPIC_SEEDS.length; t++){
+  var topic = TOPIC_SEEDS[t];
+  if (!topic.re.test(qn)) continue;
+
+  var anchors = topic.anchors || [];
+  for (var a = 0; a < anchors.length; a++){
+    var winTxt = vektorSeedWindow_(policyText, anchors[a], FORCE_WINDOW);
+    vektorSeedPushUnique_(seed, winTxt);
+  }
+}
+
+// (opcional) limite de seed para não “estourar” tokens por acidente
+if (seed.length > 6) seed = seed.slice(0, 6);
+
     var ranked = vektorPolicyPickTopChunks_(question, chunks, topK);
 
     // monta lista final sem duplicar: seeds + ranked
@@ -594,7 +742,15 @@ function vektorPolicyAssistantAsk(question, history) {
     });
 
     // corta no máximo 5 para não explodir tokens
-    finalChunks = finalChunks.slice(0, 5);
+    finalChunks = finalChunks.slice(0, topK);
+
+    // ✅ cap por chunk (reduz custo sem matar cobertura)
+      var MAX_CHARS_PER_CHUNK = 1100;
+      finalChunks = finalChunks.map(function(c){
+        c = String(c || "");
+        if (c.length <= MAX_CHARS_PER_CHUNK) return c;
+        return c.slice(0, MAX_CHARS_PER_CHUNK) + "…";
+      });
 
     // fallback defensivo
     if (!finalChunks.length) finalChunks = [policyText.substring(0, 3500)];
