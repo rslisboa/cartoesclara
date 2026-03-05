@@ -483,7 +483,9 @@ try {
   return template
   .evaluate()
   .setTitle('Grupo SBF | Vektor')
+  .setFaviconUrl('https://raw.githubusercontent.com/rslisboa/cartoesclara/8c9550fd97b31cc7e418401572c28c7af8ed71c1/Logo_Vektor_0503.png')
   .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
   }
 
 // =====================================================
