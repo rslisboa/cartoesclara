@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1.0" />
 <title>Grupo CBF | Vektor</title>
-<link rel="shortcut icon" href="https://raw.githubusercontent.com/rslisboa/cartoesclara/8c9550fd97b31cc7e418401572c28c7af8ed71c1/Logo_Vektor_0503.png?v=20260305">
+<link rel="shortcut icon" href="https://raw.githubusercontent.com/rslisboa/cartoesclara/ce030011860b128fc826cd763582f60c0d68890c/Logo_Vektor_0503_2.png">
 <script src="https://cdn.tailwindcss.com"></script>
 
 <!-- Chart.js + plugin de data labels para o gráfico de faturas -->
@@ -27052,10 +27052,6 @@ window.vektorBaixarLojasComPendenciasCicloAtual = function (ev) {
       ev.stopPropagation();
     }
 
-    renderBotMessage(
-      "HTML:<p class='text-sm text-slate-700'>Gerando Excel apenas das <b>lojas com pendências</b> no ciclo atual, aguarde um momento.</p>"
-    );
-
     google.script.run
       .withSuccessHandler(function (res) {
         if (!res || !res.ok || !res.xlsxBase64) {
@@ -27091,13 +27087,14 @@ window.vektorBaixarLojasComPendenciasCicloAtual = function (ev) {
         var msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
         renderBotMessage("HTML:<p class='text-sm text-slate-700'>Erro ao gerar o Excel: " + msg + "</p>");
       })
-      .exportarLojasComPendenciasCicloAtualXlsx(); // ✅ NOVA função no Code.gs
-    return false;
-  } catch (e) {
-    console.error("Erro em vektorBaixarLojasComPendenciasCicloAtual:", e);
-    return false;
-  }
-};
+      .exportarLojasComPendenciasCicloAtualXlsx();
+        return false;
+      } catch (e) {
+        console.error("Erro em vektorBaixarLojasComPendenciasCicloAtual:", e);
+        alert("Falha ao gerar o CSV de pendências.");
+        return false;
+      }
+    };
 
 // ===============================
 // E-MAIL — LOJAS COM PENDÊNCIAS (ciclo atual) — anexo XLSX
@@ -27152,10 +27149,6 @@ window.vektorBaixarTransacoesFatura = function (ev, extrato) {
       renderBotMessage("HTML:<p class='text-sm text-slate-700'>Não consegui identificar o extrato para exportar.</p>");
       return false;
     }
-
-    renderBotMessage(
-      "HTML:<p class='text-sm text-slate-700'>Gerando arquivo em excel da fatura <b>" + extrato + " "
-    );
 
     google.script.run
       .withSuccessHandler(function (res) {
