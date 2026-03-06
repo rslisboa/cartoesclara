@@ -539,6 +539,7 @@ function vektorPolicyAssistantAsk(question, history) {
       var wantsServicenow = /(servicenow|chamado|abertura de chamado|fluxo|solicita)/.test(s);
       var wantsStoreChange = /(trocar de loja|troca de loja|troca de gerente|mudan[cç]a entre lojas|mudar de loja|transfer[êe]ncia|transferir|loja anterior|loja nova)/.test(s);
       var wantsLabels = /(etiqueta|etiquetas|rotul|r[oó]tulo|classific|sap|quadro de etiquetas|anexo i)/.test(s);
+      var wantsTermo = /(termo de responsabilidade|termo clara|aceite|formaliza[cç][aã]o do aceite|formulario|google forms|pdf assinado|reenviado ao departamento financeiro|termo assinado)/.test(s);
 
       var sec = [];
       // Regras principais por tema
@@ -551,6 +552,7 @@ function vektorPolicyAssistantAsk(question, history) {
       if (wantsServicenow) sec.push("Anexo II");           // Solicitações no ServiceNow
       if (wantsStoreChange) sec.push("Anexo II", "5");
       if (wantsLabels) sec.push("Anexo I", "8");
+      if (wantsTermo) sec.push("5.1");
 
       // fallback: se nada casou, não força seção (deixa ranker escolher)
       return sec;
@@ -593,16 +595,20 @@ function vektorNormNoAcc_(s){
   return s;
 }
 
-function vektorSeedWindow_(policyText, anchor, win){
-  var p = vektorNormNoAcc_(policyText);
+function vektorSeedWindow_(chunks, anchor){
   var a = vektorNormNoAcc_(anchor);
-  var idx = p.indexOf(a);
-  if (idx < 0) return null;
+  if (!a) return null;
 
-  // calcula janela em cima do texto original (mantém maiúsculas etc)
-  var ini = Math.max(0, idx - win);
-  var fim = Math.min(policyText.length, idx + win);
-  return policyText.substring(ini, fim);
+  for (var i = 0; i < (chunks || []).length; i++) {
+    var c = String(chunks[i] || "");
+    if (!c) continue;
+
+    if (vektorNormNoAcc_(c).indexOf(a) >= 0) {
+      return c; // retorna o chunk completo, com prefixo "§ ..."
+    }
+  }
+
+  return null;
 }
 
 function vektorSeedPushUnique_(arr, chunk){
@@ -712,7 +718,23 @@ var TOPIC_SEEDS = [
       "anexo i", "quadro de etiquetas", "codigo sap",
       "anexo ii", "solicitacoes no servicenow"
     ]
-  }
+  },
+
+  // 5.1 Sobre o termo de responsabilidade
+
+  {
+  re: /\b(termo de responsabilidade|termo clara|aceite|google forms|formulario|formulário|pdf assinado|termo assinado)\b/,
+  anchors: [
+    "termo de responsabilidade",
+    "formalização do aceite",
+    "formalizacao do aceite",
+    "a liberação para uso do cartão está condicionada à formalização do aceite",
+    "o gerente receberá um link de um formulário",
+    "google forms",
+    "será gerado o documento do termo em formato pdf",
+    "deverá ser assinado e reenviado ao departamento financeiro"
+  ]
+}
 ];
 
 // Aplica: se match no tema, injeta janelas ao redor das âncoras no seed
@@ -722,7 +744,7 @@ for (var t = 0; t < TOPIC_SEEDS.length; t++){
 
   var anchors = topic.anchors || [];
   for (var a = 0; a < anchors.length; a++){
-    var winTxt = vektorSeedWindow_(policyText, anchors[a], FORCE_WINDOW);
+    var winTxt = vektorSeedWindow_(chunks, anchors[a]);
     vektorSeedPushUnique_(seed, winTxt);
   }
 }
@@ -745,7 +767,7 @@ if (seed.length > 6) seed = seed.slice(0, 6);
     finalChunks = finalChunks.slice(0, topK);
 
     // ✅ cap por chunk (reduz custo sem matar cobertura)
-      var MAX_CHARS_PER_CHUNK = 1100;
+      var MAX_CHARS_PER_CHUNK = 1600;
       finalChunks = finalChunks.map(function(c){
         c = String(c || "");
         if (c.length <= MAX_CHARS_PER_CHUNK) return c;
