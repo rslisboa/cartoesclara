@@ -1546,8 +1546,35 @@ display: none;
     @keyframes blink {
       0%, 80%, 100% { opacity: 0; }
       40% { opacity: 1; }
-    }
+    } 
   </style>
+
+  <style>
+  .vektor-policy-intro-wrap{
+    display:block;
+  }
+
+  .vektor-policy-intro-text{
+    display:block;
+    white-space:normal;
+    overflow-wrap:anywhere;
+    min-height:24px;
+  }
+
+  .vektor-policy-intro-caret::after{
+    content:"|";
+    display:inline-block;
+    margin-left:2px;
+    color:#005E27;
+    font-weight:900;
+    animation: vektorPolicyCaretBlink 0.9s steps(1,end) infinite;
+  }
+
+  @keyframes vektorPolicyCaretBlink{
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+</style>
 
   <style>
   /* VEKTOR - APP INVISÍVEL ATÉ LOGIN OK */
@@ -14884,6 +14911,114 @@ document.addEventListener("DOMContentLoaded", () => {
     return "boa noite";
   }
 
+  function vektorPolicyIntroHtml_(nome){
+  const nomeSafe = String(nome || "").trim();
+  const saudacaoTxt = nomeSafe
+    ? ("Olá, " + nomeSafe + "! Eu sou o <b>Assistente da Política Clara</b>. " +
+       "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências.")
+    : ("Olá! Eu sou o <b>Assistente da Política Clara</b>. " +
+       "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências.");
+
+  return (
+    "<div class='vektor-policy-intro-wrap'>" +
+      "<div id='vektorPolicyIntroText' class='vektor-policy-intro-text vektor-policy-intro-caret'></div>" +
+      "<div id='vektorPolicyHistWrap' style='margin-top:10px; display:none;'>" +
+        "<button id='policyHistOpenBtn' " +
+          "style='border:1px solid rgba(0,94,39,0.35); background:#ecfdf5; color:#065f46;" +
+                 "padding:8px 10px; border-radius:12px; font-weight:1000; font-size:12px; cursor:pointer;'>" +
+          "Quer ver o que já conversou por aqui?" +
+        "</button>" +
+      "</div>" +
+    "</div>"
+  );
+}
+
+function vektorTypeHtml_(el, html, onDone){
+  if (!el) return;
+  if (window.__vektorPolicyIntroTimer) {
+    clearTimeout(window.__vektorPolicyIntroTimer);
+    window.__vektorPolicyIntroTimer = null;
+  }
+
+  const tmp = document.createElement("div");
+  tmp.innerHTML = String(html || "");
+
+  const tokens = [];
+  (function walk(node){
+    Array.from(node.childNodes || []).forEach(function(child){
+      if (child.nodeType === 3) {
+        const txt = child.nodeValue || "";
+        for (let i = 0; i < txt.length; i++) {
+          tokens.push({ type: "char", value: txt.charAt(i) });
+        }
+      } else if (child.nodeType === 1) {
+        const tag = child.tagName.toLowerCase();
+        tokens.push({ type: "open", value: "<" + tag });
+
+        Array.from(child.attributes || []).forEach(function(attr){
+          tokens[tokens.length - 1].value += " " + attr.name + "=\"" + String(attr.value).replace(/"/g, "&quot;") + "\"";
+        });
+
+        tokens[tokens.length - 1].value += ">";
+        walk(child);
+        tokens.push({ type: "close", value: "</" + tag + ">" });
+      }
+    });
+  })(tmp);
+
+  let i = 0;
+  let out = "";
+
+  function tick(){
+    if (i >= tokens.length) {
+      el.innerHTML = out;
+      el.classList.remove("vektor-policy-intro-caret");
+      if (typeof onDone === "function") onDone();
+      return;
+    }
+
+    out += tokens[i].value;
+    el.innerHTML = out;
+    i++;
+
+    const last = tokens[i - 1];
+    const delay = (last && last.type === "char" && /[,.!?:;]/.test(last.value)) ? 75 : 36;
+
+    window.__vektorPolicyIntroTimer = setTimeout(tick, delay);
+  }
+
+  tick();
+}
+
+function vektorPolicyTodayKey_(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day;
+}
+
+function vektorPolicyIntroStorageKey_(){
+  const email = (typeof USER_EMAIL_REPLACED !== "undefined" && USER_EMAIL_REPLACED)
+    ? String(USER_EMAIL_REPLACED).trim().toLowerCase()
+    : "anon";
+  return "vektor_policy_intro_seen_" + email + "_" + vektorPolicyTodayKey_();
+}
+
+function vektorPolicyShouldAnimateToday_(){
+  try {
+    return localStorage.getItem(vektorPolicyIntroStorageKey_()) !== "1";
+  } catch(e) {
+    return true;
+  }
+}
+
+function vektorPolicyMarkAnimatedToday_(){
+  try {
+    localStorage.setItem(vektorPolicyIntroStorageKey_(), "1");
+  } catch(e) {}
+}
+
   window.__vektorChatMode = window.__vektorChatMode || "policy";
 // "legacy" | "policy"
 
@@ -14896,16 +15031,44 @@ window.vektorApplyChatMode_ = function () {
 
   if (greetingEl) {
     if (isPolicy) {
-      greetingEl.innerHTML =
-        "Olá! Eu sou o <b>Assistente da Política Clara</b>. " +
-        "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências." +
-        "<div style='margin-top:10px;'>" +
-          "<button id='policyHistOpenBtn' " +
-            "style='border:1px solid rgba(0,94,39,0.35); background:#ecfdf5; color:#065f46;" +
-                   "padding:8px 10px; border-radius:12px; font-weight:1000; font-size:12px; cursor:pointer;'>" +
-            "Quer ver o que já conversou por aqui?" +
-          "</button>" +
-        "</div>";
+      const nome = (typeof FIRST_NAME !== "undefined" && FIRST_NAME)
+        ? FIRST_NAME
+        : (typeof displayName !== "undefined" ? displayName : "");
+
+      const textoHtml = nome
+        ? ("Olá, " + nome + "! Eu sou o <b>Assistente da Política Clara</b>. " +
+           "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências.")
+        : ("Olá! Eu sou o <b>Assistente da Política Clara</b>. " +
+           "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências.");
+
+      const deveAnimar = vektorPolicyShouldAnimateToday_();
+
+      if (deveAnimar) {
+        greetingEl.innerHTML = vektorPolicyIntroHtml_(nome);
+
+        const introTextEl = document.getElementById("vektorPolicyIntroText");
+        const histWrapEl  = document.getElementById("vektorPolicyHistWrap");
+
+        vektorTypeHtml_(introTextEl, textoHtml, function () {
+          if (histWrapEl) histWrapEl.style.display = "block";
+          vektorPolicyMarkAnimatedToday_();
+          try { vektorPolicyHistBindOnce_(); } catch (e) { console.error(e); }
+        });
+
+      } else {
+        greetingEl.innerHTML =
+          textoHtml +
+          "<div style='margin-top:10px;'>" +
+            "<button id='policyHistOpenBtn' " +
+              "style='border:1px solid rgba(0,94,39,0.35); background:#ecfdf5; color:#065f46;" +
+                     "padding:8px 10px; border-radius:12px; font-weight:1000; font-size:12px; cursor:pointer;'>" +
+              "Quer ver o que já conversou por aqui?" +
+            "</button>" +
+          "</div>";
+
+        try { vektorPolicyHistBindOnce_(); } catch (e) { console.error(e); }
+      }
+
     } else {
       const saudacao = getSaudacaoPorHorario_();
       const nome = (typeof FIRST_NAME !== "undefined" && FIRST_NAME)
@@ -14924,7 +15087,6 @@ window.vektorApplyChatMode_ = function () {
       : "Digite aqui.";
   }
 
-  // no modo política, esconde o botão de anexo
   if (attachBtn) {
     attachBtn.style.display = isPolicy ? "none" : "inline-flex";
   }
@@ -15196,28 +15358,6 @@ function renderSaudacaoVektor_() {
   document.addEventListener("DOMContentLoaded", renderSaudacaoVektor_);
 
   renderSaudacaoVektor_();
-
-// 🔔 Saudaçao em outra mensagem, depois da mensagem inicial
-// ✅ Só para NÃO Administrador
-setTimeout(() => {
-
-    // Se for ADM, NÃO mostra essa saudação (ADM já tem o fluxo do informativo + pergunta inicial)
-    if (USER_ROLE_CLEAN === "Administrador") return;
-
-    if (displayName) {
-        // Versão com nome
-        renderBotMessage(
-            "HTML:<p class='text-sm text-slate-700'><b>" +
-            displayName +
-            "</b>, como posso te ajudar hoje?</p>"
-        );
-    } else {
-        // Versão sem nome (fallback)
-        renderBotMessage(
-            "HTML:<p class='text-sm text-slate-700'>Como posso te ajudar hoje?</p>"
-        );
-    }
-}, 2000);
 
 setTimeout(function () {
   try {
@@ -16855,213 +16995,6 @@ function encontrarListaTimesNaMensagem(msgOriginal) {
 }
 
     /* ========= DADOS / TABELAS ========= */
-
-    const etiquetasOficiais = [
-  {
-    nome: "MARKETING_PUBLICIDADE E PROPAGANDA",
-    palavrasChave: [
-      "marketing", "publicidade", "propaganda", "anuncio", "anúncio", "facebook", "instagram", "insta", "face",
-      "mídia", "midia", "brinde", "campanha", "banner promocional", "campanhas", "banner", "baner",
-      "impulsionamento", "divulgação", "panfleto", "adesivo promocional", "social media", "instagram ads", "facebook ads", "promoção local", "google ads", "tiktok ads", "youtube ads", "seo", "sem", "email marketing", "e-mail marketing", "inbound marketing", "outbound marketing", "influencer", "influenciadores", "parceria paga", "patrocinado", "stories", "feed", "design gráfico", "agencia de publicidade", "agência de publicidade", "criacao de conteudo", "criação de conteúdo", "material promocional", "folder", "cartaz", "outdoor", "tv paga", "revista", "jornal", "marketing digital", "alcance", "engajamento", "conversão", "leads", "pixel", "remarketing", "assessoria de imprensa", "relações públicas", "relacoes publicas", "assessoria"
-    ],
-    descricao:
-      "Ações promocionais, compra de brindes, banners, impulsionamento de redes sociais, contratação de mídia local.",
-    observacaoUso: "Somente campanhas aprovadas pelo regional ou diretoria."
-  },
-  {
-    nome: "TAXAS E EMOLUMENTOS",
-    palavrasChave: [
-      "taxa", "taxas", "emolumento", "emolumentos", "cartorio", "cartório",
-      "certidao", "certidão", "registro", "segunda via documento", "aluguel",
-      "documentação oficial", "taxa de serviço", "honorarios", "honorários"
-    ],
-    descricao:
-      "Custos com registros, certidões, taxas cartoriais ou administrativas necessárias à operação da loja.",
-    observacaoUso: ""
-  },
-  {
-    nome: "MATERIAL DE LIMPEZA",
-    palavrasChave: [
-      "detergente", "sabao", "sabão", "desinfetante", "alcool", "álcool", "pano", "rodo", "vassoura", "esponja", "papel toalha", "limpeza loja", "produto de limpeza", "desengordurante", "multiuso", "saco de lixo", "lixeira", "balde", "mop", "lustra moveis", "lustra móveis", "cera", "removedor", "amaciante", "água sanitária", "agua sanitaria", "limpa vidros", "rasteio", "escova", "flanela", "aspirador", "saponáceo", "sabonete", "dispenser", "tapete sanitizante", "sanitizante", "cloro", "alvejante", "luva", "mascara", "máscara", "limpeza do banheiro", "papel higiênico", "papel higienico", "aromatizador", "odorizador", "refil", "material de higiene", "higiene"
-    ],
-    descricao:
-      "Materiais de limpeza e higiene da loja: detergente, desinfetante, pano de chão, álcool, papel toalha, vassoura, rodo etc.",
-    observacaoUso: ""
-  },
-  {
-    nome: "MATERIAL DE INFORMÁTICA",
-    palavrasChave: [
-      "mouse", "teclado", "teclado pdv", "cabo usb", "pendrive", "pen drive", "roteador", "hub usb", "fonte", "adaptador", "cabo rede", "cartão memoria", "cartao memoria", "extensor usb", "carregador", "suporte notebook", "monitor", "impressora", "cartucho", "toner", "cabo hdmi", "ssd", "hd", "memoria ram", "memória ram", "headset", "scanner", "leitor de código", "leitor de codigo", "mousepad", "modem", "placa de video", "placa de rede", "pilhas", "bateria", "no break", "nobreak", "filtro de linha", "periférico", "periferico", "fone de ouvido", "fones", "fone"
-    ],
-    descricao:
-      "Itens de informática de baixo valor: mouse, teclado, cabos, pendrives, fontes, roteadores, hubs USB, cartões de memória.",
-    observacaoUso: "Não cobre monitores, TVs ou equipamentos patrimoniais."
-  },
-  {
-    nome: "MATERIAL DE ESCRITÓRIO",
-    palavrasChave: [
-      "caneta", "papel", "pasta", "bloco", "caderno", "etiqueta adesiva", "grampeador", "clips", "clipes", "organizador", "post-it", "marcador", "lápis", "lapis", "borracha", "corretivo", "tesoura", "régua", "regua", "perfurador", "furador de papel", "cola", "fita adesiva", "fita durex", "envelope", "arquivo", "caixa arquivo", "separador de página", "separador de pagina",
-      "carimbo", "tinta carimbo", "calculadora", "agenda", "calendário", "calendario", "prancheta", "suporte de caneta", "porta-treco", "cartucho de tinta", "toner", "porta revista", "revisteiro", "apontador", "dicionário", "dicionario", "impressos", "sulfite", "folha de sulfite", "folha A4", "folhas", "escada", "escadas"
-    ],
-    descricao:
-      "Canetas, blocos, papéis, pastas, grampeadores, clipes, etiquetas adesivas, organizadores de mesa etc.",
-    observacaoUso: ""
-  },
-  {
-    nome: "MATERIAL DE COPA E COZINHA",
-    palavrasChave: [
-      "copo", "copos", "talher", "talheres", "garrafa termica", "garrafa térmica",
-      "pano prato", "pano de prato", "filtro de cafe", "filtro de café",
-      "pote", "potes", "pote plastico", "pote plástico", "descartavel", 
-    ],
-    descricao:
-      "Copos, talheres, filtros de café, panos de prato, potes plásticos, garrafas térmicas.",
-    observacaoUso: "Não cobre eletrodomésticos como cafeteiras ou micro-ondas."
-  },
-  {
-    nome: "MATERIAL DE COPA E COZINHA OPERAÇÕES",
-    palavrasChave: ["cozinha loja", "utensilios loja", "material copa operações", "kit acrilico"],
-    descricao: "Itens de copa/cozinha utilizados especificamente em operações.",
-    observacaoUso: ""
-  },
-  {
-    nome: "MATERIAL DE LIMPEZA OPERAÇÕES",
-    palavrasChave: ["limpeza operações", "produto limpeza operacional"],
-    descricao: "Materiais de limpeza voltados à operação da loja.",
-    observacaoUso: ""
-  },
-  {
-    nome: "SERVIÇOS GRÁFICOS OPERAÇÕES",
-    palavrasChave: ["banner", "adesivo", "flyer", "folder", "grafica", "impressao", "impressão", "impressões"],
-    descricao: "Materiais gráficos operacionais, banners e impressões.",
-    observacaoUso: ""
-  },
-  {
-    nome: "MANUTENÇÃO CIVIL",
-    palavrasChave: [
-      "parede", "porta", "vidro", "prateleira", "fechadura", "reparo loja",
-      "conserto parede", "ajuste estrutura", "obra pequena"
-    ],
-    descricao:
-      "Pequenos reparos físicos na loja (parede, porta, vidro, prateleira fixa).",
-    observacaoUso: ""
-  },
-  {
-    nome: "MANUTENÇÃO ELETRICO",
-    palavrasChave: [
-      "tomada", "disjuntor", "interruptor", "reator", "soquete", "extensao",
-      "fiação", "fiacao", "elétrico", "eletrico", "luz", "lâmpada", "lampada"
-    ],
-    descricao:
-      "Troca de tomadas, disjuntores, interruptores, lâmpadas e pequenos reparos elétricos.",
-    observacaoUso: "Apenas serviços simples, sem necessidade de técnico especializado."
-  },
-  {
-    nome: "MANUTENÇÃO EQUIPAMENTOS",
-    palavrasChave: [
-      "conserto impressora", "ajuste maquina estampar", "reparo computador",
-      "ferramenta manual", "manutencao equipamentos", "reparo técnico"
-    ],
-    descricao:
-      "Reparo de impressora, máquina de estampar e computador fora de garantia.",
-    observacaoUso: ""
-  },
-  {
-    nome: "MANUTENÇÃO AR-CONDICIONADO",
-    palavrasChave: [
-      "ar condicionado", "ar-condicionado", "limpeza filtro", "carga gas",
-      "controle remoto ar", "manutenção ar", "reparo ar", "split"
-    ],
-    descricao:
-      "Limpeza, carga de gás e pequenos ajustes em ar-condicionado.",
-    observacaoUso: "Não cobre compra de novo aparelho."
-  },
-  {
-    nome: "TRANSPORTE SERVICOS EMERGENCIAS",
-    palavrasChave: [
-      "motoboy", "moto boy", "entrega urgente", "frete", "documento matriz",
-      "lalamove", "entrega loja", "envio urgente", "courier"
-    ],
-    descricao:
-      "Frete emergencial local, motoboy ou entrega urgente entre lojas e matriz.",
-    observacaoUso: "Não inclui transporte pessoal via aplicativos."
-  },
-  {
-    nome: "SERVIÇOS GRÁFICOS E DE COPIADORAS",
-    palavrasChave: [
-      "banner", "adesivo", "flyer", "folder", "encadernacao", "grafica", "impressao",
-      "material visual", "cartaz", "copiadora"
-    ],
-    descricao:
-      "Impressões, banners, adesivos, folders, encadernações e materiais visuais.",
-    observacaoUso: ""
-  },
-  {
-    nome: "SERVIÇOS DE LIMPEZA",
-    palavrasChave: [
-      "limpeza loja", "faxina", "serviço limpeza", "limpeza extra", "empresa limpeza"
-    ],
-    descricao:
-      "Contratação de serviços de limpeza eventuais para manutenção da loja.",
-    observacaoUso: ""
-  },
-  {
-    nome: "CORREIOS_SEDEX/AR/POSTAGEM",
-    palavrasChave: [
-      "sedex", "correio", "postagem"
-    ],
-    descricao: "Envio de documentos físicos via Sedex, AR, ou devoluções pequenas.",
-    observacaoUso: ""
-  },
-  {
-    nome: "LANCHES DE REFEIÇÕES",
-    palavrasChave: [
-      "lanche", "coffee break", "café", "bolo", "salgado", "biscoito", "refrigerante", "suco", "premiação", "treinamento", "ação interna", "almoco", "almoço", "jantar", "pizza", "comida", "refeicao", "refeição", "confraternização", "confraternizacao", "evento interno", "kit lanche", "break", "doces", "chocolates", "frutas", "pão", "pao", "torta", "sanduíche", "sanduiche", "kit café", "bebidas", "snacks", "celebracao", "celebração", "coquetel", "buffet", "catering", "alimentos",
-  "compra de comida", "alimentacao", "alimentação", "workshop", "curso", "reuniao", "reunião"
-    ],
-    descricao:
-      "Lanches ou coffee break para treinamento interno, ação aprovada ou premiação.",
-    observacaoUso: "Não cobre refeições pessoais."
-  },
-  {
-    nome: "AGUA POTÁVEL",
-    palavrasChave: [
-      "agua", "água", "galão", "galao", "garrafa agua", "garrafa de agua", "comprar agua", "comprar água", "suprimento de água", "reposição de água", "barril de água", "barril de agua", "água mineral", "agua mineral", "bombona", "garrafão", "garrafao",
-  "fornecedor de água"
-    ],
-    descricao:
-      "Compra de galões de água mineral ou garrafas para abastecimento da equipe.",
-    observacaoUso: ""
-  },
-  {
-    nome: "BOBINA ECF",
-    palavrasChave: [
-      "bobina", "ecf", "cupom fiscal", "bobina impressora", "bobina pdv"
-    ],
-    descricao:
-      "Bobinas para ECF / impressoras fiscais / PDV não centralizados.",
-    observacaoUso: ""
-  },
-  {
-    nome: "CHAVEIRO EMERGENCIAL",
-    palavrasChave: [
-      "chaveiro", "abrir cofre", "abrir estoque", "trocar segredo", "sem chave", "cofre", "problema cofre", "problema fechadura", "fechadura", "perdi a chave", "esqueci a chave", "chave quebrada", "troca de chave", "fazer chave", "duplicata de chave", "copia de chave", "cópia de chave", "abrir porta", "porta travada", "porta emperrada", "trancar", "trocar segredo",
-      "segredo cofre", "abertura de cofre", "trocar fechadura", "concerto fechadura", "conserto fechadura", "consertar fechadura", "emergência fechadura", "serviço chaveiro", "mestre chaveiro", "tranca", "chaves", "cilindro", "miolo da chave", "reparar cofre", "reparo fechadura", "instalar fechadura"
-    ],
-    descricao:
-      "Serviço emergencial de chaveiro para abertura de cofres, vitrines e estoques.",
-    observacaoUso: "Somente em emergências operacionais."
-  },
-  {
-    nome: "MANUTENÇÃO MAQ ESTAMPAR",
-    palavrasChave: [
-      "estampar", "maquina estampar", "máquina estampar", "reparo estampar"
-    ],
-    descricao:
-      "Reparos simples ou ajustes técnicos em máquinas de estampar, sem controle patrimonial.",
-    observacaoUso: ""
-  }
-];
 
 
     const perguntasGeraisEtiqueta = [
