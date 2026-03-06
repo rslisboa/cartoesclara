@@ -2512,14 +2512,24 @@ display: none;
     </button>
 
     <button
-  type="button"
-  onclick="window.vektorOpenConsultasAuxiliares()"
-  title="Consultas Auxiliares"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
->
-  <span class="vektor-nav-ico" aria-hidden="true">🧾</span>
-  <span class="vektor-nav-label">Consultas Auxiliares</span>
-</button>
+      type="button"
+      onclick="window.vektorOpenConsultasAuxiliares()"
+      title="Consultas Auxiliares"
+      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    >
+      <span class="vektor-nav-ico" aria-hidden="true">🧾</span>
+      <span class="vektor-nav-label">Consultas Auxiliares</span>
+    </button>
+
+    <button
+      type="button"
+      onclick="window.vektorOpenVertexCost()"
+      title="Custo Vertex"
+      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    >
+      <span class="vektor-nav-ico" aria-hidden="true">💲</span>
+      <span class="vektor-nav-label">Custo Vertex</span>
+    </button>
 
   <? } ?>
 
@@ -2528,8 +2538,8 @@ display: none;
   <!-- Rodapé do menu: Versão do Vektor -->
 <div id="vektorSidebarFooterVersion" class="mt-4 px-3 py-3 text-center border-t border-slate-200">
   <div class="text-[11px] text-slate-500 leading-tight">
-    Vektor v1.9.0<br>
-    <span class="text-slate-400">Build 25/02/2026</span>
+    Vektor v1.9.1<br>
+    <span class="text-slate-400">Build 06/03/2026</span>
   </div>
 </div>
   
@@ -4827,6 +4837,116 @@ display: none;
 
 </div>
 
+<!-- VIEW: CUSTO VERTEX -->
+<div id="vertexCostView" class="hidden" style="position:absolute; inset:0; z-index:20; display:none;">
+  <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column; min-height:0;">
+
+      <!-- Header -->
+      <div style="padding:14px 16px; background:#0b1220; border-bottom:1px solid rgba(148,163,184,0.18);">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+          <div style="min-width:260px;">
+            <div style="font-size:18px;font-weight:1000;color:#fff;line-height:1.1;">Custo Vertex</div>
+            <div style="margin-top:5px;font-size:12px;font-weight:800;color:rgba(226,232,240,0.8);">
+              Consumo de tokens por usuário, custo total e evolução mensal do uso da API Vertex.
+            </div>
+            <div style="margin-top:6px;font-size:11px;font-weight:900;color:#B5FF20;">
+              Projeto API: genai4sap-data-lake
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-left:auto;">
+            <button id="vertexCost_btnReload" type="button"
+                    style="height:36px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:12px; background:#006b2c; color:#ffffff; cursor:pointer; white-space:nowrap;">
+              Atualizar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div style="flex:1; background:#0b1220; padding:14px 16px; overflow:auto; display:flex; flex-direction:column; gap:12px; min-height:0;">
+
+        <!-- KPIs -->
+        <div style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px;">
+          <div class="analiseGastosCard">
+            <div class="analiseGastosCardLabel">Usuários</div>
+            <div id="vertexCost_kpiUsers" class="analiseGastosCardValue">—</div>
+            <div class="analiseGastosCardSub">Usuários com consumo registrado</div>
+          </div>
+
+          <div class="analiseGastosCard">
+            <div class="analiseGastosCardLabel">Tokens totais</div>
+            <div id="vertexCost_kpiTokens" class="analiseGastosCardValue">—</div>
+            <div class="analiseGastosCardSub">Entrada + saída</div>
+          </div>
+
+          <div class="analiseGastosCard">
+            <div class="analiseGastosCardLabel">Custo total (USD)</div>
+            <div id="vertexCost_kpiUsd" class="analiseGastosCardValue">—</div>
+            <div class="analiseGastosCardSub">Somatório do período</div>
+          </div>
+
+          <div class="analiseGastosCard">
+            <div class="analiseGastosCardLabel">Custo total (BRL)</div>
+            <div id="vertexCost_kpiBrl" class="analiseGastosCardValue">—</div>
+            <div class="analiseGastosCardSub">Conversão estimada</div>
+          </div>
+        </div>
+
+        <!-- Tabela -->
+        <section style="background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
+          <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
+            <div style="font-weight:900; color:#0f172a;">Consumo por usuário</div>
+            <div style="font-weight:700; color:#64748b; font-size:12px;">
+              Quantidade de chamadas, tokens de entrada, tokens de saída, total de tokens e custo.
+            </div>
+          </div>
+
+          <div id="vertexCostTableBox" style="background:#fff; border-top:1px solid #e2e8f0; overflow:auto; min-height:320px; max-height:620px;">
+            <table id="vertexCostTable" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; color:#0b1220;">
+              <thead>
+                <tr>
+                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:left; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">E-mail</th>
+                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">Chamadas</th>
+                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">Entrada</th>
+                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">Saída</th>
+                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">Total tokens</th>
+                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">USD</th>
+                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-bottom:2px double #005E27;">BRL</th>
+                </tr>
+              </thead>
+              <tbody id="vertexCostTableBody">
+                <tr>
+                  <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">
+                    Carregando...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Gráfico -->
+        <section style="background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
+          <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
+            <div style="font-weight:900; color:#0f172a;">Custo total por mês</div>
+            <div style="font-weight:700; color:#64748b; font-size:12px;">
+              Evolução mensal do custo total da Vertex API com rótulos nos pontos.
+            </div>
+          </div>
+          <div style="padding:14px 16px;">
+            <div style="height:220px;">
+              <canvas id="vertexCostChart"></canvas>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+</div>
+
  <!-- VIEW: FEEDBACK (sobrepõe SOMENTE a área do chat) -->
 <div id="feedbackView" class="hidden" style="position:absolute; inset:0; z-index:20;">
 
@@ -6537,6 +6657,7 @@ window.vektorShowChatView = function () {
   const cicloResumoView = document.getElementById("cicloResumoView");
   const analiseGastosView = document.getElementById("analiseGastosView");
   const consultasAuxView = document.getElementById("consultasAuxView");
+  const vertexCostView = document.getElementById("vertexCostView");
 
   // fecha outras views
   [
@@ -6548,6 +6669,7 @@ window.vektorShowChatView = function () {
     cicloResumoView,
     analiseGastosView,
     consultasAuxView,
+    vertexCostView,
     homeView
   ].forEach(v => {
     if (!v) return;
@@ -6614,9 +6736,10 @@ function vektorShowRadarView_() {
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
   const consultasAuxView = document.getElementById("consultasAuxView");
+  const vertexCostView = document.getElementById("vertexCostView");
 
   // fecha TODAS
-  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView].forEach(v => {
+  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -6632,28 +6755,6 @@ function vektorShowRadarView_() {
   }
 }
 
-function vektorShowFeedbackView_() {
-  const chatView = document.getElementById("chatView");
-  const radarView = document.getElementById("radarView");
-  const feedbackView = document.getElementById("feedbackView");
-  const myAlertsView = document.getElementById("myAlertsView");
-  const fluxView = document.getElementById("fluxogramaView");
-  const consultasAuxView = document.getElementById("consultasAuxView");
-
-  // fecha as demais páginas
-  if (chatView) chatView.classList.add("hidden");
-  if (radarView) radarView.classList.add("hidden");
-  if (myAlertsView) myAlertsView.classList.add("hidden");
-  if (fluxView) fluxView.classList.add("hidden");
-
-  // abre feedback
-  if (feedbackView) feedbackView.classList.remove("hidden");
-
-  // opcional: garante estado do radar
-  if (radarView) radarView.classList.remove("is-open");
-  if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
-}
-
 function vektorShowFluxogramaView_() {
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
@@ -6666,8 +6767,9 @@ function vektorShowFluxogramaView_() {
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
   const consultasAuxView = document.getElementById("consultasAuxView");
+  const vertexCostView = document.getElementById("vertexCostView");
 
-  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView, consultasAuxView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -6761,8 +6863,9 @@ function vektorShowEnvioPendenciasView_() {
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
   const consultasAuxView = document.getElementById("consultasAuxView");
+  const vertexCostView = document.getElementById("vertexCostView");
 
-  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView, consultasAuxView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7485,8 +7588,9 @@ function vektorShowAnaliseGastosView_() {
   const homeView = document.getElementById("homeView");
   const analiseGastosView = document.getElementById("analiseGastosView");
   const consultasAuxView = document.getElementById("consultasAuxView");
+  const vertexCostView = document.getElementById("vertexCostView");
 
-  [chatView, radarView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -10972,17 +11076,6 @@ function vektorDrawFluxogramaConnectors_() {
   }
 }
 
-// FEEDBACK (tela cheia)
-window.vektorOpenFeedback = function () {
-  vektorShowFeedbackView_();
-
-  // (opcional) força recarregar o iframe sempre que abrir
-  const fr = document.getElementById("feedbackFrame");
-  if (fr && fr.src) {
-    fr.src = fr.src; // recarrega mantendo mesma URL
-  }
-};
-
 // ===============================
 // RADAR (tela cheia)
 // ===============================
@@ -12368,8 +12461,9 @@ function vektorShowMyAlertsView_() {
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
   const consultasAuxView = document.getElementById("consultasAuxView");
+  const vertexCostView = document.getElementById("vertexCostView");
 
-  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView, consultasAuxView].forEach(v => {
+  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -12421,6 +12515,251 @@ window.vektorOpenConsultasAuxiliares = function(){
   window.vektorAuxShowFaturas();     // default: faturas visíveis
   window.vektorAuxLoadFaturas();     // carrega tabela na abertura
 };
+
+function vektorShowVertexCostView_(){
+  const ids = [
+    "chatView",
+    "radarView",
+    "feedbackView",
+    "myAlertsView",
+    "fluxogramaView",
+    "envioPendView",
+    "cicloResumoView",
+    "homeView",
+    "analiseGastosView",
+    "consultasAuxView",
+    "vertexCostView"
+  ];
+
+  ids.forEach(function(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add("hidden");
+    el.style.display = "none";
+  });
+
+  const v = document.getElementById("vertexCostView");
+  if (v) {
+    v.classList.remove("hidden");
+    v.style.display = "block";
+  }
+
+  const radarView = document.getElementById("radarView");
+  if (radarView) radarView.classList.remove("is-open");
+}
+
+window.vektorOpenVertexCost = function(){
+  vektorShowVertexCostView_();
+  vektorVertexCostLoad_();
+};
+
+window.__vertexCostChartInst = null;
+
+function vektorFmtInt_(n){
+  return (Number(n || 0) || 0).toLocaleString("pt-BR");
+}
+
+function vektorEscHtml_(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function vektorVertexCostLoad_(){
+  const tbody = document.getElementById("vertexCostTableBody");
+  if (!tbody) return;
+
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">
+        Carregando...
+      </td>
+    </tr>
+  `;
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.ok) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#dc2626;">
+              ${vektorEscHtml_(res && res.error ? res.error : "Erro ao carregar dados.")}
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      const k = res.kpis || {};
+      const elUsers  = document.getElementById("vertexCost_kpiUsers");
+      const elTokens = document.getElementById("vertexCost_kpiTokens");
+      const elUsd    = document.getElementById("vertexCost_kpiUsd");
+      const elBrl    = document.getElementById("vertexCost_kpiBrl");
+
+      if (elUsers)  elUsers.textContent  = vektorFmtInt_(k.users);
+      if (elTokens) elTokens.textContent = vektorFmtInt_(k.totalTokens);
+      if (elUsd)    elUsd.textContent    = k.totalUsdFmt || "—";
+      if (elBrl)    elBrl.textContent    = k.totalBrlFmt || "—";
+
+      const rows = Array.isArray(res.rows) ? res.rows : [];
+
+      tbody.innerHTML = "";
+
+      if (!rows.length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">
+            Sem histórico detalhado disponível.
+          </td>
+        `;
+        tbody.appendChild(tr);
+      } else {
+        rows.forEach(function(r){
+          const tr = document.createElement("tr");
+
+          tr.innerHTML = `
+            <td style="padding:10px; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
+              ${vektorEscHtml_(r.userEmail || "—")}
+            </td>
+            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
+              ${vektorFmtInt_(r.calls)}
+            </td>
+            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
+              ${vektorFmtInt_(r.promptTokens)}
+            </td>
+            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
+              ${vektorFmtInt_(r.outputTokens)}
+            </td>
+            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
+              ${vektorFmtInt_(r.totalTokens)}
+            </td>
+            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
+              ${vektorEscHtml_(r.usdFmt || "—")}
+            </td>
+            <td style="padding:10px; text-align:center; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
+              ${vektorEscHtml_(r.brlFmt || "—")}
+            </td>
+          `;
+
+          tbody.appendChild(tr);
+        });
+      }
+
+      vektorVertexCostRenderChart_(Array.isArray(res.monthly) ? res.monthly : []);
+    })
+    .withFailureHandler(function(err){
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#dc2626;">
+            ${vektorEscHtml_(err && err.message ? err.message : String(err || "Erro desconhecido"))}
+          </td>
+        </tr>
+      `;
+    })
+    .getVertexCostDashboard();
+}
+
+function vektorVertexCostRenderChart_(monthly){
+  const canvas = document.getElementById("vertexCostChart");
+  if (!canvas) return;
+
+  try {
+    if (window.__vertexCostChartInst) {
+      window.__vertexCostChartInst.destroy();
+      window.__vertexCostChartInst = null;
+    }
+  } catch(_) {}
+
+  const labels = monthly.map(function(x){ return x.monthLabel; });
+  const values = monthly.map(function(x){ return Number(x.totalBrl || 0) || 0; });
+
+  const ctx = canvas.getContext("2d");
+
+  try {
+    if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
+      Chart.register(ChartDataLabels);
+    }
+  } catch (_) {}
+
+  window.__vertexCostChartInst = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Custo total (BRL)",
+        data: values,
+        borderColor: "#B5FF20",
+        backgroundColor: "rgba(181,255,32,0.12)",
+        pointBackgroundColor: "#005E27",
+        pointBorderColor: "#B5FF20",
+        pointRadius: 4,
+        pointHoverRadius: 5,
+        borderWidth: 3,
+        fill: true,
+        tension: 0.25
+      }]
+    },
+    plugins: [ChartDataLabels],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 700, easing: "easeOutQuart" },
+      layout: { padding: { top: 24, right: 12, bottom: 6, left: 6 } },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: "#0f172a", font: { weight: "900" } }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(ctx){
+              const v = Number(ctx.raw || 0) || 0;
+              return "Custo: " + v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+            }
+          }
+        },
+        datalabels: {
+          align: "top",
+          anchor: "end",
+          offset: 4,
+          color: "#0f172a",
+          font: { weight: "900", size: 11 },
+          formatter: function(v){
+            const n = Number(v || 0) || 0;
+            return n.toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#334155", font: { weight:"800" } },
+          grid: { color: "rgba(148,163,184,0.12)" }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: "#334155",
+            font: { weight:"800" },
+            callback: function(v){
+              return Number(v).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+            }
+          },
+          grid: { color: "rgba(148,163,184,0.12)" }
+        }
+      }
+    }
+  });
+}
+
+(function bindVertexCostOnce_(){
+  const btn = document.getElementById("vertexCost_btnReload");
+  if (btn && !btn.__boundVertexCost) {
+    btn.__boundVertexCost = true;
+    btn.addEventListener("click", vektorVertexCostLoad_);
+  }
+})();
 
 window.vektorOpenMyAlerts = function () {
   vektorShowMyAlertsView_();
@@ -14400,6 +14739,7 @@ window.vektorShowResumoCicloView_ = function () {
   const cicloView = document.getElementById("cicloResumoView");
   const analiseGastosView = document.getElementById("analiseGastosView");
   const consultasAuxView = document.getElementById("consultasAuxView");
+  const vertexCostView = document.getElementById("vertexCostView");
 
   // ✅ fecha outras views (hidden + display none)
   if (chatView) { chatView.classList.add("hidden"); chatView.style.display = "none"; }
@@ -14409,6 +14749,7 @@ window.vektorShowResumoCicloView_ = function () {
   if (fluxView) { fluxView.classList.add("hidden"); fluxView.style.display = "none"; }
   if (envView) { envView.classList.add("hidden"); envView.style.display = "none"; }
   if (analiseGastosView) { analiseGastosView.classList.add("hidden"); analiseGastosView.style.display = "none"; }
+  if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
   if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
 
   // ✅ abre resumo do ciclo
