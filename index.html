@@ -4856,6 +4856,11 @@ display: none;
           </div>
 
           <div style="display:flex; align-items:flex-start; gap:8px; margin-left:auto;">
+            <button id="vertexCost_btnPeriodView" type="button"
+                    style="height:36px; padding:0 14px; border:1px solid rgba(181,255,32,0.45); border-radius:10px; font-weight:900; font-size:12px; background:#0f172a; color:#ffffff; cursor:pointer; white-space:nowrap;">
+              Vertex View - Per Period
+            </button>
+
             <button id="vertexCost_btnReload" type="button"
                     style="height:36px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:12px; background:#006b2c; color:#ffffff; cursor:pointer; white-space:nowrap;">
               Atualizar
@@ -4894,57 +4899,83 @@ display: none;
           </div>
         </div>
 
-        <!-- Tabela -->
-        <section style="background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
-          <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
-            <div style="font-weight:900; color:#0f172a;">Consumo por usuário</div>
-            <div style="font-weight:700; color:#64748b; font-size:12px;">
-              Quantidade de chamadas, tokens de entrada, tokens de saída, total de tokens e custo.
-            </div>
-          </div>
+       <!-- Tabela -->
+<section style="background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25); flex:1; min-height:0; display:flex; flex-direction:column;">
+  <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
+    <div style="font-weight:900; color:#0f172a;">Consumo por usuário</div>
+    <div style="font-weight:700; color:#64748b; font-size:12px;">
+      Quantidade de chamadas, tokens de entrada, tokens de saída, total de tokens e custo.
+    </div>
+    <div style="margin-top:6px; font-weight:800; color:#64748b; font-size:11px;">
+      Clique no cabeçalho para ordenar do maior para o menor e vice-versa.
+    </div>
+  </div>
 
-          <div id="vertexCostTableBox" style="background:#fff; border-top:1px solid #e2e8f0; overflow:auto; min-height:320px; max-height:620px;">
-            <table id="vertexCostTable" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; color:#0b1220;">
-              <thead>
-                <tr>
-                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:left; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">E-mail</th>
-                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">Chamadas</th>
-                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">Entrada</th>
-                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">Saída</th>
-                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">Total tokens</th>
-                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27;">USD</th>
-                  <th style="position:sticky; top:0; z-index:2; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-bottom:2px double #005E27;">BRL</th>
-                </tr>
-              </thead>
-              <tbody id="vertexCostTableBody">
-                <tr>
-                  <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">
-                    Carregando...
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- Gráfico -->
-        <section style="background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
-          <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
-            <div style="font-weight:900; color:#0f172a;">Custo total por mês</div>
-            <div style="font-weight:700; color:#64748b; font-size:12px;">
-              Evolução mensal do custo total da Vertex API com rótulos nos pontos.
-            </div>
-          </div>
-          <div style="padding:14px 16px;">
-            <div style="height:220px;">
-              <canvas id="vertexCostChart"></canvas>
-            </div>
-          </div>
-        </section>
+  <div id="vertexCostTableBox" style="background:#fff; border-top:1px solid #e2e8f0; overflow:auto; flex:1; min-height:420px; max-height:none;">
+    <table id="vertexCostTable" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; color:#0b1220;">
+      <thead>
+        <tr>
+          <th data-sort-key="userEmail" style="position:sticky; top:0; z-index:3; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:left; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; user-select:none;">
+            E-mail <span id="vertexSort_userEmail" style="opacity:.85;">↕</span>
+          </th>
+          <th data-sort-key="calls" style="position:sticky; top:0; z-index:3; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; user-select:none;">
+            Chamadas <span id="vertexSort_calls" style="opacity:.85;">↕</span>
+          </th>
+          <th data-sort-key="promptTokens" style="position:sticky; top:0; z-index:3; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; user-select:none;">
+            Entrada <span id="vertexSort_promptTokens" style="opacity:.85;">↕</span>
+          </th>
+          <th data-sort-key="outputTokens" style="position:sticky; top:0; z-index:3; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; user-select:none;">
+            Saída <span id="vertexSort_outputTokens" style="opacity:.85;">↕</span>
+          </th>
+          <th data-sort-key="totalTokens" style="position:sticky; top:0; z-index:3; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; user-select:none;">
+            Total tokens <span id="vertexSort_totalTokens" style="opacity:.85;">↕</span>
+          </th>
+          <th data-sort-key="totalUsd" style="position:sticky; top:0; z-index:3; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-right:2px double #005E27; border-bottom:2px double #005E27; cursor:pointer; user-select:none;">
+            USD <span id="vertexSort_totalUsd" style="opacity:.85;">↕</span>
+          </th>
+          <th data-sort-key="totalBrl" style="position:sticky; top:0; z-index:3; background:#123a63; color:#fff; font-size:13px; font-weight:1000; text-align:center; padding:12px 10px; border-bottom:2px double #005E27; cursor:pointer; user-select:none;">
+            BRL <span id="vertexSort_totalBrl" style="opacity:.85;">↕</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="vertexCostTableBody">
+        <tr>
+          <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">
+            Carregando...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 
       </div>
     </div>
   </main>
+</div>
+
+<div id="vertexCostPeriodModal" class="hidden" style="position:absolute; inset:0; z-index:65; background:rgba(2,6,23,0.78); display:none; align-items:center; justify-content:center; padding:22px;">
+  <div style="width:min(1120px,96vw); max-height:92vh; background:#020817; border:1px solid rgba(181,255,32,0.24); border-radius:18px; overflow:hidden; box-shadow:0 24px 80px rgba(0,0,0,0.45); display:flex; flex-direction:column;">
+    <div style="padding:14px 16px; border-bottom:1px solid rgba(148,163,184,0.18); display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <div>
+        <div style="font-size:18px; font-weight:1000; color:#ffffff; line-height:1.1;">Vertex View - Per Period</div>
+        <div style="margin-top:4px; font-size:12px; font-weight:800; color:rgba(226,232,240,0.76);">
+          Evolução mensal do custo total da Vertex API.
+        </div>
+      </div>
+
+      <button id="vertexCost_btnClosePeriodModal" type="button"
+              style="height:36px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:12px; background:#1e293b; color:#ffffff; cursor:pointer; white-space:nowrap;">
+        Fechar
+      </button>
+    </div>
+
+    <div style="padding:18px 18px 16px 18px; min-height:0;">
+      <div style="height:min(68vh,560px);">
+        <canvas id="vertexCostPeriodChart"></canvas>
+      </div>
+    </div>
+  </div>
 </div>
 
  <!-- VIEW: FEEDBACK (sobrepõe SOMENTE a área do chat) -->
@@ -12554,6 +12585,9 @@ window.vektorOpenVertexCost = function(){
 };
 
 window.__vertexCostChartInst = null;
+window.__vertexCostRows = [];
+window.__vertexCostMonthly = [];
+window.__vertexCostSort = { key: "totalUsd", dir: "desc" };
 
 function vektorFmtInt_(n){
   return (Number(n || 0) || 0).toLocaleString("pt-BR");
@@ -12569,100 +12603,163 @@ function vektorEscHtml_(s){
 
 function vektorVertexCostLoad_(){
   const tbody = document.getElementById("vertexCostTableBody");
-  if (!tbody) return;
-
-  tbody.innerHTML = `
-    <tr>
-      <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">
-        Carregando...
-      </td>
-    </tr>
-  `;
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">Carregando...</td>
+      </tr>
+    `;
+  }
 
   google.script.run
     .withSuccessHandler(function(res){
       if (!res || !res.ok) {
-        tbody.innerHTML = `
-          <tr>
-            <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#dc2626;">
-              ${vektorEscHtml_(res && res.error ? res.error : "Erro ao carregar dados.")}
-            </td>
-          </tr>
-        `;
+        if (tbody) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#dc2626;">
+                ${vektorEscHtml_(res && res.error ? res.error : "Erro ao carregar dados.")}
+              </td>
+            </tr>
+          `;
+        }
         return;
       }
 
       const k = res.kpis || {};
-      const elUsers  = document.getElementById("vertexCost_kpiUsers");
-      const elTokens = document.getElementById("vertexCost_kpiTokens");
-      const elUsd    = document.getElementById("vertexCost_kpiUsd");
-      const elBrl    = document.getElementById("vertexCost_kpiBrl");
+      document.getElementById("vertexCost_kpiUsers").textContent = vektorFmtInt_(k.users);
+      document.getElementById("vertexCost_kpiTokens").textContent = vektorFmtInt_(k.totalTokens);
+      document.getElementById("vertexCost_kpiUsd").textContent = k.totalUsdFmt || "—";
+      document.getElementById("vertexCost_kpiBrl").textContent = k.totalBrlFmt || "—";
 
-      if (elUsers)  elUsers.textContent  = vektorFmtInt_(k.users);
-      if (elTokens) elTokens.textContent = vektorFmtInt_(k.totalTokens);
-      if (elUsd)    elUsd.textContent    = k.totalUsdFmt || "—";
-      if (elBrl)    elBrl.textContent    = k.totalBrlFmt || "—";
+      window.__vertexCostRows = Array.isArray(res.rows) ? res.rows.slice() : [];
+      window.__vertexCostMonthly = Array.isArray(res.monthly) ? res.monthly.slice() : [];
 
-      const rows = Array.isArray(res.rows) ? res.rows : [];
-
-      tbody.innerHTML = "";
-
-      if (!rows.length) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">
-            Sem histórico detalhado disponível.
-          </td>
-        `;
-        tbody.appendChild(tr);
-      } else {
-        rows.forEach(function(r){
-          const tr = document.createElement("tr");
-
-          tr.innerHTML = `
-            <td style="padding:10px; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
-              ${vektorEscHtml_(r.userEmail || "—")}
-            </td>
-            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
-              ${vektorFmtInt_(r.calls)}
-            </td>
-            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
-              ${vektorFmtInt_(r.promptTokens)}
-            </td>
-            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
-              ${vektorFmtInt_(r.outputTokens)}
-            </td>
-            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
-              ${vektorFmtInt_(r.totalTokens)}
-            </td>
-            <td style="padding:10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
-              ${vektorEscHtml_(r.usdFmt || "—")}
-            </td>
-            <td style="padding:10px; text-align:center; border-bottom:2px double #111; font-size:12px; font-weight:800; color:#0f172a; background:#fff;">
-              ${vektorEscHtml_(r.brlFmt || "—")}
-            </td>
-          `;
-
-          tbody.appendChild(tr);
-        });
-      }
-
-      vektorVertexCostRenderChart_(Array.isArray(res.monthly) ? res.monthly : []);
+      vektorVertexCostRenderTable_();
     })
     .withFailureHandler(function(err){
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#dc2626;">
-            ${vektorEscHtml_(err && err.message ? err.message : String(err || "Erro desconhecido"))}
-          </td>
-        </tr>
-      `;
+      if (tbody) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#dc2626;">
+              ${vektorEscHtml_(err && err.message ? err.message : String(err || "Erro desconhecido"))}
+            </td>
+          </tr>
+        `;
+      }
     })
     .getVertexCostDashboard();
 }
 
+function vektorVertexCostGetSortValue_(row, key){
+  if (!row) return "";
+  if (key === "userEmail") return String(row.userEmail || "").toLowerCase();
+  return Number(row[key] || 0) || 0;
+}
+
+function vektorVertexCostRenderSortIndicators_(){
+  const ids = [
+    "userEmail",
+    "calls",
+    "promptTokens",
+    "outputTokens",
+    "totalTokens",
+    "totalUsd",
+    "totalBrl"
+  ];
+
+  ids.forEach(function(id){
+    const el = document.getElementById("vertexSort_" + id);
+    if (!el) return;
+    if (window.__vertexCostSort.key !== id) {
+      el.textContent = "↕";
+      return;
+    }
+    el.textContent = window.__vertexCostSort.dir === "asc" ? "↑" : "↓";
+  });
+}
+
+function vektorVertexCostRenderTable_(){
+  const tbody = document.getElementById("vertexCostTableBody");
+  if (!tbody) return;
+
+  const rows = (window.__vertexCostRows || []).slice();
+  const sort = window.__vertexCostSort || { key:"totalUsd", dir:"desc" };
+
+  rows.sort(function(a,b){
+    const av = vektorVertexCostGetSortValue_(a, sort.key);
+    const bv = vektorVertexCostGetSortValue_(b, sort.key);
+
+    if (typeof av === "string" || typeof bv === "string") {
+      return sort.dir === "asc"
+        ? String(av).localeCompare(String(bv), "pt-BR")
+        : String(bv).localeCompare(String(av), "pt-BR");
+    }
+
+    return sort.dir === "asc" ? (av - bv) : (bv - av);
+  });
+
+  vektorVertexCostRenderSortIndicators_();
+
+  if (!rows.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="padding:18px; text-align:center; font-weight:900; color:#475569;">
+          Sem histórico detalhado disponível.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(function(r){
+    return `
+      <tr>
+        <td style="padding:12px 10px; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; background:#fff; color:#0f172a; white-space:nowrap;">${vektorEscHtml_(r.userEmail || "—")}</td>
+        <td style="padding:12px 10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; background:#fff; color:#0f172a;">${vektorFmtInt_(r.calls)}</td>
+        <td style="padding:12px 10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; background:#fff; color:#0f172a;">${vektorFmtInt_(r.promptTokens)}</td>
+        <td style="padding:12px 10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; background:#fff; color:#0f172a;">${vektorFmtInt_(r.outputTokens)}</td>
+        <td style="padding:12px 10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; background:#fff; color:#0f172a;">${vektorFmtInt_(r.totalTokens)}</td>
+        <td style="padding:12px 10px; text-align:center; border-right:2px double #111; border-bottom:2px double #111; font-size:12px; font-weight:800; background:#fff; color:#0f172a;">${vektorEscHtml_(r.usdFmt || "—")}</td>
+        <td style="padding:12px 10px; text-align:center; border-bottom:2px double #111; font-size:12px; font-weight:800; background:#fff; color:#0f172a;">${vektorEscHtml_(r.brlFmt || "—")}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function vektorVertexCostToggleSort_(key){
+  if (!key) return;
+
+  if (window.__vertexCostSort.key === key) {
+    window.__vertexCostSort.dir = window.__vertexCostSort.dir === "asc" ? "desc" : "asc";
+  } else {
+    window.__vertexCostSort.key = key;
+    window.__vertexCostSort.dir = (key === "userEmail") ? "asc" : "desc";
+  }
+
+  vektorVertexCostRenderTable_();
+}
+
+function vektorOpenVertexCostPeriodModal_(){
+  const modal = document.getElementById("vertexCostPeriodModal");
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  modal.style.display = "flex";
+
+  vektorVertexCostRenderChart_(Array.isArray(window.__vertexCostMonthly) ? window.__vertexCostMonthly : []);
+}
+
+function vektorCloseVertexCostPeriodModal_(){
+  const modal = document.getElementById("vertexCostPeriodModal");
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  modal.style.display = "none";
+}
+
 function vektorVertexCostRenderChart_(monthly){
-  const canvas = document.getElementById("vertexCostChart");
+  const canvas = document.getElementById("vertexCostPeriodChart");
   if (!canvas) return;
 
   try {
@@ -12691,13 +12788,13 @@ function vektorVertexCostRenderChart_(monthly){
         label: "Custo total (BRL)",
         data: values,
         borderColor: "#B5FF20",
-        backgroundColor: "rgba(181,255,32,0.12)",
-        pointBackgroundColor: "#005E27",
+        backgroundColor: "rgba(181,255,32,0.10)",
+        pointBackgroundColor: "#B5FF20",
         pointBorderColor: "#B5FF20",
         pointRadius: 4,
         pointHoverRadius: 5,
         borderWidth: 3,
-        fill: true,
+        fill: false,
         tension: 0.25
       }]
     },
@@ -12706,11 +12803,11 @@ function vektorVertexCostRenderChart_(monthly){
       responsive: true,
       maintainAspectRatio: false,
       animation: { duration: 700, easing: "easeOutQuart" },
-      layout: { padding: { top: 24, right: 12, bottom: 6, left: 6 } },
+      layout: { padding: { top: 28, right: 16, bottom: 8, left: 8 } },
       plugins: {
         legend: {
           display: true,
-          labels: { color: "#0f172a", font: { weight: "900" } }
+          labels: { color: "#ffffff", font: { weight: "900" } }
         },
         tooltip: {
           callbacks: {
@@ -12723,8 +12820,8 @@ function vektorVertexCostRenderChart_(monthly){
         datalabels: {
           align: "top",
           anchor: "end",
-          offset: 4,
-          color: "#0f172a",
+          offset: 6,
+          color: "#ffffff",
           font: { weight: "900", size: 11 },
           formatter: function(v){
             const n = Number(v || 0) || 0;
@@ -12734,19 +12831,19 @@ function vektorVertexCostRenderChart_(monthly){
       },
       scales: {
         x: {
-          ticks: { color: "#334155", font: { weight:"800" } },
-          grid: { color: "rgba(148,163,184,0.12)" }
+          ticks: { color: "#ffffff", font: { weight:"800" } },
+          grid: { color: "rgba(148,163,184,0.18)" }
         },
         y: {
           beginAtZero: true,
           ticks: {
-            color: "#334155",
+            color: "#ffffff",
             font: { weight:"800" },
             callback: function(v){
               return Number(v).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
             }
           },
-          grid: { color: "rgba(148,163,184,0.12)" }
+          grid: { color: "rgba(148,163,184,0.18)" }
         }
       }
     }
@@ -12754,11 +12851,31 @@ function vektorVertexCostRenderChart_(monthly){
 }
 
 (function bindVertexCostOnce_(){
-  const btn = document.getElementById("vertexCost_btnReload");
-  if (btn && !btn.__boundVertexCost) {
-    btn.__boundVertexCost = true;
-    btn.addEventListener("click", vektorVertexCostLoad_);
+  const btnReload = document.getElementById("vertexCost_btnReload");
+  if (btnReload && !btnReload.__boundVertexCostReload) {
+    btnReload.__boundVertexCostReload = true;
+    btnReload.addEventListener("click", vektorVertexCostLoad_);
   }
+
+  const btnPeriod = document.getElementById("vertexCost_btnPeriodView");
+  if (btnPeriod && !btnPeriod.__boundVertexCostPeriod) {
+    btnPeriod.__boundVertexCostPeriod = true;
+    btnPeriod.addEventListener("click", vektorOpenVertexCostPeriodModal_);
+  }
+
+  const btnCloseModal = document.getElementById("vertexCost_btnClosePeriodModal");
+  if (btnCloseModal && !btnCloseModal.__boundVertexCostClose) {
+    btnCloseModal.__boundVertexCostClose = true;
+    btnCloseModal.addEventListener("click", vektorCloseVertexCostPeriodModal_);
+  }
+
+  document.querySelectorAll("#vertexCostTable thead th[data-sort-key]").forEach(function(th){
+    if (th.__boundVertexSort) return;
+    th.__boundVertexSort = true;
+    th.addEventListener("click", function(){
+      vektorVertexCostToggleSort_(th.getAttribute("data-sort-key"));
+    });
+  });
 })();
 
 window.vektorOpenMyAlerts = function () {
