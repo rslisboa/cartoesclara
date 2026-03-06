@@ -1251,6 +1251,27 @@ function vektorVertexTrackUsage_(payload) {
     acc.lastUserEmail = userEmail;
 
     props.setProperty(key, JSON.stringify(acc));
+        try {
+      var fx = vektorFxGetUsdBrl_();
+      var brl = fx ? (usd.totalUsd * fx) : 0;
+
+      var sh = getOrCreateVertexCostSheet_();
+      sh.appendRow([
+        new Date(),
+        vektorVertexGetMonthKey_(),
+        userEmail,
+        VEKTOR_VERTEX_PROJECT_ID,
+        model,
+        modelVersion,
+        promptTokens,
+        outputTokens,
+        totalTokens,
+        usd.totalUsd,
+        brl
+      ]);
+    } catch (logErr) {
+      Logger.log("Falha ao gravar log detalhado Vertex: " + (logErr && logErr.message ? logErr.message : String(logErr)));
+    }
   } catch (e) {
     // não quebra o chat por falha de métrica
     Logger.log("Falha ao registrar uso Vertex: " + (e && e.message ? e.message : String(e)));
@@ -1306,12 +1327,15 @@ function vektorVertexGetUsageSummary_() {
 function vektorFmtBrlFromUsd_(usd){
   usd = Number(usd || 0);
 
-  // usa cotação automática (BCB) com cache diário
   var fx = vektorFxGetUsdBrl_();
   if (!fx) return "R$ —";
 
+  var brl = usd * fx;
+
   var s = (brl < 0.01) ? brl.toFixed(4) : brl.toFixed(2);
   s = s.replace(/0+$/,"").replace(/\.$/,"");
+  s = s.replace(".", ",");
+
   return "R$ " + s;
 }
 
@@ -1587,6 +1611,7 @@ const VEKTOR_METRICAS_SHEET_ID = '18yAuYoAR33JOagqapxgwHh86F1WeD0mZcj9AIJym07k';
 
 // ✅ Nome da aba onde os logs serão gravados
 const VEKTOR_METRICAS_TAB_NAME = 'Vektor_Metricas';
+const VEKTOR_VERTEX_COST_TAB_NAME = 'Vektor_Vertex_Cost';
 
 // ✅ Pasta onde serão salvos os Termos de Responsabilidade
 // (ID da pasta que você mandou no link)
@@ -14270,6 +14295,152 @@ function getVektorMetricSheet_() {
   }
 
   return sheet;
+}
+
+function getOrCreateVertexCostSheet_() {
+  const ss = SpreadsheetApp.openById(VEKTOR_METRICAS_SHEET_ID);
+  let sh = ss.getSheetByName(VEKTOR_VERTEX_COST_TAB_NAME);
+
+  if (!sh) {
+    sh = ss.insertSheet(VEKTOR_VERTEX_COST_TAB_NAME);
+    sh.appendRow([
+      "Timestamp",
+      "MonthKey",
+      "UsuarioEmail",
+      "ProjetoApi",
+      "Model",
+      "ModelVersion",
+      "PromptTokens",
+      "OutputTokens",
+      "TotalTokens",
+      "EstimatedUsd",
+      "EstimatedBrl"
+    ]);
+    sh.getRange(1, 1, 1, 11).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+
+  return sh;
+}
+
+function getVertexCostDashboard() {
+  vektorAssertFunctionAllowed_("getVertexCostDashboard");
+
+  var ctx = vektorGetUserRole_();
+  var role = String((ctx && ctx.role) || "").trim();
+  if (role !== "Administrador") {
+    throw new Error("Não disponível para o seu perfil.");
+  }
+
+  var sh = getOrCreateVertexCostSheet_();
+  var lr = sh.getLastRow();
+
+  if (lr < 2) {
+    return {
+      ok: true,
+      kpis: {
+        users: 0,
+        totalTokens: 0,
+        totalUsd: 0,
+        totalUsdFmt: "US$ 0",
+        totalBrlFmt: "R$ 0"
+      },
+      rows: [],
+      monthly: []
+    };
+  }
+
+  var values = sh.getRange(2, 1, lr - 1, 11).getValues();
+
+  var byUser = {};
+  var byMonth = {};
+  var totalTokensAll = 0;
+  var totalUsdAll = 0;
+  var totalBrlAll = 0;
+
+  for (var i = 0; i < values.length; i++) {
+    var r = values[i];
+
+    var monthKey = String(r[1] || "").trim();
+    var email = String(r[2] || "").trim().toLowerCase();
+    var prompt = Number(r[6] || 0) || 0;
+    var output = Number(r[7] || 0) || 0;
+    var total = Number(r[8] || 0) || 0;
+    var usd = Number(r[9] || 0) || 0;
+    var brl = Number(r[10] || 0) || 0;
+
+    if (!email) email = "não identificado";
+
+    if (!byUser[email]) {
+      byUser[email] = {
+        userEmail: email,
+        calls: 0,
+        promptTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        totalUsd: 0,
+        totalBrl: 0
+      };
+    }
+
+    byUser[email].calls += 1;
+    byUser[email].promptTokens += prompt;
+    byUser[email].outputTokens += output;
+    byUser[email].totalTokens += total;
+    byUser[email].totalUsd += usd;
+    byUser[email].totalBrl += brl;
+
+    if (monthKey) {
+      if (!byMonth[monthKey]) byMonth[monthKey] = { totalUsd: 0, totalBrl: 0 };
+      byMonth[monthKey].totalUsd += usd;
+      byMonth[monthKey].totalBrl += brl;
+    }
+
+    totalTokensAll += total;
+    totalUsdAll += usd;
+    totalBrlAll += brl;
+  }
+
+    var rows = Object.keys(byUser).map(function(email){
+    var x = byUser[email];
+    x.usdFmt = vektorFmtUsd_(x.totalUsd);
+    x.brlFmt = Number(x.totalBrl || 0).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    });
+    return x;
+  });
+
+  rows.sort(function(a,b){
+    return (Number(b.totalUsd || 0) - Number(a.totalUsd || 0))
+        || (Number(b.totalTokens || 0) - Number(a.totalTokens || 0))
+        || String(a.userEmail || "").localeCompare(String(b.userEmail || ""), "pt-BR");
+  });
+
+  var monthly = Object.keys(byMonth).sort().map(function(k){
+    var y = String(k).slice(0,4);
+    var m = String(k).slice(4,6);
+    return {
+      monthKey: k,
+      monthLabel: m + "/" + y,
+      totalUsd: Number(byMonth[k].totalUsd || 0) || 0,
+      totalBrl: Number(byMonth[k].totalBrl || 0) || 0
+    };
+  });
+
+  return {
+    ok: true,
+    projectId: VEKTOR_VERTEX_PROJECT_ID,
+    kpis: {
+      users: rows.length,
+      totalTokens: totalTokensAll,
+      totalUsd: totalUsdAll,
+      totalUsdFmt: vektorFmtUsd_(totalUsdAll),
+      totalBrlFmt: vektorFmtBrlFromUsd_(totalUsdAll)
+    },
+    rows: rows,
+    monthly: monthly
+  };
 }
 
 /**
