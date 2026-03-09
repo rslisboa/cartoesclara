@@ -16079,10 +16079,10 @@ function vektorGetAllowedLojasFromEmails_(userEmail){
   var em = vektorNormLower_(userEmail);
   if (!em) return [];
 
-  // Admin vê tudo
+  // Admin e Analista Pro vê tudo
   var ctx = vektorGetUserRole_();
   var role = String(ctx && ctx.role ? ctx.role : "").trim().toLowerCase();
-  if (role === "administrador") return null;
+  if (role === "administrador" || role === "analista pro" || role === "marketing" ) return null;
 
   var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
   var sh = ss.getSheetByName("Emails");
