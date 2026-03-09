@@ -15044,8 +15044,7 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
   }
 }
 
-function getComparativoFaturasClaraParaChat() {
-  vektorAssertFunctionAllowed_("getComparativoFaturasClaraParaChat");
+function getComparativoFaturasClaraCore_(extratoAtualOpt, extratoAnteriorOpt) {
   try {
     var info = carregarLinhasBaseClara_();
     if (info.error) return { ok: false, error: info.error };
@@ -15053,7 +15052,6 @@ function getComparativoFaturasClaraParaChat() {
     var header = info.header || [];
     var linhas = info.linhas || [];
 
-    // ===== helper: header exato (evita confundir "Transação" com "Data da transação")
     function findHeaderExact_(headerArr, label) {
       var alvo = String(label || "").trim().toLowerCase();
       for (var i = 0; i < headerArr.length; i++) {
@@ -15063,22 +15061,24 @@ function getComparativoFaturasClaraParaChat() {
       return -1;
     }
 
-    // ===== Índices (robusto por nome)
-    var idxExtrato  = encontrarIndiceColuna_(header, ["Extrato da conta", "Extrato conta", "Extrato"]);
-    var idxValor    = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor"]);
-    var idxLojaNum  = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja", "Cod Loja", "Código Loja"]);
-    var idxTime     = encontrarIndiceColuna_(header, ["Grupos", "Grupo", "Time"]);
-    var idxCategoria= encontrarIndiceColuna_(header, ["Categoria", "Etiqueta", "Tipo de gasto", "Tag"]);
+    var idxExtrato   = encontrarIndiceColuna_(header, ["Extrato da conta", "Extrato conta", "Extrato"]);
+    var idxValor     = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLojaNum   = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja", "Cod Loja", "Código Loja"]);
+    var idxTime      = encontrarIndiceColuna_(header, ["Grupos", "Grupo", "Time"]);
+    var idxCategoria = encontrarIndiceColuna_(header, ["Categoria", "Etiqueta", "Tipo de gasto", "Tag"]);
 
-    var idxEstab = findHeaderExact_(header, "Transação");          // EXATO
-    var idxData  = findHeaderExact_(header, "Data da transação");  // EXATO
+    var idxEstab = findHeaderExact_(header, "Transação");
+    var idxData  = findHeaderExact_(header, "Data da transação");
 
     if (idxExtrato < 0 || idxValor < 0 || idxLojaNum < 0) {
-      return { ok: false, error: "Não encontrei as colunas mínimas ('Extrato da conta', 'Valor', 'LojaNum') na BaseClara." };
+      return {
+        ok: false,
+        error: "Não encontrei as colunas mínimas ('Extrato da conta', 'Valor', 'LojaNum') na BaseClara."
+      };
     }
 
-    // ===== 1) Descobrir as 2 últimas faturas (por Extrato)
-    var mapaExtratos = {}; // extrato -> {extrato, inicio, fim}
+    // ===== Descobre todos os extratos existentes
+    var mapaExtratos = {};
     for (var i = 0; i < linhas.length; i++) {
       var ex = (linhas[i][idxExtrato] || "").toString().trim();
       if (!ex) continue;
@@ -15097,25 +15097,58 @@ function getComparativoFaturasClaraParaChat() {
       .map(function(k){ return mapaExtratos[k]; })
       .filter(function(x){ return x && x.extrato; });
 
-    extratos.sort(function(a,b){
+    extratos.sort(function(a, b){
       var da = a.inicio ? a.inicio.getTime() : (a.fim ? a.fim.getTime() : 0);
       var db = b.inicio ? b.inicio.getTime() : (b.fim ? b.fim.getTime() : 0);
       return da - db;
     });
 
     if (extratos.length < 2) {
-      return { ok: false, error: "Não há faturas suficientes para comparação (preciso de pelo menos 2 extratos)." };
+      return {
+        ok: false,
+        error: "Não há faturas suficientes para comparação (preciso de pelo menos 2 extratos)."
+      };
     }
 
-    var fatAnterior = extratos[extratos.length - 2];
-    var fatAtual    = extratos[extratos.length - 1];
+    var extratoAtual = String(extratoAtualOpt || "").trim();
+    var extratoAnterior = String(extratoAnteriorOpt || "").trim();
 
-    var extratoAnterior = fatAnterior.extrato;
-    var extratoAtual    = fatAtual.extrato;
+    var fatAtual = null;
+    var fatAnterior = null;
+
+    if (!extratoAtual && !extratoAnterior) {
+      fatAnterior = extratos[extratos.length - 2];
+      fatAtual    = extratos[extratos.length - 1];
+      extratoAnterior = fatAnterior.extrato;
+      extratoAtual    = fatAtual.extrato;
+    } else {
+      if (!extratoAtual || !extratoAnterior) {
+        return {
+          ok: false,
+          error: "Informe as duas faturas para a análise temporal."
+        };
+      }
+
+      if (extratoAtual === extratoAnterior) {
+        return {
+          ok: false,
+          error: "A fatura base e a fatura de comparação não podem ser iguais."
+        };
+      }
+
+      fatAtual = mapaExtratos[extratoAtual] || null;
+      fatAnterior = mapaExtratos[extratoAnterior] || null;
+
+      if (!fatAtual || !fatAnterior) {
+        return {
+          ok: false,
+          error: "Não encontrei uma ou ambas as faturas selecionadas na BaseClara."
+        };
+      }
+    }
 
     var tz = "America/Sao_Paulo";
 
-    // ===== Período base (vai ser ajustado pelo recorte)
     var periodo = {
       anterior: {
         extrato: extratoAnterior,
@@ -15129,12 +15162,11 @@ function getComparativoFaturasClaraParaChat() {
       }
     };
 
-    // ===== Recorte: comparar o mesmo intervalo do ciclo (até "hoje" no ciclo atual)
     var hoje = new Date();
-    hoje = new Date(Utilities.formatDate(hoje, tz, "yyyy/MM/dd") + " 00:00:00"); // zera hora
+    hoje = new Date(Utilities.formatDate(hoje, tz, "yyyy/MM/dd") + " 00:00:00");
 
-    var inicioAtual = fatAtual.inicio;
-    var fimAtual    = fatAtual.fim;
+    var inicioAtual    = fatAtual.inicio;
+    var fimAtual       = fatAtual.fim;
     var inicioAnterior = fatAnterior.inicio;
     var fimAnterior    = fatAnterior.fim;
 
@@ -15142,132 +15174,85 @@ function getComparativoFaturasClaraParaChat() {
 
     var fimRecorteAtual = null;
     var fimRecorteAnterior = null;
+    var eventosSazonais = [];
 
     if (usarRecorte) {
-      // fim do recorte do atual = min(hoje, fimAtual)
       fimRecorteAtual = (hoje.getTime() < fimAtual.getTime()) ? hoje : fimAtual;
 
-      // ===== Sazonalidade (varejo): detecta eventos próximos ao recorte atual
-        function parseBRDate_(s) {
-          // "dd/MM/yyyy" -> Date (00:00 no tz)
-          var parts = String(s || "").split("/");
-          if (parts.length !== 3) return null;
-          var dd = Number(parts[0]), mm = Number(parts[1]), yy = Number(parts[2]);
-          if (!dd || !mm || !yy) return null;
-          return new Date(yy, mm - 1, dd, 0, 0, 0, 0);
+      function addDays_(d, n) {
+        return new Date(d.getTime() + n * 24 * 60 * 60 * 1000);
+      }
+
+      function lastFridayOfNovember_(year) {
+        var d = new Date(year, 10, 30, 0, 0, 0, 0);
+        while (d.getDay() !== 5) d = new Date(d.getTime() - 24*60*60*1000);
+        return d;
+      }
+
+      function secondSunday_(year, monthIndex0) {
+        var d = new Date(year, monthIndex0, 1, 0, 0, 0, 0);
+        while (d.getDay() !== 0) d = new Date(d.getTime() + 24*60*60*1000);
+        return new Date(d.getTime() + 7*24*60*60*1000);
+      }
+
+      function detectRetailEvents_(startDate, endDate) {
+        var events = [];
+        var y = startDate.getFullYear();
+        var y2 = endDate.getFullYear();
+
+        for (var year = y; year <= y2; year++) {
+          var bf = lastFridayOfNovember_(year);
+          events.push({ nome: "Black Friday", start: addDays_(bf, -3), end: addDays_(bf, 3) });
+          events.push({ nome: "Natal", start: new Date(year, 11, 20), end: new Date(year, 11, 26) });
+          events.push({ nome: "Ano Novo", start: new Date(year, 11, 28), end: new Date(year + 1, 0, 2) });
+
+          var maes = secondSunday_(year, 4);
+          events.push({ nome: "Dia das Mães", start: addDays_(maes, -3), end: addDays_(maes, 3) });
+
+          var pais = secondSunday_(year, 7);
+          events.push({ nome: "Dia dos Pais", start: addDays_(pais, -3), end: addDays_(pais, 3) });
+
+          events.push({ nome: "Dia das Crianças", start: new Date(year, 9, 9), end: new Date(year, 9, 15) });
+          events.push({ nome: "Dia dos Namorados", start: new Date(year, 5, 9), end: new Date(year, 5, 15) });
         }
 
-        function lastFridayOfNovember_(year) {
-          // Black Friday: última sexta-feira de novembro (regra prática)
-          var d = new Date(year, 10, 30, 0, 0, 0, 0); // 30/11
-          while (d.getDay() !== 5) d = new Date(d.getTime() - 24*60*60*1000); // 5=sexta
-          return d;
+        var hit = [];
+        for (var i = 0; i < events.length; i++) {
+          var e = events[i];
+          var intersects = !(e.end.getTime() < startDate.getTime() || e.start.getTime() > endDate.getTime());
+          if (intersects) hit.push(e.nome);
         }
 
-        function secondSunday_(year, monthIndex0) {
-          // 2º domingo de um mês (monthIndex0: 0=jan)
-          var d = new Date(year, monthIndex0, 1, 0, 0, 0, 0);
-          while (d.getDay() !== 0) d = new Date(d.getTime() + 24*60*60*1000); // 0=domingo
-          // primeiro domingo encontrado; soma 7 dias -> segundo
-          return new Date(d.getTime() + 7*24*60*60*1000);
-        }
+        var seen = {};
+        return hit.filter(function(n){
+          if (seen[n]) return false;
+          seen[n] = true;
+          return true;
+        });
+      }
 
-        function withinWindow_(date, start, end) {
-          if (!date || !start || !end) return false;
-          return date.getTime() >= start.getTime() && date.getTime() <= end.getTime();
-        }
+      var recorteAtualInicio = inicioAtual;
+      var recorteAtualFim = fimRecorteAtual;
+      if (recorteAtualInicio && recorteAtualFim) {
+        eventosSazonais = detectRetailEvents_(recorteAtualInicio, recorteAtualFim);
+      }
 
-        function addDays_(d, n) {
-          return new Date(d.getTime() + n * 24*60*60*1000);
-        }
-
-        function detectRetailEvents_(startDate, endDate) {
-          // Retorna eventos relevantes dentro do intervalo [startDate, endDate]
-          var events = [];
-          var y = startDate.getFullYear();
-          var y2 = endDate.getFullYear();
-
-          // Para intervalos que cruzam ano, checa os 2 anos
-          for (var year = y; year <= y2; year++) {
-            // Black Friday (janela: semana do evento)
-            var bf = lastFridayOfNovember_(year);
-            var bfStart = addDays_(bf, -3); // terça
-            var bfEnd   = addDays_(bf, +3); // segunda
-            events.push({ nome: "Black Friday", start: bfStart, end: bfEnd });
-
-            // Natal (janela: 20/12 a 26/12)
-            events.push({ nome: "Natal", start: new Date(year, 11, 20), end: new Date(year, 11, 26) });
-
-            // Ano Novo (janela: 28/12 a 02/01)
-            events.push({ nome: "Ano Novo", start: new Date(year, 11, 28), end: new Date(year + 1, 0, 2) });
-
-            // Dia das Mães (2º domingo de maio) — janela: semana do evento
-            var maes = secondSunday_(year, 4); // maio
-            events.push({ nome: "Dia das Mães", start: addDays_(maes, -3), end: addDays_(maes, +3) });
-
-            // Dia dos Pais (2º domingo de agosto) — janela: semana do evento
-            var pais = secondSunday_(year, 7); // agosto
-            events.push({ nome: "Dia dos Pais", start: addDays_(pais, -3), end: addDays_(pais, +3) });
-
-            // Dia das Crianças (12/10) — janela: semana
-            events.push({ nome: "Dia das Crianças", start: new Date(year, 9, 9), end: new Date(year, 9, 15) });
-
-            // Dia dos Namorados (12/06 no BR) — janela: semana
-            events.push({ nome: "Dia dos Namorados", start: new Date(year, 5, 9), end: new Date(year, 5, 15) });
-          }
-
-          // Filtra só os que interceptam o intervalo
-          var hit = [];
-          for (var i = 0; i < events.length; i++) {
-            var e = events[i];
-            var intersects = !(e.end.getTime() < startDate.getTime() || e.start.getTime() > endDate.getTime());
-            if (intersects) hit.push(e.nome);
-          }
-
-          // remove duplicados
-          var seen = {};
-          return hit.filter(function(n){
-            if (seen[n]) return false;
-            seen[n] = true;
-            return true;
-          });
-        }
-
-        // Intervalo real do recorte atual (datas Date)
-        var recorteAtualInicio = inicioAtual;
-        var recorteAtualFim = usarRecorte ? fimRecorteAtual : fimAtual;
-
-        var eventosSazonais = [];
-        if (recorteAtualInicio && recorteAtualFim) {
-          eventosSazonais = detectRetailEvents_(recorteAtualInicio, recorteAtualFim);
-        }
-
-      // dias decorridos desde o início do ciclo atual (0 = mesmo dia do início)
       var msDia = 24 * 60 * 60 * 1000;
       var diasDecorridos = Math.floor((fimRecorteAtual.getTime() - inicioAtual.getTime()) / msDia);
 
-      // fim do recorte anterior = inicioAnterior + mesmos dias decorridos
       fimRecorteAnterior = new Date(inicioAnterior.getTime() + diasDecorridos * msDia);
-
-      // trava: não ultrapassar o fim real do ciclo anterior
       if (fimRecorteAnterior.getTime() > fimAnterior.getTime()) fimRecorteAnterior = fimAnterior;
 
-      // atualiza período mostrado no chat
       periodo.atual.fim = Utilities.formatDate(fimRecorteAtual, tz, "dd/MM/yyyy");
       periodo.anterior.fim = Utilities.formatDate(fimRecorteAnterior, tz, "dd/MM/yyyy");
     }
 
-    // ===== Mapa fallback Loja -> Time (se vier vazio na linha)
     var mapaTime = construirMapaLojaParaTime_();
 
-    // ===== 2) Agregação por loja
-    var stats = {}; // loja -> objeto stats
-
-    // agregado geral por dia (para topDias no resumo)
-    var dayPrevGeral = {}; // "dd/MM/yyyy" -> valor
-    var dayCurGeral  = {}; // "dd/MM/yyyy" -> valor
-
-    var ultimaDataConsiderada = null; // Date (maior data que entrou no recorte atual)
+    var stats = {};
+    var dayPrevGeral = {};
+    var dayCurGeral  = {};
+    var ultimaDataConsiderada = null;
 
     function lojaKey(v) {
       var n = normalizarLojaNumero_(v);
@@ -15285,19 +15270,17 @@ function getComparativoFaturasClaraParaChat() {
       var ex2 = (row[idxExtrato] || "").toString().trim();
       if (ex2 !== extratoAtual && ex2 !== extratoAnterior) continue;
 
-      // ===== Aplica recorte por data (mesmo intervalo do ciclo)
       var dtRow = null;
       if (usarRecorte) {
         dtRow = row[idxData] instanceof Date ? row[idxData] : new Date(row[idxData]);
         if (!(dtRow instanceof Date) || isNaN(dtRow.getTime())) continue;
 
-        if (usarRecorte && ex2 === extratoAtual && dtRow && dtRow instanceof Date && !isNaN(dtRow.getTime())) {
-        if (!ultimaDataConsiderada || dtRow.getTime() > ultimaDataConsiderada.getTime()) {
-          ultimaDataConsiderada = dtRow;
+        if (ex2 === extratoAtual) {
+          if (!ultimaDataConsiderada || dtRow.getTime() > ultimaDataConsiderada.getTime()) {
+            ultimaDataConsiderada = dtRow;
+          }
         }
-      }
 
-        // zera hora para comparar por dia
         dtRow = new Date(Utilities.formatDate(dtRow, tz, "yyyy/MM/dd") + " 00:00:00");
 
         if (ex2 === extratoAtual) {
@@ -15325,14 +15308,12 @@ function getComparativoFaturasClaraParaChat() {
 
       var st = stats[loja];
 
-      // Time
       var timeLinha = (idxTime >= 0) ? str(row[idxTime]) : "";
       if (!st.time) st.time = timeLinha || (mapaTime[loja] || "N/D");
 
       var valor = valNum(row[idxValor]);
       var cat = (idxCategoria >= 0 ? str(row[idxCategoria]) : "") || "Sem categoria";
 
-      // Estabelecimento: se for Date por algum motivo, converte para string (evita aparecer GMT)
       var estabRaw = (idxEstab >= 0 ? row[idxEstab] : "");
       var estab = "Sem estabelecimento";
       if (idxEstab >= 0) {
@@ -15343,7 +15324,6 @@ function getComparativoFaturasClaraParaChat() {
         }
       }
 
-      // dia (se tiver dtRow do recorte, usa; senão tenta derivar)
       var dk = "";
       if (dtRow && dtRow instanceof Date && !isNaN(dtRow.getTime())) {
         dk = dayKey(dtRow);
@@ -15371,14 +15351,12 @@ function getComparativoFaturasClaraParaChat() {
           dayCurGeral[dk] = (dayCurGeral[dk] || 0) + valor;
         }
       }
-    } // fim loop linhas
+    }
 
-    // ===== 3) Montar rows + fator variação
     var rows = [];
     var lojas = Object.keys(stats);
 
     function pickDriverCategory(st, delta){
-      // delta por categoria = cur - prev
       var cats = {};
       Object.keys(st.catPrev || {}).forEach(function(c){ cats[c] = (cats[c] || 0) - st.catPrev[c]; });
       Object.keys(st.catCur  || {}).forEach(function(c){ cats[c] = (cats[c] || 0) + st.catCur[c]; });
@@ -15410,7 +15388,6 @@ function getComparativoFaturasClaraParaChat() {
     }
 
     function pickEstabCondicional(st, deltaAbs){
-      // Escolhe o estab com maior delta na direção do deltaAbs, mas só se existia antes e explica >= 30% do delta
       var deltas = {};
       Object.keys(st.estabPrev || {}).forEach(function(e){ deltas[e] = (deltas[e] || 0) - st.estabPrev[e]; });
       Object.keys(st.estabCur  || {}).forEach(function(e){ deltas[e] = (deltas[e] || 0) + st.estabCur[e]; });
@@ -15419,7 +15396,7 @@ function getComparativoFaturasClaraParaChat() {
       var bestD = (deltaAbs >= 0 ? -1e18 : 1e18);
 
       Object.keys(deltas).forEach(function(e){
-        if (!(st.estabPrev[e] > 0)) return; // só considera se existia no período anterior
+        if (!(st.estabPrev[e] > 0)) return;
 
         var d = deltas[e] || 0;
         if (deltaAbs >= 0) {
@@ -15432,7 +15409,7 @@ function getComparativoFaturasClaraParaChat() {
       if (!best) return null;
 
       var share = (Math.abs(deltaAbs) > 0) ? (Math.abs(bestD) / Math.abs(deltaAbs)) : 0;
-      if (share < 0.30) return null; // condicional: não explica o suficiente
+      if (share < 0.30) return null;
 
       return { estab: best, deltaEstab: bestD, share: share };
     }
@@ -15443,7 +15420,6 @@ function getComparativoFaturasClaraParaChat() {
       var cur  = st.cur || 0;
       var delta = cur - prev;
 
-      // var%
       var varPct = null;
       var varPctTxt = "";
       if (prev > 0) {
@@ -15453,16 +15429,10 @@ function getComparativoFaturasClaraParaChat() {
         varPctTxt = (cur > 0 ? "Início no período" : "—");
       }
 
-      // driver categoria
       var dCat = pickDriverCategory(st, delta);
-
-      // pico
       var pico = pickPeakDay(st);
-
-      // estab condicional
       var estabInfo = pickEstabCondicional(st, delta);
 
-      // fator variação (texto)
       var fator = "";
       if (cur === 0 && prev === 0) {
         fator = "Sem gastos nos dois períodos.";
@@ -15491,7 +15461,7 @@ function getComparativoFaturasClaraParaChat() {
         valorAtual: cur,
         deltaValor: delta,
         variacaoPctTxt: varPctTxt,
-        variacaoPctNum: varPct, // pode ser null
+        variacaoPctNum: varPct,
         categoriaDriver: dCat.cat,
         picoDia: pico.day,
         picoValor: pico.value,
@@ -15499,24 +15469,22 @@ function getComparativoFaturasClaraParaChat() {
       });
     });
 
-    // Ordena: maiores aumentos em R$ primeiro
-    rows.sort(function(a,b){
+    rows.sort(function(a, b){
       return (b.deltaValor || 0) - (a.deltaValor || 0);
     });
 
-    // ===== Totais geral
     var totalPrev = 0, totalCur = 0;
     rows.forEach(function(r){
       totalPrev += Number(r.valorAnterior) || 0;
       totalCur  += Number(r.valorAtual) || 0;
     });
+
     var totalDelta = totalCur - totalPrev;
     var totalVarPctTxt = (totalPrev > 0)
-      ? ((totalDelta/totalPrev*100 > 0 ? "+" : "") + (totalDelta/totalPrev*100).toFixed(1) + "%")
+      ? (((totalDelta / totalPrev * 100) > 0 ? "+" : "") + (totalDelta / totalPrev * 100).toFixed(1) + "%")
       : (totalCur > 0 ? "Início no período" : "—");
 
-    // ===== Top categorias (delta geral)
-    var deltaCatGeral = {}; // cat -> delta
+    var deltaCatGeral = {};
     Object.keys(stats).forEach(function(loja){
       var st = stats[loja];
       Object.keys(st.catPrev || {}).forEach(function(c){ deltaCatGeral[c] = (deltaCatGeral[c] || 0) - st.catPrev[c]; });
@@ -15525,31 +15493,41 @@ function getComparativoFaturasClaraParaChat() {
 
     var topCats = Object.keys(deltaCatGeral).map(function(c){
       return { categoria: c, delta: deltaCatGeral[c] || 0 };
-    }).sort(function(a,b){
+    }).sort(function(a, b){
       return Math.abs(b.delta) - Math.abs(a.delta);
-    }).slice(0,3);
+    }).slice(0, 3);
 
-    // ===== Top lojas contribuição (delta)
-    var topLojas = rows.slice().sort(function(a,b){
-      return Math.abs(b.deltaValor||0) - Math.abs(a.deltaValor||0);
-    }).slice(0,5);
+    var topLojas = rows.slice().sort(function(a, b){
+      return Math.abs(b.deltaValor || 0) - Math.abs(a.deltaValor || 0);
+    }).slice(0, 5);
 
-    // ===== Top dias (delta diário = cur - prev) — para "Leitura do período"
+    var deltaTimeGeral = {};
+    rows.forEach(function(r){
+      var t = String(r.time || "N/D").trim() || "N/D";
+      deltaTimeGeral[t] = (deltaTimeGeral[t] || 0) + (Number(r.deltaValor) || 0);
+    });
+
+    var topTimes = Object.keys(deltaTimeGeral).map(function(t){
+      return { time: t, delta: deltaTimeGeral[t] || 0 };
+    }).sort(function(a, b){
+      return Math.abs(b.delta) - Math.abs(a.delta);
+    }).slice(0, 5);
+
     var diasSet = {};
     Object.keys(dayPrevGeral).forEach(function(d){ diasSet[d] = true; });
-    Object.keys(dayCurGeral ).forEach(function(d){ diasSet[d] = true; });
+    Object.keys(dayCurGeral).forEach(function(d){ diasSet[d] = true; });
 
     var topDias = Object.keys(diasSet).map(function(d){
       var vPrev = dayPrevGeral[d] || 0;
-      var vCur  = dayCurGeral[d]  || 0;
+      var vCur  = dayCurGeral[d] || 0;
       return { dia: d, prev: vPrev, cur: vCur, delta: (vCur - vPrev) };
-    }).sort(function(a,b){
+    }).sort(function(a, b){
       return Math.abs(b.delta) - Math.abs(a.delta);
-    }).slice(0,5);
+    }).slice(0, 5);
 
-    // Insights (se você ainda usa em algum lugar)
-    var top = rows.filter(function(r){ return (r.deltaValor || 0) > 0; }).slice(0,5);
-    var insights = top.map(function(r){
+    var insights = rows.filter(function(r){
+      return (r.deltaValor || 0) > 0;
+    }).slice(0, 5).map(function(r){
       return {
         loja: r.loja,
         time: r.time,
@@ -15561,13 +15539,18 @@ function getComparativoFaturasClaraParaChat() {
     });
 
     var ultimaDataConsideradaTxt = ultimaDataConsiderada
-  ? Utilities.formatDate(ultimaDataConsiderada, tz, "dd/MM/yyyy")
-  : (usarRecorte && fimRecorteAtual ? Utilities.formatDate(fimRecorteAtual, tz, "dd/MM/yyyy") : "");
+      ? Utilities.formatDate(ultimaDataConsiderada, tz, "dd/MM/yyyy")
+      : (usarRecorte && fimRecorteAtual ? Utilities.formatDate(fimRecorteAtual, tz, "dd/MM/yyyy") : "");
 
     return {
       ok: true,
       periodo: periodo,
-      meta: { extratoAtual: extratoAtual, extratoAnterior: extratoAnterior, totalLojas: rows.length, ultimaDataConsiderada: ultimaDataConsideradaTxt },
+      meta: {
+        extratoAtual: extratoAtual,
+        extratoAnterior: extratoAnterior,
+        totalLojas: rows.length,
+        ultimaDataConsiderada: ultimaDataConsideradaTxt
+      },
       insights: insights,
       summary: {
         totalPrev: totalPrev,
@@ -15576,11 +15559,12 @@ function getComparativoFaturasClaraParaChat() {
         totalVarPctTxt: totalVarPctTxt,
         topCats: topCats,
         topLojas: topLojas,
+        topTimes: topTimes,
         topDias: topDias,
         eventosSazonais: eventosSazonais,
         sazonalidadeTexto: (eventosSazonais && eventosSazonais.length)
-    ? ("Observação sazonal: o recorte atual coincide com " + eventosSazonais.join(", ") + ", o que pode explicar parte da variação em relação ao período anterior.")
-    : ""
+          ? ("Observação sazonal: o recorte atual coincide com " + eventosSazonais.join(", ") + ", o que pode explicar parte da variação em relação ao período anterior.")
+          : ""
       },
       rows: rows
     };
@@ -15588,6 +15572,16 @@ function getComparativoFaturasClaraParaChat() {
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
+}
+
+function getComparativoFaturasClaraParaChat() {
+  vektorAssertFunctionAllowed_("getComparativoFaturasClaraParaChat");
+  return getComparativoFaturasClaraCore_("", "");
+}
+
+function getAnaliseTemporalFaturasVektor(extratoAtual, extratoAnterior) {
+  vektorAssertFunctionAllowed_("getAnaliseTemporalFaturasVektor");
+  return getComparativoFaturasClaraCore_(extratoAtual, extratoAnterior);
 }
 
 function DISPARAR_EMAIL_OFENSORAS_SEMANA() {
