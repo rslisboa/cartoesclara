@@ -2506,7 +2506,7 @@ display: none;
     <span class="vektor-nav-label">Estado Operacional</span>
   </button>
 
-  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Analista" || (userRole || "") === "Gerente_Reg" )  { ?>
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Analista" || (userRole || "") === "Gerentes_Reg" )  { ?>
 
   <button
     type="button"
@@ -2520,7 +2520,7 @@ display: none;
 
   <? } ?>
 
-  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Marketing" || (userRole || "") === "Gerente_Reg")  { ?>
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Analista" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg")  { ?>
     <button
     type="button"
     onclick="window.vektorOpenAnaliseGastos()"
@@ -2543,7 +2543,7 @@ display: none;
     <span class="vektor-nav-label">Fluxograma</span>
   </button>
 
-  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Marketing" || (userRole || "") === "Gerente_Reg")  { ?>
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg")  { ?>
 
   <button
     type="button"
@@ -13186,38 +13186,72 @@ window.vektorMyAlertsInit_ = function () {
       // =========================
   // Tipo de alerta (Transações vs Pendências)
   // =========================
-  try {
-    const typeSel = document.getElementById("myAl_alertType");
-    const subtitle = document.getElementById("myAl_subtitle");
-    const hint = document.getElementById("myAl_createHint");
-    const labelWrap = document.getElementById("myAl_labelWrap");
+  // =========================
+// Tipo de alerta (Transações vs Pendências)
+// =========================
+try {
+  const typeSel = document.getElementById("myAl_alertType");
+  const subtitle = document.getElementById("myAl_subtitle");
+  const hint = document.getElementById("myAl_createHint");
+  const labelWrap = document.getElementById("myAl_labelWrap");
 
-    const applyType = () => {
-      const t = String(typeSel?.value || "TRANSACOES").trim();
+  const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "").trim();
+  const roleNorm = roleTxt.toLowerCase();
 
-      if (t === "PENDENCIAS") {
-        if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
-        if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
-        if (labelWrap) labelWrap.style.display = "none";
-      } else {
-        if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
-        if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
-        if (labelWrap) labelWrap.style.display = "block";
-      }
-    };
+  const canUsePendencias =
+    roleNorm === "administrador" ||
+    roleNorm === "gerentes_reg";
 
-    if (typeSel) {
-      typeSel.onchange = function () {
-        // ao trocar tipo, limpa edição (evita editar pendências como transações)
-        window.__myAl_editingAlertId = "";
-        const btn = document.getElementById("myAl_saveBtn");
-        if (btn) btn.textContent = "Criar alerta";
-        applyType();
-      };
+  const hydrateTypeOptions = function(forceValue){
+    if (!typeSel) return;
+
+    const current = String(forceValue || typeSel.value || "TRANSACOES").trim();
+
+    let html = "<option value='TRANSACOES'>Transações</option>";
+    if (canUsePendencias) {
+      html += "<option value='PENDENCIAS'>Pendências</option>";
     }
 
-    applyType();
-  } catch (_) {}
+    typeSel.innerHTML = html;
+
+    if (canUsePendencias && current === "PENDENCIAS") {
+      typeSel.value = "PENDENCIAS";
+    } else {
+      typeSel.value = "TRANSACOES";
+    }
+  };
+
+  const applyType = () => {
+    const t = String(typeSel?.value || "TRANSACOES").trim();
+
+    if (t === "PENDENCIAS") {
+      if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
+      if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
+      if (labelWrap) labelWrap.style.display = "none";
+    } else {
+      if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
+      if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
+      if (labelWrap) labelWrap.style.display = "block";
+    }
+  };
+
+  hydrateTypeOptions();
+
+  if (typeSel) {
+    typeSel.onchange = function () {
+      window.__myAl_editingAlertId = "";
+      const btn = document.getElementById("myAl_saveBtn");
+      if (btn) btn.textContent = "Criar alerta";
+      applyType();
+    };
+  }
+
+  applyType();
+
+  // expõe helper para reaproveitar no modo edição
+  window.vektorMyAlertsHydrateTypeOptions_ = hydrateTypeOptions;
+  window.vektorMyAlertsCanUsePendencias_ = canUsePendencias;
+} catch (_) {}
 
   // ✅ Filtros Admin: popular "Área" + atualizar lista ao mudar filtros
   try {
@@ -13614,17 +13648,32 @@ window.vektorMyAlertsStartEdit_ = function (a) {
   const hint = document.getElementById("myAl_createHint");
 
   const t = String(a.alertType || "TRANSACOES").trim();
-  if (typeSel) typeSel.value = t;
+const canUsePendencias = !!window.vektorMyAlertsCanUsePendencias_;
 
-  if (t === "PENDENCIAS") {
-    if (labelWrap) labelWrap.style.display = "none";
-    if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
-    if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
-  } else {
-    if (labelWrap) labelWrap.style.display = "block";
-    if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
-    if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
-  }
+if (!canUsePendencias && t === "PENDENCIAS") {
+  const st = document.getElementById("myAl_createStatus");
+  if (st) st.textContent = "Este perfil não pode editar alertas do tipo Pendências.";
+  window.__myAl_editingAlertId = "";
+  const btn2 = document.getElementById("myAl_saveBtn");
+  if (btn2) btn2.textContent = "Criar alerta";
+  return;
+}
+
+if (typeof window.vektorMyAlertsHydrateTypeOptions_ === "function") {
+  window.vektorMyAlertsHydrateTypeOptions_(t);
+} else if (typeSel) {
+  typeSel.value = (t === "PENDENCIAS" ? "PENDENCIAS" : "TRANSACOES");
+}
+
+if (t === "PENDENCIAS") {
+  if (labelWrap) labelWrap.style.display = "none";
+  if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
+  if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
+} else {
+  if (labelWrap) labelWrap.style.display = "block";
+  if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
+  if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
+}
 
   // freq
   const freqEl = document.getElementById("myAl_freq");
