@@ -200,6 +200,73 @@
   padding-bottom:0;
 }
 
+.aux-faturas-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+}
+.aux-faturas-head-left{
+  min-width:280px;
+  flex:1 1 380px;
+}
+.aux-faturas-head-right{
+  display:flex;
+  align-items:flex-start;
+  justify-content:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+  flex:1 1 420px;
+}
+.aux-faturas-filter{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  min-width:240px;
+}
+.aux-faturas-filter label{
+  font-size:11px;
+  font-weight:900;
+  color:#334155;
+}
+.aux-faturas-select{
+  height:34px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  background:#fff;
+  color:#0f172a;
+  font-size:12px;
+  font-weight:700;
+  padding:0 10px;
+  outline:none;
+}
+.aux-faturas-select:focus{
+  border-color:#94a3b8;
+  box-shadow:0 0 0 3px rgba(181,255,32,0.18);
+}
+.aux-fat-modal-card{
+  border:1px solid #e2e8f0;
+  border-radius:12px;
+  background:#f8fafc;
+  padding:10px 12px;
+}
+.aux-fat-modal-kpi{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+@media (max-width:900px){
+  .aux-fat-modal-kpi{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media (max-width:640px){
+  .aux-fat-modal-kpi{
+    grid-template-columns:1fr;
+  }
+}
+
     /* scrollbar do histórico */
     .chat-body::-webkit-scrollbar { width:6px; }
     .chat-body::-webkit-scrollbar-track { background:transparent; }
@@ -4758,14 +4825,44 @@ display: none;
 
         <!-- PAINEL: FATURAS (default) -->
         <section id="auxFaturasPanel" style="background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
-          <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
-            <div style="font-weight:900; color:#0f172a;">Faturas (Base de Transações Clara)</div>
-            <div style="font-weight:700; color:#64748b; font-size:12px;">
-              Clique na linha da fatura para ver detalhamento por time (modal). “Extrair dados” abre o relatório de transações.
-            </div>
-          </div>
-          <div id="auxFaturasConteudo" style="padding:12px;"></div>
-        </section>
+  <div style="padding:10px 12px; border-bottom:1px solid rgba(148,163,184,0.22); background:#f8fafc;">
+    <div class="aux-faturas-head">
+      <div class="aux-faturas-head-left">
+        <div style="font-weight:900; color:#0f172a;">Faturas (Base de Transações Clara)</div>
+        <div style="font-weight:700; color:#64748b; font-size:12px;">
+          Clique na linha da fatura para ver detalhamento por time (modal). “Extrair dados” abre o relatório de transações.
+        </div>
+      </div>
+
+      <div class="aux-faturas-head-right">
+        <div class="aux-faturas-filter">
+          <label for="auxFaturaAtualSel">Fatura base</label>
+          <select id="auxFaturaAtualSel" class="aux-faturas-select">
+            <option value="">Selecione</option>
+          </select>
+        </div>
+
+        <div class="aux-faturas-filter">
+          <label for="auxFaturaAnteriorSel">Comparar com</label>
+          <select id="auxFaturaAnteriorSel" class="aux-faturas-select">
+            <option value="">Selecione</option>
+          </select>
+        </div>
+
+        <div class="aux-faturas-filter" style="min-width:auto; justify-content:flex-end;">
+          <label style="visibility:hidden;">Ação</label>
+          <button type="button"
+                  onclick="window.vektorAuxAbrirAnaliseTemporal()"
+                  class="aux-topbtn">
+            Análise Temporal.
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="auxFaturasConteudo" style="padding:12px;"></div>
+</section>
 
         <!-- PAINEL: DEMISSÕES (hidden por default) -->
         <section id="auxDemPanel" style="display:none; background:#ffffff; border-radius:14px; overflow:hidden; border:1px solid rgba(148,163,184,0.25);">
@@ -4790,6 +4887,31 @@ display: none;
           <!-- filtros (front) + tabela -->
           <div id="auxSaldosConteudo" style="padding:12px;"></div>
         </section>
+
+        <div id="auxFaturasAnaliseTemporalModal"
+     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
+  <div style="width:min(1180px, 96vw); max-height:90vh; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.30); display:flex; flex-direction:column;">
+    <div style="padding:12px 14px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#ffffff;">
+      <div>
+        <div style="font-size:16px; font-weight:1000; color:#0f172a;">Análise Temporal de Faturas</div>
+        <div id="auxFaturasAnaliseTemporalSub"
+             style="font-size:12px; font-weight:700; color:#64748b; margin-top:2px;">
+          Comparativo entre faturas selecionadas
+        </div>
+      </div>
+
+      <button type="button"
+              onclick="window.vektorAuxCloseAnaliseTemporalModal()"
+              style="height:34px; min-width:34px; padding:0 12px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#0f172a; font-size:12px; font-weight:1000; cursor:pointer;">
+        Fechar
+      </button>
+    </div>
+
+    <div id="auxFaturasAnaliseTemporalBody"
+         style="padding:14px; overflow:auto; background:#ffffff;">
+    </div>
+  </div>
+</div>
 
       </div>
     </div>
@@ -6669,11 +6791,16 @@ window.vektorOpenPolicyAssistant = function () {
 // VIEW CONTROL (Chat <-> Radar)
 // ===============================
 window.vektorShowChatView = function () {
-    if (typeof USER_ROLE_REPLACED !== "undefined" &&
-      USER_ROLE_REPLACED !== "Administrador" &&
-      window.__vektorChatMode !== "policy") {
+    if (typeof USER_ROLE_REPLACED !== "undefined") {
+  const roleAtual = String(USER_ROLE_REPLACED || "").trim();
+  const podeAbrirChatLegacy =
+    roleAtual === "Administrador" ||
+    roleAtual === "Analista Pro";
+
+  if (!podeAbrirChatLegacy && window.__vektorChatMode !== "policy") {
     return;
   }
+}
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
   const feedbackView = document.getElementById("feedbackView");
@@ -25734,6 +25861,351 @@ if (ultData) {
   }
 }
 
+window.__auxFaturasLista = [];
+
+window.vektorAuxHydrateFaturasToolbar_ = function(faturas){
+  try {
+    const selAtual = document.getElementById("auxFaturaAtualSel");
+    const selAnterior = document.getElementById("auxFaturaAnteriorSel");
+    if (!selAtual || !selAnterior) return;
+
+    const lista = Array.isArray(faturas) ? faturas.slice() : [];
+    const opts = ["<option value=''>Selecione</option>"];
+
+    lista.forEach(function(f){
+      const ex = String((f && f.extrato) || "").trim();
+      if (!ex) return;
+      const safe = ex.replace(/'/g, "&#39;");
+      opts.push("<option value='" + safe + "'>" + ex + "</option>");
+    });
+
+    selAtual.innerHTML = opts.join("");
+    selAnterior.innerHTML = opts.join("");
+
+    if (lista.length >= 2) {
+      selAtual.value = String(lista[lista.length - 1].extrato || "");
+      selAnterior.value = String(lista[lista.length - 2].extrato || "");
+    } else if (lista.length === 1) {
+      selAtual.value = String(lista[0].extrato || "");
+    }
+  } catch (e) {
+    console.error("Erro ao hidratar toolbar de faturas:", e);
+  }
+};
+
+window.vektorAuxOpenAnaliseTemporalModal_ = function(title, subtitle, bodyHtml){
+  const modal = document.getElementById("auxFaturasAnaliseTemporalModal");
+  const sub = document.getElementById("auxFaturasAnaliseTemporalSub");
+  const body = document.getElementById("auxFaturasAnaliseTemporalBody");
+
+  if (!modal || !sub || !body) return;
+
+  sub.textContent = subtitle || "Comparativo entre faturas selecionadas";
+  body.innerHTML = bodyHtml || "";
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+};
+
+window.vektorAuxCloseAnaliseTemporalModal = function(){
+  const modal = document.getElementById("auxFaturasAnaliseTemporalModal");
+  const body = document.getElementById("auxFaturasAnaliseTemporalBody");
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+  if (body) body.innerHTML = "";
+};
+
+window.vektorAuxAbrirAnaliseTemporal = function(){
+  try {
+    const selAtual = document.getElementById("auxFaturaAtualSel");
+    const selAnterior = document.getElementById("auxFaturaAnteriorSel");
+
+    let extratoAtual = selAtual ? String(selAtual.value || "").trim() : "";
+    let extratoAnterior = selAnterior ? String(selAnterior.value || "").trim() : "";
+
+    const lista = Array.isArray(window.__auxFaturasLista) ? window.__auxFaturasLista : [];
+
+    if (!extratoAtual && !extratoAnterior && lista.length >= 2) {
+      extratoAtual = String(lista[lista.length - 1].extrato || "");
+      extratoAnterior = String(lista[lista.length - 2].extrato || "");
+      if (selAtual) selAtual.value = extratoAtual;
+      if (selAnterior) selAnterior.value = extratoAnterior;
+    }
+
+    if (!extratoAtual || !extratoAnterior) {
+      alert("Selecione as duas faturas para executar a análise temporal.");
+      return;
+    }
+
+    if (extratoAtual === extratoAnterior) {
+      alert("A fatura base e a fatura de comparação não podem ser iguais.");
+      return;
+    }
+
+    window.vektorAuxOpenAnaliseTemporalModal_(
+      "Análise Temporal de Faturas",
+      "Comparando “" + extratoAtual + "” com “" + extratoAnterior + "”",
+      "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Montando análise temporal…</span></div>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function(res){
+        try {
+          if (!res || !res.ok) {
+            const msg = (res && res.error) ? res.error : "Não consegui montar a análise temporal.";
+            window.vektorAuxOpenAnaliseTemporalModal_(
+              "Análise Temporal de Faturas",
+              "Comparando “" + extratoAtual + "” com “" + extratoAnterior + "”",
+              "<p class='text-sm text-slate-700'>" + msg.replace(/</g,"&lt;").replace(/>/g,"&gt;") + "</p>"
+            );
+            return;
+          }
+
+          const html = window.vektorComparativoFaturasModalHtml_(res);
+          window.vektorAuxOpenAnaliseTemporalModal_(
+            "Análise Temporal de Faturas",
+            "Comparando “" + extratoAtual + "” com “" + extratoAnterior + "”",
+            html
+          );
+        } catch (e) {
+          console.error("Erro ao renderizar análise temporal:", e);
+          window.vektorAuxOpenAnaliseTemporalModal_(
+            "Análise Temporal de Faturas",
+            "Comparando “" + extratoAtual + "” com “" + extratoAnterior + "”",
+            "<p class='text-sm text-slate-700'>Erro ao renderizar a análise temporal.</p>"
+          );
+        }
+      })
+      .withFailureHandler(function(err){
+        console.error("Erro Apps Script (getAnaliseTemporalFaturasVektor):", err);
+        const msg = (err && err.message) ? err.message : String(err || "Erro desconhecido");
+        window.vektorAuxOpenAnaliseTemporalModal_(
+          "Análise Temporal de Faturas",
+          "Comparando “" + extratoAtual + "” com “" + extratoAnterior + "”",
+          "<p class='text-sm text-slate-700'>Erro ao consultar a análise temporal: " + msg.replace(/</g,"&lt;").replace(/>/g,"&gt;") + "</p>"
+        );
+      })
+      .getAnaliseTemporalFaturasVektor(extratoAtual, extratoAnterior);
+
+  } catch (e) {
+    console.error("Erro em vektorAuxAbrirAnaliseTemporal:", e);
+  }
+};
+
+window.vektorComparativoFaturasModalHtml_ = function(res){
+  function money(n){
+    return (Number(n || 0) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  }
+
+  const periodo = res.periodo || {};
+  const s = res.summary || {};
+  const rows = Array.isArray(res.rows) ? res.rows : [];
+
+  const totalPrev0 = Number(s.totalPrev || 0) || 0;
+  const totalCur0  = Number(s.totalCur || 0) || 0;
+  const totalDelta0 = Number(s.totalDelta || 0) || 0;
+  const totalVar0 = String(s.totalVarPctTxt || "—");
+
+  const ant = periodo.anterior || {};
+  const atu = periodo.atual || {};
+  const meta = res.meta || {};
+
+  const topCats = (s.topCats || []).slice(0, 3);
+  const topLojas = (s.topLojas || []).slice(0, 3);
+  const topTimes = (s.topTimes || []).slice(0, 3);
+  const topDias = (s.topDias || []).slice(0, 5);
+  const sazTxt = String(s.sazonalidadeTexto || "").trim();
+
+  const wrapId = "auxComparativoWrap_" + Date.now();
+  const selLojaId = "filtroCompFatLoja_" + wrapId;
+  const selTimeId = "filtroCompFatTime_" + wrapId;
+
+  const TH_BASE = "background:#0F172A;color:#fff;padding:10px 8px;border-bottom:1px solid #1e293b;font-size:12px;font-weight:900;position:sticky;top:0;z-index:2;";
+  const TH_CALC = TH_BASE + " text-align:right;";
+  const TD_BASE = "padding:8px;border-top:1px solid #e2e8f0;font-size:12px;color:#0f172a;vertical-align:top;";
+
+  const lojasUnicas = [];
+  const timesUnicos = [];
+  const lojasSet = {};
+  const timesSet = {};
+
+  rows.forEach(function(r){
+    const loja = String(r.loja || "").trim();
+    const time = String(r.time || "N/D").trim();
+    if (loja && !lojasSet[loja]) { lojasSet[loja] = true; lojasUnicas.push(loja); }
+    if (time && !timesSet[time]) { timesSet[time] = true; timesUnicos.push(time); }
+  });
+
+  lojasUnicas.sort(function(a,b){ return a.localeCompare(b); });
+  timesUnicos.sort(function(a,b){ return a.localeCompare(b); });
+
+  let optsLojas = "<option value=''>Todas</option>";
+  lojasUnicas.forEach(function(v){
+    const safe = v.replace(/'/g,"&#39;");
+    optsLojas += "<option value='" + safe + "'>" + v + "</option>";
+  });
+
+  let optsTimes = "<option value=''>Todos</option>";
+  timesUnicos.forEach(function(v){
+    const safe = v.replace(/'/g,"&#39;");
+    optsTimes += "<option value='" + safe + "'>" + v + "</option>";
+  });
+
+  let narrativa = "";
+  const direcao = totalDelta0 > 0 ? "aumento" : (totalDelta0 < 0 ? "redução" : "estabilidade");
+  const verbo = totalDelta0 > 0 ? "subiu" : (totalDelta0 < 0 ? "caiu" : "se manteve");
+
+  narrativa += "<div class='aux-fat-modal-card' style='margin-top:12px;'>";
+  narrativa +=   "<div style='font-size:13px;font-weight:1000;color:#0f172a;margin-bottom:6px;'>Leitura do período</div>";
+  narrativa +=   "<div style='font-size:13px;color:#334155;line-height:1.45;'>";
+  narrativa +=     "No recorte analisado, a fatura <b>" + verbo + "</b> de <b>" + money(totalPrev0) + "</b> para <b>" + money(totalCur0) + "</b>, ";
+  narrativa +=     "uma variação de <b>" + (totalDelta0 >= 0 ? "+" : "") + money(totalDelta0) + "</b> (" + totalVar0 + ").";
+  narrativa +=   "</div>";
+
+  if (topDias.length) {
+    narrativa += "<div style='margin-top:8px;font-size:13px;color:#334155;line-height:1.45;'>";
+    narrativa += "Os dias que mais impactaram a variação foram: ";
+    narrativa += topDias.map(function(d){
+      const delta = Number(d.delta) || 0;
+      return "<b>" + (d.dia || "—") + "</b> (" + (delta >= 0 ? "+" : "") + money(delta) + ")";
+    }).join(", ") + ".";
+    narrativa += "</div>";
+  }
+
+  if (topCats.length) {
+    narrativa += "<div style='margin-top:8px;font-size:13px;color:#334155;line-height:1.45;'>";
+    narrativa += "O " + direcao + " foi explicado principalmente por ";
+    narrativa += topCats.map(function(c){
+      const d = Number(c.delta) || 0;
+      return "<b>" + (c.categoria || "—") + "</b> (" + (d >= 0 ? "+" : "") + money(d) + ")";
+    }).join(", ") + ".";
+    narrativa += "</div>";
+  }
+
+  if (topLojas.length) {
+    narrativa += "<div style='margin-top:8px;font-size:13px;color:#334155;line-height:1.45;'>";
+    narrativa += "As maiores contribuições vieram de: ";
+    narrativa += topLojas.map(function(r){
+      const d = Number(r.deltaValor) || 0;
+      return "Loja <b>" + (r.loja || "—") + "</b> (" + (r.time || "N/D") + ") <b>" + (d >= 0 ? "+" : "") + money(d) + "</b>";
+    }).join("; ") + ".";
+    narrativa += "</div>";
+  }
+
+  if (topTimes.length) {
+    narrativa += "<div style='margin-top:8px;font-size:13px;color:#334155;line-height:1.45;'>";
+    narrativa += "Na visão por times, os maiores impactos foram: ";
+    narrativa += topTimes.map(function(t){
+      const d = Number(t.delta) || 0;
+      return "<b>" + (t.time || "N/D") + "</b> (" + (d >= 0 ? "+" : "") + money(d) + ")";
+    }).join(", ") + ".";
+    narrativa += "</div>";
+  }
+
+  if (sazTxt) {
+    narrativa += "<div style='margin-top:8px;font-size:13px;color:#334155;line-height:1.45;'>" +
+      sazTxt.replace(/</g,"&lt;").replace(/>/g,"&gt;") +
+    "</div>";
+  }
+
+  narrativa += "</div>";
+
+  let trs = "";
+  rows.forEach(function(r){
+    const loja = String(r.loja || "").trim();
+    const time = String(r.time || "N/D").trim();
+    const vPrev = Number(r.valorAnterior) || 0;
+    const vCur  = Number(r.valorAtual) || 0;
+    const dVal  = Number(r.deltaValor) || 0;
+    const varTxt = (r.variacaoPctTxt != null ? String(r.variacaoPctTxt) : "—");
+    const cat = String(r.categoriaDriver || "—");
+    const picoDia = String(r.picoDia || "—");
+    const picoV = Number(r.picoValor) || 0;
+    const fator = String(r.fatorVariacao || "—");
+
+    trs += "<tr data-loja='" + loja.replace(/'/g,"&#39;") + "' " +
+                "data-time='" + time.replace(/'/g,"&#39;") + "' " +
+                "data-prev='" + String(vPrev) + "' " +
+                "data-cur='" + String(vCur) + "'>" +
+      "<td style='" + TD_BASE + "'>" + loja + "</td>" +
+      "<td style='" + TD_BASE + "'>" + time + "</td>" +
+      "<td style='" + TD_BASE + "text-align:right;'>" + money(vPrev) + "</td>" +
+      "<td style='" + TD_BASE + "text-align:right;'>" + money(vCur) + "</td>" +
+      "<td style='" + TD_BASE + "text-align:right;'>" + (dVal >= 0 ? "+" : "") + money(dVal) + "</td>" +
+      "<td style='" + TD_BASE + "text-align:center;'>" + varTxt + "</td>" +
+      "<td style='" + TD_BASE + "'>" + cat + "</td>" +
+      "<td style='" + TD_BASE + "text-align:center;'>" + picoDia + "</td>" +
+      "<td style='" + TD_BASE + "text-align:right;'>" + money(picoV) + "</td>" +
+      "<td style='" + TD_BASE + "white-space:normal; min-width:420px;'>" + fator.replace(/</g,"&lt;").replace(/>/g,"&gt;") + "</td>" +
+    "</tr>";
+  });
+
+  let html = "";
+
+  html += "<div class='aux-fat-modal-card'>";
+  html +=   "<div style='font-size:13px;font-weight:1000;color:#0f172a;'>Faturas comparadas</div>";
+  html +=   "<div style='margin-top:6px;font-size:13px;color:#334155;line-height:1.45;'><b>Período anterior:</b> " + (ant.inicio || "") + " a " + (ant.fim || "") + " — <b>Extrato:</b> " + (ant.extrato || "—") + "</div>";
+  html +=   "<div style='margin-top:4px;font-size:13px;color:#334155;line-height:1.45;'><b>Período atual:</b> " + (atu.inicio || "") + " a " + (atu.fim || "") + " — <b>Extrato:</b> " + (atu.extrato || "—") + "</div>";
+  if (meta.ultimaDataConsiderada) {
+    html += "<div style='margin-top:6px;font-size:12px;color:#64748b;line-height:1.45;'><b>Nota:</b> O comparativo considera as transações da fatura atual registradas até <b>" + String(meta.ultimaDataConsiderada).replace(/</g,"&lt;").replace(/>/g,"&gt;") + "</b>.</div>";
+  }
+  html += "</div>";
+
+  html += "<div class='aux-fat-modal-kpi' style='margin-top:12px;'>";
+  html +=   "<div class='aux-fat-modal-card'><div style='font-size:11px;font-weight:900;color:#64748b;'>Valor anterior</div><div style='margin-top:4px;font-size:18px;font-weight:1000;color:#0f172a;'>" + money(totalPrev0) + "</div></div>";
+  html +=   "<div class='aux-fat-modal-card'><div style='font-size:11px;font-weight:900;color:#64748b;'>Valor atual</div><div style='margin-top:4px;font-size:18px;font-weight:1000;color:#0f172a;'>" + money(totalCur0) + "</div></div>";
+  html +=   "<div class='aux-fat-modal-card'><div style='font-size:11px;font-weight:900;color:#64748b;'>Δ Valor</div><div style='margin-top:4px;font-size:18px;font-weight:1000;color:#0f172a;'>" + (totalDelta0 >= 0 ? "+" : "") + money(totalDelta0) + "</div></div>";
+  html +=   "<div class='aux-fat-modal-card'><div style='font-size:11px;font-weight:900;color:#64748b;'>Variação</div><div style='margin-top:4px;font-size:18px;font-weight:1000;color:#0f172a;'>" + totalVar0 + "</div></div>";
+  html += "</div>";
+
+  html += narrativa;
+
+  html += "<div id='" + wrapId + "' style='margin-top:12px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; padding:10px; overflow:auto; max-height:55vh;'>";
+  html +=   "<div style='display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:10px;'>";
+  html +=     "<div style='display:flex; gap:8px; align-items:center; flex-wrap:nowrap;'>";
+  html +=       "<label style='font-size:13px;color:#334155;white-space:nowrap;'><b>Loja:</b></label>";
+  html +=       "<select id='" + selLojaId + "' onchange=\"window.vektorFiltrarComparativoFaturas('" + wrapId + "')\" style='font-size:12px;border:1px solid #CBD5E1;border-radius:10px;padding:6px 10px;background:#fff;min-width:220px;'>";
+  html +=         optsLojas;
+  html +=       "</select>";
+  html +=     "</div>";
+
+  html +=     "<div style='display:flex; gap:8px; align-items:center; flex-wrap:nowrap;'>";
+  html +=       "<label style='font-size:13px;color:#334155;white-space:nowrap;'><b>Time:</b></label>";
+  html +=       "<select id='" + selTimeId + "' onchange=\"window.vektorFiltrarComparativoFaturas('" + wrapId + "')\" style='font-size:12px;border:1px solid #CBD5E1;border-radius:10px;padding:6px 10px;background:#fff;min-width:220px;'>";
+  html +=         optsTimes;
+  html +=       "</select>";
+  html +=     "</div>";
+
+  html +=     "<button type='button' onclick=\"window.vektorLimparFiltrosComparativoFaturas('" + wrapId + "')\" style='background:#0F172A;color:#fff;border:none;padding:6px 12px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>Limpar</button>";
+  html +=   "</div>";
+
+  html +=   "<table style='min-width:1850px; width:100%; border-collapse:collapse;'>";
+  html +=     "<thead><tr>";
+  html +=       "<th style='" + TH_BASE + "'>Loja</th>";
+  html +=       "<th style='" + TH_BASE + "'>Time</th>";
+  html +=       "<th style='" + TH_CALC + "'>Valor Per. Anterior</th>";
+  html +=       "<th style='" + TH_CALC + "'>Valor Per. Atual</th>";
+  html +=       "<th style='" + TH_CALC + "'>Δ Valor (R$)</th>";
+  html +=       "<th style='" + TH_CALC + "'>Variação (%)</th>";
+  html +=       "<th style='" + TH_BASE + "'>Categoria driver</th>";
+  html +=       "<th style='" + TH_BASE + "'>Pico (dia)</th>";
+  html +=       "<th style='" + TH_BASE + "'>Valor pico</th>";
+  html +=       "<th style='" + TH_BASE + "'>Fator Variação</th>";
+  html +=     "</tr></thead>";
+  html +=     "<tbody>" + trs + "</tbody>";
+  html +=   "</table>";
+
+  html +=   "<div style='text-align:right; margin-top:8px;'>";
+  html +=     "<button type='button' onclick=\"exportTableToCSV(this, 'comparativo_faturas')\" style='background:#005E27;color:#fff;border:none;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'>";
+  html +=       "⬇ Exportar CSV";
+  html +=     "</button>";
+  html +=   "</div>";
+  html += "</div>";
+
+  return html;
+};
+
 window.vektorFiltrarLojasOfensoras = function (wrapId) {
   try {
     var wrap = document.getElementById(wrapId);
@@ -26312,22 +26784,17 @@ window.vektorAuxLoadFaturas = function(){
           return;
         }
 
-        const faturas = res.faturas || [];
-        // tabela “igual ao chat”
-        const htmlTabela = vektorMontarTabelaFaturas_("Tabela completa de faturas", faturas);
+        const faturasOrdenadas = (res.faturas || []).slice().sort(function(a, b){
+          const da = a && a.dataInicioIso ? Date.parse(a.dataInicioIso) : 0;
+          const db = b && b.dataInicioIso ? Date.parse(b.dataInicioIso) : 0;
+          return da - db;
+        });
 
-        // insights (igual ao chat) — se você quiser manter
-        let htmlInsights = "";
-        try {
-          htmlInsights = analisarFaturas(faturas) || "";
-        } catch(_) {}
+        window.__auxFaturasLista = faturasOrdenadas.slice();
+        window.vektorAuxHydrateFaturasToolbar_(faturasOrdenadas);
 
-        box.innerHTML =
-          "<div>" +
-            htmlTabela +
-            (htmlInsights ? ("<div class='mt-2'>" + htmlInsights + "</div>") : "") +
-          "</div>";
-
+        const htmlTabela = vektorMontarTabelaFaturas_("Tabela completa de faturas", faturasOrdenadas);
+        box.innerHTML = "<div>" + htmlTabela + "</div>";
       } catch (e) {
         console.error("Erro ao renderizar faturas (aux):", e);
         box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao renderizar tabela de faturas.</p>";
@@ -31918,31 +32385,20 @@ function vektorCarregarInformacoesIniciais() {
                   return;
                 }
 
-                // (opcional) ordena por dataInicioIso crescente para não “pular” períodos
                 const faturasOrdenadas = todas.slice().sort(function (a, b) {
                   const da = a && a.dataInicioIso ? Date.parse(a.dataInicioIso) : 0;
                   const db = b && b.dataInicioIso ? Date.parse(b.dataInicioIso) : 0;
                   return da - db;
                 });
 
+                window.__auxFaturasLista = faturasOrdenadas.slice();
+                window.vektorAuxHydrateFaturasToolbar_(faturasOrdenadas);
+
                 const titulo = "TODAS AS FATURAS (BaseClara)";
                 const htmlTabela = vektorMontarTabelaFaturas_(titulo, faturasOrdenadas);
 
                 box.innerHTML = htmlTabela;
-
-                // Insights para todas as faturas pode virar texto longo.
-                // Se quiser manter, ok; se ficar pesado, remova.
-                try {
-                  const htmlInsights = analisarFaturas(faturasOrdenadas);
-                  if (htmlInsights) {
-                    // anexa abaixo
-                    box.insertAdjacentHTML("beforeend", "<div style='margin-top:10px;'>" + htmlInsights + "</div>");
-                  }
-                } catch (e) {
-                  console.error("Erro ao gerar insights de faturas (aux):", e);
-                }
-
-                return; // não segue para o fluxo do chat
+                return;
               }
 
               // ✅ Caso contrário: mantém o comportamento antigo (últimas 6) no chat
