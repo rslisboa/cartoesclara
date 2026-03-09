@@ -2024,6 +2024,15 @@ function criarAlertaEtiquetaVektor(payload) {
     var alertType = String(payload.alertType || "TRANSACOES").trim();
     if (alertType !== "TRANSACOES" && alertType !== "PENDENCIAS") alertType = "TRANSACOES";
 
+    var roleNorm = String(role || "").trim().toLowerCase();
+    var canUsePendencias =
+      roleNorm === "administrador" ||
+      roleNorm === "gerentes_reg";
+
+    if (alertType === "PENDENCIAS" && !canUsePendencias) {
+      return { ok:false, error:"O tipo de alerta Pendências está disponível apenas para Administrador e Gerentes_Reg." };
+    }
+
     // ✅ novo: pode vir array (multi) OU string (legado)
     var etiquetasArr = Array.isArray(payload.etiquetas)
       ? payload.etiquetas.map(function(x){ return String(x || "").trim(); })
@@ -2448,9 +2457,19 @@ function atualizarAlertaEtiquetaVektor(payload) {
     var windowDays = Number(payload.windowDays || 30) || 30;
     var time = String(payload.time || "").trim();
     var allowedTimes = { "11:30": true, "16:00": true };
+    var sendAt = String(payload.sendAt || "").trim();
 
     var alertType = String(payload.alertType || "TRANSACOES").trim();
     if (alertType !== "TRANSACOES" && alertType !== "PENDENCIAS") alertType = "TRANSACOES";
+
+    var roleNorm = String(role || "").trim().toLowerCase();
+    var canUsePendencias =
+      roleNorm === "administrador" ||
+      roleNorm === "gerentes_reg";
+
+    if (alertType === "PENDENCIAS" && !canUsePendencias) {
+      return { ok:false, error:"O tipo de alerta Pendências está disponível apenas para Administrador e Gerentes_Reg." };
+    }
 
     // Multi etiquetas (mesma regra do criar)
     var etiquetasArr = Array.isArray(payload.etiquetas)
@@ -2499,7 +2518,6 @@ function atualizarAlertaEtiquetaVektor(payload) {
     var iLastRun = idx("lastRunAt");
     var iLastCnt = idx("lastRowCount");
 
-
     if (iAlertId < 0) return { ok:false, error:"Cabeçalho inválido: alertId não encontrado." };
 
     // encontra linha
@@ -2517,37 +2535,37 @@ function atualizarAlertaEtiquetaVektor(payload) {
     }
 
     // ✅ Se mudou freq e/ou sendAt, zera lastRunAt para permitir novo disparo no mesmo dia
-try {
-  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    try {
+      var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
 
-  var oldFreq = (iFreq >= 0) ? String(values[rowIndex][iFreq] || "").trim() : "";
+      var oldFreq = (iFreq >= 0) ? String(values[rowIndex][iFreq] || "").trim() : "";
 
-  // Normaliza sendAt antigo (pode vir Date/number/string)
-  var oldSendAtRaw = (iSendAt >= 0) ? values[rowIndex][iSendAt] : "";
-  var oldSendAt = "";
+      // Normaliza sendAt antigo (pode vir Date/number/string)
+      var oldSendAtRaw = (iSendAt >= 0) ? values[rowIndex][iSendAt] : "";
+      var oldSendAt = "";
 
-  if (Object.prototype.toString.call(oldSendAtRaw) === "[object Date]" && !isNaN(oldSendAtRaw.getTime())) {
-    oldSendAt = Utilities.formatDate(oldSendAtRaw, tz, "HH:mm");
-  } else if (typeof oldSendAtRaw === "number" && isFinite(oldSendAtRaw)) {
-    var totalMinutes = Math.round(oldSendAtRaw * 24 * 60);
-    var hh = Math.floor(totalMinutes / 60) % 24;
-    var mm = totalMinutes % 60;
-    oldSendAt = (String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0"));
-  } else {
-    oldSendAt = String(oldSendAtRaw || "").trim();
-    if (/^\d{2}:\d{2}:\d{2}$/.test(oldSendAt)) oldSendAt = oldSendAt.slice(0, 5);
-  }
+      if (Object.prototype.toString.call(oldSendAtRaw) === "[object Date]" && !isNaN(oldSendAtRaw.getTime())) {
+        oldSendAt = Utilities.formatDate(oldSendAtRaw, tz, "HH:mm");
+      } else if (typeof oldSendAtRaw === "number" && isFinite(oldSendAtRaw)) {
+        var totalMinutes = Math.round(oldSendAtRaw * 24 * 60);
+        var hh = Math.floor(totalMinutes / 60) % 24;
+        var mm = totalMinutes % 60;
+        oldSendAt = (String(hh).padStart(2, "0") + ":" + String(mm).padStart(2, "0"));
+      } else {
+        oldSendAt = String(oldSendAtRaw || "").trim();
+        if (/^\d{2}:\d{2}:\d{2}$/.test(oldSendAt)) oldSendAt = oldSendAt.slice(0, 5);
+      }
 
-  var newSendAt = String(sendAt || "").trim();
-  if (/^\d{2}:\d{2}:\d{2}$/.test(newSendAt)) newSendAt = newSendAt.slice(0, 5);
+      var newSendAt = String(sendAt || "").trim();
+      if (/^\d{2}:\d{2}:\d{2}$/.test(newSendAt)) newSendAt = newSendAt.slice(0, 5);
 
-  var changedSchedule = (oldFreq !== freq) || (oldSendAt !== newSendAt);
+      var changedSchedule = (oldFreq !== freq) || (oldSendAt !== newSendAt);
 
-  if (changedSchedule) {
-    if (iLastRun >= 0) sh.getRange(rowIndex + 1, iLastRun + 1).setValue("");
-    if (iLastCnt >= 0) sh.getRange(rowIndex + 1, iLastCnt + 1).setValue("");
-  }
-} catch (_) {}
+      if (changedSchedule) {
+        if (iLastRun >= 0) sh.getRange(rowIndex + 1, iLastRun + 1).setValue("");
+        if (iLastCnt >= 0) sh.getRange(rowIndex + 1, iLastCnt + 1).setValue("");
+      }
+    } catch (_) {}
 
     // atualiza campos
     if (iFreq   >= 0) sh.getRange(rowIndex + 1, iFreq   + 1).setValue(freq);
@@ -16082,7 +16100,7 @@ function vektorGetAllowedLojasFromEmails_(userEmail){
   // Admin e Analista Pro vê tudo
   var ctx = vektorGetUserRole_();
   var role = String(ctx && ctx.role ? ctx.role : "").trim().toLowerCase();
-  if (role === "administrador" || role === "analista pro" || role === "marketing" ) return null;
+  if (role === "administrador" || role === "analista pro" || role === "marketing" || role === "analista" ) return null;
 
   var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
   var sh = ss.getSheetByName("Emails");
