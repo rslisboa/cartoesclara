@@ -2506,6 +2506,8 @@ display: none;
     <span class="vektor-nav-label">Estado Operacional</span>
   </button>
 
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Analista" || (userRole || "") === "Gerente_Reg" )  { ?>
+
   <button
     type="button"
     onclick="window.vektorOpenResumoCiclo()"
@@ -2516,6 +2518,9 @@ display: none;
     <span class="vektor-nav-label">Pendências do Ciclo</span>
   </button>
 
+  <? } ?>
+
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Marketing" || (userRole || "") === "Gerente_Reg")  { ?>
     <button
     type="button"
     onclick="window.vektorOpenAnaliseGastos()"
@@ -2525,6 +2530,8 @@ display: none;
     <span class="vektor-nav-ico" aria-hidden="true">🔍</span>
     <span class="vektor-nav-label">Análise de Gastos</span>
   </button>
+
+  <? } ?>
 
   <button
     type="button"
@@ -2536,6 +2543,8 @@ display: none;
     <span class="vektor-nav-label">Fluxograma</span>
   </button>
 
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Marketing" || (userRole || "") === "Gerente_Reg")  { ?>
+
   <button
     type="button"
     onclick="window.vektorOpenMyAlerts()"
@@ -2545,6 +2554,8 @@ display: none;
     <span class="vektor-nav-ico" aria-hidden="true">⏱️</span>
     <span class="vektor-nav-label">Alertas Programados</span>
   </button>
+
+   <? } ?>
 
   <? if ((userRole || "") === "Administrador") { ?>
 
@@ -2558,6 +2569,9 @@ display: none;
       <span class="vektor-nav-label">Disparo de Ocorrências</span>
     </button>
 
+    <? } ?>
+
+    <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro") { ?>
     <button
       type="button"
       onclick="window.vektorOpenRadar('7d')"
@@ -2578,6 +2592,10 @@ display: none;
       <span class="vektor-nav-label">Envio de Pendências</span>
     </button>
 
+     <? } ?>
+
+     <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro") { ?>
+
     <button
       type="button"
       onclick="window.vektorOpenConsultasAuxiliares()"
@@ -2587,6 +2605,10 @@ display: none;
       <span class="vektor-nav-ico" aria-hidden="true">🧾</span>
       <span class="vektor-nav-label">Consultas Auxiliares</span>
     </button>
+
+    <? } ?>
+
+    <? if ((userRole || "") === "Administrador") { ?>
 
     <button
       type="button"
@@ -7774,8 +7796,10 @@ window.vektorOpenAnaliseGastos = function () {
   const cicloResumoView = document.getElementById("cicloResumoView");
   const homeView = document.getElementById("homeView");
 
-  // ✅ nova view
+  // ✅ novas views que também precisam ser escondidas
   const analiseGastosView = document.getElementById("analiseGastosView");
+  const consultasAuxView = document.getElementById("consultasAuxView");
+  const vertexCostView = document.getElementById("vertexCostView");
 
   // Esconde todas as outras
   [
@@ -7786,7 +7810,9 @@ window.vektorOpenAnaliseGastos = function () {
     fluxogramaView,
     envioPendView,
     cicloResumoView,
-    homeView
+    homeView,
+    consultasAuxView,
+    vertexCostView
   ].forEach(function(v){
     if (!v) return;
     v.classList.add("hidden");
@@ -7845,8 +7871,7 @@ window.vektorOpenAnaliseGastos = function () {
 
   // ✅ Carrega SOMENTE meta/filtros (ACL), sem buscar dataset
   try {
-    vektorAnaliseGastosEnsureMeta_(function()
-    {}, { silent: true });
+    vektorAnaliseGastosEnsureMeta_(function(){}, { silent: true });
   } catch (e) {
     console.error("Erro ao carregar meta da Análise de Gastos:", e);
   }
@@ -12648,7 +12673,8 @@ function vektorShowConsultasAuxView_(){
     "cicloResumoView",
     "homeView",
     "analiseGastosView",
-    "consultasAuxView"
+    "consultasAuxView",
+    "vertexCostView"
   ];
 
   ids.forEach(function(id){
@@ -15025,7 +15051,7 @@ window.vektorShowResumoCicloView_ = function () {
   if (envView) { envView.classList.add("hidden"); envView.style.display = "none"; }
   if (analiseGastosView) { analiseGastosView.classList.add("hidden"); analiseGastosView.style.display = "none"; }
   if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
-  if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
+  if (vertexCostView) { vertexCostView.classList.add("hidden"); vertexCostView.style.display = "none"; }
 
   // ✅ abre resumo do ciclo
   if (cicloView) {
@@ -26885,12 +26911,15 @@ window.vektorAuxShowDemissoes = function(){
 };
 
 window.vektorAuxShowSaldos = function(){
-  // 🔒 ROLE (front) — mantém sua trava atual
+  // 🔒 ROLE (front) — mantém trava atual
   try {
-    const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "");
-    const isAdmin = (roleTxt.trim().toLowerCase() === "administrador");
-    if (!isAdmin) {
-      alert("Acesso restrito: Consulta de Saldos disponível apenas para Administrador.");
+    const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "").trim().toLowerCase();
+    const podeVerSaldos =
+      roleTxt === "administrador" ||
+      roleTxt === "analista pro";
+
+    if (!podeVerSaldos) {
+      alert("Acesso restrito: Consulta de Saldos disponível apenas para Administrador e Analista Pro.");
       return;
     }
   } catch (_) {}
