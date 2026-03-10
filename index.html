@@ -2694,6 +2694,20 @@ display: none;
 
   <? } ?>
 
+  <? if (String(userEmail || "").trim().toLowerCase() === "rodrigo.lisboa@gruposbf.com.br") { ?>
+
+  <button
+    type="button"
+    onclick="window.vektorOpenBasesVektor()"
+    title="Bases Vektor"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  >
+    <span class="vektor-nav-ico" aria-hidden="true">🗂️</span>
+    <span class="vektor-nav-label">Bases Vektor</span>
+  </button>
+
+<? } ?>
+
 </div>
 
   <!-- Rodapé do menu: Versão do Vektor -->
@@ -5072,6 +5086,76 @@ display: none;
 
 </div>
 
+<!-- VIEW: BASES VEKTOR -->
+<div id="basesVektorView" class="hidden" style="position:absolute; inset:0; z-index:20; display:none;">
+  <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
+    <div style="height:100%; width:100%; display:flex; flex-direction:column; min-height:0; background:#f8fafc;">
+
+      <!-- Header -->
+      <div style="padding:14px 16px; background:#0b1220; border-bottom:1px solid rgba(148,163,184,0.18);">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+          <div style="min-width:260px;">
+            <div style="font-size:18px;font-weight:1000;color:#fff;line-height:1.1;">Bases Vektor</div>
+            <div style="margin-top:5px;font-size:12px;font-weight:800;color:rgba(226,232,240,0.82);">
+              Centralização das planilhas-base utilizadas no sistema.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conteúdo -->
+      <div style="flex:1; overflow:auto; padding:18px 16px; background:#f8fafc;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; align-items:stretch;">
+
+          <!-- Card 1 -->
+          <div style="background:#ffffff; border:2px double #005E27; border-radius:16px; box-shadow:0 10px 22px rgba(0,0,0,0.08); padding:16px; display:flex; flex-direction:column; min-height:180px;">
+            <div style="font-size:16px; font-weight:1000; color:#0f172a; line-height:1.15;">
+              Capta_Clara
+            </div>
+
+            <div style="margin-top:8px; font-size:13px; font-weight:800; color:#475569; line-height:1.4;">
+              Base utilizada no ecossistema do Vektor para suporte às rotinas e consultas do sistema.
+            </div>
+
+            <div style="margin-top:auto; padding-top:16px;">
+              <a
+                href="https://docs.google.com/spreadsheets/d/1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI/edit?gid=827150606#gid=827150606"
+                target="_blank"
+                rel="noopener noreferrer"
+                style="display:inline-flex; align-items:center; justify-content:center; height:38px; padding:0 14px; border-radius:10px; background:#005E27; color:#fff; font-size:12px; font-weight:1000; text-decoration:none;">
+                Abrir planilha
+              </a>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div style="background:#ffffff; border:2px double #005E27; border-radius:16px; box-shadow:0 10px 22px rgba(0,0,0,0.08); padding:16px; display:flex; flex-direction:column; min-height:180px;">
+            <div style="font-size:16px; font-weight:1000; color:#0f172a; line-height:1.15;">
+              Vektor_Info_calibrate
+            </div>
+
+            <div style="margin-top:8px; font-size:13px; font-weight:800; color:#475569; line-height:1.4;">
+              Planilha de apoio utilizada como base complementar para informações e calibração do sistema.
+            </div>
+
+            <div style="margin-top:auto; padding-top:16px;">
+              <a
+                href="https://docs.google.com/spreadsheets/d/18yAuYoAR33JOagqapxgwHh86F1WeD0mZcj9AIJym07k/edit?gid=682207513#gid=682207513"
+                target="_blank"
+                rel="noopener noreferrer"
+                style="display:inline-flex; align-items:center; justify-content:center; height:38px; padding:0 14px; border-radius:10px; background:#005E27; color:#fff; font-size:12px; font-weight:1000; text-decoration:none;">
+                Abrir planilha
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
 <!-- VIEW: CUSTO VERTEX -->
 <div id="vertexCostView" class="hidden" style="position:absolute; inset:0; z-index:20; display:none;">
   <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
@@ -6780,6 +6864,7 @@ window.vektorShowChatView = function () {
   const analiseGastosView = document.getElementById("analiseGastosView");
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
+  const basesVektorView = document.getElementById("basesVektorView");
 
   // fecha outras views
   [
@@ -6792,6 +6877,7 @@ window.vektorShowChatView = function () {
     analiseGastosView,
     consultasAuxView,
     vertexCostView,
+    basesVektorView,
     homeView
   ].forEach(v => {
     if (!v) return;
@@ -6859,9 +6945,10 @@ function vektorShowRadarView_() {
   const cicloResumoView = document.getElementById("cicloResumoView");
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
+  const basesVektorView = document.getElementById("basesVektorView");
 
   // fecha TODAS
-  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
+  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -6890,8 +6977,9 @@ function vektorShowFluxogramaView_() {
   const cicloResumoView = document.getElementById("cicloResumoView");
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
+  const basesVektorView = document.getElementById("basesVektorView");
 
-  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7011,8 +7099,9 @@ function vektorShowEnvioPendenciasView_() {
   const cicloResumoView = document.getElementById("cicloResumoView");
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
+  const basesVektorView = document.getElementById("basesVektorView");
 
-  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7736,8 +7825,9 @@ function vektorShowAnaliseGastosView_() {
   const analiseGastosView = document.getElementById("analiseGastosView");
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
+  const basesVektorView = document.getElementById("basesVektorView");
 
-  [chatView, radarView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7767,6 +7857,7 @@ window.vektorOpenAnaliseGastos = function () {
   const analiseGastosView = document.getElementById("analiseGastosView");
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
+  const basesVektorView = document.getElementById("basesVektorView");
 
   // Esconde todas as outras
   [
@@ -7779,7 +7870,8 @@ window.vektorOpenAnaliseGastos = function () {
     cicloResumoView,
     homeView,
     consultasAuxView,
-    vertexCostView
+    vertexCostView,
+    basesVektorView
   ].forEach(function(v){
     if (!v) return;
     v.classList.add("hidden");
@@ -12669,8 +12761,9 @@ function vektorShowMyAlertsView_() {
   const cicloResumoView = document.getElementById("cicloResumoView");
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
+  const basesVektorView = document.getElementById("basesVektorView");
 
-  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView].forEach(v => {
+  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -12698,7 +12791,8 @@ function vektorShowConsultasAuxView_(){
     "homeView",
     "analiseGastosView",
     "consultasAuxView",
-    "vertexCostView"
+    "vertexCostView",
+    "basesVektorView"
   ];
 
   ids.forEach(function(id){
@@ -12724,6 +12818,49 @@ window.vektorOpenConsultasAuxiliares = function(){
   window.vektorAuxLoadFaturas();     // carrega tabela na abertura
 };
 
+function vektorShowBasesVektorView_(){
+  const ids = [
+    "chatView",
+    "radarView",
+    "feedbackView",
+    "myAlertsView",
+    "fluxogramaView",
+    "envioPendView",
+    "cicloResumoView",
+    "homeView",
+    "analiseGastosView",
+    "consultasAuxView",
+    "vertexCostView",
+    "basesVektorView"
+  ];
+
+  ids.forEach(function(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add("hidden");
+    el.style.display = "none";
+  });
+
+  const v = document.getElementById("basesVektorView");
+  if (v) {
+    v.classList.remove("hidden");
+    v.style.display = "block";
+  }
+
+  const radarView = document.getElementById("radarView");
+  if (radarView) radarView.classList.remove("is-open");
+}
+
+window.vektorOpenBasesVektor = function(){
+  const meuEmail = (typeof USER_EMAIL_REPLACED !== "undefined"
+    ? String(USER_EMAIL_REPLACED || "").trim().toLowerCase()
+    : "");
+
+  if (meuEmail !== "rodrigo.lisboa@gruposbf.com.br") return;
+
+  vektorShowBasesVektorView_();
+};
+
 function vektorShowVertexCostView_(){
   const ids = [
     "chatView",
@@ -12736,7 +12873,8 @@ function vektorShowVertexCostView_(){
     "homeView",
     "analiseGastosView",
     "consultasAuxView",
-    "vertexCostView"
+    "vertexCostView",
+    "basesVektorView"
   ];
 
   ids.forEach(function(id){
@@ -15114,6 +15252,7 @@ window.vektorShowResumoCicloView_ = function () {
   const analiseGastosView = document.getElementById("analiseGastosView");
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
+  const basesVektorView = document.getElementById("basesVektorView");
 
   // ✅ fecha outras views (hidden + display none)
   if (chatView) { chatView.classList.add("hidden"); chatView.style.display = "none"; }
@@ -15125,6 +15264,7 @@ window.vektorShowResumoCicloView_ = function () {
   if (analiseGastosView) { analiseGastosView.classList.add("hidden"); analiseGastosView.style.display = "none"; }
   if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
   if (vertexCostView) { vertexCostView.classList.add("hidden"); vertexCostView.style.display = "none"; }
+  if (basesVektorView) { basesVektorView.classList.add("hidden"); basesVektorView.style.display = "none"; }
 
   // ✅ abre resumo do ciclo
   if (cicloView) {
