@@ -6047,7 +6047,6 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
   var CC_FIXO = "contasareceber@gruposbf.com.br";
   var SENDER_NAME = "Vektor - Grupo SBF";
 
-  // ✅ mapa CE0000 -> e-mails
   var mapEmails = vektorCarregarMapaEmailsLojas_();
 
   function normLojaKey_(lojaRaw) {
@@ -6063,7 +6062,6 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
     return "";
   }
 
-  // agrupa por lojaKey
   var grupos = {};
   rowsSelecionadas.forEach(function (r) {
     var lk = normLojaKey_(r && r.loja);
@@ -6137,32 +6135,43 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
       + '<div><b>Valor total:</b> ' + esc_(fmtBRL_(total)) + '</div>'
       + '</div>';
 
-      var saudacao = vektorSaudacaoPorHora_();
+    var saudacao = vektorSaudacaoPorHora_();
 
-        h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
-          + 'Olá, ' + esc_(String(saudacao || "").toLowerCase()) 
-          + '</div>';
+    h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
+      + 'Olá, ' + esc_(String(saudacao || "").toLowerCase())
+      + '</div>';
 
     var temViagemHosp = false;
     var temOutrosIrreg = false;
+    var temCartaoBloqueado = false;
 
     for (var j = 0; j < rows.length; j++) {
       if (isViagemHosp_(rows[j] || {})) temViagemHosp = true;
       else temOutrosIrreg = true;
-    }
 
-    var trechoFinal = 'Solicitamos que nos informem o motivo da compra para evitar o bloqueio do cartão e categoria da compra.';
-
-    if (temViagemHosp && !temOutrosIrreg) {
-      trechoFinal = 'Precisamos que entrem no site onde efetuaram a compra dessas passagens/hospedagem e realizem o cancelamento.';
-    } else if (temViagemHosp && temOutrosIrreg) {
-      trechoFinal = 'Solicitamos que nos informem o motivo da compra para evitar o bloqueio do cartão e categoria da compra, e para a compra de passagens/hospedagem, precisamos que cancelem no site da operadora.';
+      if (rows[j] && rows[j].cartaoBloqueado === true) temCartaoBloqueado = true;
     }
 
     h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
-      + 'Identificamos que os itens abaixo, comprados com o cartão da Clara, não estão em conformidade com nossa Política de Uso dos Cartões. '
-      + trechoFinal
+      + 'Identificamos que os itens abaixo, comprados com o cartão da Clara, não estão em conformidade com nossa Política de Uso dos Cartões. Solicitamos que nos informem o motivo da compra:'
       + '</div>';
+
+    if (temCartaoBloqueado) {
+      h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
+        + 'Paralelo a isso, por medida de segurança, o cartão está previamente bloqueado, onde o desbloqueio deverá ser solicitado através de chamado no ServiceNow: '
+        + 'Contas a Receber &gt; Cartão Clara &gt; Solicitação de desbloqueio de cartão.'
+        + '</div>';
+    }
+
+    if (temViagemHosp && !temOutrosIrreg) {
+      h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
+        + 'Para os casos de passagens/hospedagem, precisamos que entrem no site onde efetuaram a compra e realizem o cancelamento.'
+        + '</div>';
+    } else if (temViagemHosp && temOutrosIrreg) {
+      h += '<div style="font-size:12px; line-height:1.35; margin-bottom:12px;">'
+        + 'Para os casos de passagens/hospedagem, também precisamos que realizem o cancelamento no site da operadora.'
+        + '</div>';
+    }
 
     h += '<div style="border:1px solid #e2e8f0; border-radius:12px; overflow:hidden;">';
     h += '<table style="width:100%; border-collapse:collapse;">';
@@ -6193,8 +6202,8 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
 
     h += '</tbody></table></div>';
 
-    h += '<div style="height:16px;"></div>'; // 1ª linha de espaçamento
-    h += '<div style="height:16px;"></div>'; // 2ª linha de espaçamento
+    h += '<div style="height:16px;"></div>';
+    h += '<div style="height:16px;"></div>';
 
     h += '<div style="font-size:12px; line-height:1.5; color:#0f172a;">'
       + 'Atenciosamente,<br>'
@@ -6212,7 +6221,6 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
   var erros = [];
 
   lojaKeys.forEach(function (lojaKey) {
-    // ✅ declarar fora do try para o catch conseguir usar sem quebrar
     var pack = [];
     var to = "";
     var cc = [];
@@ -6224,18 +6232,15 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
 
       var info = mapEmails ? mapEmails[lojaKey] : null;
 
-      // gerente (to) + regional (cc) + contasareceber (cc)
       to = info && info.emailGerente ? String(info.emailGerente).trim() : "";
       cc = [];
 
       if (info && info.emailRegional) cc.push(String(info.emailRegional).trim());
       cc.push(CC_FIXO);
 
-      // fallback
       if (!to && info && info.emailRegional) to = String(info.emailRegional).trim();
       if (!to) to = CC_FIXO;
 
-      // limpa duplicados / inválidos
       cc = cc.filter(function (x) { return x && x.indexOf("@") > 0; });
 
       var ccUniq = {};
@@ -6247,15 +6252,11 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
         return true;
       });
 
-      // evita duplicar TO no CC
       cc = cc.filter(function (x) {
         return String(x || "").toLowerCase() !== String(to || "").toLowerCase();
       });
 
       var qtdItens = pack.length;
-      var totalLoja = pack.reduce(function (acc, r) {
-        return acc + (Number((r || {}).valor || 0) || 0);
-      }, 0);
 
       subject = "[ALERTA CLARA | ITENS IRREGULARES] "
         + lojaKey + " | "
@@ -6267,7 +6268,7 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
       GmailApp.sendEmail(to, subject, " ", {
         htmlBody: htmlBody,
         cc: (cc && cc.length ? cc.join(",") : undefined),
-        from: "vektor@gruposbf.com.br",   // precisa existir como “Enviar e-mail como” na conta executora
+        from: "vektor@gruposbf.com.br",
         name: SENDER_NAME,
         replyTo: REPLY_TO
       });
@@ -6297,6 +6298,9 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
             .toLowerCase();
           return /viagem|hosped|hotel|passagem|aere/.test(txt);
         }),
+        temCartaoBloqueado: pack.some(function (r) {
+          return r && r.cartaoBloqueado === true;
+        }),
         assunto: subject,
         status: "SENT",
         error: ""
@@ -6321,6 +6325,9 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
           to: to || "",
           cc: (cc && cc.join) ? cc.join(",") : "",
           temViagemHosp: false,
+          temCartaoBloqueado: packSafe.some(function (r) {
+            return r && r.cartaoBloqueado === true;
+          }),
           assunto: subject || "",
           status: "FAIL",
           error: msgErro
@@ -6346,10 +6353,20 @@ function vektorGetOrCreateItensIrregLogSheet_() {
     sh = ss.insertSheet(VEKTOR_ITENS_IRREG_LOG_TAB);
     sh.appendRow([
       "sentAt","dataEnvioBR","lojaKey","lojaRaw","time","qtdItens","valorTotal",
-      "to","cc","temViagemHosp","assunto","status","error"
+      "to","cc","temViagemHosp","temCartaoBloqueado","assunto","status","error"
     ]);
-    sh.getRange(1,1,1,13).setFontWeight("bold");
+    sh.getRange(1,1,1,14).setFontWeight("bold");
     sh.setFrozenRows(1);
+  } else {
+    var headers = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function(x){
+      return String(x || "").trim();
+    });
+
+    if (headers.indexOf("temCartaoBloqueado") === -1) {
+      sh.insertColumnAfter(10);
+      sh.getRange(1, 11).setValue("temCartaoBloqueado");
+      sh.getRange(1,1,1,sh.getLastColumn()).setFontWeight("bold");
+    }
   }
   return sh;
 }
@@ -6371,6 +6388,7 @@ function vektorLogEnvioItensIrreg_(payload) {
       payload.to || "",
       payload.cc || "",
       payload.temViagemHosp ? "SIM" : "NAO",
+      payload.temCartaoBloqueado ? "SIM" : "NAO",
       payload.assunto || "",
       payload.status || "",
       payload.error || ""
