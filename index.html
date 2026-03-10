@@ -1491,6 +1491,109 @@ display: none;
 }
 
 /* =========================
+   Modal full-screen - Resumo em vídeo
+   ========================= */
+#vektor_videoResumoModal{
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: none;
+}
+#vektor_videoResumoModal.hidden{ display:none !important; }
+
+#vektor_videoResumoBackdrop{
+  position:absolute;
+  inset:0;
+  background: rgba(2,6,23,0.82);
+  backdrop-filter: blur(2px);
+}
+
+#vektor_videoResumoPanel{
+  position:absolute;
+  inset: 16px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #0b1220;
+  border: 1px solid rgba(148,163,184,0.22);
+  box-shadow: 0 28px 70px rgba(0,0,0,0.55);
+  display:flex;
+  flex-direction:column;
+}
+
+#vektor_videoResumoHeader{
+  padding: 12px 14px;
+  background: #061a3a;
+  color: #fff;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+#vektor_videoResumoTitle{
+  font-size: 14px;
+  font-weight: 1100;
+  letter-spacing: 0.2px;
+}
+
+#vektor_videoResumoSub{
+  margin-top:2px;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.9;
+}
+
+#vektor_videoResumoActions{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+#vektor_videoResumoClose{
+  height:36px;
+  width:42px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color:#fff;
+  font-weight:1100;
+  font-size:18px;
+  cursor:pointer;
+}
+
+#vektor_videoResumoClose:hover{
+  background: rgba(255,255,255,0.12);
+}
+
+#vektor_videoResumoBody{
+  flex:1;
+  min-height:0;
+  padding: 16px;
+  background:#0b1220;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:auto;
+}
+
+#vektor_videoResumoFrameWrap{
+  width: min(1400px, 100%);
+  aspect-ratio: 16 / 9;
+  max-height: calc(100vh - 140px);
+
+  border-radius: 14px;
+  overflow: hidden;
+  background:#000;
+  box-shadow: 0 16px 42px rgba(0,0,0,0.45);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* =========================
    STATUS (Estado Operacional) - background blur
    ========================= */
 .vektor-status-card{
@@ -4127,8 +4230,20 @@ display: none;
             overflow:auto; max-height:65vh; background:rgba(226,232,240,0.92);">
 
         <table style="width:100%; border-collapse:separate; border-spacing:0; min-width:1480px;">
-          <thead>
+         <thead>
             <tr>
+              <th
+                style="position:sticky; top:0; z-index:5; text-align:center; padding:10px; width:54px; min-width:54px;
+                      background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Sel.
+              </th>
+
+              <th
+                style="position:sticky; top:0; z-index:5; text-align:center; padding:10px; width:140px; min-width:140px;
+                      background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                Cartão Bloqueado?
+              </th>
+
               <th onclick="window.vektorToggleItensIrregDetSort_('data')"
                   title="Ordenar por Data"
                   style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
@@ -4136,6 +4251,7 @@ display: none;
                         cursor:pointer; user-select:none;">
                 Data ↕
               </th>
+
               <th onclick="window.vektorToggleItensIrregDetSort_('valor')"
                   title="Ordenar por Valor"
                   style="position:sticky; top:0; z-index:5; text-align:right; padding:10px; width:100px; min-width:100px;
@@ -4143,28 +4259,34 @@ display: none;
                         cursor:pointer; user-select:none;">
                 Valor (R$) ↕
               </th>
+
               <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
-                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                        background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Loja
               </th>
+
               <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px; width:180px; min-width:180px;
-                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                        background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Time
               </th>
+
               <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
-                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                        background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Item Comprado
               </th>
+
               <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Estabelecimento
               </th>
+
               <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px;
-                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                        background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Conformidade
               </th>
+
               <th style="position:sticky; top:0; z-index:5; text-align:left; padding:10px; width:320px; min-width:320px;
-                         background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
+                        background:rgba(15,23,42,0.96); color:#fff; font-size:12px; font-weight:1000;">
                 Motivo
               </th>
             </tr>
@@ -5150,13 +5272,19 @@ display: none;
         </div>
 
         <!-- Ações do header (direita) -->
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button"
-                  onclick="vektorOpenFluxogramaDetalhado_()"
-                  style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(181,255,32,0.45); background:rgba(2,6,23,0.35); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
-            Ver Ecossistema
-          </button>
-        </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <button type="button"
+                    onclick="vektorOpenResumoVideo_()"
+                    style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(181,255,32,0.45); background:rgba(2,6,23,0.35); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
+              Vektor - Resumo em vídeo
+            </button>
+
+            <button type="button"
+                    onclick="vektorOpenFluxogramaDetalhado_()"
+                    style="height:36px; padding:0 12px; border-radius:10px; border:1px solid rgba(181,255,32,0.45); background:rgba(2,6,23,0.35); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
+              Ver Ecossistema
+            </button>
+          </div>
 
       </div>
 
@@ -5324,6 +5452,41 @@ display: none;
               box-shadow:0 16px 42px rgba(0,0,0,0.45);
             "
           />
+    </div>
+  </div>
+</div>
+
+<!-- Modal full-screen: Resumo em vídeo -->
+<div id="vektor_videoResumoModal" class="hidden" aria-hidden="true">
+  <div id="vektor_videoResumoBackdrop"></div>
+
+  <div id="vektor_videoResumoPanel" role="dialog" aria-modal="true">
+    <div id="vektor_videoResumoHeader">
+      <div>
+        <div id="vektor_videoResumoTitle">Vektor - Resumo em vídeo</div>
+        <div id="vektor_videoResumoSub">Resumo executivo do ecossistema Vektor.</div>
+      </div>
+
+      <div id="vektor_videoResumoActions">
+        <button id="vektor_videoResumoClose"
+                type="button"
+                onclick="vektorCloseResumoVideo_()"
+                title="Fechar">×</button>
+      </div>
+    </div>
+
+    <div id="vektor_videoResumoBody">
+      <div id="vektor_videoResumoFrameWrap">
+        <iframe
+          id="vektor_videoResumoFrame"
+          title="Vektor - Resumo em vídeo"
+          src=""
+          allow="autoplay; fullscreen"
+          allowfullscreen
+          referrerpolicy="no-referrer-when-downgrade"
+          style="width:100%; height:100%; border:0; background:#000;"
+        ></iframe>
+      </div>
     </div>
   </div>
 </div>
@@ -6781,6 +6944,53 @@ function vektorCloseFluxogramaDetalhado_(){
     if (ev && ev.key === "Escape") {
       const m = document.getElementById("vektor_fluxoDetModal");
       if (m && !m.classList.contains("hidden")) vektorCloseFluxogramaDetalhado_();
+    }
+  });
+})();
+
+function vektorOpenResumoVideo_(){
+  const m = document.getElementById("vektor_videoResumoModal");
+  const f = document.getElementById("vektor_videoResumoFrame");
+  if (!m || !f) return;
+
+  // URL correta para embed/preview do Google Drive
+  f.src = "https://drive.google.com/file/d/1jG4y2CBNsNv38W-tMc4ZJgIHPFN8lCdv/preview";
+
+  m.classList.remove("hidden");
+  m.style.display = "block";
+  m.setAttribute("aria-hidden", "false");
+}
+
+function vektorCloseResumoVideo_(){
+  const m = document.getElementById("vektor_videoResumoModal");
+  const f = document.getElementById("vektor_videoResumoFrame");
+  if (!m) return;
+
+  m.classList.add("hidden");
+  m.style.display = "none";
+  m.setAttribute("aria-hidden", "true");
+
+  // limpa o src para parar o vídeo/áudio ao fechar
+  if (f) f.src = "";
+}
+
+// backdrop fecha
+(function bindResumoVideoBackdropOnce_(){
+  const b = document.getElementById("vektor_videoResumoBackdrop");
+  if (!b || b.__bound) return;
+  b.__bound = true;
+  b.addEventListener("click", function(){ vektorCloseResumoVideo_(); });
+})();
+
+// ESC fecha
+(function bindResumoVideoEscOnce_(){
+  if (window.__vektorResumoVideoEscBound) return;
+  window.__vektorResumoVideoEscBound = true;
+
+  document.addEventListener("keydown", function(ev){
+    if (ev && ev.key === "Escape") {
+      const m = document.getElementById("vektor_videoResumoModal");
+      if (m && !m.classList.contains("hidden")) vektorCloseResumoVideo_();
     }
   });
 })();
@@ -11407,6 +11617,22 @@ window.vektorLoadRadarItensIrregulares = function() {
 // =====================================================
 // MODAL — Detalhamento Itens Irregulares (Radar)
 // =====================================================
+window.__itensIrregDetSel = window.__itensIrregDetSel || {};
+window.__itensIrregDetBloq = window.__itensIrregDetBloq || {};
+
+window.vektorItensIrregMakeRowKey_ = function (r) {
+  r = r || {};
+  return [
+    String(r.dataTxt || r.data || "").trim(),
+    String(r.loja || "").trim(),
+    String(r.time || "").trim(),
+    String(r.estabelecimento || "").trim(),
+    String(r.item || "").trim(),
+    String(Number(r.valor || 0)).trim(),
+    String(r.motivo || "").trim()
+  ].join("¦");
+};
+
 window.vektorOpenItensIrregDetalhamentoModal = function () {
   const m = document.getElementById("itensIrregDetalhamentoModal");
   if (!m) return;
@@ -11622,19 +11848,17 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
 
   const baseRowsRaw = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
 
-  // ✅ cria índice estável p/ checkbox (não quebra com filtros)
+  // índice estável p/ seleção principal
   const baseRows = baseRowsRaw.map((r, i) => Object.assign({}, r, { __baseIdx: i }));
 
-  // ✅ lê filtros do modal
   const selLojaEl = document.getElementById("itensIrregDetFiltroLoja");
   const selTimeEl = document.getElementById("itensIrregDetFiltroTime");
   const selLoja = selLojaEl ? String(selLojaEl.value || "").trim() : "";
   const selTime = selTimeEl ? String(selTimeEl.value || "").trim() : "";
 
-  // ✅ aplica filtros (local, sem backend)
   let rows = baseRows.slice();
 
-  // Ordena por data mais recente -> mais antiga (dd/MM/yyyy)
+  // ordenação base por data desc
   rows.sort(function(a, b){
     function toTs_(s){
       const m = String(s || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -11644,59 +11868,51 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
     const ta = toTs_(a.dataTxt || a.data || "");
     const tb = toTs_(b.dataTxt || b.data || "");
     if (tb !== ta) return tb - ta;
-
-    // desempate por valor (maior primeiro)
     return (Number(b.valor || 0) - Number(a.valor || 0));
   });
 
   if (selLoja) rows = rows.filter(r => String(r.loja || "").trim() === selLoja);
   if (selTime) rows = rows.filter(r => String(r.time || "").trim() === selTime);
 
-  // ✅ ordenação local (Data / Valor)
-function parseBRDateToTs_(s) {
-  s = String(s || "").trim();
-  // dd/MM/yyyy
-  var m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (m) {
-    var d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 0, 0, 0, 0);
-    return isNaN(d.getTime()) ? 0 : d.getTime();
-  }
-  // fallback
-  var d2 = new Date(s);
-  return isNaN(d2.getTime()) ? 0 : d2.getTime();
-}
-
-const sortCfg = window.__itensIrregDetSort || { key: "data", dir: "desc" };
-const sortKey = String(sortCfg.key || "data").toLowerCase();
-const sortDir = (String(sortCfg.dir || "desc").toLowerCase() === "asc") ? 1 : -1;
-
-rows.sort(function(a, b){
-  var av = 0, bv = 0;
-
-  if (sortKey === "valor") {
-    av = Number(a && a.valor || 0);
-    bv = Number(b && b.valor || 0);
-  } else {
-    // padrão = data
-    av = parseBRDateToTs_(a && a.dataTxt);
-    bv = parseBRDateToTs_(b && b.dataTxt);
+  function parseBRDateToTs_(s) {
+    s = String(s || "").trim();
+    var m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (m) {
+      var d = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 0, 0, 0, 0);
+      return isNaN(d.getTime()) ? 0 : d.getTime();
+    }
+    var d2 = new Date(s);
+    return isNaN(d2.getTime()) ? 0 : d2.getTime();
   }
 
-  if (av < bv) return -1 * sortDir;
-  if (av > bv) return  1 * sortDir;
+  const sortCfg = window.__itensIrregDetSort || { key: "data", dir: "desc" };
+  const sortKey = String(sortCfg.key || "data").toLowerCase();
+  const sortDir = (String(sortCfg.dir || "desc").toLowerCase() === "asc") ? 1 : -1;
 
-  // desempate estável: valor desc
-  var av2 = Number(a && a.valor || 0);
-  var bv2 = Number(b && b.valor || 0);
-  if (av2 < bv2) return 1;
-  if (av2 > bv2) return -1;
-  return 0;
-});
+  rows.sort(function(a, b){
+    var av = 0, bv = 0;
+
+    if (sortKey === "valor") {
+      av = Number(a && a.valor || 0);
+      bv = Number(b && b.valor || 0);
+    } else {
+      av = parseBRDateToTs_(a && a.dataTxt);
+      bv = parseBRDateToTs_(b && b.dataTxt);
+    }
+
+    if (av < bv) return -1 * sortDir;
+    if (av > bv) return  1 * sortDir;
+
+    var av2 = Number(a && a.valor || 0);
+    var bv2 = Number(b && b.valor || 0);
+    if (av2 < bv2) return 1;
+    if (av2 > bv2) return -1;
+    return 0;
+  });
 
   const fmtBRL = (v) =>
     Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  // ✅ badge igual ao do sistema (ALERTA/OK/REVISAR)
   const badge = (c) => {
     const x = String(c || "").toUpperCase();
     let bg = "rgba(255,255,255,0.06)", bd = "rgba(148,163,184,0.25)", tx = "rgba(226,232,240,0.95)";
@@ -11710,7 +11926,7 @@ rows.sort(function(a, b){
   if (!rows.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="8" style="padding:12px; color:rgba(15,23,42,0.75); font-weight:900; font-size:12px;">
+        <td colspan="9" style="padding:12px; color:rgba(15,23,42,0.75); font-weight:900; font-size:12px;">
           Sem itens para os filtros selecionados.
         </td>
       </tr>`;
@@ -11725,39 +11941,55 @@ rows.sort(function(a, b){
     const bg = (idx % 2 === 0) ? "rgba(226,232,240,0.92)" : "rgba(226,232,240,0.82)";
     const td = (extra) => `${tdBase} background:${bg}; ${extra || ""}`;
 
-    // ✅ checkbox dentro da 1ª coluna (Data), sem criar coluna nova
-    const checked = (window.__itensIrregDetSel && window.__itensIrregDetSel[r.__baseIdx]) ? "checked" : "";
+    const checkedMain = (window.__itensIrregDetSel && window.__itensIrregDetSel[r.__baseIdx]) ? "checked" : "";
+    const rowKey = window.vektorItensIrregMakeRowKey_(r);
+    const checkedBloq = (window.__itensIrregDetBloq && window.__itensIrregDetBloq[rowKey]) ? "checked" : "";
 
     return `
       <tr>
-        <td style="${td()}">
+        <td style="${td("text-align:center; width:54px; min-width:54px;")}">
           <input type="checkbox"
             class="itensIrregDetChk"
             data-base-idx="${r.__baseIdx}"
-            ${checked}
-            style="width:14px; height:14px; margin-right:10px; vertical-align:middle; cursor:pointer;" />
-          <span style="vertical-align:middle;">${r.dataTxt || "—"}</span>
+            ${checkedMain}
+            style="width:14px; height:14px; cursor:pointer;" />
         </td>
 
+        <td style="${td("text-align:center; width:140px; min-width:140px;")}">
+          <input type="checkbox"
+            class="itensIrregDetChkBloq"
+            data-row-key="${rowKey.replace(/"/g, "&quot;")}"
+            ${checkedBloq}
+            style="width:14px; height:14px; cursor:pointer;" />
+        </td>
+
+        <td style="${td("white-space:nowrap;")}">${r.dataTxt || "—"}</td>
         <td style="${td("text-align:right; font-weight:1000; width:100px; min-width:100px;")}">${fmtBRL(r.valor)}</td>
         <td style="${td("font-weight:1000;")}">${r.loja || "—"}</td>
         <td style="${td("font-weight:900; width:180px; min-width:180px;")}">${r.time || "—"}</td>
         <td style="${td("font-weight:900;")}">${r.item || "—"}</td>
-        <td style="${td("font-weight:900; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")}">${r.estabelecimento || "—"}
-</td>
+        <td style="${td("font-weight:900; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;")}">${r.estabelecimento || "—"}</td>
         <td style="${td("font-weight:1000;")}">${badge(r.conformidade || r.status || "")}</td>
         <td style="${td("border-right:none; font-weight:900; color:rgba(15,23,42,0.82); width:320px; min-width:320px;")}">${r.motivo || "—"}</td>
       </tr>
     `;
   }).join("");
 
-  // ✅ persiste seleção ao clicar
   tbody.querySelectorAll('input.itensIrregDetChk').forEach(chk => {
     chk.onchange = function () {
       const bi = Number(this.getAttribute("data-base-idx"));
       window.__itensIrregDetSel = window.__itensIrregDetSel || {};
       if (this.checked) window.__itensIrregDetSel[bi] = true;
       else delete window.__itensIrregDetSel[bi];
+    };
+  });
+
+  tbody.querySelectorAll('input.itensIrregDetChkBloq').forEach(chk => {
+    chk.onchange = function () {
+      const k = String(this.getAttribute("data-row-key") || "");
+      window.__itensIrregDetBloq = window.__itensIrregDetBloq || {};
+      if (this.checked) window.__itensIrregDetBloq[k] = true;
+      else delete window.__itensIrregDetBloq[k];
     };
   });
 };
@@ -11790,6 +12022,7 @@ window.vektorItensIrregDetDeselectAll_ = function () {
 window.vektorEnviarNotificacaoItensIrregularesSelecionados_ = function () {
   const baseRows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
   const selMap = window.__itensIrregDetSel || {};
+  const bloqMap = window.__itensIrregDetBloq || {};
 
   const idxs = Object.keys(selMap).map(n => Number(n)).filter(n => Number.isFinite(n));
   if (!idxs.length) {
@@ -11800,18 +12033,21 @@ window.vektorEnviarNotificacaoItensIrregularesSelecionados_ = function () {
   const selected = idxs
     .map(i => baseRows[i])
     .filter(Boolean)
-    .map(r => ({
-      dataTxt: r.dataTxt || "",
-      valor: r.valor || 0,
-      loja: r.loja || "",
-      time: r.time || "",
-      estabelecimento: r.estabelecimento || "",
-      item: r.item || "",
-      conformidade: (r.conformidade || r.status || ""),
-      motivo: r.motivo || ""
-    }));
+    .map(r => {
+      const rowKey = window.vektorItensIrregMakeRowKey_(r);
+      return {
+        dataTxt: r.dataTxt || "",
+        valor: r.valor || 0,
+        loja: r.loja || "",
+        time: r.time || "",
+        estabelecimento: r.estabelecimento || "",
+        item: r.item || "",
+        conformidade: (r.conformidade || r.status || ""),
+        motivo: r.motivo || "",
+        cartaoBloqueado: !!bloqMap[rowKey]
+      };
+    });
 
-  // loading padrão do Vektor (já existe no seu projeto)
   try {
     window.vektorGlobalLoadingShow_(
       "Enviando Notificações…",
@@ -11828,9 +12064,9 @@ window.vektorEnviarNotificacaoItensIrregularesSelecionados_ = function () {
         return;
       }
 
-      // ✅ limpa seleção após sucesso (evita reenvio acidental / “spam”)
       window.__itensIrregDetSel = {};
-      // re-render para desmarcar visualmente
+      window.__itensIrregDetBloq = {};
+
       try { window.vektorRenderItensIrregDetalhamentoFromCache_(); } catch (e) {}
 
       alert("Emails enviados com sucesso.");
