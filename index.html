@@ -7836,12 +7836,12 @@ window.vektorOpenAnaliseGastos = function () {
     console.error("Erro ao resetar visual da Análise de Gastos:", e);
   }
 
-  // ✅ Carrega SOMENTE meta/filtros (ACL), sem buscar dataset
-  try {
-    vektorAnaliseGastosEnsureMeta_(function(){}, { silent: true });
-  } catch (e) {
-    console.error("Erro ao carregar meta da Análise de Gastos:", e);
-  }
+// ✅ Carrega SOMENTE meta/filtros (ACL), sem buscar dataset
+try {
+  vektorAnaliseGastosEnsureMeta_(function(){}, { silent: true });
+} catch (e) {
+  console.error("Erro ao carregar meta da Análise de Gastos:", e);
+}
 };
 
 let __analiseGastos_inited = false;
@@ -7855,12 +7855,41 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
   opts = opts || {};
   var silent = !!opts.silent;
 
+  // Se já existe uma chamada em andamento, só espera ela terminar
+  if (window.__analiseGastosMetaLoading) {
+    var tries = 0;
+    var t = setInterval(function(){
+      tries++;
+
+      if (window.__analiseGastosMeta && window.__analiseGastosMeta.ok) {
+        clearInterval(t);
+        try { cb && cb(); } catch(_) {}
+        return;
+      }
+
+      if (!window.__analiseGastosMetaLoading) {
+        clearInterval(t);
+        try { cb && cb(); } catch(_) {}
+        return;
+      }
+
+      if (tries >= 100) { // ~12s
+        clearInterval(t);
+      }
+    }, 120);
+    return;
+  }
+
+  window.__analiseGastosMetaLoading = true;
+
   if (!silent) {
     vektorAnaliseGastosSetBusy_(true, "Carregando filtros…", "Respeitando permissões do usuário");
   }
 
   google.script.run
     .withSuccessHandler(function(res){
+      window.__analiseGastosMetaLoading = false;
+
       if (!silent) vektorAnaliseGastosSetBusy_(false);
 
       if (!res || !res.ok) {
@@ -7891,6 +7920,8 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
       try { cb && cb(); } catch(_) {}
     })
     .withFailureHandler(function(err){
+      window.__analiseGastosMetaLoading = false;
+
       if (!silent) vektorAnaliseGastosSetBusy_(false);
 
       const tb = document.getElementById("analiseGastos_tbody");
