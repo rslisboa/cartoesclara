@@ -16174,7 +16174,7 @@ function getAnaliseGastosMeta(){
 
     if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
 
-    // null => admin (vê tudo); array => lojas permitidas (LojaNorm numérica da aba Emails)
+    // null => admin (vê tudo); array => lojas permitidas
     var allowedLojas = vektorGetAllowedLojasFromEmails_(email);
 
     var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
@@ -16182,100 +16182,157 @@ function getAnaliseGastosMeta(){
     if (!sh) throw new Error('Aba "BaseClara" não encontrada.');
 
     var lastRow = sh.getLastRow();
-    var lastCol = sh.getLastColumn();
     if (lastRow < 2) {
-      return { ok: true, lojas: [], times: [], categorias: [], combos: [] };
+      return {
+        ok: true,
+        lojas: [],
+        times: [],
+        categorias: [],
+        combos: [],
+        anos: [],
+        mesesPorAno: {}
+      };
     }
 
-    var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+    // Lê só A:V (22 colunas), que já contém tudo que os filtros precisam
+    var values = sh.getRange(2, 1, lastRow - 1, 22).getValues();
 
-    // =========================
-    // ÍNDICES FIXOS (0-based) — BaseClara
-    // =========================
-    var iLojaAlias  = 7;   // H - Alias do Cartão (opcional exibição)
-    var iCategoria  = 13;  // N - Categoria da Compra
-    var iTime       = 17;  // R - Grupos (Time)
-    var iLojaNum    = 21;  // V - LojaNum (somente número) ✅ ACL/Filtro
-    var iData       = 0;   // A - Data da Transação ✅ para Ano/Mês
+    // índices locais dentro de A:V (0-based)
+    var iData      = 0;   // A
+    var iLojaAlias = 7;   // H
+    var iCategoria = 13;  // N
+    var iTime      = 17;  // R
+    var iLojaNum   = 21;  // V
 
     var lojasSet = {};
     var timesSet = {};
     var catsSet  = {};
-    var comboMap = {}; // chave única time|loja|categoria
-
+    var comboMap = {};
     var anosSet = {};
-var mesesPorAnoMap = {}; // { "2026": { "01":true, "02":true } }
+    var mesesPorAnoMap = {};
 
-function toISODateMeta_(v){
-  if (v instanceof Date) {
-    var y = v.getFullYear();
-    var m = String(v.getMonth() + 1).padStart(2, "0");
-    var d = String(v.getDate()).padStart(2, "0");
-    return y + "-" + m + "-" + d;
-  }
-  var s = String(v || "").trim();
-  if (!s) return "";
+    var allowedSet = null;
+    if (Array.isArray(allowedLojas)) {
+      allowedSet = {};
+      allowedLojas.forEach(function(x){
+        var n = normalizarLojaNumero_(x);
+        if (n != null) {
+          allowedSet[String(n)] = true;
+          allowedSet[String(n).padStart(4, "0")] = true;
+        }
+      });
+    }
 
-  var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // dd/mm/yyyy
-  if (m1) return m1[3] + "-" + m1[2] + "-" + m1[1];
+    function toISODateMeta_(v){
+      if (v instanceof Date) {
+        var y = v.getFullYear();
+        var m = String(v.getMonth() + 1).padStart(2, "0");
+        var d = String(v.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + d;
+      }
 
-  var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);   // yyyy-mm-dd
-  if (m2) return s;
+      var s = String(v || "").trim();
+      if (!s) return "";
 
-  return "";
-}
+      var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+      if (m1) return m1[3] + "-" + m1[2] + "-" + m1[1];
 
-    values.forEach(function(row){
+      var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) return s;
+
+      return "";
+    }
+
+    function lojaLabelMeta_(lojaNum, lojaAlias){
+      var num = String(lojaNum || "").replace(/\D/g, "");
+      if (!num) return "";
+      var num4 = num.padStart(4, "0");
+      var alias = String(lojaAlias || "").trim();
+      return alias ? (num4 + " - " + alias) : num4;
+    }
+
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+
       var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
-      if (!lojaNum) return;
-      lojaNum = String(lojaNum);
+      if (lojaNum == null) continue;
 
-      // ACL (não-admin)
-      if (Array.isArray(allowedLojas)) {
-        if (allowedLojas.indexOf(lojaNum) < 0) return;
+      if (allowedSet && !allowedSet[String(lojaNum)] && !allowedSet[String(lojaNum).padStart(4, "0")]) {
+        continue;
       }
 
-      var dataISO = toISODateMeta_(row[iData]);
-      if (dataISO) {
-        var ano = String(dataISO).slice(0, 4);
-        var mes = String(dataISO).slice(5, 7);
-        anosSet[ano] = true;
-        if (!mesesPorAnoMap[ano]) mesesPorAnoMap[ano] = {};
-        mesesPorAnoMap[ano][mes] = true;
-      }
-
+      var lojaAlias = String(row[iLojaAlias] || "").trim();
+      var categoria = String(row[iCategoria] || "").trim();
       var time = String(row[iTime] || "").trim();
-      if (!time) time = "N/D";
+      var dataIso = toISODateMeta_(row[iData]);
 
-      var cat = String(row[iCategoria] || "").trim();
-      if (!cat) cat = "Sem categoria";
+      var lojaLabel = lojaLabelMeta_(lojaNum, lojaAlias);
 
-      // filtro Loja exibirá LojaNum (número)
-      lojasSet[lojaNum] = true;
-      timesSet[time] = true;
-      catsSet[cat] = true;
+      if (lojaLabel) lojasSet[lojaLabel] = true;
+      if (time) timesSet[time] = true;
+      if (categoria) catsSet[categoria] = true;
 
-      var k = [time, lojaNum, cat].join("¦");
-      if (!comboMap[k]) {
-        comboMap[k] = {
-          time: time,
-          loja: lojaNum,
-          categoria: cat
-        };
+      var comboKey = [time || "", lojaLabel || "", categoria || ""].join("¦");
+      comboMap[comboKey] = {
+        time: time || "",
+        loja: lojaLabel || "",
+        categoria: categoria || ""
+      };
+
+      if (dataIso) {
+        var ano = dataIso.slice(0, 4);
+        var mes = dataIso.slice(5, 7);
+
+        if (ano && /^\d{4}$/.test(ano)) {
+          anosSet[ano] = true;
+          if (!mesesPorAnoMap[ano]) mesesPorAnoMap[ano] = {};
+          if (mes && /^\d{2}$/.test(mes)) mesesPorAnoMap[ano][mes] = true;
+        }
       }
+    }
+
+    var lojas = Object.keys(lojasSet).sort(function(a, b){
+      var na = Number(String(a).split(" - ")[0].replace(/\D/g, "")) || 0;
+      var nb = Number(String(b).split(" - ")[0].replace(/\D/g, "")) || 0;
+      return na - nb;
+    });
+
+    var times = Object.keys(timesSet).sort();
+    var categorias = Object.keys(catsSet).sort();
+
+    var combos = Object.keys(comboMap).map(function(k){
+      return comboMap[k];
+    }).sort(function(a, b){
+      var ta = String(a.time || "");
+      var tb = String(b.time || "");
+      if (ta !== tb) return ta.localeCompare(tb, "pt-BR");
+
+      var la = String(a.loja || "");
+      var lb = String(b.loja || "");
+      if (la !== lb) return la.localeCompare(lb, "pt-BR");
+
+      return String(a.categoria || "").localeCompare(String(b.categoria || ""), "pt-BR");
+    });
+
+    var anos = Object.keys(anosSet).sort(function(a,b){
+      return Number(a) - Number(b);
+    });
+
+    var mesesPorAno = {};
+    Object.keys(mesesPorAnoMap).forEach(function(ano){
+      mesesPorAno[ano] = Object.keys(mesesPorAnoMap[ano]).sort(function(a,b){
+        return Number(a) - Number(b);
+      });
     });
 
     return {
       ok: true,
-      lojas: Object.keys(lojasSet).sort(function(a,b){ return Number(a) - Number(b); }),
-      times: Object.keys(timesSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
-      categorias: Object.keys(catsSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
-      combos: Object.keys(comboMap).map(function(k){ return comboMap[k]; }),
-      anos: Object.keys(anosSet).sort(function(a,b){ return Number(a) - Number(b); }),
-      mesesPorAno: Object.keys(mesesPorAnoMap).reduce(function(acc, ano){
-        acc[ano] = Object.keys(mesesPorAnoMap[ano]).sort(function(a,b){ return Number(a) - Number(b); });
-        return acc;
-      }, {})
+      lojas: lojas,
+      times: times,
+      categorias: categorias,
+      combos: combos,
+      anos: anos,
+      mesesPorAno: mesesPorAno
     };
 
   } catch (e) {
