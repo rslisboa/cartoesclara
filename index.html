@@ -32558,8 +32558,8 @@ if (isCmdLojasOfensoras) {
           renderBotMessage(
             "HTML:" +
               "<div>" +
-                "<div style='font-size:10px; line-height:1.1; color:#94a3b8; font-weight:500; margin-bottom:7px; letter-spacing:.2px; text-transform:uppercase;'>" +
-                  vektorSafe_(sig || "gemini-2.5-flash") +
+                "<div style='font-size:10px; line-height:1.1; color:#94a3b8; font-weight:500; margin-bottom:7px; letter-spacing:.2px; text-transform:none;'>" +
+                  "AI generated | gemini-2.5-flash" +
                 "</div>" +
                 "<div class='text-sm text-slate-800 whitespace-pre-line'>" +
                   vektorSafe_(body || "") +
@@ -32576,7 +32576,50 @@ if (isCmdLojasOfensoras) {
             "</p>"
           );
         })
-        .vektorPolicyAssistantAsk(texto, []);
+        window.__vektorPolicyHistory = window.__vektorPolicyHistory || [];
+window.__vektorPolicyHistory.push({ role: "user", text: String(texto || "") });
+
+var hist = window.__vektorPolicyHistory.slice(-4);
+
+google.script.run
+  .withSuccessHandler(function(res){
+    if (!res || !res.ok) {
+      renderBotMessage(
+        "HTML:<p class='text-sm text-red-700'><b>Falha ao consultar a política:</b> " +
+        (res && res.error ? vektorSafe_(res.error) : "erro desconhecido") +
+        "</p>"
+      );
+      return;
+    }
+
+    var full = String(res.answer || "");
+    var firstNl = full.indexOf("\n");
+    var sig = (firstNl > 0) ? full.slice(0, firstNl).trim() : "";
+    var body = (firstNl > 0) ? full.slice(firstNl + 1) : full;
+
+    renderBotMessage(
+      "HTML:" +
+        "<div>" +
+          "<div style='font-size:10px; line-height:1.1; color:#94a3b8; font-weight:500; margin-bottom:7px; letter-spacing:.2px; text-transform:none;'>" +
+            "AI generated | gemini-2.5-flash" +
+          "</div>" +
+          "<div class='text-sm text-slate-800 whitespace-pre-line'>" +
+            vektorSafe_(body || "") +
+          "</div>" +
+        "</div>"
+    );
+
+    window.__vektorPolicyHistory.push({ role: "assistant", text: String(res.answer || "") });
+  })
+  .withFailureHandler(function(err){
+    const msg = (err && err.message) ? err.message : JSON.stringify(err);
+    renderBotMessage(
+      "HTML:<p class='text-sm text-red-700'><b>Erro ao chamar IA:</b> " +
+      vektorSafe_(msg) +
+      "</p>"
+    );
+  })
+  .vektorPolicyAssistantAsk(texto, hist);
 
       return;
     }
