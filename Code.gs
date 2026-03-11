@@ -5102,7 +5102,7 @@ function vektorGetOrCreateEnvPendLogSheet_() {
   if (!sh) {
     sh = ss.insertSheet(VEKTOR_ENV_PEND_LOG_TAB);
     sh.appendRow(["sentAt", "txKey", "lojaKey", "dataTransBR", "valorOriginalTxt", "cartao", "codigoAutorizacao", "estabelecimento", "pendenciasTxt", "to", "cc", "status", "error"]);
-    sh.getRange(1, 1, 1, 12).setFontWeight("bold");
+    sh.getRange(1, 1, 1, 13).setFontWeight("bold");
     sh.setFrozenRows(1);
   }
   return sh;
@@ -5169,6 +5169,197 @@ function vektorLogEnvioPendencia_(payload) {
   } catch (e) {
     Logger.log("Falha ao logar envio pendência: " + (e && e.message ? e.message : e));
   }
+}
+
+function vektorGetHistoricoEnviosPendenciasResumo() {
+  vektorAssertFunctionAllowed_("vektorGetHistoricoEnviosPendenciasResumo");
+
+  var sh = vektorGetOrCreateEnvPendLogSheet_();
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var lastRow = sh.getLastRow();
+
+  function parseMoneyPtBr_(v) {
+    if (v === null || v === undefined || v === "") return 0;
+    if (typeof v === "number") return isNaN(v) ? 0 : v;
+
+    var s = String(v).trim();
+    s = s.replace(/\s/g, "");
+    s = s.replace(/R\$/gi, "");
+    s = s.replace(/\./g, "");
+    s = s.replace(/,/g, ".");
+    var n = Number(s);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function parseSentAtSafe_(v) {
+    if (v instanceof Date) return v;
+
+    var s = String(v || "").trim();
+    if (!s) return null;
+
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (m) {
+      var d1 = new Date(
+        Number(m[1]),
+        Number(m[2]) - 1,
+        Number(m[3]),
+        Number(m[4] || 0),
+        Number(m[5] || 0),
+        Number(m[6] || 0)
+      );
+      return isNaN(d1.getTime()) ? null : d1;
+    }
+
+    var d2 = new Date(s);
+    return isNaN(d2.getTime()) ? null : d2;
+  }
+
+  function monthKey_(d) {
+    return Utilities.formatDate(d, tz, "yyyy-MM");
+  }
+
+  function dayKey_(d) {
+    return Utilities.formatDate(d, tz, "yyyy-MM-dd");
+  }
+
+  var now = new Date();
+  var monthSeeds = [];
+  var monthMap = {};
+
+  for (var k = 5; k >= 0; k--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - k, 1);
+    var ym = Utilities.formatDate(d, tz, "yyyy-MM");
+    var rec = {
+      ym: ym,
+      label: Utilities.formatDate(d, tz, "MM/yyyy"),
+      qtd: 0,
+      daysMap: {}
+    };
+    monthSeeds.push(rec);
+    monthMap[ym] = rec;
+  }
+
+  if (lastRow < 2) {
+    return {
+      ok: true,
+      lastSentAt: "",
+      lastSentAtBr: "",
+      months: monthSeeds.map(function(m){
+        return { ym: m.ym, label: m.label, qtd: 0, days: [] };
+      })
+    };
+  }
+
+  var numRows = lastRow - 1;
+
+  // Lê só as colunas necessárias:
+  // A = sentAt
+  // C = lojaKey
+  // E = valorOriginalTxt
+  // L = status
+  var sentAtCol = sh.getRange(2, 1, numRows, 1).getValues();   // A
+  var lojaCol   = sh.getRange(2, 3, numRows, 1).getValues();   // C
+  var valorCol  = sh.getRange(2, 5, numRows, 1).getValues();   // E
+  var statusCol = sh.getRange(2, 12, numRows, 1).getValues();  // L
+
+  var cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  cutoff.setHours(0, 0, 0, 0);
+
+  var lastSent = null;
+  var achouDentroJanela = false;
+
+  // percorre de baixo para cima, porque o log cresce por appendRow
+  for (var i = numRows - 1; i >= 0; i--) {
+    var status = String((statusCol[i] && statusCol[i][0]) || "").trim().toUpperCase();
+    if (status !== "SENT") continue;
+
+    var dt = parseSentAtSafe_((sentAtCol[i] && sentAtCol[i][0]) || "");
+    if (!dt) continue;
+
+    if (!lastSent) {
+      lastSent = dt;
+    }
+
+    // assim que já encontramos envios dentro da janela,
+    // e passamos para datas anteriores ao corte, podemos parar
+    if (dt < cutoff) {
+      if (achouDentroJanela) break;
+      continue;
+    }
+
+    achouDentroJanela = true;
+
+    var ym = monthKey_(dt);
+    var bucket = monthMap[ym];
+    if (!bucket) continue;
+
+    bucket.qtd++;
+
+    var dk = dayKey_(dt);
+    if (!bucket.daysMap[dk]) {
+      bucket.daysMap[dk] = {
+        dia: dk,
+        diaBr: Utilities.formatDate(dt, tz, "dd/MM"),
+        qtd: 0,
+        valorTotal: 0,
+        lojasMap: {}
+      };
+    }
+
+    var day = bucket.daysMap[dk];
+    day.qtd++;
+    day.valorTotal += parseMoneyPtBr_((valorCol[i] && valorCol[i][0]) || 0);
+
+    var loja = String((lojaCol[i] && lojaCol[i][0]) || "").trim();
+    if (loja) day.lojasMap[loja] = true;
+  }
+
+  var months = monthSeeds.map(function(m){
+    var days = Object.keys(m.daysMap)
+      .sort()
+      .map(function(k){
+        var d = m.daysMap[k];
+        return {
+          dia: d.dia,
+          diaBr: d.diaBr,
+          qtd: d.qtd,
+          valorTotal: Number(d.valorTotal || 0),
+          lojas: Object.keys(d.lojasMap).sort()
+        };
+      });
+
+    return {
+      ym: m.ym,
+      label: m.label,
+      qtd: m.qtd,
+      days: days
+    };
+  });
+
+  return {
+    ok: true,
+    lastSentAt: lastSent ? Utilities.formatDate(lastSent, tz, "yyyy-MM-dd HH:mm:ss") : "",
+    lastSentAtBr: lastSent ? Utilities.formatDate(lastSent, tz, "dd/MM/yyyy - HH:mm:ss") : "",
+    months: months
+  };
+}
+
+function vektorPingHistoricoEnvios() {
+  vektorAssertFunctionAllowed_("vektorPingHistoricoEnvios");
+
+  return {
+    ok: true,
+    lastSentAt: "2026-03-11 10:30:00",
+    lastSentAtBr: "11/03/2026 - 10:30:00",
+    months: [
+      { ym: "2025-10", label: "10/2025", qtd: 1, days: [{ dia:"2025-10-10", diaBr:"10/10", qtd:1, valorTotal:100, lojas:["CE0001"] }] },
+      { ym: "2025-11", label: "11/2025", qtd: 2, days: [{ dia:"2025-11-15", diaBr:"15/11", qtd:2, valorTotal:300, lojas:["CE0002","CE0003"] }] },
+      { ym: "2025-12", label: "12/2025", qtd: 0, days: [] },
+      { ym: "2026-01", label: "01/2026", qtd: 3, days: [{ dia:"2026-01-08", diaBr:"08/01", qtd:3, valorTotal:450, lojas:["CE0004"] }] },
+      { ym: "2026-02", label: "02/2026", qtd: 1, days: [{ dia:"2026-02-19", diaBr:"19/02", qtd:1, valorTotal:99, lojas:["CE0005"] }] },
+      { ym: "2026-03", label: "03/2026", qtd: 4, days: [{ dia:"2026-03-02", diaBr:"02/03", qtd:4, valorTotal:1200, lojas:["CE0006","CE0007"] }] }
+    ]
+  };
 }
 
 function vektorNormLojaKey_(v) {
