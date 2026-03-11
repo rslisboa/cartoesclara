@@ -1439,7 +1439,7 @@ function vektorFmtUsdWithBrl_(usdValue){
 
 // -----------------------------
 // Chamada ao Vertex Gemini
-// 
+// -----------------------------
 
 function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
   var systemText =
