@@ -3757,21 +3757,21 @@ display: none;
           <div style="position:relative; height:360px;">
             <canvas id="envPendHistChart"></canvas>
             <div id="envPendHistTooltip"
-                 style="
-                   position:absolute;
-                   display:none;
-                   min-width:360px;
-                   max-width:440px;
-                   max-height:280px;
-                   overflow:auto;
-                   background:#ffffff;
-                   border:1px solid rgba(148,163,184,0.25);
-                   border-radius:14px;
-                   box-shadow:0 18px 40px rgba(0,0,0,0.22);
-                   padding:10px 12px;
-                   z-index:20;
-                   pointer-events:none;
-                 "></div>
+              style="
+                position:absolute;
+                display:none;
+                min-width:360px;
+                max-width:440px;
+                max-height:280px;
+                overflow:auto;
+                background:#ffffff;
+                border:1px solid rgba(148,163,184,0.25);
+                border-radius:14px;
+                box-shadow:0 18px 40px rgba(0,0,0,0.22);
+                padding:10px 12px;
+                z-index:20;
+                pointer-events:auto;
+              "></div>
           </div>
         </div>
       </div>
@@ -10376,19 +10376,22 @@ window.vektorEnvPendHistFmtBRL_ = function(v){
 
 window.vektorEnvPendHistRenderLastCard_ = function(data){
   data = data || {};
+
   var elDate = document.getElementById("envPendHist_lastDate");
   var elSub  = document.getElementById("envPendHist_lastSub");
 
   if (!elDate || !elSub) return;
 
-  if (!data.lastSentAtBr) {
+  var dtBr = String(data.lastSentAtBr || "").trim();
+
+  if (!dtBr) {
     elDate.textContent = "—";
     elSub.textContent = "Nenhum envio encontrado nos logs.";
     return;
   }
 
-  elDate.textContent = data.lastSentAtBr;
-  elSub.textContent = "Dados captados da base do histórico de envios";
+  elDate.textContent = dtBr;
+  elSub.textContent = "Dados captados da base do histórico de envios.";
 };
 
 window.vektorEnvPendHistExternalTooltip_ = function(context){
@@ -10396,12 +10399,27 @@ window.vektorEnvPendHistExternalTooltip_ = function(context){
   var tooltipEl = document.getElementById("envPendHistTooltip");
   var chart = context.chart;
 
+  if (tooltipEl && !tooltipEl.__bindWheelLock) {
+  tooltipEl.__bindWheelLock = true;
+
+  tooltipEl.addEventListener("mouseenter", function(){
+    tooltipEl.__hoveringSelf = true;
+  });
+
+  tooltipEl.addEventListener("mouseleave", function(){
+    tooltipEl.__hoveringSelf = false;
+    tooltipEl.style.display = "none";
+  });
+}
+
   if (!tooltipEl) return;
 
   if (!tooltipModel || tooltipModel.opacity === 0) {
+  if (!tooltipEl.__hoveringSelf) {
     tooltipEl.style.display = "none";
-    return;
   }
+  return;
+}
 
   var idx = (tooltipModel.dataPoints && tooltipModel.dataPoints.length)
     ? tooltipModel.dataPoints[0].dataIndex
@@ -10493,6 +10511,40 @@ window.vektorEnvPendHistRenderChart_ = function(data){
 
   var ctx = canvas.getContext("2d");
 
+  const vektorEnvPendHistCenterLabelsPlugin = {
+    id: "vektorEnvPendHistCenterLabelsPlugin",
+    afterDatasetsDraw(chart) {
+      const meta = chart.getDatasetMeta(0);
+      if (!meta || meta.hidden) return;
+
+      const ds = chart.data.datasets[0];
+      const data = (ds && ds.data) ? ds.data : [];
+      const ctx = chart.ctx;
+
+      ctx.save();
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "900 12px Arial";
+
+      for (let i = 0; i < meta.data.length; i++) {
+        const el = meta.data[i];
+        if (!el) continue;
+
+        const v = Number(data[i] || 0) || 0;
+
+        const x = el.x;
+        const yTop = el.y;
+        const yBase = el.base;
+        const y = yTop + ((yBase - yTop) / 2); // centro exato da barra
+
+        ctx.fillText(String(v), x, y);
+      }
+
+      ctx.restore();
+    }
+  };
+
   window.__envPendHistChartInst = new Chart(ctx, {
     type: "bar",
     data: {
@@ -10503,11 +10555,12 @@ window.vektorEnvPendHistRenderChart_ = function(data){
         backgroundColor: "#dc2626",
         borderColor: "#ffffff",
         borderWidth: 2,
-        borderRadius: 10,
-        categoryPercentage: 0.7,
-        barPercentage: 0.82
+        borderRadius: 8,
+        categoryPercentage: 0.68,
+        barPercentage: 0.78
       }]
     },
+    plugins: [vektorEnvPendHistCenterLabelsPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -10522,12 +10575,7 @@ window.vektorEnvPendHistRenderChart_ = function(data){
           external: window.vektorEnvPendHistExternalTooltip_
         },
         datalabels: {
-          color: "#ffffff",
-          anchor: "end",
-          align: "end",
-          offset: -2,
-          font: { weight: "900", size: 11 },
-          formatter: function(v){ return v || 0; }
+          display: false
         }
       },
       scales: {
