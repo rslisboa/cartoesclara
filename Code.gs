@@ -5192,7 +5192,7 @@ function vektorGetHistoricoEnviosPendenciasResumo() {
   }
 
   function parseSentAtSafe_(v) {
-    if (v instanceof Date) return v;
+    if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
 
     var s = String(v || "").trim();
     if (!s) return null;
@@ -5212,6 +5212,40 @@ function vektorGetHistoricoEnviosPendenciasResumo() {
 
     var d2 = new Date(s);
     return isNaN(d2.getTime()) ? null : d2;
+  }
+
+  function fmtSentAtRaw_(v) {
+    if (!v) return "";
+
+    if (v instanceof Date) {
+      if (isNaN(v.getTime())) return "";
+      return Utilities.formatDate(v, tz, "yyyy-MM-dd HH:mm:ss");
+    }
+
+    var s = String(v).trim();
+    if (!s) return "";
+
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (m) {
+      return m[1] + "-" + m[2] + "-" + m[3] + " " + m[4] + ":" + m[5] + ":" + (m[6] || "00");
+    }
+
+    var d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return Utilities.formatDate(d, tz, "yyyy-MM-dd HH:mm:ss");
+    }
+
+    return s;
+  }
+
+  function fmtLastSentBr_(raw) {
+    var s = String(raw || "").trim();
+    if (!s) return "";
+
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if (!m) return s;
+
+    return m[3] + "/" + m[2] + "/" + m[1] + " - " + m[4] + ":" + m[5] + ":" + (m[6] || "00");
   }
 
   function monthKey_(d) {
@@ -5252,36 +5286,36 @@ function vektorGetHistoricoEnviosPendenciasResumo() {
 
   var numRows = lastRow - 1;
 
-  // Lê só as colunas necessárias:
   // A = sentAt
   // C = lojaKey
   // E = valorOriginalTxt
   // L = status
-  var sentAtCol = sh.getRange(2, 1, numRows, 1).getValues();   // A
-  var lojaCol   = sh.getRange(2, 3, numRows, 1).getValues();   // C
-  var valorCol  = sh.getRange(2, 5, numRows, 1).getValues();   // E
-  var statusCol = sh.getRange(2, 12, numRows, 1).getValues();  // L
+  // ✅ sentAt deve vir como TEXTO exibido na planilha para não sofrer deslocamento de fuso
+  var sentAtCol = sh.getRange(2, 1, numRows, 1).getDisplayValues();
+  var lojaCol   = sh.getRange(2, 3, numRows, 1).getValues();
+  var valorCol  = sh.getRange(2, 5, numRows, 1).getValues();
+  var statusCol = sh.getRange(2, 12, numRows, 1).getValues();
 
   var cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1);
   cutoff.setHours(0, 0, 0, 0);
 
   var lastSent = null;
+  var lastSentRaw = "";
   var achouDentroJanela = false;
 
-  // percorre de baixo para cima, porque o log cresce por appendRow
   for (var i = numRows - 1; i >= 0; i--) {
     var status = String((statusCol[i] && statusCol[i][0]) || "").trim().toUpperCase();
     if (status !== "SENT") continue;
 
-    var dt = parseSentAtSafe_((sentAtCol[i] && sentAtCol[i][0]) || "");
+        var sentCell = String((sentAtCol[i] && sentAtCol[i][0]) || "").trim();
+    var dt = parseSentAtSafe_(sentCell);
     if (!dt) continue;
 
     if (!lastSent) {
       lastSent = dt;
+      lastSentRaw = fmtSentAtRaw_(sentCell);
     }
 
-    // assim que já encontramos envios dentro da janela,
-    // e passamos para datas anteriores ao corte, podemos parar
     if (dt < cutoff) {
       if (achouDentroJanela) break;
       continue;
@@ -5338,8 +5372,8 @@ function vektorGetHistoricoEnviosPendenciasResumo() {
 
   return {
     ok: true,
-    lastSentAt: lastSent ? Utilities.formatDate(lastSent, tz, "yyyy-MM-dd HH:mm:ss") : "",
-    lastSentAtBr: lastSent ? Utilities.formatDate(lastSent, tz, "dd/MM/yyyy - HH:mm:ss") : "",
+    lastSentAt: lastSentRaw || "",
+    lastSentAtBr: fmtLastSentBr_(lastSentRaw),
     months: months
   };
 }
