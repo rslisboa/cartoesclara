@@ -3692,6 +3692,94 @@ display: none;
   </div>
 </div>
 
+<!-- Modal: Histórico de Envios (Envio de Pendências) -->
+<div id="envPendHistModal"
+     class="fixed inset-0 hidden items-center justify-center z-[72]"
+     style="background:rgba(15,23,42,0.42);">
+  <div style="
+      width:min(1120px, 96vw);
+      max-height:86vh;
+      background:#f8fafc;
+      border:1px solid rgba(148,163,184,0.22);
+      border-radius:22px;
+      box-shadow:0 24px 60px rgba(0,0,0,0.34);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    ">
+
+    <!-- header -->
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px; padding:16px 18px; background:#ffffff; border-bottom:1px solid rgba(148,163,184,0.18);">
+      <div>
+        <div style="font-size:16px; font-weight:1000; color:#0f172a;">Histórico de Envios</div>
+        <div style="font-size:12px; color:#475569; margin-top:2px;">
+          Pendências enviadas por mês — últimos 6 meses
+        </div>
+      </div>
+
+      <button type="button"
+              onclick="closeEnvPendHistModal()"
+              style="height:36px; padding:0 14px; border-radius:10px; border:none; background:#005E27; color:#fff; font-weight:900; font-size:12px; cursor:pointer;">
+        Fechar
+      </button>
+    </div>
+
+    <div style="height:5px; background:#B5FF20;"></div>
+
+    <!-- body -->
+    <div style="padding:16px 18px 18px; overflow:auto;">
+      <div style="display:grid; grid-template-columns:minmax(240px, 300px) 1fr; gap:14px; align-items:stretch;">
+        <div id="envPendHist_lastCard"
+             style="background:#ffffff; border:1px solid rgba(148,163,184,0.18); border-radius:18px; padding:14px 16px;">
+          <div style="font-size:11px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:0.5px;">
+            Último envio realizado
+          </div>
+          <div id="envPendHist_lastDate"
+               style="margin-top:8px; font-size:24px; line-height:1.1; font-weight:1000; color:#0f172a;">
+            —
+          </div>
+          <div id="envPendHist_lastSub"
+               style="margin-top:8px; font-size:12px; color:#475569;">
+            Sem histórico carregado.
+          </div>
+        </div>
+
+        <div style="background:#ffffff; border:1px solid rgba(148,163,184,0.18); border-radius:18px; padding:12px 14px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap;">
+            <div style="font-size:13px; font-weight:1000; color:#0f172a;">
+              Quantidade de pendências enviadas por mês
+            </div>
+            <div style="font-size:11px; color:#64748b; font-weight:900;">
+              Hover na barra para ver detalhamento diário
+            </div>
+          </div>
+
+          <div style="position:relative; height:360px;">
+            <canvas id="envPendHistChart"></canvas>
+            <div id="envPendHistTooltip"
+                 style="
+                   position:absolute;
+                   display:none;
+                   min-width:360px;
+                   max-width:440px;
+                   max-height:280px;
+                   overflow:auto;
+                   background:#ffffff;
+                   border:1px solid rgba(148,163,184,0.25);
+                   border-radius:14px;
+                   box-shadow:0 18px 40px rgba(0,0,0,0.22);
+                   padding:10px 12px;
+                   z-index:20;
+                   pointer-events:none;
+                 "></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <!-- Popup central: gráfico de valores por loja (Envio de Pendências) -->
 <div id="envPendLojasPopup"
      style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,0.72);">
@@ -3792,26 +3880,46 @@ display: none;
   </div>
 </div>
 
-<!-- Botão central: Como funciona a análise? -->
-        <div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 10px;">
-          <button
-            type="button"
-            onclick="openEnvPendAnaliseModal()"
-            style="
-              height:36px;
-              padding:0 14px;
-              border-radius:10px;
-              border:1px solid rgba(255,255,255,0.22);
-              background:rgba(255,255,255,0.86);
-              color:#0b1220;
-              font-weight:900;
-              font-size:12px;
-              cursor:pointer;
-              box-shadow:0 10px 22px rgba(0,0,0,0.18);
-            ">
-            Como funciona a análise?
-          </button>
-        </div>
+<!-- Botões centrais: Como funciona a análise? + Histórico Envios -->
+<div style="flex:1; display:flex; justify-content:center; align-items:center; padding:0 10px;">
+  <div style="display:flex; align-items:center; gap:10px; transform:translateX(-36px);">
+    <button
+      type="button"
+      onclick="openEnvPendAnaliseModal()"
+      style="
+        height:36px;
+        padding:0 14px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,0.22);
+        background:rgba(255,255,255,0.86);
+        color:#0b1220;
+        font-weight:900;
+        font-size:12px;
+        cursor:pointer;
+        box-shadow:0 10px 22px rgba(0,0,0,0.18);
+      ">
+      Como funciona a análise?
+    </button>
+
+    <button
+      type="button"
+      onclick="openEnvPendHistModal()"
+      style="
+        height:36px;
+        padding:0 14px;
+        border-radius:10px;
+        border:1px solid rgba(255,255,255,0.18);
+        background:rgba(239,68,68,0.92);
+        color:#ffffff;
+        font-weight:900;
+        font-size:12px;
+        cursor:pointer;
+        box-shadow:0 10px 22px rgba(0,0,0,0.18);
+      ">
+      Histórico Envios
+    </button>
+  </div>
+</div>
 
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <button type="button" onclick="window.vektorEnvioPendenciasPreview()"
@@ -6528,6 +6636,36 @@ function closeEnvPendAnaliseModal() {
     modal.style.display = "none";
     modal.classList.add("hidden");
   }
+}
+
+function openEnvPendHistModal() {
+  const modal = document.getElementById("envPendHistModal");
+  if (modal) {
+    modal.style.display = "flex";
+    modal.classList.remove("hidden");
+  }
+
+  if (window.vektorEnvPendHistLoad_) {
+    window.vektorEnvPendHistLoad_();
+  }
+}
+
+function closeEnvPendHistModal() {
+  const modal = document.getElementById("envPendHistModal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.add("hidden");
+  }
+
+  try {
+    if (window.__envPendHistChartInst) {
+      window.__envPendHistChartInst.destroy();
+      window.__envPendHistChartInst = null;
+    }
+  } catch (_) {}
+
+  const tip = document.getElementById("envPendHistTooltip");
+  if (tip) tip.style.display = "none";
 }
 
 function openMyAlTutorialModal() {
@@ -10197,7 +10335,8 @@ window.__envPend = {
   periodo: { iniIso: "", fimIso: "" },
   rows: [],        // preview detalhado
   selected: {},    // txKey -> true/false
-  resumo: null
+  resumo: null,
+  hist: null
 };
 
 window.vektorEnvioPendenciasAbrirModal = function () {
@@ -10215,6 +10354,261 @@ window.vektorEnvioPendenciasFecharModal = function () {
 
   m.classList.add("hidden");
   m.style.display = "none";
+};
+
+window.vektorEnvPendHistFmtMonthPt_ = function(ym){
+  var s = String(ym || "");
+  var y = s.slice(0, 4);
+  var m = s.slice(5, 7);
+  var map = {
+    "01":"Jan", "02":"Fev", "03":"Mar", "04":"Abr", "05":"Mai", "06":"Jun",
+    "07":"Jul", "08":"Ago", "09":"Set", "10":"Out", "11":"Nov", "12":"Dez"
+  };
+  return (map[m] || m) + "/" + y;
+};
+
+window.vektorEnvPendHistFmtBRL_ = function(v){
+  return (Number(v || 0) || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+};
+
+window.vektorEnvPendHistRenderLastCard_ = function(data){
+  data = data || {};
+  var elDate = document.getElementById("envPendHist_lastDate");
+  var elSub  = document.getElementById("envPendHist_lastSub");
+
+  if (!elDate || !elSub) return;
+
+  if (!data.lastSentAtBr) {
+    elDate.textContent = "—";
+    elSub.textContent = "Nenhum envio encontrado nos logs.";
+    return;
+  }
+
+  elDate.textContent = data.lastSentAtBr;
+  elSub.textContent = "Dados captados da base do histórico de envios";
+};
+
+window.vektorEnvPendHistExternalTooltip_ = function(context){
+  var tooltipModel = context.tooltip;
+  var tooltipEl = document.getElementById("envPendHistTooltip");
+  var chart = context.chart;
+
+  if (!tooltipEl) return;
+
+  if (!tooltipModel || tooltipModel.opacity === 0) {
+    tooltipEl.style.display = "none";
+    return;
+  }
+
+  var idx = (tooltipModel.dataPoints && tooltipModel.dataPoints.length)
+    ? tooltipModel.dataPoints[0].dataIndex
+    : -1;
+
+  var hist = (window.__envPend && window.__envPend.hist) ? window.__envPend.hist : null;
+  var months = hist && Array.isArray(hist.months) ? hist.months : [];
+  var row = idx >= 0 ? months[idx] : null;
+
+  if (!row) {
+    tooltipEl.style.display = "none";
+    return;
+  }
+
+  var dias = Array.isArray(row.days) ? row.days : [];
+
+  var html = "";
+  html += `<div style="font-size:12px; font-weight:1000; color:#0f172a; margin-bottom:8px;">${row.label || ""}</div>`;
+
+  if (!dias.length) {
+    html += `<div style="font-size:12px; color:#64748b;">Sem envios nesse mês.</div>`;
+  } else {
+    html += `
+      <table style="width:100%; border-collapse:collapse; font-size:11px;">
+        <thead>
+          <tr>
+            <th style="text-align:left; padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.22); color:#475569;">Dia</th>
+            <th style="text-align:right; padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.22); color:#475569;">Qtd</th>
+            <th style="text-align:right; padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.22); color:#475569;">Valor</th>
+            <th style="text-align:left; padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.22); color:#475569;">Lojas</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    dias.forEach(function(d){
+      html += `
+        <tr>
+          <td style="padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.14); color:#0f172a; white-space:nowrap;">${d.diaBr || ""}</td>
+          <td style="padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.14); color:#0f172a; text-align:right; white-space:nowrap;">${d.qtd || 0}</td>
+          <td style="padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.14); color:#0f172a; text-align:right; white-space:nowrap;">${window.vektorEnvPendHistFmtBRL_(d.valorTotal || 0)}</td>
+          <td style="padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.14); color:#0f172a;">${(Array.isArray(d.lojas) ? d.lojas.join(", ") : "")}</td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table>`;
+  }
+
+  tooltipEl.innerHTML = html;
+  tooltipEl.style.display = "block";
+
+  var canvasRect = chart.canvas.getBoundingClientRect();
+  var parentRect = chart.canvas.parentElement.getBoundingClientRect();
+
+  var left = tooltipModel.caretX + 18;
+  var top  = tooltipModel.caretY - 30;
+
+  var maxLeft = parentRect.width - 460;
+  if (left > maxLeft) left = Math.max(10, tooltipModel.caretX - 390);
+
+  if (top < 10) top = 10;
+
+  tooltipEl.style.left = left + "px";
+  tooltipEl.style.top  = top + "px";
+};
+
+window.vektorEnvPendHistRenderChart_ = function(data){
+  var canvas = document.getElementById("envPendHistChart");
+  if (!canvas) return;
+
+  var months = data && Array.isArray(data.months) ? data.months : [];
+
+  try {
+    if (window.__envPendHistChartInst) {
+      window.__envPendHistChartInst.destroy();
+      window.__envPendHistChartInst = null;
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof Chart !== "undefined" && typeof ChartDataLabels !== "undefined") {
+      Chart.register(ChartDataLabels);
+    }
+  } catch (_) {}
+
+  var labels = months.map(function(m){ return m.label; });
+  var values = months.map(function(m){ return Number(m.qtd || 0) || 0; });
+
+  var ctx = canvas.getContext("2d");
+
+  window.__envPendHistChartInst = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Pendências enviadas",
+        data: values,
+        backgroundColor: "#dc2626",
+        borderColor: "#ffffff",
+        borderWidth: 2,
+        borderRadius: 10,
+        categoryPercentage: 0.7,
+        barPercentage: 0.82
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "nearest",
+        intersect: false
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external: window.vektorEnvPendHistExternalTooltip_
+        },
+        datalabels: {
+          color: "#ffffff",
+          anchor: "end",
+          align: "end",
+          offset: -2,
+          font: { weight: "900", size: 11 },
+          formatter: function(v){ return v || 0; }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: "#334155",
+            font: { weight: "700" }
+          },
+          grid: {
+            display: false
+          }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0,
+            color: "#334155",
+            font: { weight: "700" }
+          },
+          grid: {
+            color: "rgba(148,163,184,0.18)"
+          }
+        }
+      }
+    }
+  });
+};
+
+window.vektorEnvPendHistLoad_ = function(){
+  var lastDate = document.getElementById("envPendHist_lastDate");
+  var lastSub  = document.getElementById("envPendHist_lastSub");
+
+  if (lastDate) lastDate.textContent = "Carregando...";
+  if (lastSub) lastSub.textContent = "Verificando informações...";
+
+  console.log("[HistEnv] início do load");
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      console.log("[HistEnv] success raw:", res);
+
+      try {
+        window.__envPend = window.__envPend || {};
+        window.__envPend.hist = res || null;
+        console.log("[HistEnv] antes de renderLastCard");
+
+        window.vektorEnvPendHistRenderLastCard_(res || {});
+
+        console.log("[HistEnv] depois de renderLastCard / antes de renderChart");
+
+        try {
+          window.vektorEnvPendHistRenderChart_(res || {});
+          console.log("[HistEnv] chart renderizado");
+        } catch (chartErr) {
+          console.error("[HistEnv] erro ao renderizar gráfico:", chartErr);
+          if (lastSub) {
+            lastSub.textContent =
+              "Os dados foram carregados, mas o gráfico falhou: " +
+              (chartErr && chartErr.message ? chartErr.message : String(chartErr));
+          }
+        }
+
+      } catch (frontErr) {
+        console.error("[HistEnv] erro no success handler:", frontErr);
+        if (lastDate) lastDate.textContent = "Erro";
+        if (lastSub) {
+          lastSub.textContent =
+            "Falha no front-end após retorno do backend: " +
+            (frontErr && frontErr.message ? frontErr.message : String(frontErr));
+        }
+      }
+    })
+    .withFailureHandler(function(err){
+      console.error("[HistEnv] failure:", err);
+      if (lastDate) lastDate.textContent = "Erro";
+      if (lastSub) {
+        lastSub.textContent =
+          (err && err.message) ? err.message : String(err || "Falha ao carregar histórico.");
+      }
+    })
+    .vektorGetHistoricoEnviosPendenciasResumo();
 };
 
 window.vektorEnvPendSelectAll = function (on) {
