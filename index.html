@@ -1406,6 +1406,102 @@ display: none;
 }
 
 /* =========================
+   FLUXO NUMERÁRIO SAP
+   ========================= */
+.sapNumCard{
+  background:#fed7aa;
+  border:2px solid #111827;
+  border-radius:14px;
+  padding:12px;
+  box-shadow:0 10px 22px rgba(0,0,0,0.08);
+}
+
+.sapNumCardLabel{
+  color:#0f172a;
+  font-size:13px;
+  font-weight:1000;
+}
+
+.sapNumCardValue{
+  margin-top:6px;
+  color:#0b1220;
+  font-size:24px;
+  font-weight:1000;
+  line-height:1.2;
+}
+
+.sapNumCardSub{
+  margin-top:4px;
+  color:#334155;
+  font-size:11px;
+  font-weight:900;
+  line-height:1.25;
+}
+
+#fluxoNumerarioSapTableBox{
+  background:#fff;
+  border:2px solid #111827;
+  border-radius:12px;
+  overflow:auto;
+  max-height:420px;
+  min-height:220px;
+}
+
+#fluxoNumerarioSapTable{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  background:#fff;
+  color:#0b1220;
+}
+
+#fluxoNumerarioSapTable thead th{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#123a63;
+  color:#fff;
+  font-size:13px;
+  font-weight:1000;
+  text-align:center;
+  vertical-align:middle;
+  line-height:1.2;
+  padding:12px 10px;
+  border-right:2px double #005E27;
+  border-bottom:2px double #005E27;
+  cursor:pointer;
+}
+
+#fluxoNumerarioSapTable thead th[data-sort]::after{
+  content:" ⇅";
+  opacity:0;
+  transition:opacity .15s ease;
+  margin-left:6px;
+}
+
+#fluxoNumerarioSapTable thead th[data-sort]:hover::after{
+  opacity:0.75;
+}
+
+#fluxoNumerarioSapTable tbody td{
+  font-size:12px;
+  border-right:2px double #111;
+  border-bottom:2px double #111;
+  padding:10px 10px;
+  background:#fff;
+  vertical-align:middle;
+}
+
+#fluxoNumerarioSapTable thead th:last-child,
+#fluxoNumerarioSapTable tbody td:last-child{
+  border-right:none;
+}
+
+#fluxoNumerarioSapTable tbody tr:hover td{
+  background:#f8fafc;
+}
+
+/* =========================
    Modal full-screen - Fluxograma detalhado (SVG)
    ========================= */
 #vektor_fluxoDetModal{
@@ -2672,13 +2768,25 @@ display: none;
       type="button"
       onclick="window.vektorOpenConsultasAuxiliares()"
       title="Consultas Auxiliares"
-      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
-    >
+      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition">
       <span class="vektor-nav-ico" aria-hidden="true">🧾</span>
       <span class="vektor-nav-label">Consultas Auxiliares</span>
     </button>
 
     <? } ?>
+
+    <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro") { ?>
+
+     <button
+      type="button"
+      onclick="window.vektorOpenFluxoNumerarioSap && window.vektorOpenFluxoNumerarioSap()"
+      title="Fluxo Numerário SAP"
+      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition">
+      <span class="vektor-nav-ico" aria-hidden="true">💵</span>
+      <span class="vektor-nav-label">Fluxo Numerário SAP</span>
+    </button>
+
+     <? } ?>
 
     <? if ((userRole || "") === "Administrador") { ?>
 
@@ -5264,6 +5372,105 @@ display: none;
   </main>
 </div>
 
+<!-- VIEW:SAP NUMERARIO -->
+
+<div id="fluxoNumerarioSapView" class="hidden" style="position:absolute; inset:0; z-index:20; display:none; background:#f8fafc; overflow:auto;">
+  <main class="chat-body" style="padding:18px; min-height:100%;">
+    <div style="width:100%; max-width:none; margin:0;">
+
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; width:100%;">
+      <div>
+        <div style="font-size:22px; font-weight:1000; color:#0f172a;">Fluxo Numerário SAP</div>
+        <div style="font-size:12px; font-weight:800; color:#475569; margin-top:4px;">
+          Mapeamento de sangrias lançadas no SAP para lojas já operando com Clara
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button id="fluxoNumerarioSapBuscarBtn"
+                type="button"
+                style="height:38px; padding:0 14px; border-radius:12px; border:1px solid #111827; background:#B5FF20; color:#0f172a; font-size:12px; font-weight:1000; cursor:pointer;">
+          Buscar
+        </button>
+
+        <button id="fluxoNumerarioSapEnviarBtn"
+                type="button"
+                style="height:38px; padding:0 14px; border-radius:12px; border:1px solid #111827; background:#fb923c; color:#0f172a; font-size:12px; font-weight:1000; cursor:pointer;">
+          Enviar notificação
+        </button>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:12px; margin-bottom:14px; width:100%;" id="fluxoNumerarioSapCards">
+      <div class="sapNumCard">
+        <div class="sapNumCardLabel">Loja com maior valor de sangria</div>
+        <div class="sapNumCardValue" id="sapNum_cardLojaTop">—</div>
+        <div class="sapNumCardSub" id="sapNum_cardLojaTopSub">—</div>
+      </div>
+
+      <div class="sapNumCard">
+        <div class="sapNumCardLabel">Última sangria identificada</div>
+        <div class="sapNumCardValue" id="sapNum_cardUltimaLoja">—</div>
+        <div class="sapNumCardSub" id="sapNum_cardUltimaLojaSub">—</div>
+      </div>
+
+      <div class="sapNumCard">
+        <div class="sapNumCardLabel">Total de ocorrências</div>
+        <div class="sapNumCardValue" id="sapNum_cardQtd">—</div>
+        <div class="sapNumCardSub" id="sapNum_cardQtdSub">Linhas retornadas</div>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
+      <div style="min-width:240px;">
+        <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Time</label>
+        <select id="fluxoNumerarioSap_selTime"
+                style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;"></select>
+      </div>
+
+      <div style="min-width:240px;">
+        <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Loja</label>
+        <select id="fluxoNumerarioSap_selLoja"
+                style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;"></select>
+      </div>
+    </div>
+
+    <div id="fluxoNumerarioSapTableBox">
+      <table id="fluxoNumerarioSapTable">
+        <thead>
+          <tr>
+            <th style="width:54px; text-align:center;">Sel.</th>
+            <th data-sort="loja">Loja</th>
+            <th data-sort="time">Time</th>
+            <th data-sort="valor">Valor Sangria</th>
+            <th data-sort="dataLancIso">Data Lançamento</th>
+            <th data-sort="texto">Texto</th>
+            <th data-sort="numdoc">Número Documento</th>
+          </tr>
+        </thead>
+        <tbody id="fluxoNumerarioSap_tbody">
+          <tr>
+            <td colspan="7" style="text-align:center; padding:14px; font-weight:900; color:#475569;">
+              Clique em Buscar para consultar.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:18px; margin-bottom:24px; background:#10233f; border:1px solid rgba(181,255,32,0.25); border-radius:14px; padding:14px; width:100%;">
+      <div style="font-size:13px; font-weight:1000; color:#fff; margin-bottom:10px;">
+        Valor total de sangria por loja
+      </div>
+      <div style="height:320px;">
+        <canvas id="fluxoNumerarioSapChart"></canvas>
+      </div>
+    </div>
+
+</div>
+  </main>
+</div>
+
 <!-- VIEW: CUSTO VERTEX -->
 <div id="vertexCostView" class="hidden" style="position:absolute; inset:0; z-index:20; display:none;">
   <main class="chat-body" style="padding:0; height:100%; overflow:hidden;">
@@ -7003,6 +7210,7 @@ window.vektorShowChatView = function () {
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
   const basesVektorView = document.getElementById("basesVektorView");
+  const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
   // fecha outras views
   [
@@ -7016,6 +7224,7 @@ window.vektorShowChatView = function () {
     consultasAuxView,
     vertexCostView,
     basesVektorView,
+    fluxoNumerarioSapView,
     homeView
   ].forEach(v => {
     if (!v) return;
@@ -7084,9 +7293,10 @@ function vektorShowRadarView_() {
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
   const basesVektorView = document.getElementById("basesVektorView");
+  const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
   // fecha TODAS
-  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
+  [chatView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView, fluxoNumerarioSapView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7116,8 +7326,9 @@ function vektorShowFluxogramaView_() {
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
   const basesVektorView = document.getElementById("basesVektorView");
+  const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
-  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView, fluxoNumerarioSapView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7238,8 +7449,9 @@ function vektorShowEnvioPendenciasView_() {
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
   const basesVektorView = document.getElementById("basesVektorView");
+  const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
-  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView, fluxoNumerarioSapView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7964,8 +8176,9 @@ function vektorShowAnaliseGastosView_() {
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
   const basesVektorView = document.getElementById("basesVektorView");
+  const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
-  [chatView, radarView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
+  [chatView, radarView, feedbackView, myAlertsView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView, fluxoNumerarioSapView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -7996,6 +8209,7 @@ window.vektorOpenAnaliseGastos = function () {
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
   const basesVektorView = document.getElementById("basesVektorView");
+  const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
   // Esconde todas as outras
   [
@@ -8009,7 +8223,8 @@ window.vektorOpenAnaliseGastos = function () {
     homeView,
     consultasAuxView,
     vertexCostView,
-    basesVektorView
+    basesVektorView,
+    fluxoNumerarioSapView
   ].forEach(function(v){
     if (!v) return;
     v.classList.add("hidden");
@@ -8072,6 +8287,78 @@ try {
 } catch (e) {
   console.error("Erro ao carregar meta da Análise de Gastos:", e);
 }
+};
+
+window.__fluxoNumerarioSapData = [];
+window.__fluxoNumerarioSapSort = { col: "dataLancIso", dir: "desc" };
+window.__fluxoNumerarioSapChart = null;
+window.__fluxoNumerarioSapMeta = null;
+
+function vektorShowFluxoNumerarioSapView_() {
+  const ids = [
+    "chatView",
+    "radarView",
+    "feedbackView",
+    "myAlertsView",
+    "fluxogramaView",
+    "envioPendView",
+    "cicloResumoView",
+    "homeView",
+    "analiseGastosView",
+    "consultasAuxView",
+    "vertexCostView",
+    "basesVektorView",
+    "fluxoNumerarioSapView"
+  ];
+
+  ids.forEach(function(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add("hidden");
+    el.style.display = "none";
+    el.classList.remove("is-open");
+  });
+
+  const v = document.getElementById("fluxoNumerarioSapView");
+  if (v) {
+    v.classList.remove("hidden");
+    v.style.display = "block";
+  }
+}
+
+function vektorFluxoNumerarioSapResetVisual_(){
+  var tb = document.getElementById("fluxoNumerarioSap_tbody");
+  if (tb) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Carregando dados de sangria...</td></tr>';
+  }
+
+  var a = document.getElementById("sapNum_cardLojaTop");
+  var b = document.getElementById("sapNum_cardLojaTopSub");
+  var c = document.getElementById("sapNum_cardUltimaLoja");
+  var d = document.getElementById("sapNum_cardUltimaLojaSub");
+  var e = document.getElementById("sapNum_cardQtd");
+  var f = document.getElementById("sapNum_cardQtdSub");
+
+  if (a) a.textContent = "—";
+  if (b) b.textContent = "—";
+  if (c) c.textContent = "—";
+  if (d) d.textContent = "—";
+  if (e) e.textContent = "—";
+  if (f) f.textContent = "Linhas retornadas";
+}
+
+window.vektorOpenFluxoNumerarioSap = function () {
+  vektorShowFluxoNumerarioSapView_();
+  vektorFluxoNumerarioSapInitOnce_();
+  vektorFluxoNumerarioSapResetVisual_();
+
+  try {
+    vektorFluxoNumerarioSapEnsureMeta_(function(){
+      vektorFluxoNumerarioSapBuscar_();
+    });
+  } catch (e) {
+    console.error("Erro ao abrir Fluxo Numerário SAP:", e);
+  }
 };
 
 let __analiseGastos_inited = false;
@@ -10328,6 +10615,435 @@ function vektorAnaliseGastosMacroRenderTop10Chart_(canvasId, serie, chartRefName
       }
     }
   });
+}
+
+window.__fluxoNumerarioSapData = [];
+window.__fluxoNumerarioSapSort = { col: "dataLancIso", dir: "desc" };
+window.__fluxoNumerarioSapChart = null;
+window.__fluxoNumerarioSapMeta = null;
+window.__fluxoNumerarioSapInitDone = false;
+
+function vektorShowFluxoNumerarioSapView_() {
+  const ids = [
+    "chatView",
+    "radarView",
+    "feedbackView",
+    "myAlertsView",
+    "fluxogramaView",
+    "envioPendView",
+    "cicloResumoView",
+    "homeView",
+    "analiseGastosView",
+    "consultasAuxView",
+    "vertexCostView",
+    "basesVektorView",
+    "fluxoNumerarioSapView"
+  ];
+
+  ids.forEach(function(id){
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add("hidden");
+    el.style.display = "none";
+    el.classList.remove("is-open");
+  });
+
+  const v = document.getElementById("fluxoNumerarioSapView");
+  if (v) {
+    v.classList.remove("hidden");
+    v.style.display = "block";
+  }
+}
+
+function vektorFluxoNumerarioSapResetVisual_(){
+  var tb = document.getElementById("fluxoNumerarioSap_tbody");
+  if (tb) {
+    tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Carregando dados de sangria...</td></tr>';
+  }
+
+  var a = document.getElementById("sapNum_cardLojaTop");
+  var b = document.getElementById("sapNum_cardLojaTopSub");
+  var c = document.getElementById("sapNum_cardUltimaLoja");
+  var d = document.getElementById("sapNum_cardUltimaLojaSub");
+  var e = document.getElementById("sapNum_cardQtd");
+  var f = document.getElementById("sapNum_cardQtdSub");
+
+  if (a) a.textContent = "—";
+  if (b) b.textContent = "—";
+  if (c) c.textContent = "—";
+  if (d) d.textContent = "—";
+  if (e) e.textContent = "—";
+  if (f) f.textContent = "Linhas retornadas";
+
+  try {
+    if (window.__fluxoNumerarioSapChart) {
+      window.__fluxoNumerarioSapChart.destroy();
+      window.__fluxoNumerarioSapChart = null;
+    }
+  } catch (_) {}
+}
+
+window.vektorOpenFluxoNumerarioSap = function () {
+  vektorShowFluxoNumerarioSapView_();
+  vektorFluxoNumerarioSapInitOnce_();
+  vektorFluxoNumerarioSapResetVisual_();
+
+  try {
+    vektorFluxoNumerarioSapEnsureMeta_(function(){
+      vektorFluxoNumerarioSapBuscar_();
+    });
+  } catch (e) {
+    console.error("Erro ao abrir Fluxo Numerário SAP:", e);
+  }
+};
+
+function vektorBuildOptionsSimple_(sel, items, allLabel){
+  if (!sel) return;
+  sel.innerHTML = "";
+
+  var opAll = document.createElement("option");
+  opAll.value = "";
+  opAll.textContent = allLabel || "Todos";
+  sel.appendChild(opAll);
+
+  (items || []).forEach(function(x){
+    var op = document.createElement("option");
+    op.value = String(x || "");
+    op.textContent = String(x || "");
+    sel.appendChild(op);
+  });
+}
+
+function vektorFluxoNumerarioSapEnsureMeta_(cb){
+  console.log("[SAP meta] iniciando ensureMeta");
+
+  if (window.__fluxoNumerarioSapMeta && window.__fluxoNumerarioSapMeta.ok) {
+    console.log("[SAP meta] meta já carregada em memória");
+    cb && cb();
+    return;
+  }
+
+  console.log("[SAP meta] chamando backend getFluxoNumerarioSapMeta...");
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      console.log("[SAP meta] success:", res);
+
+      if (!res || !res.ok) {
+        console.error("[SAP meta] resposta inválida:", res);
+        alert("Erro ao carregar filtros: " + (res && res.error ? res.error : "erro desconhecido"));
+        return;
+      }
+
+      window.__fluxoNumerarioSapMeta = res;
+
+      vektorBuildOptionsSimple_(
+        document.getElementById("fluxoNumerarioSap_selTime"),
+        res.times || [],
+        "Todos"
+      );
+
+      vektorBuildOptionsSimple_(
+        document.getElementById("fluxoNumerarioSap_selLoja"),
+        res.lojas || [],
+        "Todas"
+      );
+
+      console.log("[SAP meta] filtros carregados, chamando callback");
+      cb && cb();
+    })
+    .withFailureHandler(function(err){
+      console.error("[SAP meta] failure:", err);
+      alert("Erro ao carregar filtros: " + (err && err.message ? err.message : JSON.stringify(err)));
+    })
+    .getFluxoNumerarioSapMeta();
+}
+
+function vektorFluxoNumerarioSapRenderCards_(cards){
+  cards = cards || {};
+
+  var a = document.getElementById("sapNum_cardLojaTop");
+  var b = document.getElementById("sapNum_cardLojaTopSub");
+  var c = document.getElementById("sapNum_cardUltimaLoja");
+  var d = document.getElementById("sapNum_cardUltimaLojaSub");
+  var e = document.getElementById("sapNum_cardQtd");
+  var f = document.getElementById("sapNum_cardQtdSub");
+
+  if (a) a.textContent = cards.lojaMaiorSangria || "—";
+  if (b) b.textContent = cards.lojaMaiorSangriaValor || "—";
+  if (c) c.textContent = cards.ultimaLoja || "—";
+  if (d) d.textContent = ((cards.ultimaData || "—") + " | " + (cards.ultimaValor || "—"));
+  if (e) e.textContent = String(cards.totalOcorrencias || 0);
+  if (f) f.textContent = "Linhas retornadas";
+}
+
+function vektorFluxoNumerarioSapGetSelected_(){
+  return (window.__fluxoNumerarioSapData || []).filter(function(r){ return !!r.selected; });
+}
+
+function vektorFluxoNumerarioSapRenderTable_(){
+  var tbody = document.getElementById("fluxoNumerarioSap_tbody");
+  if (!tbody) return;
+
+  var rows = (window.__fluxoNumerarioSapData || []).slice();
+  var sort = window.__fluxoNumerarioSapSort || { col: "dataLancIso", dir: "desc" };
+
+  rows.sort(function(a,b){
+    var av = a[sort.col];
+    var bv = b[sort.col];
+
+    if (sort.col === "valor") {
+      av = Number(av || 0) || 0;
+      bv = Number(bv || 0) || 0;
+    } else {
+      av = String(av || "");
+      bv = String(bv || "");
+    }
+
+    if (av < bv) return sort.dir === "asc" ? -1 : 1;
+    if (av > bv) return sort.dir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#475569;">Nenhum dado encontrado.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(function(r, idx){
+    return `
+      <tr>
+        <td style="text-align:center;">
+          <input type="checkbox" ${r.selected ? "checked" : ""} onchange="window.__fluxoNumerarioSapData[${idx}].selected = this.checked;">
+        </td>
+        <td>${vektorSafe_(r.loja || "—")}</td>
+        <td>${vektorSafe_(r.time || "—")}</td>
+        <td style="text-align:right; font-weight:900;">${vektorSafe_(r.valorFmt || "—")}</td>
+        <td style="text-align:center;">${vektorSafe_(r.dataLanc || "—")}</td>
+        <td>${vektorSafe_(r.texto || "—")}</td>
+        <td style="text-align:center;">${vektorSafe_(r.numdoc || "—")}</td>
+      </tr>
+    `;
+  }).join("");
+}
+
+function vektorFluxoNumerarioSapRenderChart_(chartRows){
+  var canvas = document.getElementById("fluxoNumerarioSapChart");
+  if (!canvas) return;
+
+  try {
+    if (window.__fluxoNumerarioSapChart) {
+      window.__fluxoNumerarioSapChart.destroy();
+      window.__fluxoNumerarioSapChart = null;
+    }
+  } catch(e) {
+    console.error("[SAP] erro ao destruir gráfico anterior", e);
+  }
+
+  var labels = (chartRows || []).map(function(x){ return x.loja; });
+  var values = (chartRows || []).map(function(x){ return Number(x.valor || 0) || 0; });
+
+  var ctx = canvas.getContext("2d");
+  if (!ctx) {
+    console.error("[SAP] context do canvas não disponível");
+    return;
+  }
+
+  if (typeof Chart === "undefined") {
+    console.error("[SAP] Chart não está carregado");
+    return;
+  }
+
+  var sapPlugins = [];
+  if (typeof ChartDataLabels !== "undefined") {
+    try { Chart.register(ChartDataLabels); } catch(_) {}
+    sapPlugins.push(ChartDataLabels);
+  }
+
+  window.__fluxoNumerarioSapChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: labels,
+      datasets: [{
+        label: "Valor de sangria",
+        data: values,
+        backgroundColor: "#B5FF20",
+        borderColor: "#005E27",
+        borderWidth: 2,
+        borderRadius: 8,
+        borderSkipped: false
+      }]
+    },
+    plugins: sapPlugins,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: "#ffffff",
+            font: { weight: "900", size: 12 }
+          }
+        },
+        datalabels: {
+          color: "#ffffff",
+          anchor: "end",
+          align: "end",
+          offset: -2,
+          clamp: true,
+          font: { weight: "900", size: 11 },
+          formatter: function(v){
+            return (Number(v || 0) || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: "#e2e8f0", font: { weight: "800" } },
+          grid: { color: "rgba(255,255,255,0.08)" }
+        },
+        y: {
+          ticks: { color: "#e2e8f0", font: { weight: "800" } },
+          grid: { color: "rgba(255,255,255,0.08)" }
+        }
+      }
+    }
+  });
+}
+
+function vektorFluxoNumerarioSapBuscar_(){
+  var req = {
+    time: document.getElementById("fluxoNumerarioSap_selTime")?.value || "",
+    loja: document.getElementById("fluxoNumerarioSap_selLoja")?.value || ""
+  };
+
+  console.log("[SAP buscar] iniciando com req:", req);
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      console.log("[SAP buscar] success:", res);
+
+      if (!res || !res.ok) {
+        console.error("[SAP buscar] resposta inválida:", res);
+        alert("Erro ao buscar dados: " + (res && res.error ? res.error : "erro desconhecido"));
+        return;
+      }
+
+      try {
+        window.__fluxoNumerarioSapData = Array.isArray(res.rows) ? res.rows : [];
+        console.log("[SAP buscar] rows:", window.__fluxoNumerarioSapData.length);
+
+        vektorFluxoNumerarioSapRenderCards_(res.cards || {});
+        vektorFluxoNumerarioSapRenderTable_();
+        vektorFluxoNumerarioSapRenderChart_(res.chart || []);
+      } catch (e) {
+        console.error("[SAP buscar] erro na renderização:", e);
+        alert("Erro ao renderizar Fluxo Numerário SAP: " + (e && e.message ? e.message : e));
+      }
+    })
+    .withFailureHandler(function(err){
+      console.error("[SAP buscar] failure:", err);
+      alert("Erro ao buscar dados: " + (err && err.message ? err.message : JSON.stringify(err)));
+    })
+    .getFluxoNumerarioSapData(req);
+}
+
+function vektorFluxoNumerarioSapEnviar_(){
+  var rows = vektorFluxoNumerarioSapGetSelected_();
+  if (!rows.length) {
+    alert("Selecione ao menos uma linha.");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.ok) {
+        alert("Falha no envio: " + (res && res.error ? res.error : "erro desconhecido"));
+        return;
+      }
+
+      var msg = "Envio concluído.";
+      if (Array.isArray(res.enviados) && res.enviados.length) {
+        msg += "\\nLojas enviadas: " + res.enviados.join(", ");
+      }
+      if (Array.isArray(res.falhas) && res.falhas.length) {
+        msg += "\\nFalhas: " + res.falhas.map(function(x){ return x.loja + " (" + x.error + ")"; }).join(", ");
+      }
+
+      alert(msg);
+    })
+    .withFailureHandler(function(err){
+      alert("Falha no envio: " + (err && err.message ? err.message : err));
+    })
+    .sendFluxoNumerarioSapNotificacao(rows);
+}
+
+function vektorFluxoNumerarioSapInitOnce_(){
+  if (window.__fluxoNumerarioSapInitDone) return;
+  window.__fluxoNumerarioSapInitDone = true;
+
+  try {
+    var btnBuscar = document.getElementById("fluxoNumerarioSapBuscarBtn");
+    var btnEnviar = document.getElementById("fluxoNumerarioSapEnviarBtn");
+    var thead = document.querySelector("#fluxoNumerarioSapTable thead");
+    var selTime = document.getElementById("fluxoNumerarioSap_selTime");
+
+    if (btnBuscar) {
+      btnBuscar.addEventListener("click", function(){
+        vektorFluxoNumerarioSapBuscar_();
+      });
+    }
+
+    if (btnEnviar) {
+      btnEnviar.addEventListener("click", vektorFluxoNumerarioSapEnviar_);
+    }
+
+    if (thead) {
+      thead.addEventListener("click", function(ev){
+        var th = ev.target && ev.target.closest ? ev.target.closest("th[data-sort]") : null;
+        if (!th) return;
+
+        var col = th.getAttribute("data-sort") || "";
+        if (!col) return;
+
+        if (window.__fluxoNumerarioSapSort.col === col) {
+          window.__fluxoNumerarioSapSort.dir = window.__fluxoNumerarioSapSort.dir === "desc" ? "asc" : "desc";
+        } else {
+          window.__fluxoNumerarioSapSort.col = col;
+          window.__fluxoNumerarioSapSort.dir = (col === "valor") ? "desc" : "asc";
+        }
+
+        vektorFluxoNumerarioSapRenderTable_();
+      });
+    }
+
+    if (selTime) {
+      selTime.addEventListener("change", function(){
+        var time = String(selTime.value || "");
+        var lojaSelEl = document.getElementById("fluxoNumerarioSap_selLoja");
+        var meta = window.__fluxoNumerarioSapMeta || {};
+        var lojas = (meta.lojas || []).slice();
+
+        if (!time) {
+          vektorBuildOptionsSimple_(lojaSelEl, lojas, "Todas");
+          return;
+        }
+
+        var data = (window.__fluxoNumerarioSapData || []);
+        var lojasFiltradas = {};
+        data.forEach(function(r){
+          if (String(r.time || "") === time && r.loja) lojasFiltradas[r.loja] = true;
+        });
+
+        var arr = Object.keys(lojasFiltradas).sort();
+        vektorBuildOptionsSimple_(lojaSelEl, arr.length ? arr : lojas, "Todas");
+      });
+    }
+
+  } catch (e) {
+    console.error("[SAP init] erro:", e);
+    alert("Erro no init do Fluxo Numerário SAP: " + (e && e.message ? e.message : e));
+  }
 }
 
 // estado local da página
@@ -13204,8 +13920,9 @@ function vektorShowMyAlertsView_() {
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
   const basesVektorView = document.getElementById("basesVektorView");
+  const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
-  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView].forEach(v => {
+  [chatView, radarView, feedbackView, fluxView, envioPendView, cicloResumoView, consultasAuxView, vertexCostView, basesVektorView, fluxoNumerarioSapView].forEach(v => {
     if (!v) return;
     v.classList.add("hidden");
     v.style.display = "none";
@@ -15695,6 +16412,7 @@ window.vektorShowResumoCicloView_ = function () {
   const consultasAuxView = document.getElementById("consultasAuxView");
   const vertexCostView = document.getElementById("vertexCostView");
   const basesVektorView = document.getElementById("basesVektorView");
+  const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
   // ✅ fecha outras views (hidden + display none)
   if (chatView) { chatView.classList.add("hidden"); chatView.style.display = "none"; }
@@ -15707,6 +16425,7 @@ window.vektorShowResumoCicloView_ = function () {
   if (consultasAuxView) { consultasAuxView.classList.add("hidden"); consultasAuxView.style.display = "none"; }
   if (vertexCostView) { vertexCostView.classList.add("hidden"); vertexCostView.style.display = "none"; }
   if (basesVektorView) { basesVektorView.classList.add("hidden"); basesVektorView.style.display = "none"; }
+  if (fluxoNumerarioSapView) { fluxoNumerarioSapView.classList.add("hidden"); fluxoNumerarioSapView.style.display = "none"; }
 
   // ✅ abre resumo do ciclo
   if (cicloView) {
