@@ -17331,7 +17331,17 @@ function getFluxoNumerarioSapData(req) {
     var timeSel = String(req.time || "").trim();
     var lojaSel = String(req.loja || "").trim().toUpperCase();
 
-    if (!dtIni) dtIni = "2025-01-01";
+    if (!dtIni) {
+  var hoje = new Date();
+  var ini = new Date(hoje);
+  ini.setMonth(ini.getMonth() - 3);
+
+  function fmtIso_(d) {
+    return Utilities.formatDate(d, Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
+  }
+
+  dtIni = fmtIso_(ini);
+}
 
     if (dtFim && dtIni && dtFim < dtIni) {
       throw new Error("Período inválido: a data final não pode ser menor que a inicial.");
@@ -17355,7 +17365,6 @@ function getFluxoNumerarioSapData(req) {
         bseg.h_blart AS Tipodoc,
         bseg.h_budat AS Datalanc,
         bseg.h_bldat AS Datadoc,
-        bseg.valut   AS DataEfetiva,
         bseg.bschl   AS CL,
         ABS(
           CASE 
@@ -17365,20 +17374,8 @@ function getFluxoNumerarioSapData(req) {
         ) AS MontanteValor,
         bkpf.xblnr   AS Referencia,
         bseg.sgtxt   AS Texto,
-        bseg.saknr   AS NumContaRazao,
-        bseg.hkont   AS NumContaRazao2,
-        bseg.augdt   AS Datacomp,
         bseg.gkont   AS ContaContraPartida,
         bseg.gjahr   AS Exercicio, 
-        bseg.augbl   AS Numdoccomp,
-        bseg.netdt   AS Vencliq,
-        bseg.kostl   AS CentrodeCusto,
-        bseg.kunnr   AS Cliente,
-        bseg.hkont   AS ContaRazaoContabGeral,
-        bkpf.bktxt   AS TextoCabDoc,
-        bkpf.usnam   AS Usuario,
-        bkpf.cpudt   AS DataEntrada,
-        bkpf.stblg   AS NDocEstorno
       FROM \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bseg\` AS bseg
       INNER JOIN \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bkpf\` AS bkpf
         ON bseg.belnr = bkpf.belnr
