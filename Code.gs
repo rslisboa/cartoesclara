@@ -53,6 +53,83 @@ function construirMapaLojaParaTime_() {
   return map;
 }
 
+function vektorSapGetClaraMetaByLoja_(allowedSet) {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName("BaseClara");
+  if (!sh) throw new Error("Aba BaseClara não encontrada.");
+
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  if (lastRow < 2) {
+    return {
+      byLoja: {},
+      totalLojas: 0
+    };
+  }
+
+  var values = sh.getRange(1, 1, lastRow, lastCol).getValues();
+  var header = values[0].map(function(h){ return String(h || "").trim(); });
+  var rows = values.slice(1);
+
+  function idxOf_(names) {
+    for (var i = 0; i < names.length; i++) {
+      var ix = header.indexOf(names[i]);
+      if (ix >= 0) return ix;
+    }
+    return -1;
+  }
+
+  var idxAlias = idxOf_(["Alias Do Cartão", "Alias do Cartão", "Alias do Cartao", "Alias Cartão", "Alias Cartao"]);
+  var idxData  = idxOf_(["Data da Transação", "Data da Transacao", "Data Transação", "Data Transacao", "Data"]);
+
+  // fallback explícito: coluna H = 8 => índice 7
+  if (idxAlias < 0) idxAlias = 7;
+
+  var byLoja = {};
+  var lojasSet = {};
+
+  rows.forEach(function(r){
+    var alias = String(r[idxAlias] || "").trim().toUpperCase();
+    if (!alias) return;
+
+    // mantém só padrão CEXXXX
+    var dig = alias.replace(/\D/g, "");
+    if (!dig) return;
+
+    var lojaKey = "CE" + String(Number(dig) || "").padStart(4, "0");
+    if (lojaKey === "CE0000") return;
+
+    if (allowedSet && !allowedSet[lojaKey] && !allowedSet[String(Number(dig) || "")] && !allowedSet[String(Number(dig) || "").padStart(4, "0")]) {
+      return;
+    }
+
+    lojasSet[lojaKey] = true;
+
+    if (!byLoja[lojaKey]) {
+      byLoja[lojaKey] = {
+        habilitado: true,
+        primeiraTransacao: ""
+      };
+    }
+
+    if (idxData >= 0) {
+      var dv = r[idxData];
+      var d = (dv instanceof Date) ? dv : new Date(dv);
+      if (d instanceof Date && !isNaN(d.getTime())) {
+        var iso = Utilities.formatDate(d, Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
+        if (!byLoja[lojaKey].primeiraTransacao || iso < byLoja[lojaKey].primeiraTransacao) {
+          byLoja[lojaKey].primeiraTransacao = iso;
+        }
+      }
+    }
+  });
+
+  return {
+    byLoja: byLoja,
+    totalLojas: Object.keys(lojasSet).length
+  };
+}
+
 var PROP_LAST_SNAPSHOT_SIG = "VEKTOR_HISTPEND_LAST_SIG";
 
 function LIMPAR_ANTI_SPAM() {
@@ -17332,29 +17409,21 @@ function getFluxoNumerarioSapData(req) {
     var lojaSel = String(req.loja || "").trim().toUpperCase();
 
     if (!dtIni) {
-  var hoje = new Date();
-  var ini = new Date(hoje);
-  ini.setMonth(ini.getMonth() - 3);
+      var hoje = new Date();
+      var ini = new Date(hoje);
+      ini.setMonth(ini.getMonth() - 3);
+      dtIni = Utilities.formatDate(ini, Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
+    }
 
-  function fmtIso_(d) {
-    return Utilities.formatDate(d, Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
-  }
-
-  dtIni = fmtIso_(ini);
-}
+    if (!dtFim) {
+      dtFim = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
+    }
 
     if (dtFim && dtIni && dtFim < dtIni) {
       throw new Error("Período inválido: a data final não pode ser menor que a inicial.");
     }
 
-    var wherePeriodo = 'bseg.h_budat >= DATE("2025-01-01")';
-    if (dtIni && dtFim) {
-      wherePeriodo = 'bseg.h_budat BETWEEN DATE("' + dtIni + '") AND DATE("' + dtFim + '")';
-    } else if (dtIni) {
-      wherePeriodo = 'bseg.h_budat >= DATE("' + dtIni + '")';
-    } else if (dtFim) {
-      wherePeriodo = 'bseg.h_budat BETWEEN DATE("2025-01-01") AND DATE("' + dtFim + '")';
-    }
+    var wherePeriodo = 'bseg.h_budat BETWEEN DATE("' + dtIni + '") AND DATE("' + dtFim + '")';
 
     var sql = `
     WITH base_filtrada AS (
@@ -17374,7 +17443,6 @@ function getFluxoNumerarioSapData(req) {
         ) AS MontanteValor,
         bkpf.xblnr   AS Referencia,
         bseg.sgtxt   AS Texto,
-        bseg.gkont   AS ContaContraPartida,
         bseg.gjahr   AS Exercicio, 
       FROM \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bseg\` AS bseg
       INNER JOIN \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bkpf\` AS bkpf
@@ -17402,6 +17470,11 @@ function getFluxoNumerarioSapData(req) {
     var emailMap = {};
     try { emailMap = vektorCarregarMapaEmailsLojas_() || {}; } catch (_) { emailMap = {}; }
 
+    // NOVO: BaseClara
+    var claraMeta = vektorSapGetClaraMetaByLoja_(allowedSet);
+    var claraByLoja = claraMeta.byLoja || {};
+    var totalLojasBaseClara = Number(claraMeta.totalLojas || 0) || 0;
+
     var rows = raw.map(function(r){
       var lojaKey = String(r.LocalNegCorreto || "").trim().toUpperCase();
       var lojaNum = normalizarLojaNumero_(lojaKey);
@@ -17410,17 +17483,20 @@ function getFluxoNumerarioSapData(req) {
 
       var valor = Math.abs(Number(r.MontanteValor || 0) || 0);
       var dataLancIso = vektorSapParseDateIso_(r.Datalanc);
+      var claraRec = claraByLoja[lojaKey] || null;
 
       return {
         selected: false,
         loja: lojaKey,
         lojaNum: loja4,
         time: time || (emailMap[lojaKey] && emailMap[lojaKey].time ? emailMap[lojaKey].time : ""),
+        habilitadoClara: claraRec && claraRec.habilitado ? "Sim" : "Não",
         valor: valor,
         valorFmt: vektorSapFmtMoneyBr_(valor),
         dataLanc: vektorSapFmtDateBr_(r.Datalanc),
         dataLancIso: dataLancIso || "",
         texto: String(r.Texto || "").trim(),
+        referencia: String(r.Referencia || "").trim(),
         numdoc: String(r.Numdoc || "").trim(),
         tipodoc: String(r.Tipodoc || "").trim(),
         emailGerente: String((emailMap[lojaKey] && emailMap[lojaKey].emailGerente) || "").trim(),
@@ -17459,9 +17535,11 @@ function getFluxoNumerarioSapData(req) {
     var ultima = rows.length ? rows[0] : null;
 
     var byLoja = {};
+    var lojasSangriaSet = {};
     rows.forEach(function(r){
       var k = r.loja || "—";
       byLoja[k] = (byLoja[k] || 0) + (Number(r.valor || 0) || 0);
+      if (r.loja) lojasSangriaSet[r.loja] = true;
     });
 
     var chartRows = Object.keys(byLoja).map(function(loja){
@@ -17469,6 +17547,11 @@ function getFluxoNumerarioSapData(req) {
     }).sort(function(a,b){
       return b.valor - a.valor;
     }).slice(0, 20);
+
+    var qtdLojasSangria = Object.keys(lojasSangriaSet).length;
+    var pctLojasSangria = totalLojasBaseClara > 0
+      ? (qtdLojasSangria / totalLojasBaseClara) * 100
+      : 0;
 
     return {
       ok: true,
@@ -17479,7 +17562,9 @@ function getFluxoNumerarioSapData(req) {
         lojaMaiorSangriaValor: topLoja ? topLoja.valorFmt : "—",
         ultimaLoja: ultima ? ultima.loja : "—",
         ultimaData: ultima ? ultima.dataLanc : "—",
-        ultimaValor: ultima ? ultima.valorFmt : "—"
+        ultimaValor: ultima ? ultima.valorFmt : "—",
+        pctLojasSangria: pctLojasSangria.toFixed(1).replace(".", ",") + "%",
+        pctLojasSangriaSub: qtdLojasSangria + " de " + totalLojasBaseClara + " lojas"
       },
       chart: chartRows
     };
@@ -17498,7 +17583,7 @@ function vektorSapMontarTabelaEmail_(rows) {
   html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Valor</th>";
   html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Data lançamento</th>";
   html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Texto</th>";
-  html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Número documento</th>";
+  html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Referencia</th>";
   html += "</tr></thead><tbody>";
 
   rows.forEach(function(r){
@@ -17508,7 +17593,7 @@ function vektorSapMontarTabelaEmail_(rows) {
     html += "<td style='padding:8px;border:1px solid #e2e8f0; text-align:right;'>" + String(r.valorFmt || "—") + "</td>";
     html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.dataLanc || "—") + "</td>";
     html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.texto || "—").replace(/</g,"&lt;") + "</td>";
-    html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.numdoc || "—") + "</td>";
+    html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.referencia || "—").replace(/</g,"&lt;") + "</td>";
     html += "</tr>";
   });
 
