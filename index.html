@@ -5426,7 +5426,6 @@ display: none;
     <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Período inicial</label>
     <input id="fluxoNumerarioSap_dtIni"
            type="date"
-           value="2025-01-01"
            style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;">
   </div>
 
@@ -8324,6 +8323,10 @@ window.__fluxoNumerarioSapSort = { col: "dataLancIso", dir: "desc" };
 window.__fluxoNumerarioSapChart = null;
 window.__fluxoNumerarioSapMeta = null;
 
+window.__fluxoNumerarioSapBaseRows = [];
+window.__fluxoNumerarioSapLastCards = null;
+window.__fluxoNumerarioSapLastChart = null;
+
 function vektorShowFluxoNumerarioSapView_() {
   const ids = [
     "chatView",
@@ -8380,14 +8383,51 @@ function vektorFluxoNumerarioSapResetVisual_(){
 window.vektorOpenFluxoNumerarioSap = function () {
   vektorShowFluxoNumerarioSapView_();
   vektorFluxoNumerarioSapInitOnce_();
-  vektorFluxoNumerarioSapResetVisual_();
 
   try {
+    var hasCache =
+      Array.isArray(window.__fluxoNumerarioSapData) &&
+      window.__fluxoNumerarioSapData.length > 0;
+
+    if (hasCache) {
+      try {
+        if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
+          vektorFluxoNumerarioSapRebuildDependentFilters_();
+        }
+      } catch (_) {}
+
+      try {
+        if (window.__fluxoNumerarioSapLastCards) {
+          vektorFluxoNumerarioSapRenderCards_(window.__fluxoNumerarioSapLastCards);
+        }
+      } catch (_) {}
+
+      try {
+        vektorFluxoNumerarioSapRenderTable_();
+      } catch (_) {}
+
+      try {
+        if (window.__fluxoNumerarioSapLastChart) {
+          vektorFluxoNumerarioSapRenderChart_(window.__fluxoNumerarioSapLastChart);
+        }
+      } catch (_) {}
+
+      return;
+    }
+
+    vektorFluxoNumerarioSapResetVisual_();
+
+    vektorFluxoNumerarioSapShowOverlay_(
+      "Carregando Fluxo Numerário SAP…",
+      "Buscando dados padrão dos últimos 3 meses."
+    );
+
     vektorFluxoNumerarioSapEnsureMeta_(function(){
-      vektorFluxoNumerarioSapBuscar_();
+      vektorFluxoNumerarioSapBuscar_({ fromOpen: true });
     });
   } catch (e) {
     console.error("Erro ao abrir Fluxo Numerário SAP:", e);
+    vektorFluxoNumerarioSapHideOverlay_();
   }
 };
 
@@ -10713,20 +10753,6 @@ function vektorFluxoNumerarioSapResetVisual_(){
   } catch (_) {}
 }
 
-window.vektorOpenFluxoNumerarioSap = function () {
-  vektorShowFluxoNumerarioSapView_();
-  vektorFluxoNumerarioSapInitOnce_();
-  vektorFluxoNumerarioSapResetVisual_();
-
-  try {
-    vektorFluxoNumerarioSapEnsureMeta_(function(){
-      vektorFluxoNumerarioSapBuscar_();
-    });
-  } catch (e) {
-    console.error("Erro ao abrir Fluxo Numerário SAP:", e);
-  }
-};
-
 function vektorBuildOptionsSimple_(sel, items, allLabel){
   if (!sel) return;
   sel.innerHTML = "";
@@ -10870,24 +10896,25 @@ function vektorFluxoNumerarioSapRenderChart_(chartRows){
     console.error("[SAP] erro ao destruir gráfico anterior", e);
   }
 
-  var labels = (chartRows || []).map(function(x){ return x.loja; });
+  var labels = (chartRows || []).map(function(x){ return String(x.loja || ""); });
   var values = (chartRows || []).map(function(x){ return Number(x.valor || 0) || 0; });
 
   var ctx = canvas.getContext("2d");
-  if (!ctx) {
-    console.error("[SAP] context do canvas não disponível");
-    return;
-  }
+  if (!ctx) return;
 
-  if (typeof Chart === "undefined") {
-    console.error("[SAP] Chart não está carregado");
-    return;
-  }
+  if (typeof Chart === "undefined") return;
 
   var sapPlugins = [];
   if (typeof ChartDataLabels !== "undefined") {
     try { Chart.register(ChartDataLabels); } catch(_) {}
     sapPlugins.push(ChartDataLabels);
+  }
+
+  function fmtCompactK_(n){
+    n = Number(n || 0) || 0;
+    var abs = Math.abs(n);
+    if (abs >= 1000) return Math.round(n / 1000) + "k";
+    return String(Math.round(n));
   }
 
   window.__fluxoNumerarioSapChart = new Chart(ctx, {
@@ -10901,13 +10928,18 @@ function vektorFluxoNumerarioSapRenderChart_(chartRows){
         borderColor: "#005E27",
         borderWidth: 2,
         borderRadius: 8,
-        borderSkipped: false
+        borderSkipped: false,
+        barPercentage: 0.72,
+        categoryPercentage: 0.78
       }]
     },
     plugins: sapPlugins,
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      layout: {
+        padding: { top: 8, right: 8, bottom: 8, left: 8 }
+      },
       plugins: {
         legend: {
           labels: {
@@ -10916,24 +10948,43 @@ function vektorFluxoNumerarioSapRenderChart_(chartRows){
           }
         },
         datalabels: {
-          color: "#ffffff",
-          anchor: "end",
-          align: "end",
-          offset: -2,
+          anchor: "center",
+          align: "center",
+          offset: 0,
           clamp: true,
+          clip: false,
+          color: "#000000",
+          backgroundColor: "#ffffff",
+          borderColor: "#000000",
+          borderWidth: 1,
+          borderRadius: 6,
+          padding: { top: 3, right: 6, bottom: 3, left: 6 },
           font: { weight: "900", size: 11 },
           formatter: function(v){
-            return (Number(v || 0) || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+            return fmtCompactK_(v);
           }
         }
       },
       scales: {
         x: {
-          ticks: { color: "#e2e8f0", font: { weight: "800" } },
+          ticks: {
+            color: "#e2e8f0",
+            font: { weight: "800" },
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0
+          },
           grid: { color: "rgba(255,255,255,0.08)" }
         },
         y: {
-          ticks: { color: "#e2e8f0", font: { weight: "800" } },
+          beginAtZero: true,
+          ticks: {
+            color: "#e2e8f0",
+            font: { weight: "800" },
+            callback: function(v){
+              return fmtCompactK_(v);
+            }
+          },
           grid: { color: "rgba(255,255,255,0.08)" }
         }
       }
@@ -10963,9 +11014,35 @@ function vektorFluxoNumerarioSapHideOverlay_(){
   }
 }
 
-function vektorFluxoNumerarioSapBuscar_(){
+function vektorFluxoNumerarioSapApplyClientFiltersWithLoading_(){
+  vektorFluxoNumerarioSapShowOverlay_(
+    "Aplicando filtros…",
+    "Atualizando lojas, times e visualização."
+  );
+
+  setTimeout(function(){
+    try {
+      if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
+        vektorFluxoNumerarioSapRebuildDependentFilters_();
+      }
+
+      if (Array.isArray(window.__fluxoNumerarioSapData)) {
+        vektorFluxoNumerarioSapRenderTable_();
+      }
+    } catch (e) {
+      console.error("[SAP filtros] erro ao aplicar filtros no front:", e);
+    } finally {
+      vektorFluxoNumerarioSapHideOverlay_();
+    }
+  }, 120);
+}
+
+function vektorFluxoNumerarioSapBuscar_(opts){
+  opts = opts || {};
+  var fromOpen = !!opts.fromOpen;
+
   var req = {
-    dtIni: document.getElementById("fluxoNumerarioSap_dtIni")?.value || "2025-01-01",
+    dtIni: document.getElementById("fluxoNumerarioSap_dtIni")?.value || "",
     dtFim: document.getElementById("fluxoNumerarioSap_dtFim")?.value || "",
     time: document.getElementById("fluxoNumerarioSap_selTime")?.value || "",
     loja: document.getElementById("fluxoNumerarioSap_selLoja")?.value || ""
@@ -10976,10 +11053,12 @@ function vektorFluxoNumerarioSapBuscar_(){
     return;
   }
 
-  vektorFluxoNumerarioSapShowOverlay_(
-    "Buscando lançamentos de sangria…",
-    "Consultando dados do SAP e atualizando a visão."
-  );
+  if (!fromOpen) {
+    vektorFluxoNumerarioSapShowOverlay_(
+      "Buscando lançamentos de sangria…",
+      "Consultando dados do SAP e atualizando a visão."
+    );
+  }
 
   google.script.run
     .withSuccessHandler(function(res){
@@ -10991,14 +11070,16 @@ function vektorFluxoNumerarioSapBuscar_(){
 
         window.__fluxoNumerarioSapData = Array.isArray(res.rows) ? res.rows : [];
         window.__fluxoNumerarioSapBaseRows = Array.isArray(res.rows) ? res.rows.slice() : [];
+        window.__fluxoNumerarioSapLastCards = res.cards || {};
+        window.__fluxoNumerarioSapLastChart = res.chart || [];
 
         if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
           vektorFluxoNumerarioSapRebuildDependentFilters_();
         }
 
-        vektorFluxoNumerarioSapRenderCards_(res.cards || {});
+        vektorFluxoNumerarioSapRenderCards_(window.__fluxoNumerarioSapLastCards);
         vektorFluxoNumerarioSapRenderTable_();
-        vektorFluxoNumerarioSapRenderChart_(res.chart || []);
+        vektorFluxoNumerarioSapRenderChart_(window.__fluxoNumerarioSapLastChart);
       } catch (e) {
         console.error("[SAP buscar] erro na renderização:", e);
         alert("Erro ao renderizar Fluxo Numerário SAP: " + (e && e.message ? e.message : e));
@@ -11057,16 +11138,21 @@ function vektorFluxoNumerarioSapInitOnce_(){
     var dtIni = document.getElementById("fluxoNumerarioSap_dtIni");
     var dtFim = document.getElementById("fluxoNumerarioSap_dtFim");
 
-    if (dtIni && !dtIni.value) {
-      dtIni.value = "2025-01-01";
-    }
-
-    if (dtFim && !dtFim.value) {
+    if (dtIni && dtFim && !dtIni.value && !dtFim.value) {
       var hoje = new Date();
-      var yyyy = hoje.getFullYear();
-      var mm = String(hoje.getMonth() + 1).padStart(2, "0");
-      var dd = String(hoje.getDate()).padStart(2, "0");
-      dtFim.value = yyyy + "-" + mm + "-" + dd;
+      var fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      var ini = new Date(fim);
+      ini.setMonth(ini.getMonth() - 3);
+
+      function fmtDateInput_(d) {
+        var yyyy = d.getFullYear();
+        var mm = String(d.getMonth() + 1).padStart(2, "0");
+        var dd = String(d.getDate()).padStart(2, "0");
+        return yyyy + "-" + mm + "-" + dd;
+      }
+
+      dtIni.value = fmtDateInput_(ini);
+      dtFim.value = fmtDateInput_(fim);
     }
 
     if (btnBuscar) {
@@ -11094,23 +11180,42 @@ function vektorFluxoNumerarioSapInitOnce_(){
           window.__fluxoNumerarioSapSort.dir = (col === "valor") ? "desc" : "asc";
         }
 
-        vektorFluxoNumerarioSapRenderTable_();
+        vektorFluxoNumerarioSapShowOverlay_(
+          "Ordenando dados…",
+          "Atualizando a tabela."
+        );
+
+        setTimeout(function(){
+          try {
+            vektorFluxoNumerarioSapRenderTable_();
+          } finally {
+            vektorFluxoNumerarioSapHideOverlay_();
+          }
+        }, 80);
       });
     }
 
     if (selTime) {
       selTime.addEventListener("change", function(){
-        if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
-          vektorFluxoNumerarioSapRebuildDependentFilters_();
-        }
+        vektorFluxoNumerarioSapApplyClientFiltersWithLoading_();
       });
     }
 
     if (selLoja) {
       selLoja.addEventListener("change", function(){
-        if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
-          vektorFluxoNumerarioSapRebuildDependentFilters_();
-        }
+        vektorFluxoNumerarioSapApplyClientFiltersWithLoading_();
+      });
+    }
+
+    if (dtIni) {
+      dtIni.addEventListener("change", function(){
+        vektorFluxoNumerarioSapBuscar_();
+      });
+    }
+
+    if (dtFim) {
+      dtFim.addEventListener("change", function(){
+        vektorFluxoNumerarioSapBuscar_();
       });
     }
 
@@ -14076,6 +14181,7 @@ function vektorShowConsultasAuxView_(){
     "analiseGastosView",
     "consultasAuxView",
     "vertexCostView",
+    "fluxoNumerarioSapView",
     "basesVektorView"
   ];
 
@@ -14115,7 +14221,8 @@ function vektorShowBasesVektorView_(){
     "analiseGastosView",
     "consultasAuxView",
     "vertexCostView",
-    "basesVektorView"
+    "basesVektorView",
+    "fluxoNumerarioSapView"
   ];
 
   ids.forEach(function(id){
