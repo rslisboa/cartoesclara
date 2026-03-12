@@ -17101,6 +17101,526 @@ function getAnaliseGastosMacroVisoesDataset(req){
   }
 }
 
+// =====================================================
+// FLUXO NUMERÁRIO SAP — BACKEND
+// =====================================================
+
+var VEKTOR_SAP_PROJECT_ID = "gruposbf-data-lake";
+var VEKTOR_SAP_SANGRIA_LOG_SHEET = "VEKTOR_SAP_SANGRIA_LOG";
+
+function vektorSapFmtDateBr_(v) {
+  try {
+    if (!v) return "—";
+    if (v instanceof Date) {
+      return Utilities.formatDate(v, Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy");
+    }
+
+    var s = String(v).trim();
+    if (!s) return "—";
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      var p = s.split("-");
+      return p[2] + "/" + p[1] + "/" + p[0];
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+      var d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        return Utilities.formatDate(d, Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy");
+      }
+    }
+
+    return s;
+  } catch (e) {
+    return String(v || "—");
+  }
+}
+
+function vektorSapParseDateIso_(v) {
+  if (!v) return null;
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
+  }
+
+  var s = String(v).trim();
+  if (!s) return null;
+
+  var m1 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m1) return s;
+
+  var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (m2) return m2[1] + "-" + m2[2] + "-" + m2[3];
+
+  return null;
+}
+
+function vektorSapFmtMoneyBr_(n) {
+  n = Number(n || 0) || 0;
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function vektorSapNormDocKey_(row) {
+  var loja = String(row.loja || "").trim().toUpperCase();
+  var numdoc = String(row.numdoc || "").trim();
+  var dt = String(row.dataLancIso || "").trim();
+  var val = String(Number(row.valor || 0).toFixed(2));
+  return [loja, numdoc, dt, val].join("|");
+}
+
+function vektorSapGetOrCreateLogSheet_() {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sh = ss.getSheetByName(VEKTOR_SAP_SANGRIA_LOG_SHEET);
+
+  if (!sh) {
+    sh = ss.insertSheet(VEKTOR_SAP_SANGRIA_LOG_SHEET);
+    sh.appendRow([
+      "createdAt",
+      "userEmail",
+      "docKey",
+      "lojaKey",
+      "time",
+      "numdoc",
+      "datalanc",
+      "valor",
+      "to",
+      "cc",
+      "status",
+      "error"
+    ]);
+    sh.getRange(1,1,1,12).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+
+  return sh;
+}
+
+function vektorSapJaFoiNotificado_(docKey) {
+  var sh = vektorSapGetOrCreateLogSheet_();
+  var lr = sh.getLastRow();
+  if (lr < 2) return false;
+
+  var values = sh.getRange(2, 1, lr - 1, 12).getValues();
+  for (var i = values.length - 1; i >= 0; i--) {
+    var row = values[i];
+    var dk = String(row[2] || "").trim();
+    var st = String(row[10] || "").trim().toUpperCase();
+    if (dk === docKey && st === "SENT") return true;
+  }
+  return false;
+}
+
+function vektorSapLogNotificacao_(payload) {
+  payload = payload || {};
+  var sh = vektorSapGetOrCreateLogSheet_();
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var ts = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss");
+
+  sh.appendRow([
+    ts,
+    String(payload.userEmail || "").trim().toLowerCase(),
+    String(payload.docKey || "").trim(),
+    String(payload.lojaKey || "").trim(),
+    String(payload.time || "").trim(),
+    String(payload.numdoc || "").trim(),
+    String(payload.datalanc || "").trim(),
+    Number(payload.valor || 0) || 0,
+    String(payload.to || "").trim(),
+    String(payload.cc || "").trim(),
+    String(payload.status || "").trim(),
+    String(payload.error || "").trim()
+  ]);
+}
+
+function vektorSapRunQuery_(sql) {
+  var req = {
+    query: sql,
+    useLegacySql: false,
+    timeoutMs: 120000
+  };
+
+  var res = BigQuery.Jobs.query(req, VEKTOR_SAP_PROJECT_ID);
+  var jobId = res.jobReference && res.jobReference.jobId ? res.jobReference.jobId : "";
+
+  while (!res.jobComplete) {
+    Utilities.sleep(1200);
+    res = BigQuery.Jobs.getQueryResults(VEKTOR_SAP_PROJECT_ID, jobId, { timeoutMs: 120000 });
+  }
+
+  return res;
+}
+
+function vektorSapMapRows_(res) {
+  var fields = (((res || {}).schema || {}).fields || []);
+  var rows = (res && res.rows) ? res.rows : [];
+  if (!fields.length || !rows.length) return [];
+
+  var names = fields.map(function(f){ return String(f.name || ""); });
+
+  return rows.map(function(r){
+    var obj = {};
+    var vals = (r && r.f) ? r.f : [];
+    for (var i = 0; i < names.length; i++) {
+      obj[names[i]] = vals[i] ? vals[i].v : null;
+    }
+    return obj;
+  });
+}
+
+function getFluxoNumerarioSapMeta() {
+  vektorAssertFunctionAllowed_("getFluxoNumerarioSapMeta");
+
+  try {
+    var ctx = vektorGetUserRole_();
+    var email = String((ctx && ctx.email) || "").trim().toLowerCase();
+    if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
+
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email); // null admin | array restrito
+    var mapLojaTime = construirMapaLojaParaTime_() || {};
+
+    var lojasSet = {};
+    var timesSet = {};
+
+    Object.keys(mapLojaTime).forEach(function(lojaNum){
+      var loja4 = String(lojaNum).padStart(4, "0");
+      var lojaKey = "CE" + loja4;
+
+      if (Array.isArray(allowedLojas) && allowedLojas.indexOf(String(Number(lojaNum))) < 0 && allowedLojas.indexOf(loja4) < 0) {
+        return;
+      }
+
+      lojasSet[lojaKey] = true;
+      var t = String(mapLojaTime[lojaNum] || "").trim();
+      if (t) timesSet[t] = true;
+    });
+
+    return {
+      ok: true,
+      lojas: Object.keys(lojasSet).sort(),
+      times: Object.keys(timesSet).sort()
+    };
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function getFluxoNumerarioSapData(req) {
+  vektorAssertFunctionAllowed_("getFluxoNumerarioSapData");
+
+  try {
+    req = req || {};
+
+    var ctx = vektorGetUserRole_();
+    var email = String((ctx && ctx.email) || "").trim().toLowerCase();
+    if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
+
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email); // null => admin
+    var allowedSet = null;
+    if (Array.isArray(allowedLojas)) {
+      allowedSet = {};
+      allowedLojas.forEach(function(x){
+        var n = normalizarLojaNumero_(x);
+        if (n == null) return;
+        allowedSet[String(n)] = true;
+        allowedSet[String(n).padStart(4, "0")] = true;
+        allowedSet["CE" + String(n).padStart(4, "0")] = true;
+      });
+    }
+
+    var timeSel = String(req.time || "").trim();
+    var lojaSel = String(req.loja || "").trim().toUpperCase();
+
+    var sql = `
+    WITH base_filtrada AS (
+      SELECT 
+        bseg.bukrs   AS Empresa,
+        bseg.zuonr   AS Atribuicao,
+        bseg.belnr   AS Numdoc,
+        bseg.h_blart AS Tipodoc,
+        bseg.h_budat AS Datalanc,
+        bseg.h_bldat AS Datadoc,
+        bseg.valut   AS DataEfetiva,
+        bseg.bschl   AS CL,
+        CASE 
+          WHEN bseg.bschl = '50' THEN -bseg.dmbtr 
+          ELSE bseg.dmbtr 
+        END AS MontanteValor,
+        bkpf.xblnr   AS Referencia,
+        bseg.sgtxt   AS Texto,
+        bseg.saknr   AS NumContaRazao,
+        bseg.hkont   AS NumContaRazao2,
+        bseg.augdt   AS Datacomp,
+        bseg.gkont   AS ContaContraPartida,
+        bseg.gjahr   AS Exercicio, 
+        bseg.augbl   AS Numdoccomp,
+        bseg.netdt   AS Vencliq,
+        bseg.kostl   AS CentrodeCusto,
+        bseg.kunnr   AS Cliente,
+        bseg.hkont   AS ContaRazaoContabGeral,
+        bkpf.bktxt   AS TextoCabDoc,
+        bkpf.usnam   AS Usuario,
+        bkpf.cpudt   AS DataEntrada,
+        bkpf.stblg   AS NDocEstorno
+      FROM \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bseg\` AS bseg
+      INNER JOIN \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bkpf\` AS bkpf
+        ON bseg.belnr = bkpf.belnr
+      WHERE bseg.h_budat >= DATE_SUB(CURRENT_DATE("America/Sao_Paulo"), INTERVAL 60 DAY)
+        AND bseg.bukrs = "7010"
+        AND bseg.hkont = "1101005003"
+        AND bkpf.stblg IS NULL
+        AND EXTRACT(YEAR FROM bkpf.cpudt) = EXTRACT(YEAR FROM bseg.h_budat)
+        AND bseg.h_blart IN ("DX", "RV", "SG")
+    )
+    SELECT 
+      bf.*,
+      CURRENT_DATE("America/Sao_Paulo") AS DataAtualizacao,
+      FORMAT_TIMESTAMP('%H:%M:%S', CURRENT_TIMESTAMP(), 'America/Sao_Paulo') AS HoraAtualizacao,
+      CONCAT('CE', LPAD(bf.Atribuicao, 4, '0')) AS LocalNegCorreto,
+      FORMAT('%.2f', bf.MontanteValor) AS MontanteFmt
+    FROM base_filtrada bf
+    WHERE bf.Tipodoc = "SG"
+    ORDER BY bf.Datalanc DESC
+    `;
+
+    var raw = vektorSapMapRows_(vektorSapRunQuery_(sql));
+    var mapLojaTime = construirMapaLojaParaTime_() || {};
+    var emailMap = {};
+    try { emailMap = vektorCarregarMapaEmailsLojas_() || {}; } catch (_) { emailMap = {}; }
+
+    var rows = raw.map(function(r){
+      var lojaKey = String(r.LocalNegCorreto || "").trim().toUpperCase();
+      var lojaNum = normalizarLojaNumero_(lojaKey);
+      var loja4 = lojaNum != null ? String(lojaNum).padStart(4, "0") : "";
+      var time = lojaNum != null ? String(mapLojaTime[lojaNum] || "").trim() : "";
+
+      var valor = Number(r.MontanteValor || 0) || 0;
+      var dataLancIso = vektorSapParseDateIso_(r.Datalanc);
+
+      return {
+        selected: false,
+        loja: lojaKey,
+        lojaNum: loja4,
+        time: time || (emailMap[lojaKey] && emailMap[lojaKey].time ? emailMap[lojaKey].time : ""),
+        valor: valor,
+        valorFmt: vektorSapFmtMoneyBr_(valor),
+        dataLanc: vektorSapFmtDateBr_(r.Datalanc),
+        dataLancIso: dataLancIso || "",
+        texto: String(r.Texto || "").trim(),
+        numdoc: String(r.Numdoc || "").trim(),
+        tipodoc: String(r.Tipodoc || "").trim(),
+        emailGerente: String((emailMap[lojaKey] && emailMap[lojaKey].emailGerente) || "").trim(),
+        emailRegional: String((emailMap[lojaKey] && emailMap[lojaKey].emailRegional) || "").trim()
+      };
+    });
+
+    rows = rows.filter(function(r){
+      if (!r.loja) return false;
+
+      if (allowedSet && !allowedSet[r.loja] && !allowedSet[r.lojaNum] && !allowedSet[String(Number(r.lojaNum) || "")]) {
+        return false;
+      }
+
+      if (timeSel && r.time !== timeSel) return false;
+      if (lojaSel && r.loja !== lojaSel) return false;
+
+      return true;
+    });
+
+    rows.sort(function(a,b){
+      var da = Date.parse(a.dataLancIso || "") || 0;
+      var db = Date.parse(b.dataLancIso || "") || 0;
+      return db - da;
+    });
+
+    var topLoja = null;
+    var maxValor = -Infinity;
+    rows.forEach(function(r){
+      if (Number(r.valor || 0) > maxValor) {
+        maxValor = Number(r.valor || 0);
+        topLoja = r;
+      }
+    });
+
+    var ultima = rows.length ? rows[0] : null;
+
+    var byLoja = {};
+    rows.forEach(function(r){
+      var k = r.loja || "—";
+      byLoja[k] = (byLoja[k] || 0) + (Number(r.valor || 0) || 0);
+    });
+
+    var chartRows = Object.keys(byLoja).map(function(loja){
+      return { loja: loja, valor: Number(byLoja[loja] || 0) || 0 };
+    }).sort(function(a,b){
+      return b.valor - a.valor;
+    }).slice(0, 20);
+
+    return {
+      ok: true,
+      rows: rows,
+      cards: {
+        totalOcorrencias: rows.length,
+        lojaMaiorSangria: topLoja ? topLoja.loja : "—",
+        lojaMaiorSangriaValor: topLoja ? topLoja.valorFmt : "—",
+        ultimaLoja: ultima ? ultima.loja : "—",
+        ultimaData: ultima ? ultima.dataLanc : "—",
+        ultimaValor: ultima ? ultima.valorFmt : "—"
+      },
+      chart: chartRows
+    };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+function vektorSapMontarTabelaEmail_(rows) {
+  var html = "";
+  html += "<table style='width:100%; border-collapse:collapse; font-size:12px;'>";
+  html += "<thead><tr style='background:#0b1220;color:#fff;'>";
+  html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Loja</th>";
+  html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Time</th>";
+  html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Valor</th>";
+  html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Data lançamento</th>";
+  html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Texto</th>";
+  html += "<th style='padding:8px;border:1px solid #cbd5e1;'>Número documento</th>";
+  html += "</tr></thead><tbody>";
+
+  rows.forEach(function(r){
+    html += "<tr>";
+    html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.loja || "—") + "</td>";
+    html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.time || "—") + "</td>";
+    html += "<td style='padding:8px;border:1px solid #e2e8f0; text-align:right;'>" + String(r.valorFmt || "—") + "</td>";
+    html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.dataLanc || "—") + "</td>";
+    html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.texto || "—").replace(/</g,"&lt;") + "</td>";
+    html += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + String(r.numdoc || "—") + "</td>";
+    html += "</tr>";
+  });
+
+  html += "</tbody></table>";
+  return html;
+}
+
+function sendFluxoNumerarioSapNotificacao(rows) {
+  vektorAssertFunctionAllowed_("sendFluxoNumerarioSapNotificacao");
+
+  try {
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) return { ok:false, error:"Nenhuma linha selecionada." };
+
+    var ctx = vektorGetUserRole_();
+    var userEmail = String((ctx && ctx.email) || "").trim().toLowerCase();
+
+    var grupos = {};
+    rows.forEach(function(r){
+      var lojaKey = String(r.loja || "").trim().toUpperCase();
+      if (!lojaKey) return;
+      if (!grupos[lojaKey]) grupos[lojaKey] = [];
+      grupos[lojaKey].push(r);
+    });
+
+    var enviados = [];
+    var falhas = [];
+    var saudacao = vektorSaudacaoPorHora_();
+
+    Object.keys(grupos).forEach(function(lojaKey){
+      var itens = grupos[lojaKey];
+      if (!itens.length) return;
+
+      var docKey = vektorSapNormDocKey_(itens[0]);
+      if (vektorSapJaFoiNotificado_(docKey)) {
+        falhas.push({ loja: lojaKey, error: "Essa ocorrência já foi notificada anteriormente." });
+        return;
+      }
+
+      var toSet = {};
+      function addTo_(em){
+        em = String(em || "").trim();
+        if (!em) return;
+        toSet[em.toLowerCase()] = em;
+      }
+
+      addTo_(itens[0].emailGerente);
+      addTo_(itens[0].emailRegional);
+
+      var toList = Object.keys(toSet).map(function(k){ return toSet[k]; }).join(",");
+      if (!toList) {
+        falhas.push({ loja: lojaKey, error: "Sem e-mails de gerente/regional para a loja na aba Emails." });
+        return;
+      }
+
+      var dataRef = String(itens[0].dataLanc || "").trim() || "—";
+      var assunto = "[ALERTA CLARA | SANGRIA] Verificação de Uso - Loja: " + lojaKey + " - " + dataRef;
+
+      var tabela = vektorSapMontarTabelaEmail_(itens);
+
+      var corpo = "";
+      corpo += "<div style='font-family:Arial,sans-serif;color:#0f172a;'>";
+      corpo += "<p>" + saudacao + "</p>";
+      corpo += "<p>Identificamos lançamento(s) de <b>sangria</b> para a loja <b>" + lojaKey + "</b>, mesmo com operação já contemplada pelo cartão Clara.</p>";
+      corpo += "<p>Pedimos, por gentileza, a validação e o esclarecimento do motivo do uso desse procedimento.</p>";
+      corpo += "<div style='margin:14px 0;'>" + tabela + "</div>";
+      corpo += "<p>Atenciosamente,</p>";
+      corpo += "<p><b>Vektor - Contas a Receber</b></p>";
+      corpo += "</div>";
+
+      try {
+        GmailApp.sendEmail(toList, assunto, " ", {
+          from: "vektor@gruposbf.com.br",
+          name: "Vektor - Grupo SBF",
+          cc: VEKTOR_CC_CONTAS_A_RECEBER,
+          replyTo: VEKTOR_CC_CONTAS_A_RECEBER,
+          htmlBody: corpo
+        });
+
+        vektorSapLogNotificacao_({
+          userEmail: userEmail,
+          docKey: docKey,
+          lojaKey: lojaKey,
+          time: String(itens[0].time || "").trim(),
+          numdoc: String(itens[0].numdoc || "").trim(),
+          datalanc: String(itens[0].dataLanc || "").trim(),
+          valor: Number(itens[0].valor || 0) || 0,
+          to: toList,
+          cc: VEKTOR_CC_CONTAS_A_RECEBER,
+          status: "SENT",
+          error: ""
+        });
+
+        enviados.push(lojaKey);
+
+      } catch (eEnv) {
+        vektorSapLogNotificacao_({
+          userEmail: userEmail,
+          docKey: docKey,
+          lojaKey: lojaKey,
+          time: String(itens[0].time || "").trim(),
+          numdoc: String(itens[0].numdoc || "").trim(),
+          datalanc: String(itens[0].dataLanc || "").trim(),
+          valor: Number(itens[0].valor || 0) || 0,
+          to: toList,
+          cc: VEKTOR_CC_CONTAS_A_RECEBER,
+          status: "ERROR",
+          error: (eEnv && eEnv.message) ? eEnv.message : String(eEnv)
+        });
+
+        falhas.push({
+          loja: lojaKey,
+          error: (eEnv && eEnv.message) ? eEnv.message : String(eEnv)
+        });
+      }
+    });
+
+    return {
+      ok: enviados.length > 0,
+      enviados: enviados,
+      falhas: falhas
+    };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
  // ==========TESTES===============//
 
 function TESTAR_POLITICA() {
