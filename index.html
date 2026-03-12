@@ -5380,7 +5380,7 @@ display: none;
 
     <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px; width:100%;">
       <div>
-        <div style="font-size:22px; font-weight:1000; color:#0f172a;">Fluxo Numerário SAP</div>
+        <div style="font-size:22px; font-weight:1000; color:#0f172a;">Fluxo Numerário SAP - Sangrias</div>
         <div style="font-size:12px; font-weight:800; color:#475569; margin-top:4px;">
           Mapeamento de sangrias lançadas no SAP para lojas já operando com Clara
         </div>
@@ -5422,18 +5422,48 @@ display: none;
     </div>
 
     <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
-      <div style="min-width:240px;">
-        <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Time</label>
-        <select id="fluxoNumerarioSap_selTime"
-                style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;"></select>
-      </div>
+  <div style="min-width:180px;">
+    <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Período inicial</label>
+    <input id="fluxoNumerarioSap_dtIni"
+           type="date"
+           value="2025-01-01"
+           style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;">
+  </div>
 
-      <div style="min-width:240px;">
-        <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Loja</label>
-        <select id="fluxoNumerarioSap_selLoja"
-                style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;"></select>
+  <div style="min-width:180px;">
+    <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Período final</label>
+    <input id="fluxoNumerarioSap_dtFim"
+           type="date"
+           style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;">
+  </div>
+
+  <div style="min-width:240px;">
+    <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Time</label>
+    <select id="fluxoNumerarioSap_selTime"
+            style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;"></select>
+  </div>
+
+  <div style="min-width:240px;">
+    <label style="display:block; font-size:11px; font-weight:900; color:#334155; margin-bottom:4px;">Loja</label>
+    <select id="fluxoNumerarioSap_selLoja"
+            style="width:100%; height:38px; border:1px solid #cbd5e1; border-radius:12px; background:#fff; color:#0f172a; font-size:12px; font-weight:800; padding:0 10px;"></select>
+  </div>
+</div>
+
+<div id="fluxoNumerarioSap_overlay"
+     class="hidden"
+     style="position:absolute; inset:0; z-index:50; display:none; background:rgba(15,23,42,0.55);">
+  <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
+    <div style="width:min(520px, 92vw); background:#fff; border-radius:16px; border:1px solid rgba(226,232,240,1); box-shadow:0 30px 60px rgba(0,0,0,0.25); padding:16px;">
+      <div id="fluxoNumerarioSap_overlayTitle" style="font-size:16px; font-weight:1000; color:#0b1220;">Carregando…</div>
+      <div id="fluxoNumerarioSap_overlaySub" style="margin-top:6px; font-size:12px; font-weight:800; color:#334155;">Aguarde</div>
+      <div style="margin-top:12px; display:flex; align-items:center; gap:10px;">
+        <div class="vektor-spinner"></div>
+        <div style="font-size:12px; font-weight:900; color:#0f172a;">Processando informações, aguarde.</div>
       </div>
     </div>
+  </div>
+</div>
 
     <div id="fluxoNumerarioSapTableBox">
       <table id="fluxoNumerarioSapTable">
@@ -10911,27 +10941,60 @@ function vektorFluxoNumerarioSapRenderChart_(chartRows){
   });
 }
 
+function vektorFluxoNumerarioSapShowOverlay_(title, sub){
+  var ov = document.getElementById("fluxoNumerarioSap_overlay");
+  var ttl = document.getElementById("fluxoNumerarioSap_overlayTitle");
+  var sb = document.getElementById("fluxoNumerarioSap_overlaySub");
+
+  if (ttl) ttl.textContent = title || "Carregando…";
+  if (sb) sb.textContent = sub || "Aguarde";
+
+  if (ov) {
+    ov.classList.remove("hidden");
+    ov.style.display = "block";
+  }
+}
+
+function vektorFluxoNumerarioSapHideOverlay_(){
+  var ov = document.getElementById("fluxoNumerarioSap_overlay");
+  if (ov) {
+    ov.classList.add("hidden");
+    ov.style.display = "none";
+  }
+}
+
 function vektorFluxoNumerarioSapBuscar_(){
   var req = {
+    dtIni: document.getElementById("fluxoNumerarioSap_dtIni")?.value || "2025-01-01",
+    dtFim: document.getElementById("fluxoNumerarioSap_dtFim")?.value || "",
     time: document.getElementById("fluxoNumerarioSap_selTime")?.value || "",
     loja: document.getElementById("fluxoNumerarioSap_selLoja")?.value || ""
   };
 
-  console.log("[SAP buscar] iniciando com req:", req);
+  if (req.dtFim && req.dtIni && req.dtFim < req.dtIni) {
+    alert("Período inválido: a data final não pode ser menor que a inicial.");
+    return;
+  }
+
+  vektorFluxoNumerarioSapShowOverlay_(
+    "Buscando lançamentos de sangria…",
+    "Consultando dados do SAP e atualizando a visão."
+  );
 
   google.script.run
     .withSuccessHandler(function(res){
-      console.log("[SAP buscar] success:", res);
-
-      if (!res || !res.ok) {
-        console.error("[SAP buscar] resposta inválida:", res);
-        alert("Erro ao buscar dados: " + (res && res.error ? res.error : "erro desconhecido"));
-        return;
-      }
-
       try {
+        if (!res || !res.ok) {
+          alert("Erro ao buscar dados: " + (res && res.error ? res.error : "erro desconhecido"));
+          return;
+        }
+
         window.__fluxoNumerarioSapData = Array.isArray(res.rows) ? res.rows : [];
-        console.log("[SAP buscar] rows:", window.__fluxoNumerarioSapData.length);
+        window.__fluxoNumerarioSapBaseRows = Array.isArray(res.rows) ? res.rows.slice() : [];
+
+        if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
+          vektorFluxoNumerarioSapRebuildDependentFilters_();
+        }
 
         vektorFluxoNumerarioSapRenderCards_(res.cards || {});
         vektorFluxoNumerarioSapRenderTable_();
@@ -10939,9 +11002,12 @@ function vektorFluxoNumerarioSapBuscar_(){
       } catch (e) {
         console.error("[SAP buscar] erro na renderização:", e);
         alert("Erro ao renderizar Fluxo Numerário SAP: " + (e && e.message ? e.message : e));
+      } finally {
+        vektorFluxoNumerarioSapHideOverlay_();
       }
     })
     .withFailureHandler(function(err){
+      vektorFluxoNumerarioSapHideOverlay_();
       console.error("[SAP buscar] failure:", err);
       alert("Erro ao buscar dados: " + (err && err.message ? err.message : JSON.stringify(err)));
     })
@@ -10987,6 +11053,21 @@ function vektorFluxoNumerarioSapInitOnce_(){
     var btnEnviar = document.getElementById("fluxoNumerarioSapEnviarBtn");
     var thead = document.querySelector("#fluxoNumerarioSapTable thead");
     var selTime = document.getElementById("fluxoNumerarioSap_selTime");
+    var selLoja = document.getElementById("fluxoNumerarioSap_selLoja");
+    var dtIni = document.getElementById("fluxoNumerarioSap_dtIni");
+    var dtFim = document.getElementById("fluxoNumerarioSap_dtFim");
+
+    if (dtIni && !dtIni.value) {
+      dtIni.value = "2025-01-01";
+    }
+
+    if (dtFim && !dtFim.value) {
+      var hoje = new Date();
+      var yyyy = hoje.getFullYear();
+      var mm = String(hoje.getMonth() + 1).padStart(2, "0");
+      var dd = String(hoje.getDate()).padStart(2, "0");
+      dtFim.value = yyyy + "-" + mm + "-" + dd;
+    }
 
     if (btnBuscar) {
       btnBuscar.addEventListener("click", function(){
@@ -11019,30 +11100,74 @@ function vektorFluxoNumerarioSapInitOnce_(){
 
     if (selTime) {
       selTime.addEventListener("change", function(){
-        var time = String(selTime.value || "");
-        var lojaSelEl = document.getElementById("fluxoNumerarioSap_selLoja");
-        var meta = window.__fluxoNumerarioSapMeta || {};
-        var lojas = (meta.lojas || []).slice();
-
-        if (!time) {
-          vektorBuildOptionsSimple_(lojaSelEl, lojas, "Todas");
-          return;
+        if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
+          vektorFluxoNumerarioSapRebuildDependentFilters_();
         }
+      });
+    }
 
-        var data = (window.__fluxoNumerarioSapData || []);
-        var lojasFiltradas = {};
-        data.forEach(function(r){
-          if (String(r.time || "") === time && r.loja) lojasFiltradas[r.loja] = true;
-        });
-
-        var arr = Object.keys(lojasFiltradas).sort();
-        vektorBuildOptionsSimple_(lojaSelEl, arr.length ? arr : lojas, "Todas");
+    if (selLoja) {
+      selLoja.addEventListener("change", function(){
+        if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
+          vektorFluxoNumerarioSapRebuildDependentFilters_();
+        }
       });
     }
 
   } catch (e) {
     console.error("[SAP init] erro:", e);
     alert("Erro no init do Fluxo Numerário SAP: " + (e && e.message ? e.message : e));
+  }
+}
+
+function vektorFluxoNumerarioSapGetBaseRows_(){
+  return Array.isArray(window.__fluxoNumerarioSapBaseRows)
+    ? window.__fluxoNumerarioSapBaseRows.slice()
+    : [];
+}
+
+function vektorFluxoNumerarioSapRebuildDependentFilters_(){
+  var selTime = document.getElementById("fluxoNumerarioSap_selTime");
+  var selLoja = document.getElementById("fluxoNumerarioSap_selLoja");
+  if (!selTime || !selLoja) return;
+
+  var currentTime = String(selTime.value || "");
+  var currentLoja = String(selLoja.value || "");
+  var rows = vektorFluxoNumerarioSapGetBaseRows_();
+
+  var rowsForTime = currentLoja
+    ? rows.filter(function(r){ return String(r.loja || "") === currentLoja; })
+    : rows;
+
+  var rowsForLoja = currentTime
+    ? rows.filter(function(r){ return String(r.time || "") === currentTime; })
+    : rows;
+
+  var timesMap = {};
+  var lojasMap = {};
+
+  rowsForTime.forEach(function(r){
+    var t = String(r.time || "").trim();
+    if (t) timesMap[t] = true;
+  });
+
+  rowsForLoja.forEach(function(r){
+    var l = String(r.loja || "").trim();
+    if (l) lojasMap[l] = true;
+  });
+
+  var times = Object.keys(timesMap).sort();
+  var lojas = Object.keys(lojasMap).sort();
+
+  vektorBuildOptionsSimple_(selTime, times, "Todos");
+  vektorBuildOptionsSimple_(selLoja, lojas, "Todas");
+
+  if (currentTime && times.indexOf(currentTime) >= 0) {
+    selTime.value = currentTime;
+  }
+
+  if (currentLoja && lojas.indexOf(currentLoja) >= 0) {
+    selLoja.value = currentLoja;
   }
 }
 
