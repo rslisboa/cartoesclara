@@ -5419,6 +5419,12 @@ display: none;
         <div class="sapNumCardValue" id="sapNum_cardQtd">—</div>
         <div class="sapNumCardSub" id="sapNum_cardQtdSub">Linhas retornadas</div>
       </div>
+
+      <div class="sapNumCard">
+        <div class="sapNumCardLabel">% de Loja Sangria</div>
+        <div class="sapNumCardValue" id="sapNum_cardPctSangria">—</div>
+        <div class="sapNumCardSub" id="sapNum_cardPctSangriaSub">—</div>
+      </div>
     </div>
 
     <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px;">
@@ -5471,15 +5477,17 @@ display: none;
             <th style="width:54px; text-align:center;">Sel.</th>
             <th data-sort="loja">Loja</th>
             <th data-sort="time">Time</th>
+            <th data-sort="habilitadoClara">Habilitado Clara</th>
             <th data-sort="valor">Valor Sangria</th>
             <th data-sort="dataLancIso">Data Lançamento</th>
             <th data-sort="texto">Texto</th>
-            <th data-sort="numdoc">Número Documento</th>
+            <th data-sort="referencia">Nº Sangria</th>
+            <th data-sort="numdoc">Nº Documento SAP</th>
           </tr>
         </thead>
         <tbody id="fluxoNumerarioSap_tbody">
           <tr>
-            <td colspan="7" style="text-align:center; padding:14px; font-weight:900; color:#475569;">
+            <td colspan="9" style="text-align:center; padding:14px; font-weight:900; color:#475569;">
               Clique em Buscar para consultar.
             </td>
           </tr>
@@ -10824,6 +10832,8 @@ function vektorFluxoNumerarioSapRenderCards_(cards){
   var d = document.getElementById("sapNum_cardUltimaLojaSub");
   var e = document.getElementById("sapNum_cardQtd");
   var f = document.getElementById("sapNum_cardQtdSub");
+  var g = document.getElementById("sapNum_cardPctSangria");
+  var h = document.getElementById("sapNum_cardPctSangriaSub");
 
   if (a) a.textContent = cards.lojaMaiorSangria || "—";
   if (b) b.textContent = cards.lojaMaiorSangriaValor || "—";
@@ -10831,6 +10841,8 @@ function vektorFluxoNumerarioSapRenderCards_(cards){
   if (d) d.textContent = ((cards.ultimaData || "—") + " | " + (cards.ultimaValor || "—"));
   if (e) e.textContent = String(cards.totalOcorrencias || 0);
   if (f) f.textContent = "Linhas retornadas";
+  if (g) g.textContent = cards.pctLojasSangria || "—";
+  if (h) h.textContent = cards.pctLojasSangriaSub || "—";
 }
 
 function vektorFluxoNumerarioSapGetSelected_(){
@@ -10862,7 +10874,7 @@ function vektorFluxoNumerarioSapRenderTable_(){
   });
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#475569;">Nenhum dado encontrado.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:14px;font-weight:900;color:#475569;">Nenhum dado encontrado.</td></tr>';
     return;
   }
 
@@ -10874,9 +10886,11 @@ function vektorFluxoNumerarioSapRenderTable_(){
         </td>
         <td>${vektorSafe_(r.loja || "—")}</td>
         <td>${vektorSafe_(r.time || "—")}</td>
+        <td style="text-align:center; font-weight:900;">${vektorSafe_(r.habilitadoClara || "—")}</td>
         <td style="text-align:right; font-weight:900;">${vektorSafe_(r.valorFmt || "—")}</td>
         <td style="text-align:center;">${vektorSafe_(r.dataLanc || "—")}</td>
         <td>${vektorSafe_(r.texto || "—")}</td>
+        <td style="text-align:center;">${vektorSafe_(r.referencia || "—")}</td>
         <td style="text-align:center;">${vektorSafe_(r.numdoc || "—")}</td>
       </tr>
     `;
@@ -11102,24 +11116,34 @@ function vektorFluxoNumerarioSapEnviar_(){
     return;
   }
 
+  vektorFluxoNumerarioSapShowOverlay_(
+    "Enviando notificação…",
+    "Disparando e-mail para gerente, regional e Contas a Receber."
+  );
+
   google.script.run
     .withSuccessHandler(function(res){
-      if (!res || !res.ok) {
-        alert("Falha no envio: " + (res && res.error ? res.error : "erro desconhecido"));
-        return;
-      }
+      try {
+        if (!res || !res.ok) {
+          alert("Falha no envio: " + (res && res.error ? res.error : "erro desconhecido"));
+          return;
+        }
 
-      var msg = "Envio concluído.";
-      if (Array.isArray(res.enviados) && res.enviados.length) {
-        msg += "\\nLojas enviadas: " + res.enviados.join(", ");
-      }
-      if (Array.isArray(res.falhas) && res.falhas.length) {
-        msg += "\\nFalhas: " + res.falhas.map(function(x){ return x.loja + " (" + x.error + ")"; }).join(", ");
-      }
+        var msg = "Envio concluído.";
+        if (Array.isArray(res.enviados) && res.enviados.length) {
+          msg += "\nLojas enviadas: " + res.enviados.join(", ");
+        }
+        if (Array.isArray(res.falhas) && res.falhas.length) {
+          msg += "\nFalhas: " + res.falhas.map(function(x){ return x.loja + " (" + x.error + ")"; }).join(", ");
+        }
 
-      alert(msg);
+        alert(msg);
+      } finally {
+        vektorFluxoNumerarioSapHideOverlay_();
+      }
     })
     .withFailureHandler(function(err){
+      vektorFluxoNumerarioSapHideOverlay_();
       alert("Falha no envio: " + (err && err.message ? err.message : err));
     })
     .sendFluxoNumerarioSapNotificacao(rows);
