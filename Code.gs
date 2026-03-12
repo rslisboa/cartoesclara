@@ -17326,8 +17326,25 @@ function getFluxoNumerarioSapData(req) {
       });
     }
 
+    var dtIni = String(req.dtIni || "").trim();
+    var dtFim = String(req.dtFim || "").trim();
     var timeSel = String(req.time || "").trim();
     var lojaSel = String(req.loja || "").trim().toUpperCase();
+
+    if (!dtIni) dtIni = "2025-01-01";
+
+    if (dtFim && dtIni && dtFim < dtIni) {
+      throw new Error("Período inválido: a data final não pode ser menor que a inicial.");
+    }
+
+    var wherePeriodo = 'bseg.h_budat >= DATE("2025-01-01")';
+    if (dtIni && dtFim) {
+      wherePeriodo = 'bseg.h_budat BETWEEN DATE("' + dtIni + '") AND DATE("' + dtFim + '")';
+    } else if (dtIni) {
+      wherePeriodo = 'bseg.h_budat >= DATE("' + dtIni + '")';
+    } else if (dtFim) {
+      wherePeriodo = 'bseg.h_budat BETWEEN DATE("2025-01-01") AND DATE("' + dtFim + '")';
+    }
 
     var sql = `
     WITH base_filtrada AS (
@@ -17340,10 +17357,12 @@ function getFluxoNumerarioSapData(req) {
         bseg.h_bldat AS Datadoc,
         bseg.valut   AS DataEfetiva,
         bseg.bschl   AS CL,
-        CASE 
-          WHEN bseg.bschl = '50' THEN -bseg.dmbtr 
-          ELSE bseg.dmbtr 
-        END AS MontanteValor,
+        ABS(
+          CASE 
+            WHEN bseg.bschl = '50' THEN -bseg.dmbtr 
+            ELSE bseg.dmbtr 
+          END
+        ) AS MontanteValor,
         bkpf.xblnr   AS Referencia,
         bseg.sgtxt   AS Texto,
         bseg.saknr   AS NumContaRazao,
@@ -17363,7 +17382,7 @@ function getFluxoNumerarioSapData(req) {
       FROM \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bseg\` AS bseg
       INNER JOIN \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bkpf\` AS bkpf
         ON bseg.belnr = bkpf.belnr
-      WHERE bseg.h_budat >= DATE_SUB(CURRENT_DATE("America/Sao_Paulo"), INTERVAL 60 DAY)
+      WHERE ${wherePeriodo}
         AND bseg.bukrs = "7010"
         AND bseg.hkont = "1101005003"
         AND bkpf.stblg IS NULL
@@ -17392,7 +17411,7 @@ function getFluxoNumerarioSapData(req) {
       var loja4 = lojaNum != null ? String(lojaNum).padStart(4, "0") : "";
       var time = lojaNum != null ? String(mapLojaTime[lojaNum] || "").trim() : "";
 
-      var valor = Number(r.MontanteValor || 0) || 0;
+      var valor = Math.abs(Number(r.MontanteValor || 0) || 0);
       var dataLancIso = vektorSapParseDateIso_(r.Datalanc);
 
       return {
