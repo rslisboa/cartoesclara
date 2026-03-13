@@ -1940,6 +1940,33 @@ display: none;
 }
 
 /* =========================
+   MENU - BOTÃO DE PÁGINA ATIVA
+   ========================= */
+.vektor-nav-btn{
+  border: 3px solid transparent !important;
+  transition:
+    background-color .18s ease,
+    border-color .18s ease,
+    box-shadow .18s ease,
+    transform .18s ease;
+}
+
+.vektor-nav-btn.vektor-nav-active{
+  border-color: #B5FF20 !important;
+  box-shadow:
+    0 0 0 1px rgba(181,255,32,0.18),
+    0 8px 18px rgba(0,0,0,0.18);
+}
+
+/* mantém o destaque também no menu recolhido */
+#vektorShell.sidebar-collapsed .vektor-nav-btn.vektor-nav-active{
+  border-color: #B5FF20 !important;
+  box-shadow:
+    0 0 0 1px rgba(181,255,32,0.22),
+    0 8px 18px rgba(0,0,0,0.22);
+}
+
+/* =========================
    HOME HERO - BORDA ANIMADA (CONTORNO REAL via SVG)
    Só aparece com menu expandido
    ========================= */
@@ -2658,7 +2685,7 @@ display: none;
   type="button"
   onclick="window.vektorOpenPolicyAssistant()"
   title="Assistente Política Clara"
-  class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+  class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
 >
   <span class="vektor-nav-ico" aria-hidden="true">🤖</span>
   <span class="vektor-nav-label">Assistente Política Clara</span>
@@ -2668,7 +2695,7 @@ display: none;
     type="button"
     onclick="openStatusVektorModal()"
     title="Estado Operacional"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">🟢</span>
     <span class="vektor-nav-label">Estado Operacional</span>
@@ -2677,10 +2704,11 @@ display: none;
   <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Analista" || (userRole || "") === "Gerentes_Reg" )  { ?>
 
   <button
+    id="navResumoCicloBtn"
     type="button"
     onclick="window.vektorOpenResumoCiclo()"
     title="Pendências do Ciclo"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">📌</span>
     <span class="vektor-nav-label">Pendências do Ciclo</span>
@@ -2690,10 +2718,11 @@ display: none;
 
   <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Analista" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg")  { ?>
     <button
+    id="navAnaliseGastosBtn"
     type="button"
     onclick="window.vektorOpenAnaliseGastos()"
     title="Análise de Gastos"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">🔍</span>
     <span class="vektor-nav-label">Análise de Gastos</span>
@@ -2702,10 +2731,11 @@ display: none;
   <? } ?>
 
   <button
+    id="navFluxogramaBtn"
     type="button"
     onclick="window.vektorOpenFluxograma()"
     title="Fluxograma"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">🧩</span>
     <span class="vektor-nav-label">Fluxograma</span>
@@ -2714,10 +2744,11 @@ display: none;
   <? if ((userRole || "") === "Administrador" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg")  { ?>
 
   <button
+    id="navMyAlertsBtn"
     type="button"
     onclick="window.vektorOpenMyAlerts()"
     title="Alertas Programados"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">⏱️</span>
     <span class="vektor-nav-label">Alertas Programados</span>
@@ -2731,7 +2762,7 @@ display: none;
       type="button"
       onclick="openAlertasRecentesModal()"
       title="Disparo de Ocorrências"
-      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
     >
       <span class="vektor-nav-ico" aria-hidden="true">📋</span>
       <span class="vektor-nav-label">Disparo de Ocorrências</span>
@@ -2741,20 +2772,22 @@ display: none;
 
     <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro") { ?>
     <button
+      id="navRadarBtn"
       type="button"
       onclick="window.vektorOpenRadar('7d')"
       title="Radar de Irregularidade"
-      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+      class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
     >
       <span class="vektor-nav-ico" aria-hidden="true">📈</span>
       <span class="vektor-nav-label">Radar de Irregularidade</span>
     </button>
 
     <button
+      id="navEnvioPendBtn"
       type="button"
       onclick="window.vektorOpenEnvioPendencias()"
       title="Envio de Pendências"
-      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+      class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
     >
       <span class="vektor-nav-ico" aria-hidden="true">📩</span>
       <span class="vektor-nav-label">Envio de Pendências</span>
@@ -2765,10 +2798,11 @@ display: none;
      <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro") { ?>
 
     <button
+      id="navConsultasAuxBtn"
       type="button"
       onclick="window.vektorOpenConsultasAuxiliares()"
       title="Consultas Auxiliares"
-      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition">
+      class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition">
       <span class="vektor-nav-ico" aria-hidden="true">🧾</span>
       <span class="vektor-nav-label">Consultas Auxiliares</span>
     </button>
@@ -2778,10 +2812,11 @@ display: none;
     <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro") { ?>
 
      <button
+      id="navFluxoNumerarioSapBtn"
       type="button"
       onclick="window.vektorOpenFluxoNumerarioSap && window.vektorOpenFluxoNumerarioSap()"
       title="Fluxo Numerário SAP"
-      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition">
+      class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition">
       <span class="vektor-nav-ico" aria-hidden="true">💵</span>
       <span class="vektor-nav-label">Fluxo Numerário SAP</span>
     </button>
@@ -2791,10 +2826,11 @@ display: none;
     <? if ((userRole || "") === "Administrador") { ?>
 
     <button
+      id="navVertexCostBtn"
       type="button"
       onclick="window.vektorOpenVertexCost()"
       title="Custo Vertex"
-      class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+      class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
     >
       <span class="vektor-nav-ico" aria-hidden="true">💲</span>
       <span class="vektor-nav-label">Custo Vertex</span>
@@ -2805,10 +2841,11 @@ display: none;
   <? if (String(userEmail || "").trim().toLowerCase() === "rodrigo.lisboa@gruposbf.com.br") { ?>
 
   <button
+    id="navBasesVektorBtn"
     type="button"
     onclick="window.vektorOpenBasesVektor()"
     title="Bases Vektor"
-    class="w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-2 hover:bg-slate-900 transition"
+    class="vektor-nav-btn w-full inline-flex items-center justify-center rounded-lg bg-black text-white text-sm font-semibold px-3 py-1.5 hover:bg-slate-900 transition"
   >
     <span class="vektor-nav-ico" aria-hidden="true">🗂️</span>
     <span class="vektor-nav-label">Bases Vektor</span>
@@ -7211,6 +7248,22 @@ function openStatusVektorModal() {
     .vektorStatusSistema();
 }
 
+function vektorSetActiveNavBtn_(btnId) {
+  try {
+    var btns = document.querySelectorAll("#vektorShell .vektor-nav-btn");
+    btns.forEach(function(btn){
+      btn.classList.remove("vektor-nav-active");
+    });
+
+    if (!btnId) return;
+
+    var activeBtn = document.getElementById(btnId);
+    if (activeBtn) {
+      activeBtn.classList.add("vektor-nav-active");
+    }
+  } catch (_) {}
+}
+
 window.vektorOpenPolicyAssistant = function () {
   window.__vektorChatMode = "policy";
   window.vektorShowChatView();
@@ -7510,10 +7563,12 @@ function vektorShowEnvioPendenciasView_() {
 }
 
 window.vektorOpenEnvioPendencias = function () {
+  vektorSetActiveNavBtn_("navEnvioPendBtn");
   vektorShowEnvioPendenciasView_();
 };
 
 window.vektorOpenResumoCiclo = function () {
+  vektorSetActiveNavBtn_("navResumoCicloBtn");
   window.vektorShowResumoCicloView_();
   window.vektorLoadResumoCiclo(false);
 };
@@ -8231,6 +8286,7 @@ function vektorShowAnaliseGastosView_() {
 }
 
 window.vektorOpenAnaliseGastos = function () {
+  vektorSetActiveNavBtn_("navAnaliseGastosBtn");
   // Views existentes
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
@@ -8389,6 +8445,7 @@ function vektorFluxoNumerarioSapResetVisual_(){
 }
 
 window.vektorOpenFluxoNumerarioSap = function () {
+  vektorSetActiveNavBtn_("navFluxoNumerarioSapBtn");
   vektorShowFluxoNumerarioSapView_();
   vektorFluxoNumerarioSapInitOnce_();
 
@@ -12657,6 +12714,7 @@ window.vektorEnvioPendenciasEnviarSelecionadas = function () {
 };
 
 window.vektorOpenFluxograma = function () {
+  vektorSetActiveNavBtn_("navFluxogramaBtn");
   vektorShowFluxogramaView_();
 
   // desenha após layout estabilizar
@@ -12765,6 +12823,7 @@ function vektorDrawFluxogramaConnectors_() {
 // RADAR (tela cheia)
 // ===============================
 window.vektorOpenRadar = function (modo) {
+  vektorSetActiveNavBtn_("navRadarBtn");
   // abre Radar e fecha outras views (base)
   vektorShowRadarView_();
 
@@ -14227,6 +14286,7 @@ function vektorShowConsultasAuxView_(){
 }
 
 window.vektorOpenConsultasAuxiliares = function(){
+  vektorSetActiveNavBtn_("navConsultasAuxBtn");
   vektorShowConsultasAuxView_();
   window.vektorAuxShowFaturas();     // default: faturas visíveis
   window.vektorAuxLoadFaturas();     // carrega tabela na abertura
@@ -14272,7 +14332,7 @@ window.vektorOpenBasesVektor = function(){
     : "");
 
   if (meuEmail !== "rodrigo.lisboa@gruposbf.com.br") return;
-
+  vektorSetActiveNavBtn_("navBasesVektorBtn");
   vektorShowBasesVektorView_();
 };
 
@@ -14310,6 +14370,7 @@ function vektorShowVertexCostView_(){
 }
 
 window.vektorOpenVertexCost = function(){
+  vektorSetActiveNavBtn_("navVertexCostBtn");
   vektorShowVertexCostView_();
   vektorVertexCostLoad_();
 };
@@ -14640,6 +14701,7 @@ function vektorVertexCostRenderChart_(monthly){
 })();
 
 window.vektorOpenMyAlerts = function () {
+  vektorSetActiveNavBtn_("navMyAlertsBtn");
   vektorShowMyAlertsView_();
 
   // ✅ mostra filtros admin (e-mail + área) — REGRA ÚNICA (robusta)
@@ -17370,6 +17432,7 @@ window.vektorOpenLegacyChat = function () {
 };
 
 window.vektorOpenPolicyAssistant = function () {
+  vektorSetActiveNavBtn_("navPolicyAssistantBtn");
   window.__vektorChatMode = "policy";
   window.vektorShowChatView();
 };
