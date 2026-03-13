@@ -17722,6 +17722,179 @@ function sendFluxoNumerarioSapNotificacao(rows) {
   }
 }
 
+const VEKTOR_SAP_SANGRIA_MONITOR_TO = "contasareceber@gruposbf.com.br";
+const VEKTOR_SAP_SANGRIA_MONITOR_PROP_PREFIX = "VEKTOR_SAP_SANGRIA_SENT_";
+
+// Gera uma chave única da ocorrência para evitar reenvio da mesma linha
+function vektorSapSangriaMonitorKey_(r) {
+  return [
+    String(r.loja || "").trim().toUpperCase(),
+    String(r.referencia || "").trim(),
+    String(r.numdoc || "").trim(),
+    String(r.dataLanc || "").trim(),
+    String(Number(r.valor || 0).toFixed(2))
+  ].join("|");
+}
+
+function vektorSapSangriaJaEnviada_(key) {
+  if (!key) return false;
+  return !!PropertiesService.getScriptProperties().getProperty(
+    VEKTOR_SAP_SANGRIA_MONITOR_PROP_PREFIX + key
+  );
+}
+
+function vektorSapMarcarSangriaComoEnviada_(key) {
+  if (!key) return;
+  PropertiesService.getScriptProperties().setProperty(
+    VEKTOR_SAP_SANGRIA_MONITOR_PROP_PREFIX + key,
+    Utilities.formatDate(
+      new Date(),
+      Session.getScriptTimeZone() || "America/Sao_Paulo",
+      "yyyy-MM-dd HH:mm:ss"
+    )
+  );
+}
+
+/**
+ * Monitoramento automático de sangria indevida no Fluxo Numerário SAP.
+ * NÃO altera o fluxo manual da página.
+ * Deve ser usado em gatilho time-driven.
+ */
+function monitorarFluxoNumerarioSapSangriaIndevida() {
+  try {
+    var emailExec = String(Session.getEffectiveUser().getEmail() || "").trim().toLowerCase();
+    if (!isAdminEmail(emailExec)) {
+      return {
+        ok: false,
+        error: "Acesso restrito: apenas Administrador pode executar o monitoramento automático."
+      };
+    }
+
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var agora = new Date();
+
+    // Janela operacional curta para reduzir custo e evitar reprocessamento excessivo
+    var ini = new Date(agora);
+    ini.setDate(ini.getDate() - 8);
+
+    var dtIni = Utilities.formatDate(ini, tz, "yyyy-MM-dd");
+    var dtFim = Utilities.formatDate(agora, tz, "yyyy-MM-dd");
+
+    var res = getFluxoNumerarioSapData({
+      dtIni: dtIni,
+      dtFim: dtFim,
+      time: "",
+      loja: ""
+    });
+
+    if (!res || !res.ok) {
+      return {
+        ok: false,
+        error: (res && res.error) ? res.error : "Falha ao consultar Fluxo Numerário SAP."
+      };
+    }
+
+    var rows = Array.isArray(res.rows) ? res.rows : [];
+    if (!rows.length) {
+      return {
+        ok: true,
+        enviados: [],
+        msg: "Sem sangrias no período monitorado."
+      };
+    }
+
+    var pendentes = rows.filter(function(r){
+      var k = vektorSapSangriaMonitorKey_(r);
+      return !vektorSapSangriaJaEnviada_(k);
+    });
+
+    if (!pendentes.length) {
+      return {
+        ok: true,
+        enviados: [],
+        msg: "Sem novas ocorrências para envio."
+      };
+    }
+
+    var dataAssunto = Utilities.formatDate(agora, tz, "dd/MM/yyyy");
+    var assunto = "[ALERTA CLARA | SANGRIA] - " + dataAssunto;
+
+    var tabela = vektorSapMontarTabelaEmail_(pendentes);
+
+    var lojasUnicasMap = {};
+    pendentes.forEach(function(r){
+      var loja = String(r.loja || "").trim().toUpperCase();
+      if (loja) lojasUnicasMap[loja] = true;
+    });
+    var lojasUnicas = Object.keys(lojasUnicasMap).sort();
+
+    var corpo = "";
+    corpo += "<div style='font-family:Arial,sans-serif;color:#0f172a;'>";
+    corpo += "<p>Olá,</p>";
+    corpo += "<p>Identificamos lançamento(s) de sangria em loja(s) já contemplada(s) pela operação com cartão Clara.</p>";
+    corpo += "<p><b>Lojas identificadas:</b> " + lojasUnicas.join(", ") + "</p>";
+    corpo += "<div style='margin:14px 0;'>" + tabela + "</div>";
+    corpo += "<p>Atenciosamente,</p>";
+    corpo += "<p><b>Vektor - Contas a Receber</b></p>";
+    corpo += "</div>";
+
+    GmailApp.sendEmail(
+      VEKTOR_SAP_SANGRIA_MONITOR_TO,
+      assunto,
+      " ",
+      {
+        htmlBody: corpo,
+        name: "Vektor - Grupo SBF",
+        replyTo: "contasareceber@gruposbf.com.br"
+      }
+    );
+
+    // log por loja, mesmo com e-mail único
+    var byLoja = {};
+    pendentes.forEach(function(r){
+      var lojaKey = String(r.loja || "").trim().toUpperCase();
+      if (!lojaKey) return;
+      if (!byLoja[lojaKey]) byLoja[lojaKey] = [];
+      byLoja[lojaKey].push(r);
+    });
+
+    Object.keys(byLoja).forEach(function(lojaKey){
+      var itens = byLoja[lojaKey] || [];
+      var time = String(itens[0].time || "").trim();
+
+      registrarAlertaEnviado_(
+        "SANGRIA_INDEVIDA",
+        lojaKey,
+        time,
+        "AUTO_MONITORAMENTO_CONSOLIDADO | linhas=" + itens.length + " | refs=" +
+          itens.map(function(x){ return String(x.referencia || "").trim(); })
+               .filter(Boolean)
+               .join(", "),
+        VEKTOR_SAP_SANGRIA_MONITOR_TO,
+        "monitorarFluxoNumerarioSapSangriaIndevida"
+      );
+    });
+
+    pendentes.forEach(function(r){
+      vektorSapMarcarSangriaComoEnviada_(vektorSapSangriaMonitorKey_(r));
+    });
+
+    return {
+      ok: true,
+      enviados: lojasUnicas,
+      falhas: [],
+      periodo: { dtIni: dtIni, dtFim: dtFim },
+      consolidado: true
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: (e && e.message) ? e.message : String(e)
+    };
+  }
+}
+
  // ==========TESTES===============//
 
 function TESTAR_POLITICA() {
