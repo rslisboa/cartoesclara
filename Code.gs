@@ -2728,12 +2728,28 @@ function buildAlertXlsxAttachment_(alertId, periodo, rows) {
   var sh = ss.getSheets()[0];
   sh.setName("Alerta");
 
-    // Detecta se é "Pendências" pela estrutura das linhas (sem depender do layout do front)
-  var isPendencias = !!((rows && rows.length) && (rows[0] && (rows[0].pendencias != null || rows[0].titular != null)));
+  // Detecta o tipo pela estrutura das linhas
+  var firstRow = (rows && rows.length) ? (rows[0] || {}) : {};
+
+  var isPendencias = !!(
+    firstRow &&
+    (firstRow.pendencias != null || firstRow.titular != null)
+  );
+
+  var isItensIrregulares = !!(
+    firstRow &&
+    (
+      firstRow.item != null ||
+      firstRow.conformidade != null ||
+      firstRow.motivo != null
+    )
+  );
 
   var header = isPendencias
     ? ["Loja","Time","Data","Valor","Estabelecimento","Titular","Pendências"]
-    : ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
+    : isItensIrregulares
+      ? ["Data","Valor (R$)","Loja","Time","Item Comprado","Estabelecimento","Conformidade","Motivo"]
+      : ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
 
   sh.getRange(1, 1, 1, header.length).setValues([header]);
 
@@ -2750,6 +2766,20 @@ function buildAlertXlsxAttachment_(alertId, periodo, rows) {
           r.pendencias || ""
         ];
       }
+
+      if (isItensIrregulares) {
+        return [
+          r.dataTxt || r.data || "",
+          r.valor || "",
+          r.loja || r.alias || "",
+          r.time || "",
+          r.item || r.descricao || "",
+          r.estabelecimento || "",
+          r.conformidade || r.status || "",
+          r.motivo || ""
+        ];
+      }
+
       return [
         r.loja || "",
         r.time || "",
@@ -2760,6 +2790,7 @@ function buildAlertXlsxAttachment_(alertId, periodo, rows) {
         r.descricao || ""
       ];
     });
+
     sh.getRange(2, 1, values.length, header.length).setValues(values);
   }
 
@@ -2768,7 +2799,7 @@ function buildAlertXlsxAttachment_(alertId, periodo, rows) {
 
   var fileId = ss.getId();
 
-  // 2. EXPORTAÇÃO REAL PARA XLSX (isso é o que faltava)
+  // 2. EXPORTAÇÃO REAL PARA XLSX
   var url = "https://www.googleapis.com/drive/v3/files/" + fileId + "/export" +
             "?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -2816,20 +2847,35 @@ function buildAlertAttachmentSmart_(alertId, periodo, rows) {
 
 function buildAlertCsvAttachment_(alertId, periodo, rows) {
   var esc = function (s) {
-    // CSV com aspas e escape de aspas duplas
     var t = String(s == null ? "" : s);
     t = t.replace(/"/g, '""');
     return '"' + t + '"';
   };
 
-    var isPendencias = !!((rows && rows.length) && (rows[0] && (rows[0].pendencias != null || rows[0].titular != null)));
+  var firstRow = (rows && rows.length) ? (rows[0] || {}) : {};
+
+  var isPendencias = !!(
+    firstRow &&
+    (firstRow.pendencias != null || firstRow.titular != null)
+  );
+
+  var isItensIrregulares = !!(
+    firstRow &&
+    (
+      firstRow.item != null ||
+      firstRow.conformidade != null ||
+      firstRow.motivo != null
+    )
+  );
 
   var header = isPendencias
     ? ["Loja","Time","Data","Valor","Estabelecimento","Titular","Pendências"]
-    : ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
+    : isItensIrregulares
+      ? ["Data","Valor (R$)","Loja","Time","Item Comprado","Estabelecimento","Conformidade","Motivo"]
+      : ["Loja","Time","Data","Estabelecimento","Valor","Etiqueta","Descrição"];
 
   var lines = [];
-  lines.push(header.map(esc).join(";")); // separador ; (pt-BR)
+  lines.push(header.map(esc).join(";"));
 
   (rows || []).forEach(function (r) {
     if (isPendencias) {
@@ -2841,6 +2887,20 @@ function buildAlertCsvAttachment_(alertId, periodo, rows) {
         r.estabelecimento || "",
         r.titular || "",
         r.pendencias || ""
+      ].map(esc).join(";"));
+      return;
+    }
+
+    if (isItensIrregulares) {
+      lines.push([
+        r.dataTxt || r.data || "",
+        r.valor || "",
+        r.loja || r.alias || "",
+        r.time || "",
+        r.item || r.descricao || "",
+        r.estabelecimento || "",
+        r.conformidade || r.status || "",
+        r.motivo || ""
       ].map(esc).join(";"));
       return;
     }
@@ -2858,7 +2918,9 @@ function buildAlertCsvAttachment_(alertId, periodo, rows) {
 
   var csv = lines.join("\n");
 
-  return Utilities.newBlob(csv, "text/csv", 
+  return Utilities.newBlob(
+    csv,
+    "text/csv",
     "Vektor - Alerta " + alertId + " (" + periodo.inicio + " a " + periodo.fim + ").csv"
   );
 }
