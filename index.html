@@ -2741,7 +2741,7 @@ display: none;
     <span class="vektor-nav-label">Fluxograma</span>
   </button>
 
-  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg")  { ?>
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg" || (userRole || "") === "Compras_DI")  { ?>
 
   <button
     id="navMyAlertsBtn"
@@ -2770,7 +2770,7 @@ display: none;
 
     <? } ?>
 
-    <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro") { ?>
+    <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Compras_DI") { ?>
     <button
       id="navRadarBtn"
       type="button"
@@ -2781,6 +2781,10 @@ display: none;
       <span class="vektor-nav-ico" aria-hidden="true">📈</span>
       <span class="vektor-nav-label">Radar de Irregularidade</span>
     </button>
+
+    <? } ?>
+
+    <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro") { ?>
 
     <button
       id="navEnvioPendBtn"
@@ -3895,7 +3899,7 @@ display: none;
               Quantidade de pendências enviadas por mês
             </div>
             <div style="font-size:11px; color:#64748b; font-weight:900;">
-              Hover na barra para ver detalhamento diário
+              Clique na barra para ver detalhamento diário
             </div>
           </div>
 
@@ -4803,6 +4807,7 @@ display: none;
                     border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
               <option value="TRANSACOES">Transações</option>
               <option value="PENDENCIAS">Pendências</option>
+              <option value="ITENS_IRREGULARES">Itens Irregulares</option>
             </select>
           </div>
         </div>
@@ -6919,15 +6924,30 @@ function closeEnvPendAnaliseModal() {
   }
 }
 
-function openEnvPendHistModal() {
+function openEnvPendHistModal(forceReload) {
   const modal = document.getElementById("envPendHistModal");
   if (modal) {
     modal.style.display = "flex";
     modal.classList.remove("hidden");
   }
 
+  var cache = window.__envPendHistCache || null;
+
+  if (!forceReload && cache && cache.data) {
+    window.__envPend = window.__envPend || {};
+    window.__envPend.hist = cache.data;
+
+    try {
+      window.vektorEnvPendHistRenderLastCard_(cache.data);
+      window.vektorEnvPendHistRenderChart_(cache.data);
+      return;
+    } catch (e) {
+      console.error("Falha ao renderizar cache do histórico:", e);
+    }
+  }
+
   if (window.vektorEnvPendHistLoad_) {
-    window.vektorEnvPendHistLoad_();
+    window.vektorEnvPendHistLoad_(!!forceReload);
   }
 }
 
@@ -6947,6 +6967,7 @@ function closeEnvPendHistModal() {
 
   const tip = document.getElementById("envPendHistTooltip");
   if (tip) tip.style.display = "none";
+  window.__envPendHistSelectedIndex = null;
 }
 
 function openMyAlTutorialModal() {
@@ -11421,40 +11442,19 @@ window.vektorEnvPendHistRenderLastCard_ = function(data){
   elSub.textContent = "Dados captados da base do histórico de envios.";
 };
 
-window.vektorEnvPendHistExternalTooltip_ = function(context){
-  var tooltipModel = context.tooltip;
+window.vektorEnvPendHistHideTooltip_ = function(){
   var tooltipEl = document.getElementById("envPendHistTooltip");
-  var chart = context.chart;
+  if (tooltipEl) tooltipEl.style.display = "none";
+  window.__envPendHistSelectedIndex = null;
+};
 
-  if (tooltipEl && !tooltipEl.__bindWheelLock) {
-  tooltipEl.__bindWheelLock = true;
-
-  tooltipEl.addEventListener("mouseenter", function(){
-    tooltipEl.__hoveringSelf = true;
-  });
-
-  tooltipEl.addEventListener("mouseleave", function(){
-    tooltipEl.__hoveringSelf = false;
-    tooltipEl.style.display = "none";
-  });
-}
-
-  if (!tooltipEl) return;
-
-  if (!tooltipModel || tooltipModel.opacity === 0) {
-  if (!tooltipEl.__hoveringSelf) {
-    tooltipEl.style.display = "none";
-  }
-  return;
-}
-
-  var idx = (tooltipModel.dataPoints && tooltipModel.dataPoints.length)
-    ? tooltipModel.dataPoints[0].dataIndex
-    : -1;
+window.vektorEnvPendHistShowTooltipByIndex_ = function(chart, idx){
+  var tooltipEl = document.getElementById("envPendHistTooltip");
+  if (!tooltipEl || !chart || idx < 0) return;
 
   var hist = (window.__envPend && window.__envPend.hist) ? window.__envPend.hist : null;
   var months = hist && Array.isArray(hist.months) ? hist.months : [];
-  var row = idx >= 0 ? months[idx] : null;
+  var row = months[idx] || null;
 
   if (!row) {
     tooltipEl.style.display = "none";
@@ -11473,45 +11473,77 @@ window.vektorEnvPendHistExternalTooltip_ = function(context){
       <table style="width:100%; border-collapse:collapse; font-size:11px;">
         <thead>
           <tr>
-            <th style="text-align:left; padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.22); color:#475569;">Dia</th>
-            <th style="text-align:right; padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.22); color:#475569;">Qtd</th>
-            <th style="text-align:right; padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.22); color:#475569;">Valor</th>
-            <th style="text-align:left; padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.22); color:#475569;">Lojas</th>
+            <th style="text-align:left; padding:6px 4px; border-bottom:1px solid #cbd5e1; color:#475569;">Dia</th>
+            <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #cbd5e1; color:#475569;">Qtd.</th>
+            <th style="text-align:right; padding:6px 4px; border-bottom:1px solid #cbd5e1; color:#475569;">Valor</th>
+            <th style="text-align:left; padding:6px 4px; border-bottom:1px solid #cbd5e1; color:#475569;">Lojas</th>
           </tr>
         </thead>
         <tbody>
+          ${dias.map(function(d){
+            return `
+              <tr>
+                <td style="padding:6px 4px; border-bottom:1px solid #e2e8f0; color:#0f172a;">${d.diaBr || ""}</td>
+                <td style="padding:6px 4px; border-bottom:1px solid #e2e8f0; text-align:right; color:#0f172a; font-weight:800;">${Number(d.qtd || 0)}</td>
+                <td style="padding:6px 4px; border-bottom:1px solid #e2e8f0; text-align:right; color:#0f172a; font-weight:800;">${window.vektorEnvPendHistFmtBRL_(d.valorTotal || 0)}</td>
+                <td style="padding:6px 4px; border-bottom:1px solid #e2e8f0; color:#0f172a;">${Array.isArray(d.lojas) ? d.lojas.join(", ") : ""}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
     `;
-
-    dias.forEach(function(d){
-      html += `
-        <tr>
-          <td style="padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.14); color:#0f172a; white-space:nowrap;">${d.diaBr || ""}</td>
-          <td style="padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.14); color:#0f172a; text-align:right; white-space:nowrap;">${d.qtd || 0}</td>
-          <td style="padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.14); color:#0f172a; text-align:right; white-space:nowrap;">${window.vektorEnvPendHistFmtBRL_(d.valorTotal || 0)}</td>
-          <td style="padding:6px 4px; border-bottom:1px solid rgba(148,163,184,0.14); color:#0f172a;">${(Array.isArray(d.lojas) ? d.lojas.join(", ") : "")}</td>
-        </tr>
-      `;
-    });
-
-    html += `</tbody></table>`;
   }
 
   tooltipEl.innerHTML = html;
+
+  // deixa visível para medir tamanho real antes de posicionar
+  tooltipEl.style.visibility = "hidden";
   tooltipEl.style.display = "block";
 
-  var canvasRect = chart.canvas.getBoundingClientRect();
-  var parentRect = chart.canvas.parentElement.getBoundingClientRect();
+  var wrap = chart.canvas.parentElement;
+  if (!wrap) {
+    tooltipEl.style.visibility = "visible";
+    return;
+  }
 
-  var left = tooltipModel.caretX + 18;
-  var top  = tooltipModel.caretY - 30;
+  var meta = chart.getDatasetMeta(0);
+  var bar = meta && meta.data && meta.data[idx] ? meta.data[idx] : null;
 
-  var maxLeft = parentRect.width - 460;
-  if (left > maxLeft) left = Math.max(10, tooltipModel.caretX - 390);
+  var pos = bar && typeof bar.tooltipPosition === "function"
+    ? bar.tooltipPosition()
+    : { x: 40, y: 40 };
 
-  if (top < 10) top = 10;
+  var wrapW = wrap.clientWidth || 0;
+  var wrapH = wrap.clientHeight || 0;
+  var tipW  = tooltipEl.offsetWidth || 360;
+  var tipH  = tooltipEl.offsetHeight || 160;
+  var gap   = 12;
+
+  // tenta abrir à direita da barra
+  var left = pos.x + gap;
+  var top  = pos.y - (tipH / 2);
+
+  // se estourar à direita, joga para a esquerda
+  if ((left + tipW) > (wrapW - 8)) {
+    left = pos.x - tipW - gap;
+  }
+
+  // clamp horizontal
+  if (left < 8) left = 8;
+  if ((left + tipW) > (wrapW - 8)) {
+    left = Math.max(8, wrapW - tipW - 8);
+  }
+
+  // clamp vertical
+  if (top < 8) top = 8;
+  if ((top + tipH) > (wrapH - 8)) {
+    top = Math.max(8, wrapH - tipH - 8);
+  }
 
   tooltipEl.style.left = left + "px";
-  tooltipEl.style.top  = top + "px";
+  tooltipEl.style.top = top + "px";
+  tooltipEl.style.visibility = "visible";
 };
 
 window.vektorEnvPendHistRenderChart_ = function(data){
@@ -11563,7 +11595,7 @@ window.vektorEnvPendHistRenderChart_ = function(data){
         const x = el.x;
         const yTop = el.y;
         const yBase = el.base;
-        const y = yTop + ((yBase - yTop) / 2); // centro exato da barra
+        const y = yTop + ((yBase - yTop) / 2);
 
         ctx.fillText(String(v), x, y);
       }
@@ -11593,16 +11625,55 @@ window.vektorEnvPendHistRenderChart_ = function(data){
       maintainAspectRatio: false,
       interaction: {
         mode: "nearest",
-        intersect: false
+        intersect: true
       },
       plugins: {
         legend: { display: false },
         tooltip: {
-          enabled: false,
-          external: window.vektorEnvPendHistExternalTooltip_
+          enabled: false
         },
         datalabels: {
           display: false
+        }
+      },
+      onHover: function(evt, elements, chart){
+        var c = chart || this;
+        var cv = c && c.canvas ? c.canvas : canvas;
+        if (cv) {
+          cv.style.cursor = (elements && elements.length) ? "pointer" : "default";
+        }
+      },
+      onClick: function(evt, elements, chart){
+        var c = chart || this;
+        if (!c) return;
+
+        var hits = c.getElementsAtEventForMode(
+          evt,
+          "nearest",
+          { intersect: true },
+          true
+        );
+
+        if (!hits || !hits.length) {
+          if (window.vektorEnvPendHistHideTooltip_) {
+            window.vektorEnvPendHistHideTooltip_();
+          }
+          return;
+        }
+
+        var idx = hits[0].index;
+
+        if (window.__envPendHistSelectedIndex === idx) {
+          if (window.vektorEnvPendHistHideTooltip_) {
+            window.vektorEnvPendHistHideTooltip_();
+          }
+          return;
+        }
+
+        window.__envPendHistSelectedIndex = idx;
+
+        if (window.vektorEnvPendHistShowTooltipByIndex_) {
+          window.vektorEnvPendHistShowTooltipByIndex_(c, idx);
         }
       },
       scales: {
@@ -11631,7 +11702,16 @@ window.vektorEnvPendHistRenderChart_ = function(data){
   });
 };
 
-window.vektorEnvPendHistLoad_ = function(){
+window.vektorEnvPendHistLoad_ = function(forceReload){
+    if (!forceReload && window.__envPendHistCache && window.__envPendHistCache.data) {
+    window.__envPend = window.__envPend || {};
+    window.__envPend.hist = window.__envPendHistCache.data;
+
+    window.vektorEnvPendHistRenderLastCard_(window.__envPendHistCache.data);
+    window.vektorEnvPendHistRenderChart_(window.__envPendHistCache.data);
+    return;
+  }
+
   var lastDate = document.getElementById("envPendHist_lastDate");
   var lastSub  = document.getElementById("envPendHist_lastSub");
 
@@ -11645,6 +11725,11 @@ window.vektorEnvPendHistLoad_ = function(){
       console.log("[HistEnv] success raw:", res);
 
       try {
+
+        window.__envPendHistCache = {
+        data: res || null,
+        loadedAt: Date.now()
+      };
         window.__envPend = window.__envPend || {};
         window.__envPend.hist = res || null;
         console.log("[HistEnv] antes de renderLastCard");
@@ -12686,6 +12771,9 @@ window.vektorEnvioPendenciasEnviarSelecionadas = function () {
           if (falhasEl) falhasEl.innerHTML = html;
 
           // Atualiza prévia para refletir envios
+          window.__envPendHistCache = null;
+          window.__envPendHistSelectedIndex = null;
+
           window.vektorEnvioPendenciasFecharModal();
           window.vektorEnvioPendenciasPreview();
 
@@ -14822,9 +14910,6 @@ window.vektorMyAlertsInit_ = function () {
     })
     .getEtiquetasDisponiveisVektor();
 
-      // =========================
-  // Tipo de alerta (Transações vs Pendências)
-  // =========================
   // =========================
 // Tipo de alerta (Transações vs Pendências)
 // =========================
@@ -14834,43 +14919,71 @@ try {
   const hint = document.getElementById("myAl_createHint");
   const labelWrap = document.getElementById("myAl_labelWrap");
 
+  const teamWrap = document.getElementById("myAl_team")?.closest("div");
+  const storesWrap = document.getElementById("myAl_storesBox")?.closest("div");
+  const btnValores = document.getElementById("myAl_btnValores");
+
   const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "").trim();
   const roleNorm = roleTxt.toLowerCase();
 
-  const canUsePendencias =
-    roleNorm === "administrador" ||
-    roleNorm === "gerentes_reg";
+  const isAdmin = roleNorm === "administrador";
+  const isGerReg = roleNorm === "gerentes_reg";
+  const isCompras = roleNorm === "compras_di";
+
+  const canUseTransacoes = !isCompras;
+  const canUsePendencias = isAdmin || isGerReg;
+  const canUseItens = true;
+  const canUseValores = isAdmin || isCompras;
+
+  if (btnValores) {
+    btnValores.style.display = canUseValores ? "inline-flex" : "none";
+  }
 
   const hydrateTypeOptions = function(forceValue){
     if (!typeSel) return;
 
-    const current = String(forceValue || typeSel.value || "TRANSACOES").trim();
+    const current = String(forceValue || typeSel.value || "").trim();
+    let html = "";
 
-    let html = "<option value='TRANSACOES'>Transações</option>";
+    if (canUseTransacoes) {
+      html += "<option value='TRANSACOES'>Transações</option>";
+    }
     if (canUsePendencias) {
       html += "<option value='PENDENCIAS'>Pendências</option>";
+    }
+    if (canUseItens) {
+      html += "<option value='ITENS_IRREGULARES'>Itens Irregulares</option>";
     }
 
     typeSel.innerHTML = html;
 
-    if (canUsePendencias && current === "PENDENCIAS") {
-      typeSel.value = "PENDENCIAS";
-    } else {
-      typeSel.value = "TRANSACOES";
-    }
+    const allowed = [];
+    if (canUseTransacoes) allowed.push("TRANSACOES");
+    if (canUsePendencias) allowed.push("PENDENCIAS");
+    if (canUseItens) allowed.push("ITENS_IRREGULARES");
+
+    typeSel.value = allowed.indexOf(current) >= 0 ? current : (allowed[0] || "ITENS_IRREGULARES");
   };
 
   const applyType = () => {
-    const t = String(typeSel?.value || "TRANSACOES").trim();
+    const t = String(typeSel?.value || "").trim();
+
+    const showTeamAndStores = isGerReg;
+    if (teamWrap) teamWrap.style.display = showTeamAndStores ? "block" : "none";
+    if (storesWrap) storesWrap.style.display = showTeamAndStores ? "block" : "none";
+
+    const hideEtiqueta = (t === "PENDENCIAS" || t === "ITENS_IRREGULARES");
+    if (labelWrap) labelWrap.style.display = hideEtiqueta ? "none" : "block";
 
     if (t === "PENDENCIAS") {
       if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
       if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
-      if (labelWrap) labelWrap.style.display = "none";
+    } else if (t === "ITENS_IRREGULARES") {
+      if (subtitle) subtitle.textContent = "Alertas de Itens Irregulares (somente itens com conformidade ALERTA), com execução programada em dias úteis.";
+      if (hint) hint.textContent = "O alerta gera uma tabela (Data, Valor, Loja, Time, Item Comprado, Estabelecimento, Conformidade, Motivo), ordenada da data mais recente para a mais antiga.";
     } else {
       if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
       if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
-      if (labelWrap) labelWrap.style.display = "block";
     }
   };
 
@@ -14887,9 +15000,12 @@ try {
 
   applyType();
 
-  // expõe helper para reaproveitar no modo edição
   window.vektorMyAlertsHydrateTypeOptions_ = hydrateTypeOptions;
   window.vektorMyAlertsCanUsePendencias_ = canUsePendencias;
+  window.vektorMyAlertsCanUseTransacoes_ = canUseTransacoes;
+  window.vektorMyAlertsCanUseItensIrregulares_ = canUseItens;
+  window.vektorMyAlertsCanUseValores_ = canUseValores;
+  window.vektorMyAlertsIsGerReg_ = isGerReg;
 } catch (_) {}
 
   // ✅ Filtros Admin: popular "Área" + atualizar lista ao mudar filtros
@@ -15035,6 +15151,8 @@ window.vektorMyAlertsCreate = function () {
   try {
     const email = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
     const role  = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "").trim() : "");
+    const roleNorm = String(role || "").trim().toLowerCase();
+    const isGerReg = !!window.vektorMyAlertsIsGerReg_ || (roleNorm === "gerentes_reg");
 
     const freq = (document.getElementById("myAl_freq")?.value || "DAILY").trim();
 
@@ -15043,11 +15161,13 @@ window.vektorMyAlertsCreate = function () {
     const windowDays = Number(winRaw || 30) || 30;
 
     // Time / Grupo
-    const time = (document.getElementById("myAl_team")?.value || "").trim();
+    const time = isGerReg
+      ? (document.getElementById("myAl_team")?.value || "").trim()
+      : "__ALL__";
 
     // Horário (HH:mm) - obrigatório e restrito
     const allowedTimes = ["11:30", "16:00"];
-    const sendAt = String(document.getElementById("myAl_sendAt")?.value || "").trim(); // ✅ FIX
+    const sendAt = String(document.getElementById("myAl_sendAt")?.value || "").trim();
 
     // Tipo de alerta
     const alertType = String(document.getElementById("myAl_alertType")?.value || "TRANSACOES").trim();
@@ -15070,8 +15190,11 @@ window.vektorMyAlertsCreate = function () {
     const isAll = etiquetas.includes("__ALL__");
     const etiquetasFinal = isAll ? [] : etiquetas.filter(x => x && x !== "__ALL__");
 
-    // ✅ regra: Pendências não usa etiquetas
-    const etiquetasFinalEff = (alertType === "PENDENCIAS") ? [] : etiquetasFinal;
+    // Pendências e Itens Irregulares não usam etiquetas
+    const etiquetasFinalEff =
+      (alertType === "PENDENCIAS" || alertType === "ITENS_IRREGULARES")
+        ? []
+        : etiquetasFinal;
 
     // Lojas
     const storesBox = document.getElementById("myAl_storesBox");
@@ -15083,10 +15206,17 @@ window.vektorMyAlertsCreate = function () {
     }
 
     // Validações
-    if (!email) { setStatus("Não foi possível identificar seu e-mail."); return; }
-    if (!time) { setStatus("Selecione um time."); return; }
+    if (!email) {
+      setStatus("Não foi possível identificar seu e-mail.");
+      return;
+    }
 
-    if (time !== "__ALL__" && !lojas.length) {
+    if (isGerReg && !time) {
+      setStatus("Selecione um time.");
+      return;
+    }
+
+    if (isGerReg && time !== "__ALL__" && !lojas.length) {
       setStatus("Selecione ao menos 1 loja.");
       return;
     }
@@ -15096,7 +15226,6 @@ window.vektorMyAlertsCreate = function () {
       return;
     }
 
-    // ✅ sendAt obrigatório e restrito
     if (!sendAt) {
       setStatus("Selecione o horário do e-mail (11:30 ou 16:00).");
       return;
@@ -15120,22 +15249,16 @@ window.vektorMyAlertsCreate = function () {
     const payload = {
       email: email,
       role: role,
-
-      // ✅ novo
       alertType: alertType,
-
       freq: freq,
       windowDays: windowDays,
       time: time,
-      sendAt: sendAt,     // ✅ FIX
-      lojas: lojas,
-
-      // ✅ transações usam etiquetas; pendências sempre vazio
+      sendAt: sendAt,
+      lojas: isGerReg ? lojas : [],
       etiquetas: etiquetasFinalEff,
       etiqueta: (etiquetasFinalEff[0] || "")
     };
 
-    // ✅ handlers ligados à chamada real
     const runner = google.script.run
       .withSuccessHandler(function (res) {
         if (window.vektorMyAlertsHideLoading_) window.vektorMyAlertsHideLoading_();
@@ -15169,7 +15292,6 @@ window.vektorMyAlertsCreate = function () {
         if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
       });
 
-    // chamada REAL
     if (editingId) {
       payload.alertId = editingId;
       runner.atualizarAlertaEtiquetaVektor(payload);
@@ -15301,13 +15423,29 @@ if (!canUsePendencias && t === "PENDENCIAS") {
 if (typeof window.vektorMyAlertsHydrateTypeOptions_ === "function") {
   window.vektorMyAlertsHydrateTypeOptions_(t);
 } else if (typeSel) {
-  typeSel.value = (t === "PENDENCIAS" ? "PENDENCIAS" : "TRANSACOES");
+  typeSel.value = (
+  t === "PENDENCIAS" ? "PENDENCIAS" :
+  t === "ITENS_IRREGULARES" ? "ITENS_IRREGULARES" :
+  "TRANSACOES"
+);
 }
+
+const isGerReg = !!window.vektorMyAlertsIsGerReg_;
+
+const teamWrap = document.getElementById("myAl_team")?.closest("div");
+const storesWrap = document.getElementById("myAl_storesBox")?.closest("div");
+
+if (teamWrap) teamWrap.style.display = isGerReg ? "block" : "none";
+if (storesWrap) storesWrap.style.display = isGerReg ? "block" : "none";
 
 if (t === "PENDENCIAS") {
   if (labelWrap) labelWrap.style.display = "none";
   if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
   if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
+} else if (t === "ITENS_IRREGULARES") {
+  if (labelWrap) labelWrap.style.display = "none";
+  if (subtitle) subtitle.textContent = "Alertas de Itens Irregulares (somente itens com conformidade ALERTA), com execução programada em dias úteis.";
+  if (hint) hint.textContent = "O alerta gera uma tabela (Data, Valor, Loja, Time, Item Comprado, Estabelecimento, Conformidade, Motivo), ordenada da data mais recente para a mais antiga.";
 } else {
   if (labelWrap) labelWrap.style.display = "block";
   if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
@@ -15334,7 +15472,7 @@ if (t === "PENDENCIAS") {
   }
 
   // etiquetas (multi) — ✅ só para Transações
-  if (t !== "PENDENCIAS") {
+  if (t !== "PENDENCIAS" && t !== "ITENS_IRREGULARES") {
     const labelEl = document.getElementById("myAl_label");
     if (labelEl && labelEl.tagName === "SELECT") {
       const raw = String(a.etiqueta || "").trim(); // "A | B | C" ou ""
@@ -15385,13 +15523,15 @@ window.vektorMyAlertsRefresh = function () {
 
   const email = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
   const role  = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "").trim() : "");
+  const roleNorm = String(role || "").trim().toLowerCase();
+  const isAdmin = roleNorm === "administrador";
+  const isGerReg = !!window.vektorMyAlertsIsGerReg_ || (roleNorm === "gerentes_reg");
 
-  // filtros admin
   const adminEmailEl = document.getElementById("myAl_adminEmail");
   const adminRoleEl  = document.getElementById("myAl_adminRole");
 
-  const adminFilterEmail = (role === "Administrador" && adminEmailEl) ? String(adminEmailEl.value || "").trim() : "";
-  const adminFilterRole  = (role === "Administrador" && adminRoleEl)  ? String(adminRoleEl.value  || "").trim() : "";
+  const adminFilterEmail = (isAdmin && adminEmailEl) ? String(adminEmailEl.value || "").trim() : "";
+  const adminFilterRole  = (isAdmin && adminRoleEl)  ? String(adminRoleEl.value  || "").trim() : "";
 
   if (typeof google === "undefined" || !google.script || !google.script.run) {
     if (list) list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>google.script.run indisponível.</div>";
@@ -15425,6 +15565,8 @@ window.vektorMyAlertsRefresh = function () {
         card.style.color = "rgba(226,232,240,0.92)";
         card.style.fontSize = "12px";
 
+        const t = String(a.alertType || "TRANSACOES").trim();
+
         const timeLabel =
           (String(a.time || "").trim() === "__ALL__") ? "Todos" : (a.time || "—");
 
@@ -15436,54 +15578,51 @@ window.vektorMyAlertsRefresh = function () {
             ? String(a.etiquetaLabel)
             : ((a.etiqueta && String(a.etiqueta).trim()) ? String(a.etiqueta).trim() : "Todas");
 
-            const horaLabel = (a.sendAt && String(a.sendAt).trim())
+        const horaLabel = (a.sendAt && String(a.sendAt).trim())
           ? String(a.sendAt).trim()
           : "Imediato";
 
-            const t = String(a.alertType || "TRANSACOES").trim();
-            const tipoLbl = (a.alertTypeLabel || (t === "PENDENCIAS" ? "Pendências" : "Transações"));
+        const tipoLbl =
+          a.alertTypeLabel ||
+          (t === "PENDENCIAS"
+            ? "Pendências"
+            : (t === "ITENS_IRREGULARES" ? "Itens Irregulares" : "Transações"));
 
-            const head =
-              "<div style='display:flex; justify-content:space-between; gap:10px; align-items:flex-start;'>" +
-                "<div>" +
-                  "<div style='font-weight:900; color:#fff; font-size:13px;'>" +
-                    "ID: " + (a.alertId || "—") +
-                    " &nbsp; <span style='opacity:0.85; font-weight:900;'>TIPO ALERTA:</span> " + tipoLbl +
-                  "</div>" +
-                  "<div style='opacity:0.85; margin-top:2px;'>" +
-                    (t === "PENDENCIAS" ? "" : ("<b>Etiqueta:</b> " + etiquetaLabel + " &nbsp; ")) +
-                    "<b>Time:</b> " + timeLabel +
-                    " &nbsp; <b>Lojas:</b> " + lojasLabel +
-                    " &nbsp; <b>Freq:</b> " + (a.freqLabel || a.freq || "—") +
-                  "</div>" +
+        const showEtiqueta = (t === "TRANSACOES");
+        const showTimeLoja = isGerReg;
 
-            "<div style='opacity:0.75; margin-top:2px;'>" +
-              "<b>Dono:</b> " + (a.ownerEmail || "—") +
-              " &nbsp; <b>Hora:</b> " + horaLabel +
-              " &nbsp; <b>Última execução:</b> " + (a.lastRunAt || "—") +
+        const head =
+          "<div style='display:flex; justify-content:space-between; gap:10px; align-items:flex-start;'>" +
+            "<div>" +
+              "<div style='font-weight:900; color:#fff; font-size:13px;'>" +
+                "ID: " + (a.alertId || "—") +
+                " &nbsp; <span style='opacity:0.85; font-weight:900;'>TIPO ALERTA:</span> " + tipoLbl +
+              "</div>" +
+              "<div style='opacity:0.85; margin-top:2px;'>" +
+                (showEtiqueta ? ("<b>Etiqueta:</b> " + etiquetaLabel + " &nbsp; ") : "") +
+                (showTimeLoja ? ("<b>Time:</b> " + timeLabel + " &nbsp; <b>Lojas:</b> " + lojasLabel + " &nbsp; ") : "") +
+                "<b>Freq:</b> " + (a.freqLabel || a.freq || "—") +
+              "</div>" +
+              "<div style='opacity:0.75; margin-top:2px;'>" +
+                "<b>Dono:</b> " + (a.ownerEmail || "—") +
+                " &nbsp; <b>Hora:</b> " + horaLabel +
+                " &nbsp; <b>Última execução:</b> " + (a.lastRunAt || "—") +
+              "</div>" +
             "</div>" +
-            "</div>" +
-
             "<div style='display:flex; gap:8px; align-items:flex-start;'>" +
-
-            // Coluna da direita
-            "<div style='display:flex; flex-direction:column; gap:6px;'>" +
-
-              "<button type='button' data-id='" + a.alertId + "' class='myAl_toggleBtn' " +
-                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;'>" +
-                (a.isActive ? "Desativar" : "Ativar") +
-              "</button>" +
-
-              // ✅ Novo botão Editar (abaixo do Desativar)
-              "<button type='button' data-id='" + a.alertId + "' class='myAl_editBtn' " +
-                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(59,130,246,0.22); color:#fff; font-weight:900; font-size:12px;'>" +
-                "Editar</button>" +
-
-              "<button type='button' data-id='" + a.alertId + "' class='myAl_delBtn' " +
-                "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(239,68,68,0.22); color:#fff; font-weight:900; font-size:12px;'>Excluir</button>" +
-
+              "<div style='display:flex; flex-direction:column; gap:6px;'>" +
+                "<button type='button' data-id='" + a.alertId + "' class='myAl_toggleBtn' " +
+                  "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:#fff; font-weight:900; font-size:12px;'>" +
+                  (a.isActive ? "Desativar" : "Ativar") +
+                "</button>" +
+                "<button type='button' data-id='" + a.alertId + "' class='myAl_editBtn' " +
+                  "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(59,130,246,0.22); color:#fff; font-weight:900; font-size:12px;'>" +
+                  "Editar</button>" +
+                "<button type='button' data-id='" + a.alertId + "' class='myAl_delBtn' " +
+                  "style='height:32px; padding:0 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.18); background:rgba(239,68,68,0.22); color:#fff; font-weight:900; font-size:12px;'>Excluir</button>" +
+              "</div>" +
             "</div>" +
-          "</div>"
+          "</div>";
 
         card.innerHTML = head;
         list.appendChild(card);
@@ -15504,12 +15643,11 @@ window.vektorMyAlertsRefresh = function () {
         };
       });
 
-            list.querySelectorAll(".myAl_editBtn").forEach(btn => {
+      list.querySelectorAll(".myAl_editBtn").forEach(btn => {
         btn.onclick = function () {
           const alertId = btn.getAttribute("data-id");
           if (!alertId) return;
 
-          // acha o objeto do alerta pelo id dentro de "rows"
           const a = rows.find(x => String(x.alertId) === String(alertId));
           if (!a) {
             if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_("Não foi possível localizar os dados do alerta para editar.", "error");
@@ -15533,7 +15671,7 @@ window.vektorMyAlertsRefresh = function () {
               const msg = "Falha ao excluir: " + (err && err.message ? err.message : err);
               if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
             })
-            .excluirAlertaVektor({ alertId: alertId }); // ✅ nome correto
+            .excluirAlertaVektor({ alertId: alertId });
         };
       });
     })
