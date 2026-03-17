@@ -5362,13 +5362,16 @@ display: none;
       <div style="min-width:220px; display:flex; flex-direction:column; gap:4px;">
         <label for="auxZfiStatusSel" style="font-size:11px; font-weight:900; color:#334155;">Status</label>
         <select id="auxZfiStatusSel"
-                class="aux-faturas-select"
-                onchange="window.vektorAuxAplicarFiltroStatusZfi_()"
-                style="min-width:220px;">
+        class="aux-faturas-select"
+        onchange="window.vektorAuxAplicarFiltroStatusZfi_()"
+        style="min-width:220px;">
           <option value="TODOS">Todos</option>
           <option value="OK">OK</option>
           <option value="SEM_ETIQUETA">Sem etiqueta</option>
-          <option value="MULTIPLAS_ETIQUETAS">Múltiplas etiquetas</option>
+          <option value="ETIQUETA_INFERIDA">Etiqueta inferida</option>
+          <option value="MULTIPLAS_ETIQUETAS_USOU_PRIMEIRA">Múltiplas etiquetas - usou a primeira</option>
+          <option value="RATEIO_LOJAS">Rateio de lojas</option>
+          <option value="CC_SOBRESCRITO_DESCRICAO">CC pela descrição</option>
           <option value="PROBLEMA">Somente problemas</option>
         </select>
       </div>
@@ -28029,7 +28032,13 @@ window.vektorAuxRenderPreviewZfi_ = function(res){
   };
 
   if (qtd) qtd.textContent = String(summary.totalRows || 0);
-  if (sem) sem.textContent = String(summary.semEtiqueta || 0);
+  if (sem) {
+    sem.textContent = String(summary.semEtiqueta || 0);
+    sem.title =
+      "Sem etiqueta: " + String(summary.semEtiqueta || 0) +
+      " | Inferidas: " + String(summary.etiquetasInferidas || 0) +
+      " | Múltiplas (usou primeira): " + String(summary.multiplasEtiquetasUsouPrimeira || 0);
+  }
   if (val) val.textContent = window.vektorAuxFmtMoneyBr_(summary.valorTotal || 0);
   if (lan) lan.textContent = String(summary.dataLancamentoBr || "—");
 
@@ -28078,7 +28087,7 @@ window.vektorAuxAplicarFiltroStatusZfi_ = function(){
   }
 
   html += "<div style='border:1px solid #e2e8f0; border-radius:12px; overflow:auto; max-height:52vh; background:#fff;'>";
-  html += "<table style='width:100%; border-collapse:separate; border-spacing:0; font-size:12px; color:#0f172a; min-width:1120px;'>";
+  html += "<table style='width:100%; border-collapse:separate; border-spacing:0; font-size:12px; color:#0f172a; min-width:1260px;'>";
   html += "<thead><tr>";
 
   [
@@ -28087,6 +28096,7 @@ window.vektorAuxAplicarFiltroStatusZfi_ = function(){
     "Valor",
     "Etiqueta original",
     "Conta 2",
+    "Centro de custo",
     "Referência",
     "Texto do item",
     "Status"
@@ -28117,6 +28127,7 @@ window.vektorAuxAplicarFiltroStatusZfi_ = function(){
     html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right;'>" + window.vektorAuxFmtMoneyBr_(r.valor || 0) + "</td>";
     html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.etiquetaOriginal || "") + "</td>";
     html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.conta2 || "") + "</td>";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.centroCusto2 || "") + "</td>";
     html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.referencia || "") + "</td>";
     html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.textoItem || "") + "</td>";
     html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:center; font-weight:900; color:" + statusColor + ";'>" + statusLabel + "</td>";
