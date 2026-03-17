@@ -16102,6 +16102,315 @@ function getAnaliseTemporalFaturasVektor(extratoAtual, extratoAnterior) {
   return getComparativoFaturasClaraCore_(extratoAtual, extratoAnterior);
 }
 
+// =====================================================
+// ZFI - Prévia e montagem do CSV para SAP
+// =====================================================
+
+// ⚠️ Há conflito entre o seu texto e o CSV modelo.
+// Ajuste estas flags se quiser mudar o comportamento sem reescrever tudo.
+var VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA = false; // false = segue o modelo anexado (recomendado)
+var VEKTOR_ZFI_LOCNEG_SEM_PAD4 = false;         // true = segue o seu texto; false = segue o modelo
+var VEKTOR_ZFI_EXPORT_COM_BOM = false;         // false = mais próximo do CSV modelo
+
+function vektorZfiFmtDateDdMmYyyyDigits_(dateObj, semZero) {
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return "";
+  var d = dateObj.getDate();
+  var m = dateObj.getMonth() + 1;
+  var y = dateObj.getFullYear();
+
+  if (semZero) {
+    return String(d) + String(m) + String(y);
+  }
+  return String(d).padStart(2, "0") + String(m).padStart(2, "0") + String(y);
+}
+
+function vektorZfiFmtDateBr_(dateObj) {
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return "";
+  var d = String(dateObj.getDate()).padStart(2, "0");
+  var m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  var y = String(dateObj.getFullYear());
+  return d + "/" + m + "/" + y;
+}
+
+function vektorZfiFmtMonth2_(dateObj) {
+  if (!(dateObj instanceof Date) || isNaN(dateObj.getTime())) return "";
+  return String(dateObj.getMonth() + 1).padStart(2, "0");
+}
+
+function vektorZfiFmtMoneySap_(n) {
+  var v = Number(n || 0) || 0;
+  return v.toFixed(2).replace(".", ",");
+}
+
+function vektorZfiSafeText_(s) {
+  return String(s == null ? "" : s).replace(/[;\r\n]+/g, " ").trim();
+}
+
+function vektorZfiLojaNum_(v) {
+  var n = normalizarLojaNumero_(v);
+  return n ? String(n) : "";
+}
+
+function vektorZfiLoja4_(v) {
+  var n = normalizarLojaNumero_(v);
+  return n ? String(n).padStart(4, "0") : "";
+}
+
+function vektorZfiLocNeg_(v) {
+  var n = normalizarLojaNumero_(v);
+  if (!n) return "";
+  return VEKTOR_ZFI_LOCNEG_SEM_PAD4 ? String(n) : String(n).padStart(4, "0");
+}
+
+function vektorZfiClassificarEtiqueta_(etiquetaRaw) {
+  var txt = String(etiquetaRaw || "").trim();
+  if (!txt) {
+    return {
+      statusCode: "SEM_ETIQUETA",
+      conta2: "",
+      etiquetaOriginal: ""
+    };
+  }
+
+  var nums = txt.match(/\d{6,}/g) || [];
+  var unicos = [];
+  var seen = {};
+
+  nums.forEach(function(n){
+    var v = String(n || "").trim();
+    if (!v) return;
+    if (seen[v]) return;
+    seen[v] = true;
+    unicos.push(v);
+  });
+
+  if (unicos.length === 0) {
+    return {
+      statusCode: "SEM_ETIQUETA",
+      conta2: "",
+      etiquetaOriginal: txt
+    };
+  }
+
+  if (unicos.length > 1) {
+    return {
+      statusCode: "MULTIPLAS_ETIQUETAS",
+      conta2: "",
+      etiquetaOriginal: txt
+    };
+  }
+
+  return {
+    statusCode: "OK",
+    conta2: unicos[0],
+    etiquetaOriginal: txt
+  };
+}
+
+function vektorZfiReferenciaFromLancamento_(dataLanc) {
+  if (!(dataLanc instanceof Date) || isNaN(dataLanc.getTime())) return "";
+
+  var meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+  var prevMonth = new Date(dataLanc.getFullYear(), dataLanc.getMonth() - 1, 1);
+  var mmTxt = meses[prevMonth.getMonth()] || "";
+  var yy = String(prevMonth.getFullYear()).slice(-2);
+
+  return "Clara " + mmTxt + yy;
+}
+
+function vektorZfiTextoItemFromLancamento_(dataLanc) {
+  var ref = vektorZfiReferenciaFromLancamento_(dataLanc);
+  return ref ? ("Sangria " + ref) : "";
+}
+
+function vektorZfiCsvExcelSafeText_(s) {
+  var v = String(s == null ? "" : s);
+  if (!v) return "";
+  return '="' + v.replace(/"/g, '""') + '"';
+}
+
+function vektorZfiBuildCsvRow_(obj) {
+  return [
+    vektorZfiCsvExcelSafeText_(obj.dataTransacaoArquivo), // Data
+    "CC",                     // Tipo Doc
+    "7010",                   // Empresa
+    vektorZfiCsvExcelSafeText_(obj.dataLancamentoArquivo), // Data Lanç.
+    obj.mesLancamento,        // Mês
+    "BRL",                    // Moeda
+    obj.referencia,           // Referencia
+    "31",                     // Chave Lanç.
+    "244135",                 // Conta
+    "",                       // Rz.Esp.
+    obj.montante1,            // Montante
+    "",                       // Centro de custo
+    "",                       // Elemento PEP
+    "",                       // Ordem
+    vektorZfiCsvExcelSafeText_(obj.locNeg), // Loc.Neg.
+    vektorZfiCsvExcelSafeText_(obj.dataEfetiva1), // Data Efetiva
+    "",                       // Cond.Pag.
+    "",                       // Dias
+    vektorZfiCsvExcelSafeText_(obj.dataVencimentoArquivo), // Data Venc.
+    obj.atribuicao,           // Atribuição
+    obj.textoItem,            // Texto do item
+    "40",                     // Chave Lanç.2
+    obj.conta2 ? vektorZfiCsvExcelSafeText_(obj.conta2) : "", // Conta 2
+    obj.montante2,            // Montante
+    obj.centroCusto2 ? vektorZfiCsvExcelSafeText_(obj.centroCusto2) : "", // Centro de custo
+    "",                       // Elemento PEP
+    "",                       // Ordem
+    vektorZfiCsvExcelSafeText_(obj.dataEfetiva2), // Data Efetiva
+    obj.textoCampoNota,       // Texto do campo Nota
+    "",                       // coluna vazia
+    obj.atribuicao2,          // Atrib. 2
+    ""                        // rze 2
+  ];
+}
+
+function getPreviewArquivoZFIVektor(req) {
+  vektorAssertFunctionAllowed_("getPreviewArquivoZFIVektor");
+
+  try {
+    req = req || {};
+    var extratoAlvo = String(req.extrato || "").trim();
+    if (!extratoAlvo) {
+      return { ok:false, error:"Período da fatura não informado." };
+    }
+
+    var info = carregarLinhasBaseClara_();
+    if (info.error) return { ok:false, error: info.error };
+
+    var header = info.header || [];
+    var linhas = info.linhas || [];
+    if (!linhas.length) {
+      return { ok:true, extrato: extratoAlvo, previewRows: [], csvRows: [], summary: { totalRows:0, semEtiqueta:0, valorTotal:0 } };
+    }
+
+    var idxExtrato = encontrarIndiceColuna_(header, ["Extrato da conta", "Extrato conta", "Extrato"]);
+    var idxData    = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
+    var idxValor   = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor"]);
+    var idxLoja    = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja", "Cod Loja", "Código Loja"]);
+    var idxEtiq    = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+
+    if (idxExtrato < 0) return { ok:false, error:"Não encontrei a coluna 'Extrato da conta' na BaseClara." };
+    if (idxData < 0)    return { ok:false, error:"Não encontrei a coluna 'Data da Transação' na BaseClara." };
+    if (idxValor < 0)   return { ok:false, error:"Não encontrei a coluna de Valor na BaseClara." };
+    if (idxLoja < 0)    return { ok:false, error:"Não encontrei a coluna 'LojaNum' na BaseClara." };
+    if (idxEtiq < 0)    return { ok:false, error:"Não encontrei a coluna 'Etiquetas' na BaseClara." };
+
+    var pExtrato = parseExtratoContaPeriodo_(extratoAlvo);
+    if (!pExtrato) {
+      return { ok:false, error:"Não consegui interpretar o período da fatura selecionada." };
+    }
+
+    // regra operacional: data de lançamento = hoje
+    var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+    var hoje = new Date();
+    var dataLanc = new Date(Utilities.formatDate(hoje, tz, "yyyy/MM/dd") + " 00:00:00");
+    var dataVenc = new Date(dataLanc.getFullYear(), dataLanc.getMonth(), 12);
+
+    var referencia = vektorZfiReferenciaFromLancamento_(dataLanc);
+    var textoItem = vektorZfiTextoItemFromLancamento_(dataLanc);
+
+    var previewRows = [];
+    var csvRows = [];
+    var valorTotal = 0;
+    var semEtiqueta = 0;
+    var multiplasEtiquetas = 0;
+
+    for (var i = 0; i < linhas.length; i++) {
+      var row = linhas[i];
+
+      var extrato = String(row[idxExtrato] || "").trim();
+      if (extrato !== extratoAlvo) continue;
+
+      var dataRaw = row[idxData];
+      var dataTx = (dataRaw instanceof Date) ? dataRaw : new Date(dataRaw);
+      if (!(dataTx instanceof Date) || isNaN(dataTx.getTime())) continue;
+
+      var valor = Number(row[idxValor] || 0) || 0;
+      var lojaNum = vektorZfiLojaNum_(row[idxLoja]);
+      var loja4 = vektorZfiLoja4_(row[idxLoja]);
+
+      var etiquetaInfo = vektorZfiClassificarEtiqueta_(row[idxEtiq]);
+      var etiquetaOriginal = etiquetaInfo.etiquetaOriginal;
+      var conta2 = etiquetaInfo.conta2;
+      var statusCode = etiquetaInfo.statusCode;
+
+      if (statusCode === "SEM_ETIQUETA") semEtiqueta += 1;
+      if (statusCode === "MULTIPLAS_ETIQUETAS") multiplasEtiquetas += 1;
+
+      valorTotal += valor;
+
+      var obj = {
+        dataTransacaoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(dataTx, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+        dataTransacaoBr: vektorZfiFmtDateBr_(dataTx),
+
+        dataLancamentoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+        dataLancamentoBr: vektorZfiFmtDateBr_(dataLanc),
+        mesLancamento: vektorZfiFmtMonth2_(dataLanc),
+
+        referencia: referencia,
+        montante1: vektorZfiFmtMoneySap_(valor),
+        locNeg: vektorZfiLocNeg_(row[idxLoja]),
+        dataEfetiva1: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+        dataVencimentoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(dataVenc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+        atribuicao: referencia,
+        textoItem: textoItem,
+        conta2: conta2,
+        montante2: vektorZfiFmtMoneySap_(valor),
+        centroCusto2: loja4 ? ("7010" + loja4 + "01") : "",
+        dataEfetiva2: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+        textoCampoNota: textoItem,
+        atribuicao2: referencia,
+
+        loja: lojaNum,
+        etiquetaOriginal: etiquetaOriginal,
+        valor: valor
+      };
+
+      previewRows.push({
+      dataTransacaoBr: obj.dataTransacaoBr,
+      loja: lojaNum,
+      valor: valor,
+      etiquetaOriginal: etiquetaOriginal,
+      conta2: conta2,
+      referencia: referencia,
+      textoItem: textoItem,
+      statusCode: statusCode
+    });
+
+      csvRows.push(vektorZfiBuildCsvRow_(obj));
+    }
+
+    previewRows.sort(function(a, b){
+      var da = Date.parse((a.dataTransacaoBr || "").split("/").reverse().join("-")) || 0;
+      var db = Date.parse((b.dataTransacaoBr || "").split("/").reverse().join("-")) || 0;
+      return da - db;
+    });
+
+    return {
+      ok: true,
+      extrato: extratoAlvo,
+      previewRows: previewRows,
+      csvRows: csvRows,
+      summary: {
+        totalRows: previewRows.length,
+        semEtiqueta: semEtiqueta,
+        multiplasEtiquetas: multiplasEtiquetas,
+        valorTotal: valorTotal,
+        dataLancamentoBr: vektorZfiFmtDateBr_(dataLanc),
+        dataLancamentoArquivo: Utilities.formatDate(dataLanc, tz, "yyyy-MM-dd"),
+        dataVencimentoBr: vektorZfiFmtDateBr_(dataVenc),
+        referencia: referencia
+      }
+    };
+
+  } catch (e) {
+    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
 function DISPARAR_EMAIL_OFENSORAS_SEMANA() {
   var props = PropertiesService.getScriptProperties();
 
