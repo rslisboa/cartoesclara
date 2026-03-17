@@ -16162,7 +16162,7 @@ function vektorZfiLocNeg_(v) {
   return VEKTOR_ZFI_LOCNEG_SEM_PAD4 ? String(n) : String(n).padStart(4, "0");
 }
 
-function vektorZfiClassificarEtiqueta_(etiquetaRaw) {
+function vektorZfiResolverEtiquetas_(etiquetaRaw) {
   var txt = String(etiquetaRaw || "").trim();
   if (!txt) {
     return {
@@ -16173,18 +16173,15 @@ function vektorZfiClassificarEtiqueta_(etiquetaRaw) {
   }
 
   var nums = txt.match(/\d{6,}/g) || [];
-  var unicos = [];
-  var seen = {};
+  var lista = [];
 
   nums.forEach(function(n){
-    var v = String(n || "").trim();
-    if (!v) return;
-    if (seen[v]) return;
-    seen[v] = true;
-    unicos.push(v);
+    n = String(n || "").trim();
+    if (!n) return;
+    lista.push(n);
   });
 
-  if (unicos.length === 0) {
+  if (!lista.length) {
     return {
       statusCode: "SEM_ETIQUETA",
       conta2: "",
@@ -16192,19 +16189,153 @@ function vektorZfiClassificarEtiqueta_(etiquetaRaw) {
     };
   }
 
-  if (unicos.length > 1) {
+  if (lista.length > 1) {
     return {
-      statusCode: "MULTIPLAS_ETIQUETAS",
-      conta2: "",
+      statusCode: "MULTIPLAS_ETIQUETAS_USOU_PRIMEIRA",
+      conta2: lista[0],
       etiquetaOriginal: txt
     };
   }
 
   return {
     statusCode: "OK",
-    conta2: unicos[0],
+    conta2: lista[0],
     etiquetaOriginal: txt
   };
+}
+
+function vektorZfiNormDesc_(s) {
+  s = String(s || "").trim();
+  try {
+    s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  } catch (_) {}
+  return s.toUpperCase();
+}
+
+function vektorZfiExtrairLojasRateio_(descricaoRaw) {
+  var txt = vektorZfiNormDesc_(descricaoRaw);
+  if (!txt) return [];
+
+  // só entra se houver verbo/contexto de rateio
+  var falaRateio =
+    /DIVID|RATEI|RATEAR|RATEADO|RATEIO|ENTRE LOJAS|ENTRE AS LOJAS|LOJAS:/i.test(txt);
+
+  if (!falaRateio) return [];
+
+  var nums = txt.match(/\b\d{1,4}\b/g) || [];
+  var out = [];
+  var seen = {};
+
+  nums.forEach(function(n){
+    var loja = String(Number(n) || "").trim();
+    if (!loja) return;
+    if (seen[loja]) return;
+    seen[loja] = true;
+    out.push(loja);
+  });
+
+  return out.length >= 2 ? out : [];
+}
+
+function vektorZfiExtrairCcDescricao_(descricaoRaw) {
+  var txt = String(descricaoRaw || "").trim();
+  if (!txt) return "";
+
+  var m =
+    txt.match(/CC\s*[:\-]?\s*([0-9A-Z]{8,20})/i) ||
+    txt.match(/CENTRO\s+DE\s+CUSTO\s*[:\-]?\s*([0-9A-Z]{8,20})/i);
+
+  return m && m[1] ? String(m[1]).trim().toUpperCase() : "";
+}
+
+function vektorZfiRatearValor_(valorTotal, qtd) {
+  valorTotal = Number(valorTotal || 0) || 0;
+  qtd = Number(qtd || 0) || 0;
+  if (qtd <= 1) return [valorTotal];
+
+  var base = Math.floor((valorTotal / qtd) * 100) / 100;
+  var out = [];
+  var soma = 0;
+
+  for (var i = 0; i < qtd; i++) {
+    var v = (i < qtd - 1) ? base : Number((valorTotal - soma).toFixed(2));
+    out.push(v);
+    soma = Number((soma + v).toFixed(2));
+  }
+  return out;
+}
+
+function vektorZfiExtratosAnteriores2_(todosExtratos, extratoAtual) {
+  var lista = Array.isArray(todosExtratos) ? todosExtratos.slice() : [];
+  var idx = lista.indexOf(extratoAtual);
+  if (idx < 0) return [];
+  var out = [];
+  if (idx - 1 >= 0) out.push(lista[idx - 1]);
+  if (idx - 2 >= 0) out.push(lista[idx - 2]);
+  return out;
+}
+
+function vektorZfiConstruirIndiceHistoricoEtiquetas_(linhas, idxs, extratosHistorico) {
+  var histSet = {};
+  (extratosHistorico || []).forEach(function(x){ histSet[String(x || "").trim()] = true; });
+
+  var byEstab = {};
+  var byDesc  = {};
+
+  function add_(mapa, key, etiqueta) {
+    key = String(key || "").trim();
+    etiqueta = String(etiqueta || "").trim();
+    if (!key || !etiqueta) return;
+    if (!mapa[key]) mapa[key] = {};
+    mapa[key][etiqueta] = (mapa[key][etiqueta] || 0) + 1;
+  }
+
+  (linhas || []).forEach(function(row){
+    var extrato = String(row[idxs.idxExtrato] || "").trim();
+    if (!histSet[extrato]) return;
+
+    var etiquetaInfo = vektorZfiResolverEtiquetas_(row[idxs.idxEtiq]);
+    if (!etiquetaInfo.conta2) return;
+
+    var estab = vektorZfiNormDesc_(row[idxs.idxEstab]);
+    var desc  = vektorZfiNormDesc_(row[idxs.idxDesc]);
+
+    add_(byEstab, estab, etiquetaInfo.conta2);
+    add_(byDesc, desc, etiquetaInfo.conta2);
+  });
+
+  return { byEstab: byEstab, byDesc: byDesc };
+}
+
+function vektorZfiPickEtiquetaHist_(bucket) {
+  if (!bucket) return "";
+  var best = "";
+  var bestN = -1;
+
+  Object.keys(bucket).forEach(function(et){
+    var n = Number(bucket[et] || 0) || 0;
+    if (n > bestN) {
+      bestN = n;
+      best = et;
+    }
+  });
+
+  return best;
+}
+
+function vektorZfiExpandirRateioLojas_(txBase, lojasRateio) {
+  lojasRateio = Array.isArray(lojasRateio) ? lojasRateio.slice() : [];
+  if (!lojasRateio.length) return [txBase];
+
+  var partes = vektorZfiRatearValor_(txBase.valor, lojasRateio.length);
+
+  return lojasRateio.map(function(loja, i){
+    var c = JSON.parse(JSON.stringify(txBase || {}));
+    c.lojaNum = String(loja || "").trim();
+    c.valor = Number(partes[i] || 0) || 0;
+    c.statusExtra = "RATEIO_LOJAS";
+    return c;
+  });
 }
 
 function vektorZfiReferenciaFromLancamento_(dataLanc) {
@@ -16283,7 +16414,21 @@ function getPreviewArquivoZFIVektor(req) {
     var header = info.header || [];
     var linhas = info.linhas || [];
     if (!linhas.length) {
-      return { ok:true, extrato: extratoAlvo, previewRows: [], csvRows: [], summary: { totalRows:0, semEtiqueta:0, valorTotal:0 } };
+      return {
+        ok:true,
+        extrato: extratoAlvo,
+        previewRows: [],
+        csvRows: [],
+        summary: {
+          totalRows:0,
+          semEtiqueta:0,
+          multiplasEtiquetasUsouPrimeira:0,
+          etiquetasInferidas:0,
+          rateiosAplicados:0,
+          ccSobrescrito:0,
+          valorTotal:0
+        }
+      };
     }
 
     var idxExtrato = encontrarIndiceColuna_(header, ["Extrato da conta", "Extrato conta", "Extrato"]);
@@ -16291,6 +16436,8 @@ function getPreviewArquivoZFIVektor(req) {
     var idxValor   = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor"]);
     var idxLoja    = encontrarIndiceColuna_(header, ["LojaNum", "Loja Num", "Loja", "Cod Loja", "Código Loja"]);
     var idxEtiq    = encontrarIndiceColuna_(header, ["Etiquetas", "Etiqueta"]);
+    var idxDesc    = encontrarIndiceColuna_(header, ["Descrição", "Descricao", "Comentário", "Comentario"]);
+    var idxEstab   = encontrarIndiceColuna_(header, ["Nome do Estabelecimento", "Estabelecimento", "Nome estabelecimento", "Transação", "Transacao"]);
 
     if (idxExtrato < 0) return { ok:false, error:"Não encontrei a coluna 'Extrato da conta' na BaseClara." };
     if (idxData < 0)    return { ok:false, error:"Não encontrei a coluna 'Data da Transação' na BaseClara." };
@@ -16312,11 +16459,41 @@ function getPreviewArquivoZFIVektor(req) {
     var referencia = vektorZfiReferenciaFromLancamento_(dataLanc);
     var textoItem = vektorZfiTextoItemFromLancamento_(dataLanc);
 
+    // histórico das 2 faturas anteriores para inferência de etiqueta
+    var extratosUnicos = [];
+    var extratoSeen = {};
+    for (var u = 0; u < linhas.length; u++) {
+      var ex = String(linhas[u][idxExtrato] || "").trim();
+      if (!ex || extratoSeen[ex]) continue;
+      extratoSeen[ex] = true;
+      extratosUnicos.push(ex);
+    }
+
+    extratosUnicos.sort(function(a, b){
+      var pa = parseExtratoContaPeriodo_(a);
+      var pb = parseExtratoContaPeriodo_(b);
+      var ta = pa && pa.start ? pa.start.getTime() : 0;
+      var tb = pb && pb.start ? pb.start.getTime() : 0;
+      return ta - tb;
+    });
+
+    var extratosHist = vektorZfiExtratosAnteriores2_(extratosUnicos, extratoAlvo);
+
+    var histIdx = vektorZfiConstruirIndiceHistoricoEtiquetas_(linhas, {
+      idxExtrato: idxExtrato,
+      idxEtiq: idxEtiq,
+      idxEstab: idxEstab,
+      idxDesc: idxDesc
+    }, extratosHist);
+
     var previewRows = [];
     var csvRows = [];
     var valorTotal = 0;
     var semEtiqueta = 0;
-    var multiplasEtiquetas = 0;
+    var multiplasEtiquetasUsouPrimeira = 0;
+    var etiquetasInferidas = 0;
+    var rateiosAplicados = 0;
+    var ccSobrescrito = 0;
 
     for (var i = 0; i < linhas.length; i++) {
       var row = linhas[i];
@@ -16329,58 +16506,112 @@ function getPreviewArquivoZFIVektor(req) {
       if (!(dataTx instanceof Date) || isNaN(dataTx.getTime())) continue;
 
       var valor = Number(row[idxValor] || 0) || 0;
-      var lojaNum = vektorZfiLojaNum_(row[idxLoja]);
-      var loja4 = vektorZfiLoja4_(row[idxLoja]);
+      var descricaoRaw = idxDesc >= 0 ? String(row[idxDesc] || "").trim() : "";
+      var estabelecimentoRaw = idxEstab >= 0 ? String(row[idxEstab] || "").trim() : "";
 
-      var etiquetaInfo = vektorZfiClassificarEtiqueta_(row[idxEtiq]);
-      var etiquetaOriginal = etiquetaInfo.etiquetaOriginal;
-      var conta2 = etiquetaInfo.conta2;
-      var statusCode = etiquetaInfo.statusCode;
-
-      if (statusCode === "SEM_ETIQUETA") semEtiqueta += 1;
-      if (statusCode === "MULTIPLAS_ETIQUETAS") multiplasEtiquetas += 1;
-
-      valorTotal += valor;
-
-      var obj = {
-        dataTransacaoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(dataTx, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
-        dataTransacaoBr: vektorZfiFmtDateBr_(dataTx),
-
-        dataLancamentoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
-        dataLancamentoBr: vektorZfiFmtDateBr_(dataLanc),
-        mesLancamento: vektorZfiFmtMonth2_(dataLanc),
-
-        referencia: referencia,
-        montante1: vektorZfiFmtMoneySap_(valor),
-        locNeg: vektorZfiLocNeg_(row[idxLoja]),
-        dataEfetiva1: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
-        dataVencimentoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(dataVenc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
-        atribuicao: referencia,
-        textoItem: textoItem,
-        conta2: conta2,
-        montante2: vektorZfiFmtMoneySap_(valor),
-        centroCusto2: loja4 ? ("7010" + loja4 + "01") : "",
-        dataEfetiva2: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
-        textoCampoNota: textoItem,
-        atribuicao2: referencia,
-
-        loja: lojaNum,
-        etiquetaOriginal: etiquetaOriginal,
-        valor: valor
+      var txBase = {
+        lojaNum: vektorZfiLojaNum_(row[idxLoja]),
+        valor: valor,
+        dataTx: dataTx,
+        descricaoRaw: descricaoRaw,
+        estabelecimentoRaw: estabelecimentoRaw,
+        etiquetaRaw: row[idxEtiq]
       };
 
-      previewRows.push({
-      dataTransacaoBr: obj.dataTransacaoBr,
-      loja: lojaNum,
-      valor: valor,
-      etiquetaOriginal: etiquetaOriginal,
-      conta2: conta2,
-      referencia: referencia,
-      textoItem: textoItem,
-      statusCode: statusCode
-    });
+      var lojasRateio = vektorZfiExtrairLojasRateio_(descricaoRaw);
+      var ccOverride = vektorZfiExtrairCcDescricao_(descricaoRaw);
 
-      csvRows.push(vektorZfiBuildCsvRow_(obj));
+      var txExpandida = vektorZfiExpandirRateioLojas_(txBase, lojasRateio);
+      if (lojasRateio.length >= 2) rateiosAplicados += 1;
+      if (ccOverride) ccSobrescrito += 1;
+
+      for (var e = 0; e < txExpandida.length; e++) {
+        var itemTx = txExpandida[e];
+
+        var lojaNum = vektorZfiLojaNum_(itemTx.lojaNum);
+        var loja4 = vektorZfiLoja4_(itemTx.lojaNum);
+
+        var etiquetaInfo = vektorZfiResolverEtiquetas_(itemTx.etiquetaRaw);
+        var etiquetaOriginal = etiquetaInfo.etiquetaOriginal;
+        var conta2 = etiquetaInfo.conta2;
+        var statusCode = etiquetaInfo.statusCode;
+
+        if (statusCode === "MULTIPLAS_ETIQUETAS_USOU_PRIMEIRA") {
+          multiplasEtiquetasUsouPrimeira += 1;
+        }
+
+        if (!conta2) {
+          var estabKey = vektorZfiNormDesc_(itemTx.estabelecimentoRaw);
+          var descKey  = vektorZfiNormDesc_(itemTx.descricaoRaw);
+
+          var tagHist = vektorZfiPickEtiquetaHist_(histIdx.byEstab[estabKey]) ||
+                        vektorZfiPickEtiquetaHist_(histIdx.byDesc[descKey]);
+
+          if (tagHist) {
+            conta2 = tagHist;
+            statusCode = "ETIQUETA_INFERIDA";
+            etiquetasInferidas += 1;
+          } else {
+            statusCode = "SEM_ETIQUETA";
+            semEtiqueta += 1;
+          }
+        }
+
+        // prioridade de status visual
+        if (statusCode === "OK") {
+          if (ccOverride) {
+            statusCode = "CC_SOBRESCRITO_DESCRICAO";
+          } else if (lojasRateio.length >= 2) {
+            statusCode = "RATEIO_LOJAS";
+          }
+        }
+
+        var centroCustoFinal = ccOverride || (loja4 ? ("7010" + loja4 + "01") : "");
+        var valorLinha = Number(itemTx.valor || 0) || 0;
+
+        valorTotal = Number((valorTotal + valorLinha).toFixed(2));
+
+        var obj = {
+          dataTransacaoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(itemTx.dataTx, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+          dataTransacaoBr: vektorZfiFmtDateBr_(itemTx.dataTx),
+
+          dataLancamentoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+          dataLancamentoBr: vektorZfiFmtDateBr_(dataLanc),
+          mesLancamento: vektorZfiFmtMonth2_(dataLanc),
+
+          referencia: referencia,
+          montante1: vektorZfiFmtMoneySap_(valorLinha),
+          locNeg: vektorZfiLocNeg_(itemTx.lojaNum),
+          dataEfetiva1: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+          dataVencimentoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(dataVenc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+          atribuicao: referencia,
+          textoItem: textoItem,
+          conta2: conta2,
+          montante2: vektorZfiFmtMoneySap_(valorLinha),
+          centroCusto2: centroCustoFinal,
+          dataEfetiva2: vektorZfiFmtDateDdMmYyyyDigits_(dataLanc, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
+          textoCampoNota: textoItem,
+          atribuicao2: referencia,
+
+          loja: lojaNum,
+          etiquetaOriginal: etiquetaOriginal,
+          valor: valorLinha
+        };
+
+        previewRows.push({
+          dataTransacaoBr: obj.dataTransacaoBr,
+          loja: lojaNum,
+          valor: valorLinha,
+          etiquetaOriginal: etiquetaOriginal,
+          conta2: conta2,
+          centroCusto2: centroCustoFinal,
+          referencia: referencia,
+          textoItem: textoItem,
+          statusCode: statusCode
+        });
+
+        csvRows.push(vektorZfiBuildCsvRow_(obj));
+      }
     }
 
     previewRows.sort(function(a, b){
@@ -16397,7 +16628,10 @@ function getPreviewArquivoZFIVektor(req) {
       summary: {
         totalRows: previewRows.length,
         semEtiqueta: semEtiqueta,
-        multiplasEtiquetas: multiplasEtiquetas,
+        multiplasEtiquetasUsouPrimeira: multiplasEtiquetasUsouPrimeira,
+        etiquetasInferidas: etiquetasInferidas,
+        rateiosAplicados: rateiosAplicados,
+        ccSobrescrito: ccSobrescrito,
         valorTotal: valorTotal,
         dataLancamentoBr: vektorZfiFmtDateBr_(dataLanc),
         dataLancamentoArquivo: Utilities.formatDate(dataLanc, tz, "yyyy-MM-dd"),
@@ -18007,8 +18241,8 @@ function getFluxoNumerarioSapData(req) {
         bkpf.xblnr   AS Referencia,
         bseg.sgtxt   AS Texto,
         bseg.gjahr   AS Exercicio, 
-      FROM \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bseg\` AS bseg
-      INNER JOIN \`gruposbf-data-lake.trusted.sbf_trd_sap_0000_sap_bkpf\` AS bkpf
+      FROM \`gruposbf-data-lake.trusted.sbf_trd_kfk_6000_sap_tbl_bseg\` AS bseg
+      INNER JOIN \`gruposbf-data-lake.trusted.sbf_trd_kfk_6000_sap_tbl_bkpf\` AS bkpf
         ON bseg.belnr = bkpf.belnr
       WHERE ${wherePeriodo}
         AND bseg.bukrs = "7010"
