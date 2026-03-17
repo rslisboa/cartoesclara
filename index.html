@@ -5219,7 +5219,7 @@ display: none;
         </div>
       </div>
 
-      <div class="aux-faturas-head-right">
+          <div class="aux-faturas-head-right">
         <div class="aux-faturas-filter">
           <label for="auxFaturaAtualSel">Fatura base</label>
           <select id="auxFaturaAtualSel" class="aux-faturas-select">
@@ -5237,12 +5237,22 @@ display: none;
         <div class="aux-faturas-filter" style="min-width:auto; justify-content:flex-end;">
           <label style="visibility:hidden;">Ação</label>
           <button type="button"
+                  onclick="window.vektorAuxAbrirGerarZfi()"
+                  class="aux-topbtn">
+            Gerar Arquivo ZFI
+          </button>
+        </div>
+
+        <div class="aux-faturas-filter" style="min-width:auto; justify-content:flex-end;">
+          <label style="visibility:hidden;">Ação</label>
+          <button type="button"
                   onclick="window.vektorAuxAbrirAnaliseTemporal()"
                   class="aux-topbtn">
             Análise Temporal.
           </button>
         </div>
-      </div>
+        </div>
+
     </div>
   </div>
 
@@ -5294,6 +5304,91 @@ display: none;
 
     <div id="auxFaturasAnaliseTemporalBody"
          style="padding:14px; overflow:auto; background:#ffffff;">
+    </div>
+  </div>
+</div>
+
+<div id="auxFaturasZfiModal"
+     class="fixed inset-0 bg-black/60 z-50 hidden items-center justify-center">
+  <div style="width:min(1280px, 96vw); max-height:92vh; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,0.30); display:flex; flex-direction:column;">
+    <div style="padding:12px 14px; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; gap:12px; background:#ffffff;">
+      <div>
+        <div style="font-size:16px; font-weight:1000; color:#0f172a;">Prévia — Arquivo ZFI</div>
+        <div id="auxFaturasZfiSub"
+             style="font-size:12px; font-weight:700; color:#64748b; margin-top:2px;">
+          Selecione o período da fatura para montar a prévia do arquivo.
+        </div>
+      </div>
+
+      <button type="button"
+              onclick="window.vektorAuxCloseZfiModal()"
+              style="height:34px; min-width:34px; padding:0 12px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; color:#0f172a; font-size:12px; font-weight:1000; cursor:pointer;">
+        Fechar
+      </button>
+    </div>
+
+          <div style="padding:12px 14px; border-bottom:1px solid #e2e8f0; background:#f8fafc; display:flex; align-items:end; gap:12px; flex-wrap:wrap;">
+      <div style="min-width:260px; display:flex; flex-direction:column; gap:4px;">
+        <label for="auxZfiExtratoSel" style="font-size:11px; font-weight:900; color:#334155;">Período da fatura</label>
+        <select id="auxZfiExtratoSel"
+                class="aux-faturas-select"
+                style="min-width:260px;">
+          <option value="">Selecione</option>
+        </select>
+      </div>
+
+      <button type="button"
+              onclick="window.vektorAuxGerarPreviewZfi()"
+              class="aux-topbtn">
+        Montar prévia
+      </button>
+
+      <button type="button"
+              id="auxZfiDownloadBtn"
+              onclick="window.vektorAuxDownloadZfiCsv()"
+              class="aux-topbtn"
+              style="display:none;">
+        Download CSV
+      </button>
+
+      <div style="min-width:220px; display:flex; flex-direction:column; gap:4px;">
+        <label for="auxZfiStatusSel" style="font-size:11px; font-weight:900; color:#334155;">Status</label>
+        <select id="auxZfiStatusSel"
+                class="aux-faturas-select"
+                onchange="window.vektorAuxAplicarFiltroStatusZfi_()"
+                style="min-width:220px;">
+          <option value="TODOS">Todos</option>
+          <option value="OK">OK</option>
+          <option value="SEM_ETIQUETA">Sem etiqueta</option>
+          <option value="MULTIPLAS_ETIQUETAS">Múltiplas etiquetas</option>
+          <option value="PROBLEMA">Somente problemas</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="padding:12px 14px; border-bottom:1px solid #e2e8f0; background:#fff;">
+      <div id="auxZfiResumoWrap" style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px;">
+        <div class="aux-fat-modal-card">
+          <div style="font-size:11px; font-weight:900; color:#64748b;">Transações</div>
+          <div id="auxZfiResumoQtd" style="margin-top:4px; font-size:20px; font-weight:1000; color:#0f172a;">—</div>
+        </div>
+        <div class="aux-fat-modal-card">
+          <div style="font-size:11px; font-weight:900; color:#64748b;">Sem etiqueta</div>
+          <div id="auxZfiResumoSemEtiqueta" style="margin-top:4px; font-size:20px; font-weight:1000; color:#b91c1c;">—</div>
+        </div>
+        <div class="aux-fat-modal-card">
+          <div style="font-size:11px; font-weight:900; color:#64748b;">Valor total</div>
+          <div id="auxZfiResumoValor" style="margin-top:4px; font-size:20px; font-weight:1000; color:#0f172a;">—</div>
+        </div>
+        <div class="aux-fat-modal-card">
+          <div style="font-size:11px; font-weight:900; color:#64748b;">Data de lançamento</div>
+          <div id="auxZfiResumoLanc" style="margin-top:4px; font-size:20px; font-weight:1000; color:#0f172a;">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="auxZfiBody" style="padding:12px 14px; overflow:auto; flex:1; min-height:240px;">
+      <p class="text-sm text-slate-700">Selecione o período e clique em <b>Montar prévia</b>.</p>
     </div>
   </div>
 </div>
@@ -27771,6 +27866,383 @@ window.vektorAuxCloseAnaliseTemporalModal = function(){
   modal.classList.add("hidden");
   modal.classList.remove("flex");
   if (body) body.innerHTML = "";
+};
+
+window.__auxZfiPreview = {
+  extrato: "",
+  rows: [],
+  rowsAll: [],
+  csvRows: [],
+  summary: null,
+  statusFilter: "TODOS"
+};
+
+window.vektorAuxOpenZfiModal_ = function(subtitle, bodyHtml){
+  const modal = document.getElementById("auxFaturasZfiModal");
+  const sub = document.getElementById("auxFaturasZfiSub");
+  const body = document.getElementById("auxZfiBody");
+  if (!modal || !sub || !body) return;
+
+  sub.textContent = subtitle || "Selecione o período da fatura para montar a prévia do arquivo.";
+  body.innerHTML = bodyHtml || "";
+  modal.classList.remove("hidden");
+  modal.classList.add("flex");
+};
+
+window.vektorAuxCloseZfiModal = function(){
+  const modal = document.getElementById("auxFaturasZfiModal");
+  const body = document.getElementById("auxZfiBody");
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+  if (body) {
+    body.innerHTML = "<p class='text-sm text-slate-700'>Selecione o período e clique em <b>Montar prévia</b>.</p>";
+  }
+
+  window.__auxZfiPreview = {
+  extrato: "",
+  rows: [],
+  rowsAll: [],
+  csvRows: [],
+  summary: null,
+  statusFilter: "TODOS"
+};
+
+  const btnDl = document.getElementById("auxZfiDownloadBtn");
+  if (btnDl) btnDl.style.display = "none";
+
+  const qtd = document.getElementById("auxZfiResumoQtd");
+  const sem = document.getElementById("auxZfiResumoSemEtiqueta");
+  const val = document.getElementById("auxZfiResumoValor");
+  const lan = document.getElementById("auxZfiResumoLanc");
+
+  if (qtd) qtd.textContent = "—";
+  if (sem) sem.textContent = "—";
+  if (val) val.textContent = "—";
+  if (lan) lan.textContent = "—";
+};
+
+window.vektorAuxAbrirGerarZfi = function(){
+  try {
+    const sel = document.getElementById("auxZfiExtratoSel");
+    const lista = Array.isArray(window.__auxFaturasLista) ? window.__auxFaturasLista.slice() : [];
+
+    if (!sel) return;
+
+    const opts = ["<option value=''>Selecione</option>"];
+    lista.forEach(function(f){
+      const ex = String((f && f.extrato) || "").trim();
+      if (!ex) return;
+      const safe = ex.replace(/'/g, "&#39;");
+      opts.push("<option value='" + safe + "'>" + ex + "</option>");
+    });
+    sel.innerHTML = opts.join("");
+
+    const atualSel = document.getElementById("auxFaturaAtualSel");
+    const extratoAtual = atualSel ? String(atualSel.value || "").trim() : "";
+    if (extratoAtual) {
+      sel.value = extratoAtual;
+    } else if (lista.length) {
+      sel.value = String(lista[lista.length - 1].extrato || "");
+    }
+
+    window.vektorAuxOpenZfiModal_(
+      "Selecione o período da fatura e monte a prévia antes de baixar o CSV.",
+      "<p class='text-sm text-slate-700'>Selecione o período e clique em <b>Montar prévia</b>.</p>"
+    );
+  } catch (e) {
+    console.error("Erro ao abrir modal ZFI:", e);
+    alert("Erro ao abrir o modal do ZFI: " + (e && e.message ? e.message : e));
+  }
+};
+
+window.vektorAuxFmtMoneyBr_ = function(v){
+  const n = Number(v || 0) || 0;
+  return n.toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+};
+
+window.vektorAuxEscapeHtml_ = function(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;");
+};
+
+window.vektorAuxRenderPreviewZfi_ = function(res){
+  const body = document.getElementById("auxZfiBody");
+  const btnDl = document.getElementById("auxZfiDownloadBtn");
+  const qtd = document.getElementById("auxZfiResumoQtd");
+  const sem = document.getElementById("auxZfiResumoSemEtiqueta");
+  const val = document.getElementById("auxZfiResumoValor");
+  const lan = document.getElementById("auxZfiResumoLanc");
+  const selStatus = document.getElementById("auxZfiStatusSel");
+
+  if (!body) return;
+
+  const rowsAll = Array.isArray(res.previewRows) ? res.previewRows.slice() : [];
+  const summary = res.summary || {};
+  const filtroAtual = selStatus ? String(selStatus.value || "TODOS") : "TODOS";
+
+  window.__auxZfiPreview = {
+    extrato: String(res.extrato || ""),
+    rows: rowsAll.slice(),
+    rowsAll: rowsAll.slice(),
+    csvRows: Array.isArray(res.csvRows) ? res.csvRows.slice() : [],
+    summary: summary,
+    statusFilter: filtroAtual
+  };
+
+  if (qtd) qtd.textContent = String(summary.totalRows || 0);
+  if (sem) sem.textContent = String(summary.semEtiqueta || 0);
+  if (val) val.textContent = window.vektorAuxFmtMoneyBr_(summary.valorTotal || 0);
+  if (lan) lan.textContent = String(summary.dataLancamentoBr || "—");
+
+  if (btnDl) btnDl.style.display = rowsAll.length ? "inline-flex" : "none";
+
+  window.vektorAuxAplicarFiltroStatusZfi_();
+};
+
+window.vektorAuxAplicarFiltroStatusZfi_ = function(){
+  const body = document.getElementById("auxZfiBody");
+  const selStatus = document.getElementById("auxZfiStatusSel");
+  if (!body) return;
+
+  const data = window.__auxZfiPreview || {};
+  const allRows = Array.isArray(data.rowsAll) ? data.rowsAll.slice() : [];
+  const filtro = selStatus ? String(selStatus.value || "TODOS") : "TODOS";
+
+  data.statusFilter = filtro;
+
+  let rows = allRows.filter(function(r){
+    const st = String(r.statusCode || "OK");
+
+    if (filtro === "TODOS") return true;
+    if (filtro === "PROBLEMA") return st === "SEM_ETIQUETA" || st === "MULTIPLAS_ETIQUETAS";
+    return st === filtro;
+  });
+
+  data.rows = rows.slice();
+
+  if (!rows.length) {
+    body.innerHTML = "<p class='text-sm text-slate-700'>Nenhuma transação encontrada para o filtro selecionado.</p>";
+    return;
+  }
+
+  let html = "";
+
+  const qtdSemEtiqueta = allRows.filter(function(r){ return String(r.statusCode || "") === "SEM_ETIQUETA"; }).length;
+  const qtdMultiplas = allRows.filter(function(r){ return String(r.statusCode || "") === "MULTIPLAS_ETIQUETAS"; }).length;
+
+  if (qtdSemEtiqueta || qtdMultiplas) {
+    html +=
+      "<div style='margin-bottom:12px; padding:10px 12px; border:1px solid #fecaca; background:#fef2f2; color:#991b1b; border-radius:12px; font-size:12px; font-weight:800;'>" +
+        "Problemas encontrados: <b>" + qtdSemEtiqueta + "</b> sem etiqueta e <b>" + qtdMultiplas + "</b> com múltiplas etiquetas. " +
+        "Nesses casos, a coluna <b>Conta 2</b> vai em branco no CSV." +
+      "</div>";
+  }
+
+  html += "<div style='border:1px solid #e2e8f0; border-radius:12px; overflow:auto; max-height:52vh; background:#fff;'>";
+  html += "<table style='width:100%; border-collapse:separate; border-spacing:0; font-size:12px; color:#0f172a; min-width:1120px;'>";
+  html += "<thead><tr>";
+
+  [
+    "Data",
+    "Loja",
+    "Valor",
+    "Etiqueta original",
+    "Conta 2",
+    "Referência",
+    "Texto do item",
+    "Status"
+  ].forEach(function(h){
+    html += "<th style='position:sticky; top:0; z-index:2; background:#123a63; color:#fff; padding:10px; border-right:1px solid #0f2742; border-bottom:1px solid #0f2742; text-align:center; white-space:nowrap;'>" + h + "</th>";
+  });
+
+  html += "</tr></thead><tbody>";
+
+  rows.forEach(function(r){
+    const st = String(r.statusCode || "OK");
+    const problema = st !== "OK";
+
+    let statusLabel = "OK";
+    let statusColor = "#166534";
+
+    if (st === "SEM_ETIQUETA") {
+      statusLabel = "Sem etiqueta";
+      statusColor = "#b45309";
+    } else if (st === "MULTIPLAS_ETIQUETAS") {
+      statusLabel = "Múltiplas etiquetas";
+      statusColor = "#b91c1c";
+    }
+
+    html += "<tr" + (problema ? " style='background:#fff7ed;'" : "") + ">";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:center;'>" + window.vektorAuxEscapeHtml_(r.dataTransacaoBr || "") + "</td>";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:center;'>" + window.vektorAuxEscapeHtml_(r.loja || "") + "</td>";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:right;'>" + window.vektorAuxFmtMoneyBr_(r.valor || 0) + "</td>";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.etiquetaOriginal || "") + "</td>";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.conta2 || "") + "</td>";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.referencia || "") + "</td>";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0;'>" + window.vektorAuxEscapeHtml_(r.textoItem || "") + "</td>";
+    html += "<td style='padding:8px 10px; border-bottom:1px solid #e2e8f0; text-align:center; font-weight:900; color:" + statusColor + ";'>" + statusLabel + "</td>";
+    html += "</tr>";
+  });
+
+  html += "</tbody></table></div>";
+  body.innerHTML = html;
+};
+
+window.vektorAuxGerarPreviewZfi = function(){
+  try {
+    const sel = document.getElementById("auxZfiExtratoSel");
+    const extrato = sel ? String(sel.value || "").trim() : "";
+
+    if (!extrato) {
+      alert("Selecione o período da fatura.");
+      return;
+    }
+
+    window.vektorAuxOpenZfiModal_(
+      "Montando a prévia do arquivo ZFI para “" + extrato + "”.",
+      "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Montando prévia da ZFI…</span></div>"
+    );
+
+    google.script.run
+      .withSuccessHandler(function(res){
+        try {
+          if (!res || !res.ok) {
+            const msg = (res && res.error) ? res.error : "Não consegui montar a prévia do arquivo ZFI.";
+            window.vektorAuxOpenZfiModal_(
+              "Prévia — Arquivo ZFI",
+              "<p class='text-sm text-slate-700'>" + window.vektorAuxEscapeHtml_(msg) + "</p>"
+            );
+            return;
+          }
+
+          window.vektorAuxOpenZfiModal_(
+            "Prévia pronta para a fatura “" + extrato + "”.",
+            "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Renderizando prévia…</span></div>"
+          );
+
+          window.vektorAuxRenderPreviewZfi_(res);
+        } catch (e) {
+          console.error("Erro ao renderizar prévia ZFI:", e);
+          window.vektorAuxOpenZfiModal_(
+            "Prévia — Arquivo ZFI",
+            "<p class='text-sm text-slate-700'>Erro ao renderizar a prévia do arquivo ZFI.</p>"
+          );
+        }
+      })
+      .withFailureHandler(function(err){
+        console.error("Erro Apps Script (getPreviewArquivoZFIVektor):", err);
+        const msg = (err && err.message) ? err.message : String(err || "");
+        window.vektorAuxOpenZfiModal_(
+          "Prévia — Arquivo ZFI",
+          "<p class='text-sm text-slate-700'>Erro ao consultar dados do ZFI: " + window.vektorAuxEscapeHtml_(msg) + "</p>"
+        );
+      })
+      .getPreviewArquivoZFIVektor({ extrato: extrato });
+
+  } catch (e) {
+    console.error("Erro ao montar preview ZFI:", e);
+    alert("Erro ao montar a prévia do ZFI: " + (e && e.message ? e.message : e));
+  }
+};
+
+window.vektorAuxDownloadZfiCsv = function(){
+  try {
+    const data = window.__auxZfiPreview || {};
+    const filtro = String(data.statusFilter || "TODOS");
+    const previewRowsFiltradas = Array.isArray(data.rows) ? data.rows : [];
+    const allPreviewRows = Array.isArray(data.rowsAll) ? data.rowsAll : [];
+    const allCsvRows = Array.isArray(data.csvRows) ? data.csvRows : [];
+
+    let rows = allCsvRows;
+
+    if (filtro !== "TODOS") {
+      const allowedIdx = {};
+      previewRowsFiltradas.forEach(function(r){
+        const chave = [
+          String(r.dataTransacaoBr || ""),
+          String(r.loja || ""),
+          String(r.valor || ""),
+          String(r.etiquetaOriginal || ""),
+          String(r.statusCode || "")
+        ].join("|");
+        allowedIdx[chave] = (allowedIdx[chave] || 0) + 1;
+      });
+
+      rows = [];
+      for (let i = 0; i < allPreviewRows.length; i++) {
+        const p = allPreviewRows[i] || {};
+        const chave = [
+          String(p.dataTransacaoBr || ""),
+          String(p.loja || ""),
+          String(p.valor || ""),
+          String(p.etiquetaOriginal || ""),
+          String(p.statusCode || "")
+        ].join("|");
+
+        if (allowedIdx[chave] > 0) {
+          rows.push(allCsvRows[i]);
+          allowedIdx[chave]--;
+        }
+      }
+    }
+    const summary = data.summary || {};
+
+    if (!rows.length) {
+      alert("Não há dados para exportar.");
+      return;
+    }
+
+    function csvSafe_(v){
+      let s = String(v == null ? "" : v);
+
+      s = s.replace(/\r?\n/g, " ");
+
+      if (/[;"\n\r]/.test(s)) {
+        s = '"' + s.replace(/"/g, '""') + '"';
+      }
+
+      return s;
+    }
+
+    const header = [
+      "Data","Tipo Doc","Empresa","Data Lanç.","Mês","Moeda","Referencia","Chave Lanç.","Conta ","Rz.Esp.","    Montante    ","Centro de custo","Elemento PEP","Ordem","Loc.Neg.","Data Efetiva","Cond.Pag.","Dias","Data Venc.","Atribuição","Texto do item","Chave Lanç.2","Conta 2"," Montante ","Centro de custo","Elemento PEP","Ordem","Data Efetiva","Texto do campo Nota","","Atrib. 2","rze 2"
+    ];
+
+    const lines = [header.join(";")];
+
+    rows.forEach(function(r){
+      lines.push(r.map(csvSafe_).join(";"));
+    });
+
+    const csvContent = lines.join("\r\n");
+    const bom = "\uFEFF";
+    const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" });
+
+    const extratoSafe = String(data.extrato || "zfi").replace(/[^\w\-]+/g, "_");
+    const dt = String(summary.dataLancamentoArquivo || "").replace(/-/g, "");
+    const fileName = "zfi_" + extratoSafe + "_" + dt + ".csv";
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(function(){
+      try { document.body.removeChild(a); } catch(_) {}
+      try { URL.revokeObjectURL(url); } catch(_) {}
+    }, 150);
+  } catch (e) {
+    console.error("Erro ao baixar CSV ZFI:", e);
+    alert("Erro ao gerar download do CSV: " + (e && e.message ? e.message : e));
+  }
 };
 
 window.vektorAuxAbrirAnaliseTemporal = function(){
