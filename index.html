@@ -5219,38 +5219,46 @@ display: none;
         </div>
       </div>
 
-          <div class="aux-faturas-head-right">
-        <div class="aux-faturas-filter">
-          <label for="auxFaturaAtualSel">Fatura base</label>
-          <select id="auxFaturaAtualSel" class="aux-faturas-select">
-            <option value="">Selecione</option>
-          </select>
-        </div>
+          <div class="aux-faturas-head-actions"
+     style="display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:nowrap; width:100%;">
 
-        <div class="aux-faturas-filter">
-          <label for="auxFaturaAnteriorSel">Comparar com</label>
-          <select id="auxFaturaAnteriorSel" class="aux-faturas-select">
-            <option value="">Selecione</option>
-          </select>
-        </div>
+          <div class="aux-faturas-head-left"
+              style="display:flex; align-items:flex-end; gap:12px; flex:0 0 auto;">
+            <div class="aux-faturas-filter" style="min-width:auto; justify-content:flex-start; margin:0;">
+              <label style="visibility:hidden;">Ação</label>
+              <button type="button"
+                      onclick="window.vektorAuxAbrirGerarZfi()"
+                      class="aux-topbtn">
+                Gerar Arquivo ZFI
+              </button>
+            </div>
+          </div>
 
-        <div class="aux-faturas-filter" style="min-width:auto; justify-content:flex-end;">
-          <label style="visibility:hidden;">Ação</label>
-          <button type="button"
-                  onclick="window.vektorAuxAbrirGerarZfi()"
-                  class="aux-topbtn">
-            Gerar Arquivo ZFI
-          </button>
-        </div>
+          <div class="aux-faturas-head-right"
+              style="display:flex; align-items:flex-end; justify-content:flex-end; gap:12px; flex-wrap:nowrap; margin-left:auto; flex:0 1 auto;">
+            <div class="aux-faturas-filter" style="margin:0;">
+              <label for="auxFaturaAtualSel">Fatura base</label>
+              <select id="auxFaturaAtualSel" class="aux-faturas-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
 
-        <div class="aux-faturas-filter" style="min-width:auto; justify-content:flex-end;">
-          <label style="visibility:hidden;">Ação</label>
-          <button type="button"
-                  onclick="window.vektorAuxAbrirAnaliseTemporal()"
-                  class="aux-topbtn">
-            Análise Temporal.
-          </button>
-        </div>
+            <div class="aux-faturas-filter" style="margin:0;">
+              <label for="auxFaturaAnteriorSel">Comparar com</label>
+              <select id="auxFaturaAnteriorSel" class="aux-faturas-select">
+                <option value="">Selecione</option>
+              </select>
+            </div>
+
+            <div class="aux-faturas-filter" style="min-width:auto; justify-content:flex-end; margin:0;">
+              <label style="visibility:hidden;">Ação</label>
+              <button type="button"
+                      onclick="window.vektorAuxAbrirAnaliseTemporal()"
+                      class="aux-topbtn">
+                Análise Temporal.
+              </button>
+            </div>
+          </div>
         </div>
 
     </div>
@@ -27896,18 +27904,10 @@ window.vektorAuxCloseZfiModal = function(){
 
   modal.classList.add("hidden");
   modal.classList.remove("flex");
+
   if (body) {
     body.innerHTML = "<p class='text-sm text-slate-700'>Selecione o período e clique em <b>Montar prévia</b>.</p>";
   }
-
-  window.__auxZfiPreview = {
-  extrato: "",
-  rows: [],
-  rowsAll: [],
-  csvRows: [],
-  summary: null,
-  statusFilter: "TODOS"
-};
 
   const btnDl = document.getElementById("auxZfiDownloadBtn");
   if (btnDl) btnDl.style.display = "none";
@@ -27916,17 +27916,20 @@ window.vektorAuxCloseZfiModal = function(){
   const sem = document.getElementById("auxZfiResumoSemEtiqueta");
   const val = document.getElementById("auxZfiResumoValor");
   const lan = document.getElementById("auxZfiResumoLanc");
+  const selStatus = document.getElementById("auxZfiStatusSel");
 
   if (qtd) qtd.textContent = "—";
   if (sem) sem.textContent = "—";
   if (val) val.textContent = "—";
   if (lan) lan.textContent = "—";
+  if (selStatus) selStatus.value = "TODOS";
 };
 
 window.vektorAuxAbrirGerarZfi = function(){
   try {
     const sel = document.getElementById("auxZfiExtratoSel");
     const lista = Array.isArray(window.__auxFaturasLista) ? window.__auxFaturasLista.slice() : [];
+    const cached = window.__auxZfiPreview || {};
 
     if (!sel) return;
 
@@ -27941,10 +27944,40 @@ window.vektorAuxAbrirGerarZfi = function(){
 
     const atualSel = document.getElementById("auxFaturaAtualSel");
     const extratoAtual = atualSel ? String(atualSel.value || "").trim() : "";
-    if (extratoAtual) {
+
+    if (cached && cached.extrato) {
+      sel.value = String(cached.extrato || "");
+    } else if (extratoAtual) {
       sel.value = extratoAtual;
     } else if (lista.length) {
       sel.value = String(lista[lista.length - 1].extrato || "");
+    }
+
+    // ✅ se já existe prévia montada, reaproveita sem bater no backend
+    if (cached && Array.isArray(cached.rowsAll) && cached.rowsAll.length) {
+      window.vektorAuxOpenZfiModal_(
+        "Prévia reutilizada da fatura “" + String(cached.extrato || "") + "”.",
+        "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Recarregando prévia salva…</span></div>"
+      );
+
+      const fakeRes = {
+        extrato: String(cached.extrato || ""),
+        previewRows: Array.isArray(cached.rowsAll) ? cached.rowsAll.slice() : [],
+        csvRows: Array.isArray(cached.csvRows) ? cached.csvRows.slice() : [],
+        summary: cached.summary || {}
+      };
+
+      setTimeout(function(){
+        try {
+          const selStatus = document.getElementById("auxZfiStatusSel");
+          if (selStatus) selStatus.value = String(cached.statusFilter || "TODOS");
+          window.vektorAuxRenderPreviewZfi_(fakeRes);
+        } catch (e) {
+          console.error("Erro ao reaproveitar cache ZFI:", e);
+        }
+      }, 0);
+
+      return;
     }
 
     window.vektorAuxOpenZfiModal_(
@@ -28926,12 +28959,8 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
       "<p style='margin-bottom:6px;text-align:center;font-weight:bold;'>" + titulo + "</p>",
 
       "<p style='margin-bottom:8px;text-align:center;font-size:13px;color:#000000;'>" +
-        "Clique na linha da fatura para verificar o valor detalhado por times." +
-      "</p>" +
-
-      "<p style='margin-bottom:8px;text-align:center;font-size:13px;color:#000000;'>" +
-        "E clique em <b>Extrair dados</b> para verificar o relatório de transações da fatura." +
-      "</p>",
+        "Clique na <b>linha da fatura</b> para verificar o valor detalhado por times. E clique em <b>Extrair dados</b> para verificar o relatório de transações da fatura." +
+      "</p>"+
 
       // ✅ WRAPPER COM ROLAGEM (vertical + horizontal)
       "<div style='max-height: calc(100vh - 340px); overflow:auto; border:2px double #000; border-radius:12px; padding-bottom:14px;'>",
