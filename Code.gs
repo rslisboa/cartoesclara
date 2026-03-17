@@ -16213,16 +16213,33 @@ function vektorZfiNormDesc_(s) {
 }
 
 function vektorZfiExtrairLojasRateio_(descricaoRaw) {
-  var txt = vektorZfiNormDesc_(descricaoRaw);
+  var txtOrig = String(descricaoRaw || "").trim();
+  var txt = vektorZfiNormDesc_(txtOrig);
   if (!txt) return [];
 
-  // só entra se houver verbo/contexto de rateio
   var falaRateio =
-    /DIVID|RATEI|RATEAR|RATEADO|RATEIO|ENTRE LOJAS|ENTRE AS LOJAS|LOJAS:/i.test(txt);
+    /DIVID|RATEI|RATEAR|RATEADO|RATEIO|ENTRE LOJAS|ENTRE AS LOJAS|LOJAS?\s*:/i.test(txt);
 
   if (!falaRateio) return [];
 
-  var nums = txt.match(/\b\d{1,4}\b/g) || [];
+  // tenta isolar só o trecho que realmente lista lojas
+  var alvo = txt;
+  var mTrecho =
+    txt.match(/LOJAS?\s*:\s*([0-9,\s\/\-E]+)/i) ||
+    txt.match(/ENTRE LOJAS\s*([0-9,\s\/\-E]+)/i) ||
+    txt.match(/ENTRE AS LOJAS\s*([0-9,\s\/\-E]+)/i) ||
+    txt.match(/DIVIDIR ENTRE LOJAS\s*([0-9,\s\/\-E]+)/i) ||
+    txt.match(/RATEIO ENTRE LOJAS\s*([0-9,\s\/\-E]+)/i);
+
+  if (mTrecho && mTrecho[1]) {
+    alvo = String(mTrecho[1] || "").trim();
+  } else {
+    // se não conseguiu isolar a lista de lojas, não arrisca ratear
+    return [];
+  }
+
+  // só números de 3 ou 4 dígitos na área isolada
+  var nums = alvo.match(/\b\d{3,4}\b/g) || [];
   var out = [];
   var seen = {};
 
@@ -16330,11 +16347,17 @@ function vektorZfiExpandirRateioLojas_(txBase, lojasRateio) {
   var partes = vektorZfiRatearValor_(txBase.valor, lojasRateio.length);
 
   return lojasRateio.map(function(loja, i){
-    var c = JSON.parse(JSON.stringify(txBase || {}));
-    c.lojaNum = String(loja || "").trim();
-    c.valor = Number(partes[i] || 0) || 0;
-    c.statusExtra = "RATEIO_LOJAS";
-    return c;
+    return {
+      lojaNum: String(loja || "").trim(),
+      lojaOriginal: String(txBase.lojaNum || "").trim(),
+      valor: Number(partes[i] || 0) || 0,
+      valorOriginal: Number(txBase.valor || 0) || 0,
+      dataTx: txBase.dataTx instanceof Date ? new Date(txBase.dataTx.getTime()) : txBase.dataTx,
+      descricaoRaw: txBase.descricaoRaw || "",
+      estabelecimentoRaw: txBase.estabelecimentoRaw || "",
+      etiquetaRaw: txBase.etiquetaRaw || "",
+      statusExtra: "RATEIO_LOJAS"
+    };
   });
 }
 
@@ -16558,13 +16581,11 @@ function getPreviewArquivoZFIVektor(req) {
         }
 
         // prioridade de status visual
-        if (statusCode === "OK") {
-          if (ccOverride) {
-            statusCode = "CC_SOBRESCRITO_DESCRICAO";
-          } else if (lojasRateio.length >= 2) {
+        if (lojasRateio.length >= 2) {
             statusCode = "RATEIO_LOJAS";
+          } else if (statusCode === "OK" && ccOverride) {
+            statusCode = "CC_SOBRESCRITO_DESCRICAO";
           }
-        }
 
         var centroCustoFinal = ccOverride || (loja4 ? ("7010" + loja4 + "01") : "");
         var valorLinha = Number(itemTx.valor || 0) || 0;
@@ -16601,7 +16622,9 @@ function getPreviewArquivoZFIVektor(req) {
         previewRows.push({
           dataTransacaoBr: obj.dataTransacaoBr,
           loja: lojaNum,
+          lojaOriginal: itemTx.lojaOriginal || lojaNum,
           valor: valorLinha,
+          valorOriginal: Number(itemTx.valorOriginal || valorLinha) || 0,
           etiquetaOriginal: etiquetaOriginal,
           conta2: conta2,
           centroCusto2: centroCustoFinal,
