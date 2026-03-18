@@ -2316,7 +2316,7 @@ display: none;
               onclick="window.vektorOpenEmpresaModal_()"
               title="Trocar empresa"
               style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%); width:46px; height:46px; border:none; background:transparent; cursor:pointer; padding:0;">
-        <img src="https://raw.githubusercontent.com/rslisboa/cartoesclara/d36a11491ba57e08c170890a4d7529bb46a9bfe7/botao-home.png"
+        <img src="https://raw.githubusercontent.com/rslisboa/cartoesclara/bb05e8c1382f9e976029b2991ee66e7fcf4becc4/troca.png"
             alt="Trocar empresa"
             style="width:46px; height:46px; object-fit:contain; display:block;" />
       </button>
@@ -29705,14 +29705,19 @@ window.vektorAuxLoadDemissoes = function(){
   google.script.run
     .withSuccessHandler(function(res){
       try {
-        if (!res || !res.ok || !Array.isArray(res.rows)) {
-          box.innerHTML = "<p class='text-sm text-slate-700'>Não consegui consultar as demissões agora.</p>";
+        if (!res || !res.ok) {
+          var detalhe = (res && res.error) ? String(res.error) : "Erro desconhecido.";
+          box.innerHTML =
+            "<div class='text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2'>" +
+              "<div class='font-semibold'>Não consegui consultar as demissões agora.</div>" +
+              "<div class='mt-1 text-red-600'>" + detalhe.replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</div>" +
+            "</div>";
           return;
         }
 
         const rows = res.rows || [];
         if (!rows.length) {
-          box.innerHTML = "<p class='text-sm text-slate-700'>Nenhuma demissão encontrada no mês atual.</p>";
+          box.innerHTML = "<p class='text-sm text-slate-700'>Nenhuma demissão encontrada no período consultado.</p>";
           return;
         }
 
@@ -29752,7 +29757,11 @@ window.vektorAuxLoadDemissoes = function(){
     .withFailureHandler(function(err){
       console.error("Erro Apps Script (getUltimasDemissoesGerentes):", err);
       const msg = (err && err.message) ? err.message : String(err || "");
-      box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao consultar demissões: " + msg + "</p>";
+      box.innerHTML =
+        "<div class='text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2'>" +
+          "<div class='font-semibold'>Erro ao consultar demissões.</div>" +
+          "<div class='mt-1 text-red-600'>" + String(msg).replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</div>" +
+        "</div>";
     })
     .getUltimasDemissoesGerentes();
 };
