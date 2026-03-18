@@ -4508,40 +4508,79 @@ function normalizarDataParaISO_(input) {
   return "2025-12-01";
 }
 
-function getUltimasDemissoesGerentes() {
-    vektorAssertFunctionAllowed_("getUltimasDemissoesGerentes");
+function getUltimasDemissoesGerentes(empresa) {
+  vektorAssertFunctionAllowed_("getUltimasDemissoesGerentes");
+
   try {
-    var query = `
-      WITH base AS (
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+
+    var query = "";
+
+    if (empresaAtual === "FISIA") {
+      query = `
+        WITH base AS (
+          SELECT
+            cod_matricula_colaborador AS matricula,
+            des_email_corporativo,
+            des_titulo_cargo,
+            nom_apelido_filial,
+            nom_afastamento,
+            COALESCE(
+              SAFE_CAST(dat_afastamento AS DATE),
+              DATE(SAFE_CAST(dat_afastamento AS TIMESTAMP)),
+              DATE(SAFE_CAST(dat_afastamento AS DATETIME)),
+              SAFE.PARSE_DATE('%d/%m/%Y', CAST(dat_afastamento AS STRING))
+            ) AS dat_afastamento_date
+          FROM \`fisia-data-lake.refined.fis_ref_gld_dim_snr_funcionarios\`
+          WHERE dat_chave >= "2023-01-01"
+            AND des_titulo_cargo LIKE '%HEAD COACH%'
+        )
         SELECT
-          cod_matricula_colaborador AS matricula,
+          matricula,
+          des_email_corporativo,
+          des_titulo_cargo,
+          nom_apelido_filial,
+          COALESCE(NULLIF(nom_afastamento, ""), "Desligado") AS nom_afastamento,
+          FORMAT_DATE('%d/%m/%Y', dat_afastamento_date) AS dat_afastamento
+        FROM base
+        WHERE dat_afastamento_date IS NOT NULL
+          AND dat_afastamento_date >= DATE("2026-01-01")
+        ORDER BY dat_afastamento_date DESC
+      `;
+    } else {
+      query = `
+        WITH base AS (
+          SELECT
+            cod_matricula_colaborador AS matricula,
+            des_email_corporativo,
+            des_titulo_cargo,
+            nom_apelido_filial,
+            nom_afastamento,
+            COALESCE(
+              SAFE_CAST(dat_afastamento AS DATE),
+              DATE(SAFE_CAST(dat_afastamento AS TIMESTAMP)),
+              DATE(SAFE_CAST(dat_afastamento AS DATETIME)),
+              SAFE.PARSE_DATE('%d/%m/%Y', CAST(dat_afastamento AS STRING))
+            ) AS dat_afastamento_date
+          FROM \`cnto-data-lake.refined.cnt_ref_gld_dim_snr_funcionarios\`
+          WHERE dat_chave >= "2023-01-01"
+            AND des_titulo_cargo LIKE '%GERENTE%'
+            AND nom_afastamento = "Demitido"
+        )
+        SELECT
+          matricula,
           des_email_corporativo,
           des_titulo_cargo,
           nom_apelido_filial,
           nom_afastamento,
-          COALESCE(
-            SAFE_CAST(dat_afastamento AS DATE),
-            DATE(SAFE_CAST(dat_afastamento AS TIMESTAMP)),
-            DATE(SAFE_CAST(dat_afastamento AS DATETIME)),
-            SAFE.PARSE_DATE('%d/%m/%Y', CAST(dat_afastamento AS STRING))
-          ) AS dat_afastamento_date
-        FROM \`cnto-data-lake.refined.cnt_ref_gld_dim_snr_funcionarios\`
-        WHERE dat_chave >= "2023-01-01"
-          AND des_titulo_cargo LIKE '%GERENTE%'
-          AND nom_afastamento = "Demitido"
-      )
-      SELECT
-        matricula,
-        des_email_corporativo,
-        des_titulo_cargo,
-        nom_apelido_filial,
-        nom_afastamento,
-        FORMAT_DATE('%d/%m/%Y', dat_afastamento_date) AS dat_afastamento
-      FROM base
-      WHERE dat_afastamento_date IS NOT NULL
-        AND dat_afastamento_date >= DATE("2025-12-01")
-      ORDER BY dat_afastamento_date DESC
-    `;
+          FORMAT_DATE('%d/%m/%Y', dat_afastamento_date) AS dat_afastamento
+        FROM base
+        WHERE dat_afastamento_date IS NOT NULL
+          AND dat_afastamento_date >= DATE("2025-12-01")
+        ORDER BY dat_afastamento_date DESC
+      `;
+    }
 
     var request = {
       query: query,
@@ -4569,7 +4608,11 @@ function getUltimasDemissoesGerentes() {
       });
     }
 
-    return { ok: true, rows: rows };
+    return {
+      ok: true,
+      empresaAtual: empresaAtual,
+      rows: rows
+    };
 
   } catch (e) {
     return { ok: false, error: e && e.message ? e.message : String(e) };
