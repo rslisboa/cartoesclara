@@ -5,6 +5,119 @@
 var BASE_CLARA_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI"; // ID real da planilha que uso
 var HIST_PEND_CLARA_RAW = "HIST_PEND_CLARA_RAW";
 
+var VEKTOR_EMPRESA_CENTAURO = "CENTAURO";
+var VEKTOR_EMPRESA_FISIA    = "FISIA";
+
+var VEKTOR_BASE_SHEETS = {
+  CENTAURO: "BaseClara",
+  FISIA: "BaseClara_Fisia"
+};
+
+function vektorNormEmpresa_(empresa) {
+  var e = String(empresa || "").trim().toUpperCase();
+  if (e === VEKTOR_EMPRESA_FISIA) return VEKTOR_EMPRESA_FISIA;
+  return VEKTOR_EMPRESA_CENTAURO;
+}
+
+function vektorEmpresaDefaultByEmail_(email) {
+  var em = String(email || "").trim().toLowerCase();
+  return /@fisia\b/.test(em) ? VEKTOR_EMPRESA_FISIA : VEKTOR_EMPRESA_CENTAURO;
+}
+
+function vektorPodeTrocarEmpresa_(role) {
+  var r = String(role || "").trim();
+  return (
+    r === "Administrador" ||
+    r === "Analista Pro" ||
+    r === "Analista" ||
+    r === "Compras_DI"
+  );
+}
+
+function vektorEmpresaPropKey_(email) {
+  return "VEKTOR_EMPRESA_ATUAL_" + String(email || "").trim().toLowerCase();
+}
+
+function vektorGetEmpresaAtual_(email, role) {
+  var em = String(email || "").trim().toLowerCase();
+  var defaultEmpresa = vektorEmpresaDefaultByEmail_(em);
+
+  if (!vektorPodeTrocarEmpresa_(role)) {
+    return defaultEmpresa;
+  }
+
+  var props = PropertiesService.getUserProperties();
+  var saved = props.getProperty(vektorEmpresaPropKey_(em)) || "";
+  saved = vektorNormEmpresa_(saved);
+
+  return saved || defaultEmpresa;
+}
+
+function vektorSetEmpresaAtual_(email, role, empresa) {
+  var em = String(email || "").trim().toLowerCase();
+  var emp = vektorNormEmpresa_(empresa);
+  var defaultEmpresa = vektorEmpresaDefaultByEmail_(em);
+
+  if (!vektorPodeTrocarEmpresa_(role)) {
+    emp = defaultEmpresa;
+  }
+
+  PropertiesService.getUserProperties().setProperty(vektorEmpresaPropKey_(em), emp);
+  return emp;
+}
+
+function vektorGetBaseSheetNameByEmpresa_(empresa) {
+  var emp = vektorNormEmpresa_(empresa);
+  return VEKTOR_BASE_SHEETS[emp] || "BaseClara";
+}
+
+function vektorGetBaseSheetByEmpresa_(empresa) {
+  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
+  var sheetName = vektorGetBaseSheetNameByEmpresa_(empresa);
+  var sh = ss.getSheetByName(sheetName);
+  if (!sh) throw new Error('Aba "' + sheetName + '" não encontrada.');
+  return sh;
+}
+
+function vektorGetEmpresaContext_(empresaReq) {
+  var ctx = vektorGetUserRole_();
+  var email = String(ctx.email || "").trim().toLowerCase();
+  var role  = String(ctx.role  || "").trim();
+
+  var defaultEmpresa = vektorEmpresaDefaultByEmail_(email);
+  var podeTrocar = vektorPodeTrocarEmpresa_(role);
+
+  var empresaAtual = empresaReq
+    ? vektorNormEmpresa_(empresaReq)
+    : vektorGetEmpresaAtual_(email, role);
+
+  if (!podeTrocar) empresaAtual = defaultEmpresa;
+
+  return {
+    email: email,
+    role: role,
+    empresaDefault: defaultEmpresa,
+    empresaAtual: empresaAtual,
+    podeTrocarEmpresa: podeTrocar,
+    baseSheetName: vektorGetBaseSheetNameByEmpresa_(empresaAtual)
+  };
+}
+
+function vektorTrocarEmpresaAtual(empresa) {
+  vektorAssertWhitelisted_();
+  var ctx = vektorGetUserRole_();
+  var atual = vektorSetEmpresaAtual_(ctx.email, ctx.role, empresa);
+
+  return {
+    ok: true,
+    empresaAtual: atual,
+    empresaDefault: vektorEmpresaDefaultByEmail_(ctx.email),
+    podeTrocarEmpresa: vektorPodeTrocarEmpresa_(ctx.role),
+    role: ctx.role,
+    email: ctx.email
+  };
+}
+
 function normalizarLojaNumero_(valor) {
   var digits = String(valor || "").replace(/\D/g, "");
   if (!digits) return null;
@@ -17,9 +130,8 @@ function normalizarLojaNumero_(valor) {
  * - Coluna R = 18 = "Grupos" (Time)
  * - Coluna V = 22 = "LojaNum"
  */
-function construirMapaLojaParaTime_() {
-  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-  var sh = ss.getSheetByName("BaseClara");
+function construirMapaLojaParaTime_(empresa) {
+  var sh = vektorGetBaseSheetByEmpresa_(empresa);
   if (!sh) throw new Error("Aba BaseClara não encontrada.");
 
   var lastRow = sh.getLastRow();
@@ -53,10 +165,9 @@ function construirMapaLojaParaTime_() {
   return map;
 }
 
-function vektorSapGetClaraMetaByLoja_(allowedSet) {
-  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-  var sh = ss.getSheetByName("BaseClara");
-  if (!sh) throw new Error("Aba BaseClara não encontrada.");
+function vektorSapGetClaraMetaByLoja_(allowedSet, empresa) {
+  var sh = vektorGetBaseSheetByEmpresa_(empresa);
+  if (!sh) throw new Error("Aba da base não encontrada.");
 
   var lastRow = sh.getLastRow();
   var lastCol = sh.getLastColumn();
@@ -82,7 +193,6 @@ function vektorSapGetClaraMetaByLoja_(allowedSet) {
   var idxAlias = idxOf_(["Alias Do Cartão", "Alias do Cartão", "Alias do Cartao", "Alias Cartão", "Alias Cartao"]);
   var idxData  = idxOf_(["Data da Transação", "Data da Transacao", "Data Transação", "Data Transacao", "Data"]);
 
-  // fallback explícito: coluna H = 8 => índice 7
   if (idxAlias < 0) idxAlias = 7;
 
   var byLoja = {};
@@ -92,14 +202,14 @@ function vektorSapGetClaraMetaByLoja_(allowedSet) {
     var alias = String(r[idxAlias] || "").trim().toUpperCase();
     if (!alias) return;
 
-    // mantém só padrão CEXXXX
+    var lojaKey = vektorNormLojaKey_(alias);
+    if (!lojaKey) return;
+
     var dig = alias.replace(/\D/g, "");
-    if (!dig) return;
+    var lojaNum = String(Number(dig || "") || "");
+    var loja4 = lojaNum ? lojaNum.padStart(4, "0") : "";
 
-    var lojaKey = "CE" + String(Number(dig) || "").padStart(4, "0");
-    if (lojaKey === "CE0000") return;
-
-    if (allowedSet && !allowedSet[lojaKey] && !allowedSet[String(Number(dig) || "")] && !allowedSet[String(Number(dig) || "").padStart(4, "0")]) {
+    if (allowedSet && !allowedSet[lojaKey] && !allowedSet[lojaNum] && !allowedSet[loja4]) {
       return;
     }
 
@@ -234,7 +344,21 @@ try {
   } catch (eTrack) {
     // não pode quebrar login por falha de log
   }
-  return { ok: true, email: sess, token: token, ttlSeconds: VEKTOR_SESSION_TTL_SECONDS };
+
+    var ctx = vektorGetUserRole_();
+    var empresaDefault = vektorEmpresaDefaultByEmail_(sess);
+    var empresaAtual = vektorSetEmpresaAtual_(sess, ctx.role, empresaDefault);
+
+  return {
+    ok: true,
+    email: sess,
+    role: ctx.role,
+    token: token,
+    ttlSeconds: VEKTOR_SESSION_TTL_SECONDS,
+    empresaDefault: empresaDefault,
+    empresaAtual: empresaAtual,
+    podeTrocarEmpresa: vektorPodeTrocarEmpresa_(ctx.role)
+  };
 
 }
 
@@ -476,16 +600,16 @@ function vektorValidateSessionToken_(token) {
   var emailSessao = (Session.getActiveUser().getEmail() || "").trim().toLowerCase();
   if (!emailSessao) return { ok: false, error: "Não foi possível identificar seu e-mail Google." };
 
-  // ✅ VEKTOR_EMAILS (ATIVO) é a fonte de verdade
   if (!isWhitelistedEmail_(emailSessao)) {
     return { ok: false, error: "Acesso negado: usuário não habilitado no Vektor." };
   }
 
+  var ctx;
   try {
-  vektorGetUserRole_(); // garante ATIVO
-} catch (e) {
-  return { ok: false, error: "Não disponível para o seu perfil." };
-}
+    ctx = vektorGetUserRole_(); // garante ATIVO
+  } catch (e) {
+    return { ok: false, error: "Não disponível para o seu perfil." };
+  }
 
   var cache = CacheService.getScriptCache();
   var emailDoToken = (cache.get("VEKTOR_SESSION_" + t) || "").trim().toLowerCase();
@@ -493,14 +617,20 @@ function vektorValidateSessionToken_(token) {
   if (!emailDoToken) return { ok: false, error: "Sessão expirada ou inválida. Faça login novamente." };
   if (emailDoToken !== emailSessao) return { ok: false, error: "Sessão não corresponde ao usuário logado." };
 
-    // ✅ marca o usuário como "ativo hoje" sempre que a sessão for validada
-    try {
-      vektorTrackActiveUserToday_(emailSessao);
-    } catch (eTrack) {
-      // não quebra validação por falha de log
-    }
+  try {
+    vektorTrackActiveUserToday_(emailSessao);
+  } catch (eTrack) {}
 
-  return { ok: true, email: emailSessao };
+  var empresaAtual = vektorGetEmpresaAtual_(emailSessao, ctx.role);
+
+  return {
+    ok: true,
+    email: emailSessao,
+    role: ctx.role,
+    empresaDefault: vektorEmpresaDefaultByEmail_(emailSessao),
+    empresaAtual: empresaAtual,
+    podeTrocarEmpresa: vektorPodeTrocarEmpresa_(ctx.role)
+  };
 }
 
 function validarSessaoVektor(token) {
@@ -556,6 +686,16 @@ try {
   // 👇 passa também o e-mail bruto
   template.userEmail = email;
   template.userRole  = role;
+
+  var empresaDefault = vektorEmpresaDefaultByEmail_(email);
+  var podeTrocarEmpresa = false;
+
+  try {
+    podeTrocarEmpresa = vektorPodeTrocarEmpresa_(role);
+  } catch (_) {}
+
+  template.userEmpresaDefault = empresaDefault;
+  template.userPodeTrocarEmpresa = podeTrocarEmpresa;
 
   return template
   .evaluate()
@@ -1714,8 +1854,8 @@ function getOrCreateAlertasLogSheet_() {
   var sh = ss.getSheetByName(VEKTOR_ALERTAS_LOG_TAB);
   if (!sh) {
     sh = ss.insertSheet(VEKTOR_ALERTAS_LOG_TAB);
-    sh.appendRow(["timestamp", "tipo", "loja", "time", "detalhe", "destinatarios", "origem"]);
-    sh.getRange(1, 1, 1, 7).setFontWeight("bold");
+    sh.appendRow(["timestamp", "tipo", "loja", "time", "detalhe", "destinatarios", "origem", "EMPRESA"]);
+    sh.getRange(1, 1, 1, 8).setFontWeight("bold");
     sh.setFrozenRows(1);
   }
   return sh;
@@ -1725,11 +1865,12 @@ function getOrCreateAlertasLogSheet_() {
  * Registra um alerta enviado (linha simples, rastreável).
  * tipo: "LIMITE", "PENDENCIAS", "USO_IRREGULAR", "OFENSORAS", etc.
  */
-function registrarAlertaEnviado_(tipo, loja, time, detalhe, destinatarios, origem) {
+function registrarAlertaEnviado_(tipo, loja, time, detalhe, destinatarios, origem, empresa) {
   try {
     var sh = getOrCreateAlertasLogSheet_();
     var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
     var ts = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss");
+    var emp = vektorNormEmpresa_(empresa || "CENTAURO");
 
     sh.appendRow([
       ts,
@@ -1738,7 +1879,8 @@ function registrarAlertaEnviado_(tipo, loja, time, detalhe, destinatarios, orige
       String(time || "").trim(),
       String(detalhe || "").trim(),
       String(destinatarios || "").trim(),
-      String(origem || "").trim()
+      String(origem || "").trim(),
+      emp
     ]);
   } catch (e) {
     Logger.log("Falha ao registrar alerta enviado: " + (e && e.message ? e.message : e));
@@ -1750,20 +1892,36 @@ function registrarAlertaEnviado_(tipo, loja, time, detalhe, destinatarios, orige
  * dias: janela (ex 14)
  * limit: limite de linhas (ex 200)
  */
-function getAlertasRecentes(dias, limit) {
+function getAlertasRecentes(dias, limit, empresa) {
   vektorAssertFunctionAllowed_("getAlertasRecentes");
+
   try {
     dias = Number(dias) || 14;
     limit = Number(limit) || 200;
 
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+
     var sh = getOrCreateAlertasLogSheet_();
     var lastRow = sh.getLastRow();
-    if (lastRow < 2) return { ok: true, rows: [] };
+    if (lastRow < 2) return { ok: true, empresa: empresaAtual, rows: [] };
 
-    var values = sh.getRange(2, 1, lastRow - 1, 7).getValues(); // sem cabeçalho
-    // values: [ts,tipo,loja,time,detalhe,destinatarios,origem]
+    var values = sh.getDataRange().getValues();
+    var head = values[0].map(function(x){ return String(x || "").trim(); });
 
-    // filtra por janela
+    var iTs   = head.indexOf("timestamp");
+    var iTipo = head.indexOf("tipo");
+    var iLoja = head.indexOf("loja");
+    var iTime = head.indexOf("time");
+    var iDet  = head.indexOf("detalhe");
+    var iDest = head.indexOf("destinatarios");
+    var iOrig = head.indexOf("origem");
+    var iEmp  = head.indexOf("EMPRESA");
+
+    if (iTs < 0 || iTipo < 0 || iLoja < 0 || iTime < 0 || iDet < 0 || iDest < 0 || iOrig < 0) {
+      throw new Error("Cabeçalho inválido em Vektor_Alertas_Log.");
+    }
+
     var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
     var agora = new Date();
     var ini = new Date(agora);
@@ -1771,63 +1929,63 @@ function getAlertasRecentes(dias, limit) {
     ini.setHours(0, 0, 0, 0);
 
     function parseTs_(s) {
-  // Se vier como Date (Sheets converte), usa direto
-  if (s instanceof Date) return s;
+      if (s instanceof Date) return s;
+      if (!s) return null;
 
-  // Espera "yyyy-MM-dd HH:mm:ss"
-  if (!s) return null;
+      var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/);
+      if (m) {
+        return new Date(
+          Number(m[1]),
+          Number(m[2]) - 1,
+          Number(m[3]),
+          Number(m[4]),
+          Number(m[5]),
+          Number(m[6])
+        );
+      }
 
-  var m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})\s(\d{2}):(\d{2}):(\d{2})$/);
-  if (m) {
-    return new Date(
-      Number(m[1]),
-      Number(m[2]) - 1,
-      Number(m[3]),
-      Number(m[4]),
-      Number(m[5]),
-      Number(m[6])
-    );
-  }
-
-  // Fallback: tenta parse nativo (caso venha em outro formato)
-  var d2 = new Date(String(s));
-  return isNaN(d2.getTime()) ? null : d2;
-}
+      var d2 = new Date(String(s));
+      return isNaN(d2.getTime()) ? null : d2;
+    }
 
     var out = [];
-    for (var i = values.length - 1; i >= 0; i--) { // mais recentes primeiro
+    for (var i = values.length - 1; i >= 1; i--) {
       var r = values[i];
-      var d = parseTs_(r[0]);
+
+      var empresaRow = (iEmp >= 0) ? String(r[iEmp] || "").trim().toUpperCase() : "CENTAURO";
+      if (!empresaRow) empresaRow = "CENTAURO";
+      if (empresaRow !== empresaAtual) continue;
+
+      var d = parseTs_(r[iTs]);
       if (!d) continue;
-      if (d < ini) break; // como está em ordem cronológica, pode parar
+      if (d < ini) continue;
 
       var tsTxt = "";
-        try {
-          tsTxt = Utilities.formatDate(d, tz, "dd/MM/yyyy HH:mm:ss");
-        } catch (e) {
-          tsTxt = String(r[0] || "");
-        }
+      try {
+        tsTxt = Utilities.formatDate(d, tz, "dd/MM/yyyy HH:mm:ss");
+      } catch (e) {
+        tsTxt = String(r[iTs] || "");
+      }
 
-        out.push({
-          timestamp: tsTxt,                 // ✅ string serializável no WebApp
-          tipo: String(r[1] || ""),
-          loja: String(r[2] || ""),
-          time: String(r[3] || ""),
-          detalhe: String(r[4] || ""),
-          destinatarios: String(r[5] || ""),
-          origem: String(r[6] || "")
-        });
-
+      out.push({
+        timestamp: tsTxt,
+        tipo: String(r[iTipo] || ""),
+        loja: String(r[iLoja] || ""),
+        time: String(r[iTime] || ""),
+        detalhe: String(r[iDet] || ""),
+        destinatarios: String(r[iDest] || ""),
+        origem: String(r[iOrig] || ""),
+        empresa: empresaRow
+      });
 
       if (out.length >= limit) break;
     }
 
-    return { ok: true, rows: out, meta: { dias: dias, limit: limit } };
+    return { ok: true, empresa: empresaAtual, rows: out, meta: { dias: dias, limit: limit } };
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
-
 }
 
 /**
@@ -1956,48 +2114,65 @@ function getStatusOperacionalVektor() {
 // =====================================================
 
 function getOrCreateUserAlertsSheet_() {
-  // Reaproveita o mesmo spreadsheet do log de alertas
   var logSh = getOrCreateAlertasLogSheet_();
   var ss = logSh.getParent();
 
   var name = "VEKTOR_USER_ALERTS";
   var sh = ss.getSheetByName(name);
-  if (!sh) {
-  sh = ss.insertSheet(name);
-  sh.appendRow([
-    "alertId", "ownerEmail", "ownerRole",
-    "createdAt", "isActive",
-    "freq", "windowDays",
-    "time", "sendAt", "lojasCsv", "etiqueta",
-    "lastRunAt", "lastRowCount", "alertType"
-  ]);
-    } else {
-      // MIGRAÇÃO: adiciona sendAt se não existir
-      var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
-      if (head.indexOf("sendAt") < 0) {
-        // insere a coluna sendAt logo após "time"
-        var iTime = head.indexOf("time");
-        var insertPos = (iTime >= 0 ? iTime + 2 : head.length + 1); // 1-based
-        sh.insertColumnAfter(insertPos - 1);
-        sh.getRange(1, insertPos).setValue("sendAt");
-      }
-      // MIGRAÇÃO: adiciona alertType se não existir (default: TRANSACOES)
-      head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
-      if (head.indexOf("alertType") < 0) {
-        var lastCol = sh.getLastColumn();
-        sh.insertColumnAfter(lastCol);
-        sh.getRange(1, lastCol + 1).setValue("alertType");
 
-        // Preenche as linhas existentes com default TRANSACOES
-        var lr = sh.getLastRow();
-        if (lr >= 2) {
-          var fill = [];
-          for (var r = 2; r <= lr; r++) fill.push(["TRANSACOES"]);
-          sh.getRange(2, lastCol + 1, lr - 1, 1).setValues(fill);
-        }
-      }
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.appendRow([
+      "alertId", "ownerEmail", "ownerRole",
+      "createdAt", "isActive",
+      "freq", "windowDays",
+      "time", "sendAt", "lojasCsv", "etiqueta",
+      "lastRunAt", "lastRowCount", "alertType", "EMPRESA"
+    ]);
+    sh.getRange(1, 1, 1, 15).setFontWeight("bold");
+    sh.setFrozenRows(1);
+    return sh;
+  }
+
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+
+  if (head.indexOf("sendAt") < 0) {
+    var iTime = head.indexOf("time");
+    var insertPos = (iTime >= 0 ? iTime + 2 : head.length + 1);
+    sh.insertColumnAfter(insertPos - 1);
+    sh.getRange(1, insertPos).setValue("sendAt");
+  }
+
+  head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  if (head.indexOf("alertType") < 0) {
+    var lastCol1 = sh.getLastColumn();
+    sh.insertColumnAfter(lastCol1);
+    sh.getRange(1, lastCol1 + 1).setValue("alertType");
+
+    var lr1 = sh.getLastRow();
+    if (lr1 >= 2) {
+      var fill1 = [];
+      for (var r1 = 2; r1 <= lr1; r1++) fill1.push(["TRANSACOES"]);
+      sh.getRange(2, lastCol1 + 1, lr1 - 1, 1).setValues(fill1);
     }
-    return sh;}
+  }
+
+  head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  if (head.indexOf("EMPRESA") < 0) {
+    var lastCol2 = sh.getLastColumn();
+    sh.insertColumnAfter(lastCol2);
+    sh.getRange(1, lastCol2 + 1).setValue("EMPRESA");
+
+    var lr2 = sh.getLastRow();
+    if (lr2 >= 2) {
+      var fill2 = [];
+      for (var r2 = 2; r2 <= lr2; r2++) fill2.push(["CENTAURO"]);
+      sh.getRange(2, lastCol2 + 1, lr2 - 1, 1).setValues(fill2);
+    }
+  }
+
+  return sh;
+}
 
 function getOrCreateUserAlertsRunsSheet_() {
   var logSh = getOrCreateAlertasLogSheet_();
@@ -2005,88 +2180,34 @@ function getOrCreateUserAlertsRunsSheet_() {
 
   var name = "VEKTOR_USER_ALERT_RUNS";
   var sh = ss.getSheetByName(name);
+
   if (!sh) {
     sh = ss.insertSheet(name);
     sh.appendRow([
       "runId", "alertId", "ownerEmail",
       "runAt", "periodoIni", "periodoFim",
-      "rowCount", "rowsJsonPreview"
+      "rowCount", "rowsJsonPreview", "EMPRESA"
     ]);
+    sh.getRange(1, 1, 1, 9).setFontWeight("bold");
+    sh.setFrozenRows(1);
+    return sh;
   }
+
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  if (head.indexOf("EMPRESA") < 0) {
+    var lastCol = sh.getLastColumn();
+    sh.insertColumnAfter(lastCol);
+    sh.getRange(1, lastCol + 1).setValue("EMPRESA");
+
+    var lr = sh.getLastRow();
+    if (lr >= 2) {
+      var fill = [];
+      for (var r = 2; r <= lr; r++) fill.push(["CENTAURO"]);
+      sh.getRange(2, lastCol + 1, lr - 1, 1).setValues(fill);
+    }
+  }
+
   return sh;
-}
-
-function getTimesELojasParaAlertasVektor() {
-  vektorAssertFunctionAllowed_("getTimesELojasParaAlertasVektor");
-
-  try {
-    // ✅ ACL por Emails SOMENTE para Gerentes_Reg
-    var ctx = vektorGetUserRole_(); // { email, role }
-    var role = String((ctx && ctx.role) || "").trim();
-    var email = String((ctx && ctx.email) || "").trim().toLowerCase();
-
-    var allowedSet = null; // { "0092": true, "92": true, ... }
-    if (role === "Gerentes_Reg") {
-      var allowed = vektorGetAllowedLojasFromEmails_(email); // array ou null
-      if (Array.isArray(allowed)) {
-        allowedSet = {};
-        allowed.forEach(function(x){
-          x = String(x || "").trim();
-          if (!x) return;
-          allowedSet[x] = true;
-          allowedSet[x.padStart(4, "0")] = true;
-          // também guarda versão sem zeros (algumas bases usam "92")
-          var dig = x.replace(/\D/g, "");
-          if (dig) allowedSet[String(Number(dig) || "").trim()] = true;
-        });
-      }
-    }
-
-    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
-    if (!sh) return { ok:false, error:"Aba BaseClara não encontrada." };
-
-    var lastRow = sh.getLastRow();
-    if (lastRow < 2) return { ok:true, times:[], lojasPorTime:{} };
-
-    // ✅ Coluna R = Grupos (Time) | Coluna V = LojaNum
-    // R..V => 18..22 (1-based), 5 colunas: [Grupos, S, T, U, LojaNum]
-    var values = sh.getRange(2, 18, lastRow - 1, 5).getValues();
-
-    var map = {}; // time -> { loja4:true }
-    var timesSet = {};
-
-    for (var i = 0; i < values.length; i++) {
-      var r = values[i];
-
-      var time = String(r[0] || "").trim();         // R
-      var lojaNum = normalizarLojaNumero_(r[4]);    // V
-      if (!time || !lojaNum) continue;
-
-      var lojaStr = String(lojaNum);               // ex: "92"
-      var loja4 = lojaStr.padStart(4, "0");        // ex: "0092"
-
-      // ✅ aplica ACL somente para Gerentes_Reg (quando allowedSet não é null)
-      if (allowedSet) {
-        if (!allowedSet[lojaStr] && !allowedSet[loja4]) continue;
-      }
-
-      timesSet[time] = true;
-      if (!map[time]) map[time] = {};
-      map[time][loja4] = true; // sempre devolve loja no formato 4 dígitos
-    }
-
-    var times = Object.keys(timesSet).sort();
-    var lojasPorTime = {};
-    times.forEach(function(t){
-      lojasPorTime[t] = Object.keys(map[t] || {}).sort();
-    });
-
-    return { ok:true, times: times, lojasPorTime: lojasPorTime };
-
-  } catch (e) {
-    return { ok:false, error: (e && e.message) ? e.message : String(e) };
-  }
 }
 
 function criarAlertaEtiquetaVektor(payload) {
@@ -2099,6 +2220,9 @@ function criarAlertaEtiquetaVektor(payload) {
     var windowDays = Number(payload.windowDays || 30) || 30;
     var time = String(payload.time || "").trim();
     var sendAt = String(payload.sendAt || "").trim();
+
+    var empCtx = vektorGetEmpresaContext_(payload.empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
 
     var allowedTimes = { "11:30": true, "16:00": true };
 
@@ -2184,18 +2308,22 @@ function criarAlertaEtiquetaVektor(payload) {
       etiquetaFinalCsv,
       "",
       "",
-      alertType
+      alertType,
+      empresaAtual
     ]);
 
     try {
       var row = sh.getLastRow();
-      var colSendAt = 9;
-      var cell = sh.getRange(row, colSendAt);
-      cell.setNumberFormat("@");
-      cell.setValue(String(sendAt || "").trim());
+      var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+      var iSendAt = head.indexOf("sendAt");
+      if (iSendAt >= 0) {
+        var cell = sh.getRange(row, iSendAt + 1);
+        cell.setNumberFormat("@");
+        cell.setValue(String(sendAt || "").trim());
+      }
     } catch (eFmt) {}
 
-    return { ok:true, alertId: alertId };
+    return { ok:true, alertId: alertId, empresa: empresaAtual };
 
   } catch (e) {
     return { ok:false, error: (e && e.message) ? e.message : String(e) };
@@ -2210,84 +2338,84 @@ function criarAlertaEtiquetaVektor(payload) {
  * - Loja (Alias do Cartão) = H = 8 => idx 7
  * - Time (Grupos)          = R = 18 => idx 17
  */
-function getTimesELojasParaAlertasVektor() {
+function getTimesELojasParaAlertasVektor(req) {
   vektorAssertFunctionAllowed_("getTimesELojasParaAlertasVektor");
 
   try {
-    // ✅ ACL por Emails SOMENTE para Gerentes_Reg
-    var ctx = vektorGetUserRole_(); // { email, role }
+    req = req || {};
+
+    var ctx = vektorGetUserRole_();
     var role = String((ctx && ctx.role) || "").trim();
     var email = String((ctx && ctx.email) || "").trim().toLowerCase();
 
-    var allowedSet = null; // se null => sem restrição
+    var empCtx = vektorGetEmpresaContext_(req.empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+
+    var allowedSet = null;
     if (role === "Gerentes_Reg") {
-      var allowed = vektorGetAllowedLojasFromEmails_(email); // array ou null
+      var allowed = vektorGetAllowedLojasFromEmails_(email, empresaAtual);
       if (Array.isArray(allowed)) {
         allowedSet = {};
         allowed.forEach(function(x){
-          x = String(x || "").trim();
-          if (!x) return;
-          var dig = x.replace(/\D/g, "");
-          if (!dig) return;
+          var lojaKey = vektorNormLojaKey_(x);
+          if (lojaKey) allowedSet[lojaKey] = true;
 
-          var n = String(Number(dig) || "").trim();      // "92"
-          var n4 = n.padStart(4, "0");                   // "0092"
-          allowedSet[n] = true;
-          allowedSet[n4] = true;
+          var n = normalizarLojaNumero_(x);
+          if (n != null) {
+            allowedSet[String(n)] = true;
+            allowedSet[String(n).padStart(4, "0")] = true;
+          }
         });
       } else {
-        // se não houver nenhuma loja liberada para o e-mail, retorna vazio
         allowedSet = {};
       }
     }
 
-    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
-    if (!sh) return { ok:false, error:"Aba BaseClara não encontrada." };
+    var sh = vektorGetBaseSheetByEmpresa_(empresaAtual);
+    if (!sh) return { ok:false, error:"Aba da base não encontrada." };
 
     var lastRow = sh.getLastRow();
-    if (lastRow < 2) return { ok:true, times:[], lojasPorTime:{} };
+    if (lastRow < 2) return { ok:true, empresa: empresaAtual, times:[], lojasPorTime:{} };
 
-    // ✅ BaseClara: R=Grupos(Time), V=LojaNum
-    // R..V => col 18..22 (1-based), 5 colunas
-    var values = sh.getRange(2, 18, lastRow - 1, 5).getValues();
+    // H..V => Alias Do Cartão até LojaNum
+    var values = sh.getRange(2, 8, lastRow - 1, 15).getValues();
 
-    var map = {};      // time -> { loja4:true }
-    var timesSet = {}; // time -> true
+    var map = {};
+    var timesSet = {};
 
     for (var i = 0; i < values.length; i++) {
       var r = values[i];
 
-      var time = String(r[0] || "").trim();        // R
-      var lojaNum = normalizarLojaNumero_(r[4]);   // V
-      if (!time || !lojaNum) continue;
+      var lojaAlias = r[0];   // H
+      var time = String(r[10] || "").trim();   // R
+      var lojaNum = r[14];    // V
 
-      var lojaStr = String(lojaNum).replace(/\D/g, "");
-      if (!lojaStr) continue;
+      var lojaKey = vektorNormLojaKey_(lojaAlias) || vektorNormLojaKey_(lojaNum);
+      if (!lojaKey) {
+        var nn = normalizarLojaNumero_(lojaNum);
+        if (nn != null) lojaKey = String(nn).padStart(4, "0");
+      }
 
-      var lojaN = String(Number(lojaStr) || "").trim(); // "92"
-      if (!lojaN) continue;
+      if (!time || !lojaKey) continue;
 
-      var loja4 = lojaN.padStart(4, "0");               // "0092"
-
-      // ✅ aplica ACL somente para Gerentes_Reg
       if (allowedSet) {
-        if (!allowedSet[lojaN] && !allowedSet[loja4]) continue;
+        var n2 = normalizarLojaNumero_(lojaKey);
+        var loja4 = (n2 != null) ? String(n2).padStart(4, "0") : "";
+        if (!allowedSet[lojaKey] && !allowedSet[String(n2)] && !allowedSet[loja4]) continue;
       }
 
       timesSet[time] = true;
       if (!map[time]) map[time] = {};
-      map[time][loja4] = true;
+      map[time][lojaKey] = true;
     }
 
     var times = Object.keys(timesSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); });
-
     var lojasPorTime = {};
     times.forEach(function(t){
-      lojasPorTime[t] = Object.keys(map[t] || {}).sort(function(a,b){ return a.localeCompare(b); });
+      lojasPorTime[t] = Object.keys(map[t] || {}).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); });
     });
 
-    return { ok:true, times: times, lojasPorTime: lojasPorTime };
+    return { ok:true, empresa: empresaAtual, times: times, lojasPorTime: lojasPorTime };
 
   } catch (e) {
     return { ok:false, error: (e && e.message) ? e.message : String(e) };
@@ -2298,25 +2426,25 @@ function getTimesELojasParaAlertasVektor() {
  * Lista todas as etiquetas existentes na BaseClara (coluna T).
  * Suporta células com múltiplas tags (separadas por vírgula, ponto e vírgula ou barra).
  */
-function getEtiquetasDisponiveisVektor() {
+function getEtiquetasDisponiveisVektor(req) {
   try {
     if (typeof vektorAssertFunctionAllowed_ === "function") {
       vektorAssertFunctionAllowed_("getEtiquetasDisponiveisVektor");
     }
 
-    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
-    if (!sh) return { ok: false, error: "Aba BaseClara não encontrada." };
+    req = req || {};
+    var empCtx = vektorGetEmpresaContext_(req.empresa);
+    var sh = vektorGetBaseSheetByEmpresa_(empCtx.empresaAtual);
+
+    if (!sh) return { ok: false, error: "Aba da base não encontrada." };
 
     var lastRow = sh.getLastRow();
-    if (lastRow < 2) return { ok: true, etiquetas: [] };
+    if (lastRow < 2) return { ok: true, empresa: empCtx.empresaAtual, etiquetas: [] };
 
-    // lê só a coluna T (20) de 2..lastRow
-    var colT = sh.getRange(2, 20, lastRow - 1, 1).getValues(); // T
+    var colT = sh.getRange(2, 20, lastRow - 1, 1).getValues();
 
     var set = {};
 
-    // ✅ exclusões
     var EXCLUIR = {
       "AR": true,
       "POSTAGEM": true,
@@ -2329,7 +2457,7 @@ function getEtiquetasDisponiveisVektor() {
       if (!cell) return;
 
       cell
-        .split(/[;,\/\|]+/g)
+        .split(/[;\/\|]+/g)
         .map(function (s) { return String(s || "").trim(); })
         .filter(Boolean)
         .forEach(function (t) {
@@ -2344,7 +2472,11 @@ function getEtiquetasDisponiveisVektor() {
         });
     });
 
-    return { ok: true, etiquetas: Object.keys(set).sort() };
+    return {
+      ok: true,
+      empresa: empCtx.empresaAtual,
+      etiquetas: Object.keys(set).sort()
+    };
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
@@ -2354,22 +2486,27 @@ function getEtiquetasDisponiveisVektor() {
 function listarAlertasUsuarioVektor(req) {
   try {
     req = req || {};
+
     var email = String(req.email || "").trim().toLowerCase();
     var role = String(req.role || "").trim();
 
     var adminFilterEmail = String(req.adminFilterEmail || "").trim().toLowerCase();
     var adminFilterRole  = String(req.adminFilterRole  || "").trim();
+    var alertTypeFilter = String(req.alertType || "").trim().toUpperCase();
+
+    var empCtx = vektorGetEmpresaContext_(req.empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
 
     var sh = getOrCreateUserAlertsSheet_();
     var values = sh.getDataRange().getValues();
-    if (values.length < 2) return { ok: true, alertas: [] };
+    if (values.length < 2) return { ok: true, empresa: empresaAtual, alertas: [] };
 
     var head = values[0].map(String);
     var idx = function (name) { return head.indexOf(name); };
 
     var iAlertId   = idx("alertId");
     var iOwner     = idx("ownerEmail");
-    var iOwnerRole = idx("ownerRole"); // pode existir ou não
+    var iOwnerRole = idx("ownerRole");
     var iActive    = idx("isActive");
     var iFreq      = idx("freq");
     var iWin       = idx("windowDays");
@@ -2379,19 +2516,17 @@ function listarAlertasUsuarioVektor(req) {
     var iEtq       = idx("etiqueta");
     var iLastRun   = idx("lastRunAt");
     var iType      = idx("alertType");
-
+    var iEmpresa   = idx("EMPRESA");
 
     var isAdmin = (role === "Administrador");
 
-    // Normalização (evita falha por maiúsculas/minúsculas/espacos)
     var norm_ = function (s) { return String(s || "").trim().toLowerCase(); };
 
-    // Carrega ACL 1 vez, só se precisar
     var acl = null;
     var getRoleFromAcl_ = function (emailLower) {
       try {
         if (!emailLower) return "";
-        if (!acl) acl = vektorLoadEmailsRoleMap_(); // => { byEmail: { "a@b": {role:"X", ativo:true} } }
+        if (!acl) acl = vektorLoadEmailsRoleMap_();
         if (!acl || !acl.byEmail || !acl.byEmail[emailLower]) return "";
         return String(acl.byEmail[emailLower].role || "").trim();
       } catch (e) {
@@ -2405,28 +2540,30 @@ function listarAlertasUsuarioVektor(req) {
 
       var owner = String(row[iOwner] || "").trim().toLowerCase();
 
-      // 1) ownerRole pela planilha
       var ownerRole = "";
       if (iOwnerRole >= 0) ownerRole = String(row[iOwnerRole] || "").trim();
 
-      // 2) fallback: coluna "role" (se existir)
       if (!ownerRole) {
         var iRoleFallback = idx("role");
         ownerRole = (iRoleFallback >= 0) ? String(row[iRoleFallback] || "").trim() : "";
       }
 
-      // 3) fallback final: ACL (fonte de verdade)
       if (!ownerRole) {
         ownerRole = getRoleFromAcl_(owner);
       }
 
-      // Regra de visibilidade + filtros
+      var empresaRow = "";
+      if (iEmpresa >= 0) empresaRow = String(row[iEmpresa] || "").trim().toUpperCase();
+      if (!empresaRow) empresaRow = "CENTAURO";
+      if (empresaRow !== empresaAtual) continue;
+
+      var rowType = (iType >= 0 ? String(row[iType] || "TRANSACOES").trim().toUpperCase() : "TRANSACOES");
+        if (alertTypeFilter && alertTypeFilter !== "__ALL__" && rowType !== alertTypeFilter) continue;
+
       if (!isAdmin) {
         if (owner !== email) continue;
       } else {
         if (adminFilterEmail && owner.indexOf(adminFilterEmail) === -1) continue;
-
-        // ✅ filtro por área/role (NORMALIZADO + com fallback ACL)
         if (adminFilterRole) {
           if (norm_(ownerRole) !== norm_(adminFilterRole)) continue;
         }
@@ -2454,27 +2591,24 @@ function listarAlertasUsuarioVektor(req) {
       else if (etiquetaCount === 1) etiquetaLabel = etqs[0];
       else etiquetaLabel = etiquetaCount + " etiquetas";
 
-      var tz = Session.getScriptTimeZone();
+      var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
 
       function formatSendAt_(v) {
         if (!v) return "";
-        // Se vier como Date (Sheets time), formata HH:mm
         if (Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime())) {
           return Utilities.formatDate(v, tz, "HH:mm");
         }
-        // Se vier como texto, tenta normalizar
         var s = String(v).trim();
-        // Se já estiver HH:mm, ok
         if (/^\d{2}:\d{2}$/.test(s)) return s;
-        // Se vier com segundos HH:mm:ss, corta
-        if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s.slice(0,5);
-        return s; // fallback
+        if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s.slice(0, 5);
+        return s;
       }
 
       out.push({
         alertId: String(row[iAlertId] || ""),
         ownerEmail: owner,
         ownerRole: ownerRole,
+        empresa: empresaRow,
         isActive: row[iActive] === true,
         freq: f,
         freqLabel: freqLabel,
@@ -2482,13 +2616,9 @@ function listarAlertasUsuarioVektor(req) {
         time: String(row[iTime] || ""),
         sendAt: (iSendAt >= 0 ? formatSendAt_(row[iSendAt]) : ""),
         lojasCount: lojasCount,
-
-        // etiquetas continuam existindo para Transações
         etiqueta: etiquetaRaw,
         etiquetaCount: etiquetaCount,
         etiquetaLabel: etiquetaLabel,
-
-        // ✅ NOVO: tipo
         alertType: (iType >= 0 ? String(row[iType] || "TRANSACOES").trim() : "TRANSACOES"),
         alertTypeLabel: (function(){
           var t = (iType >= 0 ? String(row[iType] || "").trim() : "");
@@ -2496,15 +2626,14 @@ function listarAlertasUsuarioVektor(req) {
           if (t === "ITENS_IRREGULARES") return "Itens Irregulares";
           return "Transações";
         })(),
-
         lastRunAt: (row[iLastRun] instanceof Date)
-          ? Utilities.formatDate(row[iLastRun], Session.getScriptTimeZone() || "America/Sao_Paulo", "dd/MM/yyyy HH:mm")
+          ? Utilities.formatDate(row[iLastRun], tz, "dd/MM/yyyy HH:mm")
           : (row[iLastRun] ? String(row[iLastRun]) : "—")
       });
     }
 
     out.reverse();
-    return { ok: true, alertas: out };
+    return { ok: true, empresa: empresaAtual, alertas: out };
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
@@ -2547,6 +2676,9 @@ function atualizarAlertaEtiquetaVektor(payload) {
 
     var email = String(payload.email || "").trim().toLowerCase();
     var role  = String(payload.role || "").trim();
+
+    var empCtx = vektorGetEmpresaContext_(payload.empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
 
     var freq = String(payload.freq || "DAILY").trim();
     var windowDays = Number(payload.windowDays || 30) || 30;
@@ -2628,6 +2760,7 @@ function atualizarAlertaEtiquetaVektor(payload) {
     var iType    = idx("alertType");
     var iLastRun = idx("lastRunAt");
     var iLastCnt = idx("lastRowCount");
+    var iEmpresa = idx("EMPRESA");
 
     if (iAlertId < 0) return { ok:false, error:"Cabeçalho inválido: alertId não encontrado." };
 
@@ -2644,6 +2777,14 @@ function atualizarAlertaEtiquetaVektor(payload) {
     var isAdmin = (role === "Administrador");
     if (!isAdmin && ownerEmail && ownerEmail !== email) {
       return { ok:false, error:"Você não tem permissão para editar este alerta." };
+    }
+
+    if (iEmpresa >= 0) {
+      var empresaRow = String(values[rowIndex][iEmpresa] || "").trim().toUpperCase();
+      if (!empresaRow) empresaRow = "CENTAURO";
+      if (empresaRow !== empresaAtual) {
+        return { ok:false, error:"Esse alerta pertence a outra empresa." };
+      }
     }
 
     try {
@@ -2688,8 +2829,9 @@ function atualizarAlertaEtiquetaVektor(payload) {
     if (iLojas  >= 0) sh.getRange(rowIndex + 1, iLojas  + 1).setValue(lojas.join(","));
     if (iEtq    >= 0) sh.getRange(rowIndex + 1, iEtq    + 1).setValue(etiquetaFinalCsv);
     if (iType   >= 0) sh.getRange(rowIndex + 1, iType   + 1).setValue(alertType);
+    if (iEmpresa >= 0) sh.getRange(rowIndex + 1, iEmpresa + 1).setValue(empresaAtual);
 
-    return { ok:true, alertId: alertId };
+    return { ok:true, alertId: alertId, empresa: empresaAtual };
 
   } catch (e) {
     return { ok:false, error: (e && e.message) ? e.message : String(e) };
@@ -2932,6 +3074,9 @@ function executarAlertaEtiquetaVektor(req) {
     var alertId = String(req.alertId || "").trim();
     var preview = !!req.preview;
 
+    var reqEmpCtx = vektorGetEmpresaContext_(req.empresa);
+    var empresaReq = String(reqEmpCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+
     var sh = getOrCreateUserAlertsSheet_();
     var values = sh.getDataRange().getValues();
     if (!values || values.length < 2) return { ok: false, error: "Base de alertas vazia." };
@@ -2951,6 +3096,7 @@ function executarAlertaEtiquetaVektor(req) {
     var iLastRun   = idx("lastRunAt");
     var iLastCnt   = idx("lastRowCount");
     var iType      = idx("alertType");
+    var iEmpresa   = idx("EMPRESA");
 
     var rowIdx = -1;
     for (var r = 1; r < values.length; r++) {
@@ -2962,6 +3108,13 @@ function executarAlertaEtiquetaVektor(req) {
     if (rowIdx < 0) return { ok: false, error: "Alerta não encontrado." };
 
     var row = values[rowIdx];
+    var empresaAlerta = (iEmpresa >= 0) ? String(row[iEmpresa] || "").trim().toUpperCase() : "CENTAURO";
+    if (!empresaAlerta) empresaAlerta = "CENTAURO";
+
+    if (empresaAlerta !== empresaReq) {
+      return { ok:false, error:"Esse alerta pertence a outra empresa." };
+    }
+
     var isActive = (row[iActive] === true);
     if (!isActive && !preview) return { ok: true, skipped: true, reason: "inativo" };
 
@@ -2994,25 +3147,33 @@ function executarAlertaEtiquetaVektor(req) {
       : [];
 
     if (ownerEmail && String(ownerRole) === "Gerentes_Reg") {
-      var allowedLojasOwner = vektorGetAllowedLojasFromEmails_(String(ownerEmail).trim().toLowerCase());
+      var allowedLojasOwner = vektorGetAllowedLojasFromEmails_(String(ownerEmail).trim().toLowerCase(), empresaAlerta);
 
       if (Array.isArray(allowedLojasOwner)) {
         var allowedSet = {};
         allowedLojasOwner.forEach(function(x){
-          x = String(x || "").trim();
-          if (!x) return;
-          allowedSet[x] = true;
-          allowedSet[x.padStart(4, "0")] = true;
+          var lojaKey = vektorNormLojaKey_(x);
+          if (lojaKey) allowedSet[lojaKey] = true;
+
+          var n = normalizarLojaNumero_(x);
+          if (n != null) {
+            allowedSet[String(n)] = true;
+            allowedSet[String(n).padStart(4, "0")] = true;
+          }
         });
 
         if (!lojas || !lojas.length) {
-          lojas = Object.keys(allowedSet).filter(function(k){ return /^\d{4}$/.test(k); });
+          lojas = Object.keys(allowedSet).filter(function(k){
+            return /^[A-Z]{2}\d{4}$/.test(k) || /^\d{4}$/.test(k);
+          });
         } else {
           lojas = lojas.filter(function(x){
             x = String(x || "").trim();
             if (!x) return false;
-            var x4 = x.padStart(4, "0");
-            return !!allowedSet[x] || !!allowedSet[x4];
+            var lojaKey2 = vektorNormLojaKey_(x);
+            var n2 = normalizarLojaNumero_(x);
+            var loja4 = (n2 != null) ? String(n2).padStart(4, "0") : "";
+            return !!allowedSet[x] || !!allowedSet[lojaKey2] || !!allowedSet[String(n2)] || !!allowedSet[loja4];
           });
         }
 
@@ -3034,7 +3195,7 @@ function executarAlertaEtiquetaVektor(req) {
     var rows = [];
 
     if (alertType === "PENDENCIAS") {
-      rows = queryPendenciasBaseClaraAlert_(ini, now, time, lojas);
+      rows = queryPendenciasBaseClaraAlert_(ini, now, time, lojas, empresaAlerta);
 
     } else if (alertType === "ITENS_IRREGULARES") {
       var resItens = getItensIrregularesParaAlertaProgramado_(ini, now, ownerRole, ownerEmail, time, lojas);
@@ -3045,11 +3206,11 @@ function executarAlertaEtiquetaVektor(req) {
 
     } else {
       if (!etiquetas.length) {
-        rows = queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, "");
+        rows = queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, "", empresaAlerta);
       } else {
         var acc = [];
         etiquetas.forEach(function (et) {
-          acc = acc.concat(queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, et));
+          acc = acc.concat(queryTransacoesBaseClaraPorEtiqueta_(ini, now, time, lojas, et, empresaAlerta));
         });
         rows = acc;
       }
@@ -3062,17 +3223,33 @@ function executarAlertaEtiquetaVektor(req) {
 
     var runsSh = getOrCreateUserAlertsRunsSheet_();
     var previewRows = rows.slice(0, 60);
+    var runHead = runsSh.getRange(1,1,1,runsSh.getLastColumn()).getValues()[0].map(String);
+    var iRunEmp = runHead.indexOf("EMPRESA");
 
-    runsSh.appendRow([
-      "RUN" + Utilities.getUuid().replace(/-/g, "").slice(0, 10).toUpperCase(),
-      alertId,
-      ownerEmail,
-      now,
-      periodo.inicio,
-      periodo.fim,
-      rows.length,
-      JSON.stringify(previewRows)
-    ]);
+    if (iRunEmp >= 0) {
+      runsSh.appendRow([
+        "RUN" + Utilities.getUuid().replace(/-/g, "").slice(0, 10).toUpperCase(),
+        alertId,
+        ownerEmail,
+        now,
+        periodo.inicio,
+        periodo.fim,
+        rows.length,
+        JSON.stringify(previewRows),
+        empresaAlerta
+      ]);
+    } else {
+      runsSh.appendRow([
+        "RUN" + Utilities.getUuid().replace(/-/g, "").slice(0, 10).toUpperCase(),
+        alertId,
+        ownerEmail,
+        now,
+        periodo.inicio,
+        periodo.fim,
+        rows.length,
+        JSON.stringify(previewRows)
+      ]);
+    }
 
     if (!preview) {
       try {
@@ -3102,8 +3279,6 @@ function executarAlertaEtiquetaVektor(req) {
             cc: "contasareceber@gruposbf.com.br",
             attachments: [attachment]
           });
-        } else {
-          Logger.log("Alerta " + alertId + " sem ownerEmail: não enviou e-mail.");
         }
       } catch (mailErr) {
         Logger.log(
@@ -3116,6 +3291,7 @@ function executarAlertaEtiquetaVektor(req) {
     return {
       ok: true,
       alertId: alertId,
+      empresa: empresaAlerta,
       ownerEmail: ownerEmail,
       ownerRole: ownerRole,
       freq: freq,
@@ -3132,72 +3308,50 @@ function executarAlertaEtiquetaVektor(req) {
   }
 }
 
-function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
-  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-  var sh = ss.getSheetByName("BaseClara");
-  if (!sh) throw new Error("Aba BaseClara não encontrada.");
+function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro, empresa) {
+  var empCtx = vektorGetEmpresaContext_(empresa);
+  var sh = vektorGetBaseSheetByEmpresa_(empCtx.empresaAtual);
+  if (!sh) throw new Error("Aba da base não encontrada.");
 
   var lr = sh.getLastRow();
   if (lr < 2) return [];
 
-  // Lê A..W (23 colunas)
   var values = sh.getRange(2, 1, lr - 1, 23).getValues();
 
-  // Índices zero-based (A..W)
-  var IDX_DATA  = 0;   // A
-  var IDX_ESTAB = 2;   // C  ✅ você pediu explicitamente
-  var IDX_VALOR = 5;   // F
-  var IDX_RECIBO = 14; // O
-  var IDX_TITULAR = 16;// Q
-  var IDX_GRUPO = 17;  // R (time/grupo)
-  var IDX_ETIQUETA = 19; // T
-  var IDX_DESC = 20;     // U
-  var IDX_LOJA_NUM = 21; // V
+  var IDX_DATA      = 0;   // A
+  var IDX_ESTAB     = 2;   // C
+  var IDX_VALOR     = 5;   // F
+  var IDX_ALIAS     = 7;   // H
+  var IDX_RECIBO    = 14;  // O
+  var IDX_TITULAR   = 16;  // Q
+  var IDX_GRUPO     = 17;  // R
+  var IDX_ETIQUETA  = 19;  // T
+  var IDX_DESC      = 20;  // U
+  var IDX_LOJA_NUM  = 21;  // V
 
-  // Normaliza filtros
   var timeSel = String(timeFiltro || "").trim();
-    var lojasSet = {};
+
+  var lojasSet = {};
   (lojasFiltro || []).forEach(function(l){
-    // normaliza "CE0147" / "0147" / 147 => "147"
+    var lojaKey = vektorNormLojaKey_(l);
+    if (lojaKey) lojasSet[lojaKey] = true;
+
     var n = normalizarLojaNumero_(l);
-    if (n !== null) lojasSet[String(n)] = true;
+    if (n !== null) {
+      lojasSet[String(n)] = true;
+      lojasSet[String(n).padStart(4, "0")] = true;
+    }
   });
 
-    function isVazio_(v) {
-    if (v === null || v === undefined) return true;
-
-    // IMPORTANTÍSSIMO: no Google Sheets, checkbox pode virar boolean
-    if (v === false) return true;
-
-    var s = String(v).trim().toLowerCase();
-
-    // placeholders comuns
-    if (!s) return true;
-    if (s === "-" || s === "—" || s === "n/a" || s === "na") return true;
-
-    // casos que na BaseClara significam "sem recibo" (pendência)
-    if (s === "não" || s === "nao") return true;
-    if (s === "false" || s === "0") return true;
-
-    // textos livres comuns
-    if (s.indexOf("sem recibo") >= 0) return true;
-    if (s.indexOf("sem nota") >= 0) return true;
-
-    return false;
-  }
-
-    function isBlank_(v) {
+  function isBlank_(v) {
     return String(v == null ? "" : v).trim() === "";
   }
 
   function isReciboPendente_(v) {
-    // regra: pendência de NF quando coluna O for "Não"
     var s = String(v == null ? "" : v).trim().toLowerCase();
     return (s === "não" || s === "nao");
   }
 
-  // Converte para datas comparáveis
-    // ✅ evita drift quando ini/fim chegam como "YYYY-MM-DD"
   var iniD = (ini instanceof Date) ? ini : (vektorParseDateAny_(ini) || new Date(ini));
   var fimD = (fim instanceof Date) ? fim : (vektorParseDateAny_(fim) || new Date(fim));
 
@@ -3207,7 +3361,6 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
 
   var iniMs = iniD.getTime();
   var fimMs = fimD.getTime();
-
   var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
 
   var out = [];
@@ -3217,30 +3370,25 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
 
     var dt = row[IDX_DATA];
     var dt2 = (dt instanceof Date) ? dt : (vektorParseDateAny_(dt) || new Date(dt));
-      if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
+    if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
 
     var tms = dt2.getTime();
     if (tms < iniMs || tms > fimMs) continue;
 
-        // Loja (BaseClara coluna V = LojaNum)
-    var lojaNum = normalizarLojaNumero_(row[IDX_LOJA_NUM]);
-    if (lojaNum === null) continue;
+    var lojaKey = vektorNormLojaKey_(row[IDX_ALIAS]) || vektorNormLojaKey_(row[IDX_LOJA_NUM]);
+    if (!lojaKey) {
+      var lojaNumFallback = normalizarLojaNumero_(row[IDX_LOJA_NUM]);
+      if (lojaNumFallback !== null) lojaKey = String(lojaNumFallback).padStart(4, "0");
+    }
+    if (!lojaKey) continue;
 
-    // para filtrar, usa chave numérica (sem "CE" e sem zeros à esquerda)
-    var lojaKey = String(lojaNum);
-
-    // para exibir, você pode padronizar como "CE####"
-    var loja = "CE" + String(lojaNum).padStart(4, "0");
-
-    // Filtro lojas (quando time != __ALL__)
     if (timeSel !== "__ALL__" && Object.keys(lojasSet).length) {
-      if (!lojasSet[lojaKey]) continue;
+      var lojaNum = normalizarLojaNumero_(lojaKey);
+      var loja4 = lojaNum != null ? String(lojaNum).padStart(4, "0") : "";
+      if (!lojasSet[lojaKey] && !lojasSet[String(lojaNum)] && !lojasSet[loja4]) continue;
     }
 
-    // Time
     var grp = String(row[IDX_GRUPO] || "").trim();
-
-    // Filtro por time
     if (timeSel && timeSel !== "__ALL__") {
       if (grp !== timeSel) continue;
     }
@@ -3253,9 +3401,9 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
     var recibo = String(row[IDX_RECIBO] || "").trim();
     var desc = String(row[IDX_DESC] || "").trim();
 
-    var pendEtiqueta = isBlank_(etiquetas);        // T vazia
-    var pendNF       = isReciboPendente_(recibo); // O = "Não"
-    var pendDesc     = isBlank_(desc);            // U vazia
+    var pendEtiqueta = isBlank_(etiquetas);
+    var pendNF       = isReciboPendente_(recibo);
+    var pendDesc     = isBlank_(desc);
 
     if (!pendEtiqueta && !pendNF && !pendDesc) continue;
 
@@ -3265,7 +3413,7 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro) {
     if (pendNF) pendList.push("Nota fiscal/Recibo");
 
     out.push({
-      loja: loja,
+      loja: lojaKey,
       time: grp || "—",
       data: Utilities.formatDate(dt2, tz, "dd/MM/yyyy"),
       valor: valor,
@@ -4232,55 +4380,51 @@ function isDueBySchedule_(freq, lastRun, sendAtRaw, now, tz) {
 }
 
 // Busca robusta por header (evita quebrar quando mudarem posições)
-function queryTransacoesBaseClaraPorEtiqueta_(ini, fim, time, lojas, etiqueta) {
-  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-  var sh = ss.getSheetByName("BaseClara");
+function queryTransacoesBaseClaraPorEtiqueta_(ini, fim, time, lojas, etiqueta, empresa) {
+  var empCtx = vektorGetEmpresaContext_(empresa);
+  var sh = vektorGetBaseSheetByEmpresa_(empCtx.empresaAtual);
   if (!sh) return [];
 
   var lastRow = sh.getLastRow();
   if (lastRow < 2) return [];
 
-  // =========================
-  // ÍNDICES FIXOS (0-based)
-  // BaseClara: A..W
-  // =========================
-  var I_DATA = 0;        // A - Data da Transação
-  var I_ESTAB = 2;       // C - Transação (Estabelecimento)
-  var I_VALOR_RS = 5;    // F - Valor em R$
-  var I_LOJA = 7;        // H - Alias Do Cartão (Loja)
-  var I_TIME = 17;       // R - Grupos (Time)
-  var I_ETIQUETAS = 19;  // T - Etiquetas
-  var I_DESC = 20;       // U - Descrição (Item comprado)
+  var I_DATA       = 0;   // A
+  var I_ESTAB      = 2;   // C
+  var I_VALOR_RS   = 5;   // F
+  var I_ALIAS      = 7;   // H
+  var I_TIME       = 17;  // R
+  var I_ETIQUETAS  = 19;  // T
+  var I_DESC       = 20;  // U
+  var I_LOJA_NUM   = 21;  // V
 
-  // Lê somente A..W (23 colunas)
   var NUM_COLS = 23;
   var values = sh.getRange(2, 1, lastRow - 1, NUM_COLS).getValues();
 
-  // Normalização
   var norm = function (s) {
     return String(s == null ? "" : s).trim().toLowerCase();
   };
 
-  // Set de lojas permitidas (comparação por string exata normalizada)
   var lojasSet = {};
   (lojas || []).forEach(function (l) {
-    var x = String(l == null ? "" : l).trim();
-    if (x) lojasSet[norm(x)] = true;
+    var lojaKey = vektorNormLojaKey_(l);
+    if (lojaKey) lojasSet[norm(lojaKey)] = true;
+
+    var n = normalizarLojaNumero_(l);
+    if (n != null) {
+      lojasSet[norm(String(n))] = true;
+      lojasSet[norm(String(n).padStart(4, "0"))] = true;
+    }
   });
   var hasLojasFilter = Object.keys(lojasSet).length > 0;
 
-  // Etiqueta alvo (normalizada)
   var etqTarget = norm(etiqueta);
 
-  // Se Etiquetas vier com múltiplos valores (ex.: "Alimentação, Viagem"),
-  // vamos considerar "match" se uma das etiquetas for exatamente igual ao alvo
   var etiquetaMatch = function (cellValue) {
     if (!etqTarget) return true;
     var raw = String(cellValue == null ? "" : cellValue);
     if (!raw.trim()) return false;
 
-    // separadores comuns
-    var parts = raw.split(/[,;|]+/).map(function (p) { return norm(p); }).filter(Boolean);
+    var parts = raw.split(/[,;|\/]+/).map(function (p) { return norm(p); }).filter(Boolean);
     if (!parts.length) return (norm(raw) === etqTarget);
 
     for (var i = 0; i < parts.length; i++) {
@@ -4289,9 +4433,8 @@ function queryTransacoesBaseClaraPorEtiqueta_(ini, fim, time, lojas, etiqueta) {
     return false;
   };
 
-  // Garantir que ini/fim são Date
-  var iniD = (ini instanceof Date) ? ini : new Date(ini);
-  var fimD = (fim instanceof Date) ? fim : new Date(fim);
+  var iniD = (ini instanceof Date) ? ini : (vektorParseDateAny_(ini) || new Date(ini));
+  var fimD = (fim instanceof Date) ? fim : (vektorParseDateAny_(fim) || new Date(fim));
 
   if (!(iniD instanceof Date) || isNaN(iniD.getTime())) return [];
   if (!(fimD instanceof Date) || isNaN(fimD.getTime())) return [];
@@ -4302,34 +4445,35 @@ function queryTransacoesBaseClaraPorEtiqueta_(ini, fim, time, lojas, etiqueta) {
   for (var i = 0; i < values.length; i++) {
     var r = values[i];
 
-    var loja = String(r[I_LOJA] == null ? "" : r[I_LOJA]).trim();   // Alias do Cartão
-    var t = String(r[I_TIME] == null ? "" : r[I_TIME]).trim();     // Grupos
+    var lojaKey = vektorNormLojaKey_(r[I_ALIAS]) || vektorNormLojaKey_(r[I_LOJA_NUM]);
+    if (!lojaKey) {
+      var nn = normalizarLojaNumero_(r[I_LOJA_NUM]);
+      if (nn != null) lojaKey = String(nn).padStart(4, "0");
+    }
+
+    var t = String(r[I_TIME] == null ? "" : r[I_TIME]).trim();
     var etqCell = r[I_ETIQUETAS];
 
-    // Filtros: time e lojas
-    // ✅ "__ALL__" significa não filtrar time
     if (time && time !== "__ALL__" && t !== time) continue;
 
     if (hasLojasFilter) {
-      if (!loja) continue;
-      if (!lojasSet[norm(loja)]) continue;
+      var lojaNum = normalizarLojaNumero_(lojaKey);
+      var loja4 = lojaNum != null ? String(lojaNum).padStart(4, "0") : "";
+      if (!lojasSet[norm(lojaKey)] && !lojasSet[norm(String(lojaNum))] && !lojasSet[norm(loja4)]) continue;
     }
 
-    // Filtro: etiqueta
     if (!etiquetaMatch(etqCell)) continue;
 
-    // Data
     var d = r[I_DATA];
-    var dObj = (d instanceof Date) ? d : new Date(d);
+    var dObj = (d instanceof Date) ? d : (vektorParseDateAny_(d) || new Date(d));
     if (!(dObj instanceof Date) || isNaN(dObj.getTime())) continue;
     if (dObj < iniD || dObj > fimD) continue;
 
-    // Valor (F pode vir como número ou string)
     var v = r[I_VALOR_RS];
     var valor = (typeof v === "number") ? v : Number(String(v || "").replace(/\./g, "").replace(",", "."));
 
     out.push({
-      loja: loja,
+      loja: lojaKey,
       time: t,
       data: Utilities.formatDate(dObj, tz, "dd/MM/yyyy"),
       estabelecimento: String(r[I_ESTAB] == null ? "" : r[I_ESTAB]),
@@ -5171,9 +5315,26 @@ function getClaraPendSheet_() {
 
 
 // Abre a aba BaseClara
-function getBaseClaraSheet_() {
-  var ss = SpreadsheetApp.openById(SPREADSHEET_ID_CLARA);
-  return ss.getSheetByName(SHEET_NOME_BASE_CLARA);
+function getBaseClaraSheet_(empresa) {
+  return vektorGetBaseSheetByEmpresa_(empresa);
+}
+
+function carregarLinhasBaseClara_(empresa) {
+  var sh = getBaseClaraSheet_(empresa);
+  if (!sh) {
+    return { header: [], linhas: [], error: "Aba da base não encontrada." };
+  }
+
+  var values = sh.getDataRange().getValues();
+  if (!values || !values.length) {
+    return { header: [], linhas: [], error: null };
+  }
+
+  return {
+    header: values[0] || [],
+    linhas: values.slice(1),
+    error: null
+  };
 }
 
 function parseDateClara_(value) {
@@ -5218,18 +5379,20 @@ function parseDateClara_(value) {
 }
 
 // Lê todas as linhas da BaseClara (ignorando cabeçalho)
-function carregarLinhasBaseClara_() {
-  var sh = getBaseClaraSheet_();
+function carregarLinhasBaseClara_(empresa) {
+  var sh = getBaseClaraSheet_(empresa);
   if (!sh) {
-    return { header: [], linhas: [], error: "Aba 'BaseClara' não encontrada na planilha Captura_Clara." };
+    return { header: [], linhas: [], error: "Aba da base não encontrada." };
   }
   var values = sh.getDataRange().getValues();
   if (!values || values.length < 2) {
     return { header: values && values[0] ? values[0] : [], linhas: [], error: null };
   }
-  var header = values[0];
-  var linhas = values.slice(1);
-  return { header: header, linhas: linhas, error: null };
+  return {
+    header: values[0],
+    linhas: values.slice(1),
+    error: null
+  };
 }
 
 // =======================
@@ -5571,44 +5734,64 @@ function vektorPingHistoricoEnvios() {
 }
 
 function vektorNormLojaKey_(v) {
-  // Aceita "CE0062", "0062", 62 etc -> retorna "CE0062"
   var s = String(v || "").trim().toUpperCase();
   if (!s) return "";
-  var m = s.match(/CE\s*(\d{1,6})/i);
-  var digits = "";
-  if (m && m[1]) digits = m[1];
-  else digits = s.replace(/\D/g, "");
-  if (!digits) return "";
-  var cod4 = ("0000" + digits).slice(-4);
-  return "CE" + cod4;
+
+  var m = s.match(/\b(CE|NV|NI)\s*0*(\d{1,6})\b/);
+  if (m) {
+    return m[1] + String(Number(m[2] || "")).padStart(4, "0");
+  }
+
+  return "";
 }
 
-function vektorCarregarMapaEmailsLojas_() {
+function vektorCarregarMapaEmailsLojas_(empresa) {
+  var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
+
   var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
   var sh = ss.getSheetByName(SHEET_NOME_EMAILS_LOJAS);
   if (!sh) throw new Error("Aba '" + SHEET_NOME_EMAILS_LOJAS + "' não encontrada na planilha BaseClara.");
 
   var lr = sh.getLastRow();
+  var lc = sh.getLastColumn();
   if (lr < 2) return {};
 
-  // A..G
-  var values = sh.getRange(1, 1, lr, 7).getValues();
-  // Cabeçalho esperado (mas vamos por posição, como você definiu):
-  // A Loja, B LojaNorm, C Shopping, D Time, E Email Gerente, F Nome Gerente Regional, G Email Gerente Regional
+  var values = sh.getRange(1, 1, lr, lc).getValues();
+  var header = values[0].map(function(h){ return String(h || "").trim(); });
 
-  var map = {}; // "CE0001" -> { time, emailGerente, emailRegional }
+  function idxOf_(names, fallback) {
+    for (var i = 0; i < names.length; i++) {
+      var ix = header.indexOf(names[i]);
+      if (ix >= 0) return ix;
+    }
+    return fallback;
+  }
+
+  var iLoja = idxOf_(["Loja"], 0);
+  var iTime = idxOf_(["Time"], 3);
+  var iGer = idxOf_(["E-mail Gerente", "Email Gerente"], 4);
+  var iReg = idxOf_(["E-mail Gerente Regional", "Email Gerente Regional"], 6);
+  var iEmp = idxOf_(["EMPRESA"], -1);
+
+  var map = {};
   for (var r = 1; r < values.length; r++) {
     var row = values[r];
-    var lojaKey = vektorNormLojaKey_(row[0]); // A
+
+    var empresaRow = (iEmp >= 0) ? String(row[iEmp] || "").trim().toUpperCase() : "CENTAURO";
+    if (!empresaRow) empresaRow = "CENTAURO";
+    if (empresaRow !== empresaAtual) continue;
+
+    var lojaKey = vektorNormLojaKey_(row[iLoja]);
     if (!lojaKey) continue;
 
     map[lojaKey] = {
       lojaKey: lojaKey,
-      time: String(row[3] || "").trim(),              // D
-      emailGerente: String(row[4] || "").trim(),      // E
-      emailRegional: String(row[6] || "").trim()      // G
+      time: String(row[iTime] || "").trim(),
+      emailGerente: String(row[iGer] || "").trim(),
+      emailRegional: String(row[iReg] || "").trim()
     };
   }
+
   return map;
 }
 
@@ -5650,8 +5833,11 @@ function vektorFormatDateBR_(d) {
   }
 }
 
-function vektorQueryPendenciasRecusadas_(ini, fim) {
-  var base = carregarLinhasBaseClara_();
+function vektorQueryPendenciasRecusadas_(ini, fim, empresa) {
+  var empCtx = vektorGetEmpresaContext_(empresa);
+  var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+
+  var base = carregarLinhasBaseClara_(empresaAtual);
   if (base.error) throw new Error(base.error);
 
   var header = base.header || [];
@@ -5691,7 +5877,7 @@ function vektorQueryPendenciasRecusadas_(ini, fim) {
       if (p[1] < 0) throw new Error("Não encontrei a coluna '" + p[0] + "' no cabeçalho da BaseClara.");
     });
 
-  var emailsMap = vektorCarregarMapaEmailsLojas_();
+  var emailsMap = vektorCarregarMapaEmailsLojas_(empresaAtual);
 
   var out = []; // registros “linha a linha”
   for (var i = 0; i < linhas.length; i++) {
@@ -5878,14 +6064,14 @@ function vektorParseValorBR_(x) {
 }
 
 // 1) PREVIEW: devolve resumo pro chat
-function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
+function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso, empresa) {
   vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadas");
 
   var ini = vektorParseIsoDateSafe_(dataInicioIso);
   var fim = vektorParseIsoDateSafe_(dataFimIso);
   if (!ini || !fim) return { ok: false, error: "Informe data inicial e final válidas." };
 
-  var rows = vektorQueryPendenciasRecusadas_(ini, fim);
+  var rows = vektorQueryPendenciasRecusadas_(ini, fim, empresa);
 
   var total = rows.length;
   var cRec = 0, cEtq = 0, cDesc = 0, cDiv = 0; // ✅ NOVO
@@ -5895,7 +6081,7 @@ function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
   // ✅ mapa Loja -> Time (vem da aba Emails/Lojas)
       var lojaInfoMap = {};
       try {
-        lojaInfoMap = vektorCarregarMapaEmailsLojas_(); // { "CE0062": { time, ... }, ... }
+        lojaInfoMap = vektorCarregarMapaEmailsLojas_(String(vektorGetEmpresaContext_(empresa).empresaAtual || "CENTAURO").trim().toUpperCase()); 
       } catch (eMap) {
         lojaInfoMap = {};
       }
@@ -5958,8 +6144,11 @@ function previewEnvioPendenciasClaraRecusadas(dataInicioIso, dataFimIso) {
   };
 }
 
-function vektorCalcularStatusMixPeriodo_(ini, fim) {
-  var base = carregarLinhasBaseClara_();
+function vektorCalcularStatusMixPeriodo_(ini, fim, empresa) {
+  var empCtx = vektorGetEmpresaContext_(empresa);
+  var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+
+  var base = carregarLinhasBaseClara_(empresaAtual);
   if (base.error) throw new Error(base.error);
 
   var header = base.header || [];
@@ -6087,7 +6276,7 @@ function vektorCalcularValorRecusadasPorLojaPeriodo_(ini, fim) {
   };
 }
 
-function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso) {
+function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso, empresa) {
   vektorAssertFunctionAllowed_("previewEnvioPendenciasClaraRecusadasDetalhado");
 
   try {
@@ -6106,10 +6295,10 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
     ini = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate(), 0, 0, 0, 0);
     fim = new Date(fim.getFullYear(), fim.getMonth(), fim.getDate(), 23, 59, 59, 999);
 
-    var rows = vektorQueryPendenciasRecusadas_(ini, fim);
+    var rows = vektorQueryPendenciasRecusadas_(ini, fim, empresa);
 
     // ✅ NOVO: Status mix do período (Aprovada / Recusada / Necessita aprovação)
-    var statusMix = vektorCalcularStatusMixPeriodo_(ini, fim); // { total, aprovada, recusada, necessita, pct... }
+    var statusMix = vektorCalcularStatusMixPeriodo_(ini, fim, empresa); // { total, aprovada, recusada, necessita, pct... }
 
     var sentMap = vektorCarregarTxKeysJaEnviadas_() || {};
     if (typeof sentMap !== "object") sentMap = {};
@@ -6204,7 +6393,9 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
     // ===== ENRIQUECE lojasValorArr com TIME (para filtro no popup) =====
     var mapEmailsLojas = {};
     try {
-      mapEmailsLojas = vektorCarregarMapaEmailsLojas_() || {};
+      var empCtx = vektorGetEmpresaContext_(empresa);
+      var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+      mapEmailsLojas = vektorCarregarMapaEmailsLojas_(empresaAtual) || {};
     } catch (eMap) {
       mapEmailsLojas = {};
     }
@@ -6280,7 +6471,7 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
   }
 }
 
-function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFimIso, txKeys) {
+function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFimIso, txKeys, empresa) {
   vektorAssertFunctionAllowed_("dispararEnvioPendenciasClaraRecusadasSelecionadas");
 
   var lock = LockService.getScriptLock();
@@ -6301,7 +6492,7 @@ function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFi
     });
     if (!Object.keys(want).length) return { ok: false, error: "Nenhuma transação selecionada." };
 
-    var rowsAll = vektorQueryPendenciasRecusadas_(ini, fim);
+    var rowsAll = vektorQueryPendenciasRecusadas_(ini, fim, empresa);
 
     // ✅ envio único (carrega APÓS pegar o lock, para evitar concorrência)
     var sentMap = vektorCarregarTxKeysJaEnviadas_();
@@ -7859,14 +8050,15 @@ function getFrequenciaUsoClara(tipoFiltro, valorFiltro, mesesBack) {
  * @param {string|Date} dataFim  (dd/MM/yyyy ou Date)
  * @param {number} janelaDiasReincidencia (default 15)
  */
-function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, janelaDiasReincidencia) {
+function getListaItensCompradosClara(tipoFiltro, valorFiltro, dataIni, dataFim, janelaDiasReincidencia, empresa) {
   vektorAssertFunctionAllowed_("getListaItensCompradosClara");
   try {
     tipoFiltro = (tipoFiltro || "").toString().toLowerCase().trim(); // "time" | "loja"
     valorFiltro = (valorFiltro || "").toString().trim();
     janelaDiasReincidencia = Number(janelaDiasReincidencia) || 15;
 
-    var info = carregarLinhasBaseClara_();
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var info = carregarLinhasBaseClara_(empCtx.empresaAtual);
     if (info.error) return { ok: false, error: info.error };
 
     var header = info.header;
@@ -8279,6 +8471,7 @@ function getItensIrregularesRadarVisao(params) {
     var conformidade = String(p.conformidade || p.conf || "").trim().toUpperCase();
     var groupBy = String(p.groupBy || "loja").trim().toLowerCase();
     var limit = Number(p.limit) || 2500;
+    var empresa = String(p.empresa || "").trim().toUpperCase();
 
     // Debug de entrada (pra não ficar cego depois)
     var debugIn = {
@@ -8317,7 +8510,7 @@ function getItensIrregularesRadarVisao(params) {
     // Motor (geral)
     // ⚠️ Se o seu motor NÃO exigir "geral", ele ignora; se exigir, isso evita retorno 0.
     // ============================
-    var res = getListaItensCompradosClara("geral", "", dtIniBR, dtFimBR, limit);
+    var res = getListaItensCompradosClara("geral", "", dtIniBR, dtFimBR, limit, empresa);
     if (!res || !res.ok) {
       return {
         ok: false,
@@ -8565,7 +8758,7 @@ function getItensIrregularesParaAlertaProgramado_(ini, fim, ownerRole, ownerEmai
 // - Loja:  agrega por Cartão
 // =====================================================
 
-function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
+function getRelacaoSaldosClara(tipoFiltro, valorFiltro, empresa) {
   vektorAssertFunctionAllowed_("getRelacaoSaldosClara");
   try {
     // 🔒 Apenas Administrador
@@ -8576,6 +8769,9 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
 
     tipoFiltro = (tipoFiltro || "geral").toString().toLowerCase().trim();
     valorFiltro = (valorFiltro || "").toString().trim();
+
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();  
 
     var LIMITE_TETO = 3500; // teto hard do recomendado/ações
 
@@ -8601,25 +8797,36 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
       return { ok: false, error: "Aba Info_limites sem dados." };
     }
 
+    var limHead = limValues[0].map(function(h){ return String(h || "").trim(); });
+    var idxEmp = limHead.indexOf("EMPRESA");
+    if (idxEmp < 0) {
+      return { ok: false, error: 'Não encontrei a coluna "EMPRESA" na aba Info_limites.' };
+    }
+
     // Mapa: chaveCartao -> {nome, tipo, titular, limite}
     var limites = {};
     for (var i = 1; i < limValues.length; i++) {
       var r = limValues[i];
-      var nome = (r[0] || "").toString().trim();   // A
+
+      var empresaRow = String(r[idxEmp] || "").trim().toUpperCase();
+      if (!empresaRow) empresaRow = "CENTAURO";
+      if (empresaRow !== empresaAtual) continue;
+
+      var nome = (r[0] || "").toString().trim();
       if (!nome) continue;
 
       var tipo = (r[1] || "").toString().trim();   // B
       var titular = (r[3] || "").toString().trim();// D
       var limite = Number(r[4]) || 0;              // E
 
-      var k = cartaoKeyCE_(nome);
+      var k = cartaoKeyLoja_(nome);
       if (!k) continue;
 
       limites[k] = { nomeCartao: nome, tipo: tipo, titular: titular, limite: limite };
     }
 
     // --- 3) Lê BaseClara ---
-    var info = carregarLinhasBaseClara_();
+    var info = carregarLinhasBaseClara_(empresaAtual);
     if (info.error) return { ok: false, error: info.error };
 
     var header = info.header || [];
@@ -8669,7 +8876,7 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
       var gruposRaw0 = (r0[idxGrupos] || "").toString().trim();
 
       // Cartão (chave padronizada)
-      var cartaoKey0 = cartaoKeyCE_(alias0);
+      var cartaoKey0 = cartaoKeyLoja_(alias0);
       if (!cartaoKey0) continue;
 
       // Regra do Rodrigo: sem vínculo => não registrar (fica oculto até ter 1ª transação com vínculo)
@@ -8728,7 +8935,7 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
       if (!v) continue;
 
       // Cartão (chave padronizada)
-      var cartaoKey = cartaoKeyCE_(alias);
+      var cartaoKey = cartaoKeyLoja_(alias);
       if (!cartaoKey) continue;
 
       // chave de agregação
@@ -9203,7 +9410,7 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro) {
  * H (7)  = Alias do Cartão (Loja no seu contexto)
  * U (20) = Descrição (Item comprado)
  */
-function getTransacoesLojaPeriodoAberto(aliasLoja) {
+function getTransacoesLojaPeriodoAberto(aliasLoja, empresa) {
   vektorAssertFunctionAllowed_("getTransacoesLojaPeriodoAberto");
   try {
     var email = Session.getActiveUser().getEmail();
@@ -9213,7 +9420,8 @@ function getTransacoesLojaPeriodoAberto(aliasLoja) {
     aliasLoja = (aliasLoja || "").toString().trim();
     if (!aliasLoja) return { ok: true, rows: [], meta: { inicio:"", fim:"" } };
 
-    var info = carregarLinhasBaseClara_();
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var info = carregarLinhasBaseClara_(empCtx.empresaAtual);
     if (info.error) return { ok: false, error: info.error };
 
     var linhas = info.linhas || [];
@@ -10071,13 +10279,22 @@ try {
 // USO IRREGULAR (CONSERVADOR) - BASECLARA
 // ==============================
 
-function getPossivelUsoIrregularParaChat(modo) {
-  // 🔒 RBAC por VEKTOR_ACESSOS (ROLE -> FUNCTION_ALLOW)
+function getPossivelUsoIrregularParaChat(modo, empresa) {
   vektorAssertFunctionAllowed_("getPossivelUsoIrregularParaChat");
-  try {
-    modo = (modo || "7d").toString().toLowerCase().trim(); // default 7 dias
 
-    var rel = detectarUsoIrregularBaseClara_({ modo: modo });
+  try {
+    modo = (modo || "7d").toString().toLowerCase().trim();
+
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var rel = detectarUsoIrregularBaseClara_({
+      modo: modo,
+      empresa: empCtx.empresaAtual
+    });
+
+    if (rel && typeof rel === "object") {
+      rel.empresa = empCtx.empresaAtual;
+    }
+
     return rel;
 
   } catch (e) {
@@ -10373,9 +10590,9 @@ function montarEmailUsoIrregular_(rel) {
 }
 
 function detectarUsoIrregularBaseClara_(opts) {
-  var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-  var sh = ss.getSheetByName("BaseClara");
-  if (!sh) return { ok: false, error: "Aba BaseClara não encontrada." };
+  opts = opts || {};
+  var empCtx = vektorGetEmpresaContext_(opts.empresa);
+  var sh = vektorGetBaseSheetByEmpresa_(empCtx.empresaAtual);
 
   var lastRow = sh.getLastRow();
   if (lastRow < 2) return { ok: true, rows: [], meta: { periodo: "" } };
@@ -11529,21 +11746,19 @@ function projeçãoCiclo_(ini, fim, totalUsado) {
   }
 }
 
-function cartaoKeyCE_(raw) {
+function cartaoKeyLoja_(raw) {
   var s = (raw || "").toString();
-  var norm = normalizarTexto_(s); // já remove acentos etc.
+  var norm = normalizarTexto_(s);
   if (!norm) return "";
 
-  // captura CE + 4 dígitos em qualquer lugar do texto
-  var m = norm.match(/\bce\s*0*(\d{1,4})\b/);
+  var m = norm.match(/\b(ce|nv|ni)\s*0*(\d{1,4})\b/);
   if (!m) return "";
 
-  var dig = String(Number(m[1] || "")).padStart(4, "0");
-
-  // virtual: aceita "virtual" e também o typo "virual"
+  var prefix = String(m[1] || "").toUpperCase();
+  var dig = String(Number(m[2] || "")).padStart(4, "0");
   var isVirtual = (norm.indexOf("virtual") !== -1) || (norm.indexOf("virual") !== -1);
 
-  return "ce" + dig + (isVirtual ? "|virtual" : "");
+  return prefix + dig + (isVirtual ? "|virtual" : "");
 }
 
 function moneyBR_(n) {
@@ -15180,6 +15395,7 @@ function getLojasOfensorasParaChat(diasJanela) {
 // ===============================
 function getResumoCicloPendencias() {
   vektorAssertFunctionAllowed_("getResumoCicloPendencias");
+  var empCtx = vektorGetEmpresaContext_();
 
   try {
     // ✅ ACL por Emails (mesmo padrão da Análise de Gastos)
@@ -15207,10 +15423,10 @@ function getResumoCicloPendencias() {
     var fimCiclo = pc.fim;
 
     // mapa Loja -> Time
-    var mapaTime = construirMapaLojaParaTime_();
+    var mapaTime = construirMapaLojaParaTime_(empCtx.empresaAtual);
 
     var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
+    var sh = vektorGetBaseSheetByEmpresa_(empCtx.empresaAtual);
     if (!sh) throw new Error("Aba BaseClara não encontrada.");
 
     var lastRow = sh.getLastRow();
@@ -15413,6 +15629,7 @@ function getResumoCicloPendencias() {
 // =====================================================
 function getResumoCicloPendenciasDetalheLojaResumo(loja) {
   vektorAssertFunctionAllowed_("getResumoCicloPendenciasDetalheLojaResumo");
+  var empCtx = vektorGetEmpresaContext_();
 
   try {
     var lojaIn = String(loja || "").trim();
@@ -15426,7 +15643,7 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
 
     // abre BaseClara
     var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
+    var sh = vektorGetBaseSheetByEmpresa_(empCtx.empresaAtual);
     if (!sh) return { ok: false, error: "Aba BaseClara não encontrada." };
 
     var lastRow = sh.getLastRow();
@@ -15765,7 +15982,7 @@ function getComparativoFaturasClaraCore_(extratoAtualOpt, extratoAnteriorOpt) {
       periodo.anterior.fim = Utilities.formatDate(fimRecorteAnterior, tz, "dd/MM/yyyy");
     }
 
-    var mapaTime = construirMapaLojaParaTime_();
+    var mapaTime = construirMapaLojaParaTime_(empCtx.empresaAtual);
 
     var stats = {};
     var dayPrevGeral = {};
@@ -17238,14 +17455,24 @@ function vektorHeaderIndex_(header, names){
  * Retorna lojas permitidas do usuário (não-admin) via aba "Emails".
  * Admin => null (significa "todas").
  */
-function vektorGetAllowedLojasFromEmails_(userEmail){
-  var em = vektorNormLower_(userEmail);
+function vektorGetAllowedLojasFromEmails_(email, empresa) {
+  var em = String(email || "").trim().toLowerCase();
   if (!em) return [];
 
-  // Admin e Analista Pro vê tudo
   var ctx = vektorGetUserRole_();
   var role = String(ctx && ctx.role ? ctx.role : "").trim().toLowerCase();
-  if (role === "administrador" || role === "analista pro" || role === "marketing" || role === "analista" ) return null;
+
+  // perfis que veem tudo
+  if (
+    role === "administrador" ||
+    role === "analista pro" ||
+    role === "marketing" ||
+    role === "analista"
+  ) {
+    return null;
+  }
+
+  var empresaAtual = vektorNormEmpresa_(empresa || vektorEmpresaDefaultByEmail_(em));
 
   var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
   var sh = ss.getSheetByName("Emails");
@@ -17254,18 +17481,26 @@ function vektorGetAllowedLojasFromEmails_(userEmail){
   var values = sh.getDataRange().getValues();
   if (!values || values.length < 2) return [];
 
-  var header = values[0];
+  var header = values[0].map(function(h){ return String(h || "").trim(); });
 
-  var iLoja = 1; // coluna B = LojaNorm (fixo como você disse)
-  var iGer = vektorHeaderIndex_(header, ["e-mail gerente regional", "email gerente regional", "e-mail ger regional", "email ger regional"]);
-  var iAdd = 7; // coluna H (0-based 7)
+  var iLoja = 1; // LojaNorm
+  var iGer  = vektorHeaderIndex_(header, ["e-mail gerente regional", "email gerente regional", "e-mail ger regional", "email ger regional"]);
+  var iAdd  = 7; // adicionais
+  var iEmp  = header.indexOf("EMPRESA");
 
   if (iGer < 0) throw new Error('Não encontrei a coluna "E-mail Gerente Regional" na aba Emails.');
+  if (iEmp < 0) throw new Error('Não encontrei a coluna "EMPRESA" na aba Emails.');
 
   var allowed = {};
-  for (var r=1; r<values.length; r++){
+  for (var r = 1; r < values.length; r++) {
     var row = values[r];
-    var lojaNorm = normalizarLojaNumero_(row[iLoja]);
+
+    var empresaRow = String(row[iEmp] || "").trim().toUpperCase();
+    if (!empresaRow) empresaRow = "CENTAURO";
+    if (empresaRow !== empresaAtual) continue;
+
+    var lojaRaw = row[iLoja];
+    var lojaNorm = vektorNormLojaKey_(lojaRaw) || String(normalizarLojaNumero_(lojaRaw) || "").trim();
     if (!lojaNorm) continue;
 
     var ger = vektorNormLower_(row[iGer]);
@@ -17273,27 +17508,43 @@ function vektorGetAllowedLojasFromEmails_(userEmail){
 
     var ok = false;
     if (ger && ger === em) ok = true;
-    if (!ok && addList && addList.length){
-      for (var k=0; k<addList.length; k++){
-        if (addList[k] && addList[k] === em) { ok = true; break; }
+
+    if (!ok && addList && addList.length) {
+      for (var k = 0; k < addList.length; k++) {
+        if (addList[k] && addList[k] === em) {
+          ok = true;
+          break;
+        }
       }
     }
 
-    if (ok) allowed[String(lojaNorm)] = true;
+    if (ok) {
+      allowed[String(lojaNorm)] = true;
+
+      var n = normalizarLojaNumero_(lojaRaw);
+      if (n != null) {
+        allowed[String(n)] = true;
+        allowed[String(n).padStart(4, "0")] = true;
+      }
+    }
   }
 
-  return Object.keys(allowed).sort(function(a,b){ return Number(a)-Number(b); });
+  return Object.keys(allowed).sort(function(a, b){
+    return String(a).localeCompare(String(b), "pt-BR");
+  });
 }
 
 /**
- * Meta da página: times/lojas/categorias permitidos
- * - Admin: times/lojas/categorias de toda BaseClara
- * - Não-admin: lojas filtradas pela aba Emails, e times/categorias derivadas dessas lojas
+ * Dataset da página: retorna tx já filtradas por ACL e pelo recorte solicitado.
+ * req: {dtIni, dtFim, time, loja, categoria}
  */
-function getAnaliseGastosMeta(){
+
+function getAnaliseGastosMeta(req) {
   vektorAssertFunctionAllowed_("getAnaliseGastosMeta");
 
   try {
+    req = req || {};
+
     var ctx = vektorGetUserRole_();
     var email = (ctx && ctx.email)
       ? String(ctx.email).trim().toLowerCase()
@@ -17301,17 +17552,19 @@ function getAnaliseGastosMeta(){
 
     if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
 
-    // null => admin (vê tudo); array => lojas permitidas
-    var allowedLojas = vektorGetAllowedLojasFromEmails_(email);
+    var empCtx = vektorGetEmpresaContext_(req.empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
 
-    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
-    if (!sh) throw new Error('Aba "BaseClara" não encontrada.');
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email, empresaAtual);
+
+    var sh = vektorGetBaseSheetByEmpresa_(empresaAtual);
+    if (!sh) throw new Error('Aba da base não encontrada para a empresa selecionada.');
 
     var lastRow = sh.getLastRow();
     if (lastRow < 2) {
       return {
         ok: true,
+        empresa: empresaAtual,
         lojas: [],
         times: [],
         categorias: [],
@@ -17321,15 +17574,13 @@ function getAnaliseGastosMeta(){
       };
     }
 
-    // Lê só A:V (22 colunas), que já contém tudo que os filtros precisam
     var values = sh.getRange(2, 1, lastRow - 1, 22).getValues();
 
-    // índices locais dentro de A:V (0-based)
-    var iData      = 0;   // A
-    var iLojaAlias = 7;   // H
-    var iCategoria = 13;  // N
-    var iTime      = 17;  // R
-    var iLojaNum   = 21;  // V
+    var iData      = 0;
+    var iLojaAlias = 7;
+    var iCategoria = 13;
+    var iTime      = 17;
+    var iLojaNum   = 21;
 
     var lojasSet = {};
     var timesSet = {};
@@ -17342,6 +17593,9 @@ function getAnaliseGastosMeta(){
     if (Array.isArray(allowedLojas)) {
       allowedSet = {};
       allowedLojas.forEach(function(x){
+        var lojaNorm = vektorNormLojaKey_(x);
+        if (lojaNorm) allowedSet[lojaNorm] = true;
+
         var n = normalizarLojaNumero_(x);
         if (n != null) {
           allowedSet[String(n)] = true;
@@ -17370,94 +17624,60 @@ function getAnaliseGastosMeta(){
       return "";
     }
 
-    function lojaLabelMeta_(lojaNum, lojaAlias){
-      var num = String(lojaNum || "").replace(/\D/g, "");
-      if (!num) return "";
-      var num4 = num.padStart(4, "0");
-      var alias = String(lojaAlias || "").trim();
-      return alias ? (num4 + " - " + alias) : num4;
-    }
+    values.forEach(function(row){
+      var lojaNum = row[iLojaNum];
+      var lojaAlias = row[iLojaAlias];
+      var time = String(row[iTime] || "").trim();
+      var categoria = String(row[iCategoria] || "").trim();
 
-    for (var i = 0; i < values.length; i++) {
-      var row = values[i];
-
-      var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
-      if (lojaNum == null) continue;
-
-      if (allowedSet && !allowedSet[String(lojaNum)] && !allowedSet[String(lojaNum).padStart(4, "0")]) {
-        continue;
+      var lojaKey = vektorNormLojaKey_(lojaAlias) || vektorNormLojaKey_(lojaNum);
+      if (!lojaKey) {
+        var lojaN = normalizarLojaNumero_(lojaNum);
+        if (lojaN != null) lojaKey = String(lojaN).padStart(4, "0");
       }
 
-      var lojaAlias = String(row[iLojaAlias] || "").trim();
-      var categoria = String(row[iCategoria] || "").trim();
-      var time = String(row[iTime] || "").trim();
-      var dataIso = toISODateMeta_(row[iData]);
+      if (allowedSet) {
+        var lojaNumNorm = normalizarLojaNumero_(lojaNum);
+        var loja4 = lojaNumNorm != null ? String(lojaNumNorm).padStart(4, "0") : "";
+        if (!allowedSet[lojaKey] && !allowedSet[String(lojaNumNorm)] && !allowedSet[loja4]) return;
+      }
 
-      var lojaLabel = lojaLabelMeta_(lojaNum, lojaAlias);
-
-      if (lojaLabel) lojasSet[lojaLabel] = true;
+      if (lojaKey) lojasSet[lojaKey] = true;
       if (time) timesSet[time] = true;
       if (categoria) catsSet[categoria] = true;
 
-      var comboKey = [time || "", lojaLabel || "", categoria || ""].join("¦");
-      comboMap[comboKey] = {
-        time: time || "",
-        loja: lojaLabel || "",
-        categoria: categoria || ""
-      };
-
-      if (dataIso) {
-        var ano = dataIso.slice(0, 4);
-        var mes = dataIso.slice(5, 7);
-
-        if (ano && /^\d{4}$/.test(ano)) {
-          anosSet[ano] = true;
-          if (!mesesPorAnoMap[ano]) mesesPorAnoMap[ano] = {};
-          if (mes && /^\d{2}$/.test(mes)) mesesPorAnoMap[ano][mes] = true;
+      if (time && lojaKey && categoria) {
+          var comboKey = time + "||" + lojaKey + "||" + categoria;
+          comboMap[comboKey] = {
+            time: time,
+            loja: lojaKey,
+            categoria: categoria
+          };
         }
+
+      var iso = toISODateMeta_(row[iData]);
+      if (iso) {
+        var y = iso.slice(0, 4);
+        var m = iso.slice(5, 7);
+        anosSet[y] = true;
+        if (!mesesPorAnoMap[y]) mesesPorAnoMap[y] = {};
+        mesesPorAnoMap[y][m] = true;
       }
-    }
-
-    var lojas = Object.keys(lojasSet).sort(function(a, b){
-      var na = Number(String(a).split(" - ")[0].replace(/\D/g, "")) || 0;
-      var nb = Number(String(b).split(" - ")[0].replace(/\D/g, "")) || 0;
-      return na - nb;
     });
 
-    var times = Object.keys(timesSet).sort();
-    var categorias = Object.keys(catsSet).sort();
-
-    var combos = Object.keys(comboMap).map(function(k){
-      return comboMap[k];
-    }).sort(function(a, b){
-      var ta = String(a.time || "");
-      var tb = String(b.time || "");
-      if (ta !== tb) return ta.localeCompare(tb, "pt-BR");
-
-      var la = String(a.loja || "");
-      var lb = String(b.loja || "");
-      if (la !== lb) return la.localeCompare(lb, "pt-BR");
-
-      return String(a.categoria || "").localeCompare(String(b.categoria || ""), "pt-BR");
-    });
-
-    var anos = Object.keys(anosSet).sort(function(a,b){
-      return Number(a) - Number(b);
-    });
-
+    var anos = Object.keys(anosSet).sort();
     var mesesPorAno = {};
-    Object.keys(mesesPorAnoMap).forEach(function(ano){
-      mesesPorAno[ano] = Object.keys(mesesPorAnoMap[ano]).sort(function(a,b){
-        return Number(a) - Number(b);
-      });
+    Object.keys(mesesPorAnoMap).forEach(function(y){
+      mesesPorAno[y] = Object.keys(mesesPorAnoMap[y]).sort();
     });
 
     return {
       ok: true,
-      lojas: lojas,
-      times: times,
-      categorias: categorias,
-      combos: combos,
+      empresa: empresaAtual,
+      lojas: Object.keys(lojasSet).sort(),
+      times: Object.keys(timesSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
+      categorias: Object.keys(catsSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
+      combos: Object.keys(comboMap).map(function(k){ return comboMap[k]; }),
       anos: anos,
       mesesPorAno: mesesPorAno
     };
@@ -17467,25 +17687,22 @@ function getAnaliseGastosMeta(){
   }
 }
 
-/**
- * Dataset da página: retorna tx já filtradas por ACL e pelo recorte solicitado.
- * req: {dtIni, dtFim, time, loja, categoria}
- */
 function getAnaliseGastosDataset(req){
   vektorAssertFunctionAllowed_("getAnaliseGastosDataset");
 
   try {
     req = req || {};
-    var dtIni = String(req.dtIni || "").trim();   // yyyy-mm-dd
-    var dtFim = String(req.dtFim || "").trim();   // yyyy-mm-dd
-    
+
+    var dtIni = String(req.dtIni || "").trim();
+    var dtFim = String(req.dtFim || "").trim();
+
     var fTimeArr = Array.isArray(req.time) ? req.time.map(String) : (req.time ? [String(req.time)] : []);
     var fLojaArr = Array.isArray(req.loja) ? req.loja.map(String) : (req.loja ? [String(req.loja)] : []);
     var fCatArr  = Array.isArray(req.categoria) ? req.categoria.map(String) : (req.categoria ? [String(req.categoria)] : []);
 
-    fTimeArr = fTimeArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
-    fLojaArr = fLojaArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
-    fCatArr  = fCatArr.map(function(s){ return String(s||"").trim(); }).filter(Boolean);
+    fTimeArr = fTimeArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
+    fLojaArr = fLojaArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
+    fCatArr  = fCatArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
 
     if (!dtIni || !dtFim) throw new Error("Informe dtIni e dtFim.");
     if (dtIni > dtFim) throw new Error("Período inválido: dtIni > dtFim.");
@@ -17497,33 +17714,36 @@ function getAnaliseGastosDataset(req){
 
     if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
 
-    // null => admin; array => lojas permitidas (LojaNorm da aba Emails)
-    var allowedLojas = vektorGetAllowedLojasFromEmails_(email);
+    var empCtx = vektorGetEmpresaContext_(req.empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
 
-    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
-    if (!sh) throw new Error('Aba "BaseClara" não encontrada.');
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email, empresaAtual);
+
+    var sh = vektorGetBaseSheetByEmpresa_(empresaAtual);
+    if (!sh) throw new Error('Aba da base não encontrada para a empresa selecionada.');
 
     var lastRow = sh.getLastRow();
     var lastCol = sh.getLastColumn();
 
     if (lastRow < 2) {
-      return { ok: true, meta: { periodoTxt: dtIni + " a " + dtFim, totalTx: 0 }, tx: [] };
+      return {
+        ok: true,
+        empresa: empresaAtual,
+        meta: { periodoTxt: dtIni + " a " + dtFim, totalTx: 0 },
+        tx: []
+      };
     }
 
     var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
 
-    // =========================
-    // ÍNDICES FIXOS (0-based) — BaseClara
-    // =========================
-    var iData      = 0;   // A - Data da Transação
-    var iEstab     = 2;   // C - Transação (Estabelecimento)
-    var iValor     = 5;   // F - Valor em R$
-    var iLojaAlias = 7;   // H - Alias do Cartão (opcional exibição)
-    var iCategoria = 13;  // N - Categoria da Compra ✅
-    var iTime      = 17;  // R - Grupos (Time)
-    var iDesc      = 20;  // U - Descrição (Item comprado)
-    var iLojaNum   = 21;  // V - LojaNum ✅ ACL/Filtro
+    var iData      = 0;
+    var iEstab     = 2;
+    var iValor     = 5;
+    var iLojaAlias = 7;
+    var iCategoria = 13;
+    var iTime      = 17;
+    var iDesc      = 20;
+    var iLojaNum   = 21;
 
     function toISODate_(v){
       if (v instanceof Date) {
@@ -17536,11 +17756,9 @@ function getAnaliseGastosDataset(req){
       var s = String(v || "").trim();
       if (!s) return "";
 
-      // dd/mm/yyyy
       var m1 = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
       if (m1) return m1[3] + "-" + m1[2] + "-" + m1[1];
 
-      // yyyy-mm-dd
       var m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (m2) return s;
 
@@ -17554,22 +17772,43 @@ function getAnaliseGastosDataset(req){
       return iso;
     }
 
+    var allowedSet = null;
+    if (Array.isArray(allowedLojas)) {
+      allowedSet = {};
+      allowedLojas.forEach(function(x){
+        var lojaNorm = vektorNormLojaKey_(x);
+        if (lojaNorm) allowedSet[lojaNorm] = true;
+
+        var n = normalizarLojaNumero_(x);
+        if (n != null) {
+          allowedSet[String(n)] = true;
+          allowedSet[String(n).padStart(4, "0")] = true;
+        }
+      });
+    }
+
     var tx = [];
 
     values.forEach(function(row){
-      var lojaNum = normalizarLojaNumero_(row[iLojaNum]);
-      if (!lojaNum) return;
-      lojaNum = String(lojaNum);
+      var lojaNumRaw = row[iLojaNum];
+      var lojaAlias = row[iLojaAlias];
 
-      // ACL (comparando LojaNorm da aba Emails com BaseClara!V = LojaNum)
-      if (Array.isArray(allowedLojas)) {
-        if (allowedLojas.indexOf(lojaNum) < 0) return;
+      var lojaKey = vektorNormLojaKey_(lojaAlias) || vektorNormLojaKey_(lojaNumRaw);
+      var lojaNum = normalizarLojaNumero_(lojaNumRaw);
+
+      if (!lojaKey && lojaNum != null) {
+        lojaKey = String(lojaNum).padStart(4, "0");
+      }
+
+      if (!lojaKey) return;
+
+      if (allowedSet) {
+        var loja4 = lojaNum != null ? String(lojaNum).padStart(4, "0") : "";
+        if (!allowedSet[lojaKey] && !allowedSet[String(lojaNum)] && !allowedSet[loja4]) return;
       }
 
       var dataISO = toISODate_(row[iData]);
       if (!dataISO) return;
-
-      // período
       if (dataISO < dtIni || dataISO > dtFim) return;
 
       var time = String(row[iTime] || "").trim();
@@ -17586,19 +17825,14 @@ function getAnaliseGastosDataset(req){
 
       var valor = Number(row[iValor]) || 0;
 
-      // filtro Loja (agora é LojaNum)
       if (fTimeArr.length && fTimeArr.indexOf(time) < 0) return;
-      if (fLojaArr.length && fLojaArr.indexOf(lojaNum) < 0) return;
+      if (fLojaArr.length && fLojaArr.indexOf(lojaKey) < 0) return;
       if (fCatArr.length  && fCatArr.indexOf(categoria) < 0) return;
-
-      // Exibição: se quiser mostrar alias junto, você pode concatenar
-      // var lojaAlias = String(row[iLojaAlias] || "").trim();
-      // var lojaExib = lojaAlias ? (lojaNum + " - " + lojaAlias) : lojaNum;
 
       tx.push({
         dataISO: dataISO,
         dataBR: toBR_(dataISO),
-        loja: lojaNum, // ✅ mantendo filtro/coluna Loja como número da loja
+        loja: lojaKey,
         time: time,
         categoria: categoria,
         estabelecimento: estabelecimento,
@@ -17609,6 +17843,7 @@ function getAnaliseGastosDataset(req){
 
     return {
       ok: true,
+      empresa: empresaAtual,
       meta: {
         periodoTxt: dtIni + " a " + dtFim,
         totalTx: tx.length
@@ -18096,11 +18331,17 @@ function vektorSapJaFoiNotificado_(docKey) {
   var lr = sh.getLastRow();
   if (lr < 2) return false;
 
-  var values = sh.getRange(2, 1, lr - 1, 12).getValues();
+  var head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  var iDoc = head.indexOf("docKey");
+  var iStatus = head.indexOf("status");
+
+  var values = sh.getRange(2, 1, lr - 1, sh.getLastColumn()).getValues();
+
   for (var i = values.length - 1; i >= 0; i--) {
     var row = values[i];
-    var dk = String(row[2] || "").trim();
-    var st = String(row[10] || "").trim().toUpperCase();
+    var dk = String(row[iDoc] || "").trim();
+    var st = String(row[iStatus] || "").trim().toUpperCase();
+
     if (dk === docKey && st === "SENT") return true;
   }
   return false;
@@ -18171,30 +18412,52 @@ function getFluxoNumerarioSapMeta() {
     var email = String((ctx && ctx.email) || "").trim().toLowerCase();
     if (!email) throw new Error("Não foi possível identificar seu e-mail Google.");
 
-    var allowedLojas = vektorGetAllowedLojasFromEmails_(email); // null admin | array restrito
-    var mapLojaTime = construirMapaLojaParaTime_() || {};
+    var allowedLojas = vektorGetAllowedLojasFromEmails_(email);
+    var mapLojaTime = construirMapaLojaParaTime_("CENTAURO") || {};
 
     var lojasSet = {};
     var timesSet = {};
 
-    Object.keys(mapLojaTime).forEach(function(lojaNum){
-      var loja4 = String(lojaNum).padStart(4, "0");
-      var lojaKey = "CE" + loja4;
+    var allowedSet = null;
+    if (Array.isArray(allowedLojas)) {
+      allowedSet = {};
+      allowedLojas.forEach(function(x){
+        var k = vektorNormLojaKey_(x);
+        if (k) allowedSet[k] = true;
 
-      if (Array.isArray(allowedLojas) && allowedLojas.indexOf(String(Number(lojaNum))) < 0 && allowedLojas.indexOf(loja4) < 0) {
-        return;
+        var n = normalizarLojaNumero_(x);
+        if (n != null) {
+          allowedSet[String(n)] = true;
+          allowedSet[String(n).padStart(4, "0")] = true;
+        }
+      });
+    }
+
+    Object.keys(mapLojaTime).forEach(function(lojaKeyRaw){
+      var lojaKey = vektorNormLojaKey_(lojaKeyRaw);
+      if (!lojaKey) return;
+
+      var lojaNum = normalizarLojaNumero_(lojaKey);
+      var loja4 = (lojaNum != null) ? String(lojaNum).padStart(4, "0") : "";
+
+      if (allowedSet) {
+        if (!allowedSet[lojaKey] && !allowedSet[String(lojaNum)] && !allowedSet[loja4]) {
+          return;
+        }
       }
 
       lojasSet[lojaKey] = true;
-      var t = String(mapLojaTime[lojaNum] || "").trim();
+
+      var t = String(mapLojaTime[lojaKeyRaw] || "").trim();
       if (t) timesSet[t] = true;
     });
 
     return {
       ok: true,
       lojas: Object.keys(lojasSet).sort(),
-      times: Object.keys(timesSet).sort()
+      times: Object.keys(timesSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); })
     };
+
   } catch (e) {
     return { ok:false, error: (e && e.message) ? e.message : String(e) };
   }
@@ -18532,13 +18795,13 @@ function sendFluxoNumerarioSapNotificacao(rows) {
     });
 
     return {
-      ok: enviados.length > 0,
+      ok: falhas.length === 0,
       enviados: enviados,
       falhas: falhas
     };
 
   } catch (e) {
-    return { ok:false, error: (e && e.message) ? e.message : String(e) };
+    return { ok:false, error:(e && e.message) ? e.message : String(e) };
   }
 }
 
