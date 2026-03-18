@@ -2292,19 +2292,34 @@ display: none;
     </div>
 
     <!-- FAIXA PREMIUM (só na HOME + só menu expandido + não aparece se feriado estiver visível) -->
-    <div id="vektorPremiumStrip" class="w-full flex items-center justify-center" style="display:none;">
-      <div class="hps-top-inner">
-        <div class="hps-steps">
-          <div class="hps-item" style="--d:2.1s"><span class="hps-box"></span><span class="hps-label">Segurança</span></div>
-          <div class="hps-item" style="--d:3s"><span class="hps-box"></span><span class="hps-label">Controle</span></div>
-          <div class="hps-item" style="--d:3.9s"><span class="hps-box"></span><span class="hps-label">Autonomia</span></div>
-          <div class="hps-item" style="--d:4.8s"><span class="hps-box"></span><span class="hps-label">Tecnologia</span></div>
-        </div>
+    <div id="vektorTopBarWrap"
+     class="w-full flex items-center justify-center relative"
+     style="min-height:44px;">
 
-        <div class="hps-final">
-          VEKTOR - PLATAFORMA DE GOVERNANÇA FINANCEIRA | CARTÃO CLARA
+      <div id="vektorPremiumStrip" class="w-full flex items-center justify-center" style="display:none;">
+        <div class="hps-top-inner">
+          <div class="hps-steps">
+            <div class="hps-item" style="--d:2.1s"><span class="hps-box"></span><span class="hps-label">Segurança</span></div>
+            <div class="hps-item" style="--d:3s"><span class="hps-box"></span><span class="hps-label">Controle</span></div>
+            <div class="hps-item" style="--d:3.9s"><span class="hps-box"></span><span class="hps-label">Autonomia</span></div>
+            <div class="hps-item" style="--d:4.8s"><span class="hps-box"></span><span class="hps-label">Tecnologia</span></div>
+          </div>
+
+          <div class="hps-final">
+            VEKTOR - PLATAFORMA DE GOVERNANÇA FINANCEIRA | CARTÃO CLARA
+          </div>
         </div>
       </div>
+
+      <button id="vektorEmpresaHomeBtn"
+              type="button"
+              onclick="window.vektorOpenEmpresaModal_()"
+              title="Trocar empresa"
+              style="display:none; position:absolute; right:12px; top:50%; transform:translateY(-50%); width:46px; height:46px; border:none; background:transparent; cursor:pointer; padding:0;">
+        <img src="https://raw.githubusercontent.com/rslisboa/cartoesclara/d36a11491ba57e08c170890a4d7529bb46a9bfe7/botao-home.png"
+            alt="Trocar empresa"
+            style="width:46px; height:46px; object-fit:contain; display:block;" />
+      </button>
     </div>
 
   </div>
@@ -2413,6 +2428,46 @@ display: none;
     </div>
   </div>
 </div>
+
+ <!-- =======================
+     TROCA DE EMPRESA
+     ======================= -->
+
+      <div id="vektorEmpresaModal"
+     class="fixed inset-0 z-[10030] hidden items-center justify-center"
+     style="display:none;">
+        <div class="absolute inset-0 bg-black/50" onclick="window.vektorCloseEmpresaModal_()"></div>
+
+        <div class="relative bg-white rounded-2xl shadow-2xl w-[92%] max-w-[420px] p-5 border border-slate-200">
+          <div class="text-base font-extrabold text-slate-900">Selecionar empresa</div>
+          <div class="mt-1 text-sm text-slate-600">Escolha a visão do Vektor para navegar.</div>
+
+          <div class="mt-4 space-y-3">
+            <button type="button" id="vektorEmpresaBtnCentauro"
+                    onclick="window.vektorSelecionarEmpresa_('CENTAURO')"
+                    class="w-full flex items-center justify-between rounded-xl border border-slate-300 px-4 py-3 text-left hover:bg-slate-50">
+              <span class="font-bold text-slate-800">Centauro</span>
+              <span id="vektorEmpresaCheckCentauro">✅</span>
+            </button>
+
+            <button type="button" id="vektorEmpresaBtnFisia"
+                    onclick="window.vektorSelecionarEmpresa_('FISIA')"
+                    class="w-full flex items-center justify-between rounded-xl border border-slate-300 px-4 py-3 text-left hover:bg-slate-50">
+              <span class="font-bold text-slate-800">Fisia</span>
+              <span id="vektorEmpresaCheckFisia">✅</span>
+            </button>
+          </div>
+
+          <div class="mt-4 flex justify-end">
+            <button type="button"
+                    onclick="window.vektorCloseEmpresaModal_()"
+                    class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+
 
   <!-- =======================
      OVERLAY MANUTENÇÃO
@@ -2639,8 +2694,9 @@ display: none;
 
   <!-- Bloco Vektor + título -->
   <div class="w-full flex flex-col items-center mb-4">
-    <h1 class="text-xl font-extrabold bg-[#005E27] text-[#B5FF20] px-3 py-2 rounded-lg text-center">
-      Grupo SBF | Vektor
+   <h1 id="vektorSidebarBrand"
+    class="text-xl font-extrabold bg-[#005E27] text-[#B5FF20] px-3 py-2 rounded-lg text-center">
+      Centauro | Vektor
     </h1>
   </div>
 
@@ -6612,8 +6668,20 @@ function hideMaintenance_() {
           saveSessionToken_(res.token, res.ttlSeconds);
           scheduleAutoLogout_();
         }
+
+        window.__vektorEmpresaAtual = String(
+          (res && res.empresaAtual) || USER_EMPRESA_DEFAULT || "CENTAURO"
+        ).trim().toUpperCase();
+
+        window.__vektorPodeTrocarEmpresa = !!(res && res.podeTrocarEmpresa);
+
+        try { window.vektorAtualizarBotaoEmpresa_(); } catch(e) { console.error(e); }
+        try { window.vektorRefreshEmpresaChecks_(); } catch(e) { console.error(e); }
+        try { window.vektorAtualizarTituloEmpresa_(); } catch(e) { console.error(e); }
+
         closeModal_();
         showApp_();
+
         if (window.vektorPlayTopbarPremiumStrip) {
           requestAnimationFrame(function(){
             requestAnimationFrame(function(){
@@ -6635,6 +6703,267 @@ function hideMaintenance_() {
       setError_("Erro na validação: " + (err && err.message ? err.message : err));
     })
     .validarLoginVektor(email);
+}
+
+window.vektorAtualizarBotaoEmpresa_ = function() {
+  const btn = document.getElementById("vektorEmpresaHomeBtn");
+  if (!btn) return;
+
+  const role = String(USER_ROLE_REPLACED || "").trim();
+  const podeTrocar =
+    role === "Administrador" ||
+    role === "Analista Pro" ||
+    role === "Analista" ||
+    role === "Compras_DI";
+
+  btn.style.display = podeTrocar ? "block" : "none";
+};
+
+window.vektorOpenEmpresaModal_ = function() {
+  const m = document.getElementById("vektorEmpresaModal");
+  if (!m) return;
+
+  window.vektorRefreshEmpresaChecks_();
+  m.classList.remove("hidden");
+  m.style.display = "flex";
+};
+
+window.vektorCloseEmpresaModal_ = function() {
+  const m = document.getElementById("vektorEmpresaModal");
+  if (!m) return;
+  m.classList.add("hidden");
+  m.style.display = "none";
+};
+
+window.vektorRefreshEmpresaChecks_ = function() {
+  const atual = String(window.__vektorEmpresaAtual || USER_EMPRESA_DEFAULT || "CENTAURO").toUpperCase();
+
+  const c1 = document.getElementById("vektorEmpresaCheckCentauro");
+  const c2 = document.getElementById("vektorEmpresaCheckFisia");
+
+  if (c1) c1.textContent = (atual === "CENTAURO") ? "✅" : "";
+  if (c2) c2.textContent = (atual === "FISIA") ? "✅" : "";
+};
+
+window.vektorAtualizarTituloEmpresa_ = function() {
+  const el = document.getElementById("vektorSidebarBrand");
+  if (!el) return;
+
+  const emp = String(window.__vektorEmpresaAtual || USER_EMPRESA_DEFAULT || "CENTAURO").toUpperCase();
+  el.textContent = (emp === "FISIA" ? "Fisia | Vektor" : "Centauro | Vektor");
+};
+
+window.vektorSelecionarEmpresa_ = function(empresa) {
+  const emp = String(empresa || "").trim().toUpperCase();
+  if (!emp) return;
+
+  if (window.__vektorEmpresaSwitching === true) return;
+  window.__vektorEmpresaSwitching = true;
+
+  const anterior = String(window.__vektorEmpresaAtual || USER_EMPRESA_DEFAULT || "CENTAURO").toUpperCase();
+
+  const btnC = document.getElementById("vektorEmpresaBtnCentauro");
+  const btnF = document.getElementById("vektorEmpresaBtnFisia");
+  const checkC = document.getElementById("vektorEmpresaCheckCentauro");
+  const checkF = document.getElementById("vektorEmpresaCheckFisia");
+  const status = document.getElementById("vektorEmpresaModalStatus");
+
+  function setBusyUi_(busy, selectedEmp, msg) {
+    if (btnC) {
+      btnC.disabled = !!busy;
+      btnC.style.opacity = busy ? "0.7" : "1";
+      btnC.style.pointerEvents = busy ? "none" : "auto";
+    }
+    if (btnF) {
+      btnF.disabled = !!busy;
+      btnF.style.opacity = busy ? "0.7" : "1";
+      btnF.style.pointerEvents = busy ? "none" : "auto";
+    }
+
+    if (checkC) checkC.textContent = (selectedEmp === "CENTAURO") ? (busy ? "⏳" : "✅") : "";
+    if (checkF) checkF.textContent = (selectedEmp === "FISIA") ? (busy ? "⏳" : "✅") : "";
+
+    if (status) status.textContent = msg || "";
+  }
+
+  function unlockUi_(selectedEmp, msg) {
+    window.__vektorEmpresaSwitching = false;
+    setBusyUi_(false, selectedEmp, msg || "");
+  }
+
+  // feedback imediato
+  window.__vektorEmpresaAtual = emp;
+  if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
+    window.vektorAtualizarTituloEmpresa_();
+  }
+  setBusyUi_(true, emp, "Trocando empresa...");
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      try {
+        if (!res || !res.ok) {
+          window.__vektorEmpresaAtual = anterior;
+          if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
+            window.vektorAtualizarTituloEmpresa_();
+          }
+          unlockUi_(anterior, "Não foi possível trocar a empresa.");
+          return;
+        }
+
+        window.__vektorEmpresaAtual = String(res.empresaAtual || emp).toUpperCase();
+
+        if (typeof window.vektorRefreshEmpresaChecks_ === "function") {
+          window.vektorRefreshEmpresaChecks_();
+        }
+        if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
+          window.vektorAtualizarTituloEmpresa_();
+        }
+
+        if (typeof window.vektorResetCachesEmpresa_ === "function") {
+          window.vektorResetCachesEmpresa_();
+        }
+
+        [
+          "chatView",
+          "cicloResumoView",
+          "analiseGastosView",
+          "fluxogramaView",
+          "myAlertsView",
+          "radarView",
+          "envioPendView",
+          "consultasAuxView",
+          "fluxoNumerarioSapView",
+          "vertexCostView",
+          "basesVektorView"
+        ].forEach(function(id){
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.classList.add("hidden");
+          el.style.display = "none";
+        });
+
+        try {
+          const radarView = document.getElementById("radarView");
+          if (radarView) radarView.classList.remove("is-open");
+        } catch (_) {}
+
+        const homeView = document.getElementById("homeView");
+        if (homeView) {
+          homeView.classList.remove("hidden");
+          homeView.style.display = "flex";
+          homeView.style.opacity = "1";
+          homeView.style.filter = "blur(0)";
+        }
+
+        if (typeof vektorSetActiveNavBtn_ === "function") {
+          vektorSetActiveNavBtn_("");
+        }
+
+        unlockUi_(window.__vektorEmpresaAtual, "");
+        if (typeof window.vektorCloseEmpresaModal_ === "function") {
+          window.vektorCloseEmpresaModal_();
+        }
+
+      } catch (e) {
+        console.error("Erro ao finalizar troca de empresa:", e);
+        window.__vektorEmpresaAtual = anterior;
+        if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
+          window.vektorAtualizarTituloEmpresa_();
+        }
+        unlockUi_(anterior, "Erro ao aplicar a troca.");
+      }
+    })
+    .withFailureHandler(function(err){
+      console.error("Erro ao trocar empresa:", err);
+      window.__vektorEmpresaAtual = anterior;
+      if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
+        window.vektorAtualizarTituloEmpresa_();
+      }
+      unlockUi_(anterior, "Erro ao trocar empresa.");
+    })
+    .vektorTrocarEmpresaAtual(emp);
+};
+
+window.vektorEmpresaAtual_ = function() {
+  return String(window.__vektorEmpresaAtual || USER_EMPRESA_DEFAULT || "CENTAURO").toUpperCase();
+};
+
+window.vektorResetCachesEmpresa_ = function() {
+  window.__analiseGastosMeta = null;
+  window.__analiseGastosMetaLoading = false;
+  window.__fluxoNumerarioSapMeta = null;
+  window.__fluxoNumerarioSapBusy = false;
+};
+
+window.vektorRecarregarViewAtualPorEmpresa_ = function() {
+  try {
+    if (!document.getElementById("homeView")?.classList.contains("hidden")) return;
+    if (!document.getElementById("cicloResumoView")?.classList.contains("hidden")) {
+      if (typeof window.vektorAbrirResumoCiclo === "function") window.vektorAbrirResumoCiclo();
+      return;
+    }
+    if (!document.getElementById("analiseGastosView")?.classList.contains("hidden")) {
+      if (typeof window.vektorAbrirAnaliseGastos === "function") window.vektorAbrirAnaliseGastos();
+      return;
+    }
+    if (!document.getElementById("myAlertsView")?.classList.contains("hidden")) {
+      if (typeof window.vektorOpenMyAlerts === "function") window.vektorOpenMyAlerts();
+      return;
+    }
+    if (!document.getElementById("radarView")?.classList.contains("hidden")) {
+      if (typeof window.vektorOpenRadar === "function") window.vektorOpenRadar("7d");
+      return;
+    }
+    if (!document.getElementById("envioPendView")?.classList.contains("hidden")) {
+      if (typeof window.vektorOpenEnvioPendencias === "function") window.vektorOpenEnvioPendencias();
+      return;
+    }
+    if (!document.getElementById("consultasAuxView")?.classList.contains("hidden")) {
+      if (typeof window.vektorOpenConsultasAuxiliares === "function") window.vektorOpenConsultasAuxiliares();
+      return;
+    }
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+function vektorResetCachesEmpresa_() {
+  window.__analiseGastosMeta = null;
+  window.__analiseGastosMetaLoading = false;
+  window.__fluxoNumerarioSapMeta = null;
+  window.__fluxoNumerarioSapBusy = false;
+}
+
+function vektorRecarregarViewAtualPorEmpresa_() {
+  try {
+    if (!document.getElementById("homeView")?.classList.contains("hidden")) return;
+    if (!document.getElementById("cicloResumoView")?.classList.contains("hidden")) {
+      if (typeof window.vektorAbrirResumoCiclo === "function") window.vektorAbrirResumoCiclo();
+      return;
+    }
+    if (!document.getElementById("analiseGastosView")?.classList.contains("hidden")) {
+      if (typeof window.vektorAbrirAnaliseGastos === "function") window.vektorAbrirAnaliseGastos();
+      return;
+    }
+    if (!document.getElementById("myAlertsView")?.classList.contains("hidden")) {
+      if (typeof window.vektorOpenMyAlerts === "function") window.vektorOpenMyAlerts();
+      return;
+    }
+    if (!document.getElementById("radarView")?.classList.contains("hidden")) {
+      if (typeof window.vektorOpenRadar === "function") window.vektorOpenRadar("7d");
+      return;
+    }
+    if (!document.getElementById("envioPendView")?.classList.contains("hidden")) {
+      if (typeof window.vektorOpenEnvioPendencias === "function") window.vektorOpenEnvioPendencias();
+      return;
+    }
+    if (!document.getElementById("consultasAuxView")?.classList.contains("hidden")) {
+      if (typeof window.vektorOpenConsultasAuxiliares === "function") window.vektorOpenConsultasAuxiliares();
+      return;
+    }
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 let __vektorLoginHandlersBound = false;
@@ -6857,6 +7186,17 @@ document.addEventListener("DOMContentLoaded", function () {
     google.script.run
       .withSuccessHandler(function (res) {
         if (res && res.ok) {
+                    if (res && res.empresaAtual) {
+            window.__vektorEmpresaAtual = String(res.empresaAtual || "").trim().toUpperCase();
+          } else {
+            window.__vektorEmpresaAtual = USER_EMPRESA_DEFAULT;
+          }
+
+          window.__vektorPodeTrocarEmpresa = !!(res && res.podeTrocarEmpresa);
+          window.vektorAtualizarBotaoEmpresa_();
+          window.vektorRefreshEmpresaChecks_();
+          window.vektorAtualizarTituloEmpresa_();
+
           // sessão válida: libera sem modal
           showApp_();
           if (window.vektorPlayTopbarPremiumStrip) {
@@ -7697,6 +8037,33 @@ window.vektorOpenEnvioPendencias = function () {
 window.vektorOpenResumoCiclo = function () {
   vektorSetActiveNavBtn_("navResumoCicloBtn");
   window.vektorShowResumoCicloView_();
+
+  if (window.__cicloResumoData && window.__cicloResumoData.ok) {
+    try {
+      const selTime = document.getElementById("cicloResumo_selTime");
+      const selLoja = document.getElementById("cicloResumo_selLoja");
+      if (selTime && !selTime.__bindResumoCache) {
+        selTime.__bindResumoCache = true;
+        selTime.addEventListener("change", function(){ window.vektorLoadResumoCiclo(true); });
+      }
+      if (selLoja && !selLoja.__bindResumoCache) {
+        selLoja.__bindResumoCache = true;
+        selLoja.addEventListener("change", function(){ window.vektorLoadResumoCiclo(true); });
+      }
+    } catch(_) {}
+
+    // reaproveita dataset já carregado
+    try {
+      const tbody = document.getElementById("cicloResumo_tbody");
+      if (tbody) tbody.innerHTML = "";
+      // reaplica filtros locais sem backend
+      const ev = new Event("change");
+      document.getElementById("cicloResumo_selTime")?.dispatchEvent(ev);
+    } catch(_) {}
+
+    return;
+  }
+
   window.vektorLoadResumoCiclo(false);
 };
 
@@ -7709,6 +8076,18 @@ window.vektorLoadResumoCiclo = function (force) {
   const loading = document.getElementById("cicloResumoLoading");
   const content = document.getElementById("cicloResumoContent");
   const tbody = document.getElementById("cicloResumo_tbody");
+
+  if (!force && window.__cicloResumoData && window.__cicloResumoData.ok) {
+  try {
+    const res = window.__cicloResumoData;
+    const tbody = document.getElementById("cicloResumo_tbody");
+    if (tbody) tbody.innerHTML = "";
+    // reaproveita dados já carregados
+    const selTime = document.getElementById("cicloResumo_selTime");
+    if (selTime) selTime.dispatchEvent(new Event("change"));
+    return;
+  } catch (_) {}
+}
 
 setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
 
@@ -8460,15 +8839,17 @@ window.vektorOpenAnaliseGastos = function () {
   // Inicializa apenas uma vez
   try {
     vektorAnaliseGastosInitOnce_();
+    if (window.__analiseGastosData && Array.isArray(window.__analiseGastosTx) && window.__analiseGastosTx.length) {
+  try {
+    vektorAnaliseGastosRender_(window.__analiseGastosTx, window.__analiseGastosData.meta || {});
+    return;
+  } catch (e) {
+    console.error("Erro ao reaproveitar cache da Análise de Gastos:", e);
+  }
+}
   } catch (e) {
     console.error("Erro ao inicializar Análise de Gastos:", e);
   }
-
-  // ✅ NÃO reaproveitar dataset antigo ao entrar novamente na página
-  try {
-    window.__analiseGastosData = null;
-    window.__analiseGastosTx = [];
-  } catch (_) {}
 
   // ✅ Reset visual (cards + tabela) sem buscar dados
   try {
@@ -8706,7 +9087,7 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
       const tb = document.getElementById("analiseGastos_tbody");
       if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
     })
-    .getAnaliseGastosMeta();
+    .getAnaliseGastosMeta({ empresa: vektorEmpresaAtual_() });
 }
 
 function vektorAnaliseGastosBuscar_(){
@@ -8766,11 +9147,12 @@ function vektorAnaliseGastosBuscar_(){
         if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:1000;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
       })
       .getAnaliseGastosDataset({
+        empresa: vektorEmpresaAtual_(),
         dtIni: dtIni,
         dtFim: dtFim,
-        time: time,           // ✅ array
-        loja: loja,           // ✅ array
-        categoria: cat        // ✅ array
+        time: time,
+        loja: loja,
+        categoria: cat
       });
   });
 }
@@ -9151,7 +9533,6 @@ function vektorAnaliseGastosLoadMeta_(){
       const selLoja = document.getElementById("analiseGastos_selLoja");
       const selCat  = document.getElementById("analiseGastos_selCategoria");
 
-      // carrega opções iniciais completas
       vektorBuildOptions_(selTime, (res.times || []), "Todos");
       vektorBuildOptions_(selLoja, (res.lojas || []), "Todas");
       vektorBuildOptions_(selCat,  (res.categorias || []), "Todas");
@@ -9159,7 +9540,6 @@ function vektorAnaliseGastosLoadMeta_(){
       try { vektorAnaliseGastosHydrateAnoMes_(res); } catch(e){ console.error(e); }
       try { vektorAnaliseGastosMacroHydrateFilters_(res); } catch(e){ console.error(e); }
 
-      // garante que os filtros passem a se respeitar
       vektorAnaliseGastosRebuildFilterOptions_();
 
       const tb = document.getElementById("analiseGastos_tbody");
@@ -9170,7 +9550,7 @@ function vektorAnaliseGastosLoadMeta_(){
       const tb = document.getElementById("analiseGastos_tbody");
       if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
     })
-    .getAnaliseGastosMeta();
+    .getAnaliseGastosMeta({ empresa: vektorEmpresaAtual_() });
 }
 
 /* --------- BACKEND: dados (tx) --------- */
@@ -9204,18 +9584,8 @@ function vektorAnaliseGastosFetchData_(){
   google.script.run
     .withSuccessHandler(function(res){
       vektorAnaliseGastosSetBusy_(false);
-      if (!res || !res.ok) {
-        const tb = document.getElementById("analiseGastos_tbody");
-        if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
-        return;
-      }
-
-      window.__analiseGastosData = res;
-      // grava tx base
-      window.__analiseGastosTx = Array.isArray(res.tx) ? res.tx.slice() : [];
-
-      // aplica filtros e render
-      vektorAnaliseGastosApply_();
+      // mantém aqui o seu restante atual de renderização
+      vektorAnaliseGastosRenderResultado_(res);
     })
     .withFailureHandler(function(err){
       vektorAnaliseGastosSetBusy_(false);
@@ -9223,6 +9593,7 @@ function vektorAnaliseGastosFetchData_(){
       if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
     })
     .getAnaliseGastosDataset({
+      empresa: vektorEmpresaAtual_(),
       dtIni: dtIni,
       dtFim: dtFim,
       time: time,
@@ -12784,7 +13155,7 @@ window.vektorEnvioPendenciasPreview = function () {
         if (st) st.textContent = "Erro ao gerar prévia.";
         if (resumoEl) resumoEl.textContent = (err && err.message) ? err.message : String(err || "Erro");
       })
-      .previewEnvioPendenciasClaraRecusadasDetalhado(iniIso, fimIso);
+      .previewEnvioPendenciasClaraRecusadasDetalhado(iniIso, fimIso, vektorEmpresaAtual_());
 
   } catch (e) {
     try { window.vektorEnvPendOverlayHide_(); } catch (_) {}
@@ -12896,7 +13267,7 @@ window.vektorEnvioPendenciasEnviarSelecionadas = function () {
           releaseUi_();
         }
       })
-      .dispararEnvioPendenciasClaraRecusadasSelecionadas(iniIso, fimIso, keys);
+      .dispararEnvioPendenciasClaraRecusadasSelecionadas(iniIso, fimIso, keys, vektorEmpresaAtual_());
 
   } catch (e) {
     // erro síncrono do JS (antes do google.script.run)
@@ -13018,10 +13389,8 @@ function vektorDrawFluxogramaConnectors_() {
 // ===============================
 window.vektorOpenRadar = function (modo) {
   vektorSetActiveNavBtn_("navRadarBtn");
-  // abre Radar e fecha outras views (base)
   vektorShowRadarView_();
 
-  // ✅ garante que Alertas Programados não fique por cima
   const myAlertsView = document.getElementById("myAlertsView");
   if (myAlertsView) myAlertsView.classList.add("hidden");
 
@@ -13029,9 +13398,18 @@ window.vektorOpenRadar = function (modo) {
   if (radarView) radarView.classList.add("is-open");
 
   setRadarActiveBtn_(modo);
+  window.vektorSetRadarViewMode_("RADAR");
 
-  // ✅ garante que ao abrir o Radar, volta para a visão tradicional
-    window.vektorSetRadarViewMode_("RADAR");
+  window.__radarCacheByModo = window.__radarCacheByModo || {};
+
+  // ✅ reaproveita cache se já carregou esse modo
+  if (window.__radarCacheByModo[modo]) {
+    const cached = window.__radarCacheByModo[modo];
+    renderRadarHeatmap_(cached.lojas || []);
+    renderRadarRanking_(cached.lojas || [], cached.detalhesPorLoja || {});
+    renderRadarInsights_(cached.lojas || []);
+    return;
+  }
 
   const loading = document.getElementById("radarLoading");
   const heat = document.getElementById("radarHeatmap");
@@ -13062,6 +13440,11 @@ window.vektorOpenRadar = function (modo) {
         }
         return;
       }
+
+      window.__radarCacheByModo[modo] = {
+        lojas: lojas,
+        detalhesPorLoja: res.detalhesPorLoja || {}
+      };
 
       renderRadarHeatmap_(lojas);
       renderRadarRanking_(lojas, res.detalhesPorLoja || {});
@@ -13392,7 +13775,8 @@ window.vektorLoadRadarItensIrregulares = function() {
         itemContains: itemQ,
         conformidade: conf,
         groupBy: groupBy,
-        limit: 2500
+        limit: 2500,
+        empresa: vektorEmpresaAtual_()
         });
 
         window.vektorGlobalLoadingShow_(
@@ -14482,8 +14866,14 @@ function vektorShowConsultasAuxView_(){
 window.vektorOpenConsultasAuxiliares = function(){
   vektorSetActiveNavBtn_("navConsultasAuxBtn");
   vektorShowConsultasAuxView_();
-  window.vektorAuxShowFaturas();     // default: faturas visíveis
-  window.vektorAuxLoadFaturas();     // carrega tabela na abertura
+  window.vektorAuxShowFaturas();
+
+  if (window.__auxFaturasLoaded === true) {
+    return;
+  }
+
+  window.__auxFaturasLoaded = true;
+  window.vektorAuxLoadFaturas();
 };
 
 function vektorShowBasesVektorView_(){
@@ -14898,14 +15288,25 @@ window.vektorOpenMyAlerts = function () {
   vektorSetActiveNavBtn_("navMyAlertsBtn");
   vektorShowMyAlertsView_();
 
-  // ✅ mostra filtros admin (e-mail + área) — REGRA ÚNICA (robusta)
   try {
     const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "");
-    console.log("ROLE FRONT:", roleTxt);
     const isAdmin = (roleTxt.trim().toLowerCase() === "administrador");
     const box = document.getElementById("myAl_adminFilterBox");
     if (box) box.style.display = isAdmin ? "block" : "none";
   } catch (_) {}
+
+  const empresaAtual = (typeof window.vektorEmpresaAtual_ === "function")
+    ? window.vektorEmpresaAtual_()
+    : "CENTAURO";
+
+  // ✅ se já inicializou para a mesma empresa, não recarrega tudo
+  if (window.__myAlertsInited === true && window.__myAlertsEmpresaLoaded === empresaAtual) {
+    window.vektorMyAlertsRefresh();
+    return;
+  }
+
+  window.__myAlertsInited = true;
+  window.__myAlertsEmpresaLoaded = empresaAtual;
 
   window.vektorMyAlertsInit_();
 };
@@ -14916,8 +15317,12 @@ window.vektorMyAlertsInit_ = function () {
 
   google.script.run
     .withSuccessHandler(function (res) {
-      // ✅ NÃO falhar silencioso
+      const teamSel = document.getElementById("myAl_team");
+
       if (!res || !res.ok) {
+        if (teamSel) {
+          teamSel.innerHTML = "<option value=''>Falha ao carregar times</option>";
+        }
         const msg = "Falha ao carregar Times/Lojas: " + (res && res.error ? res.error : "sem permissão ou erro desconhecido");
         if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
         return;
@@ -14925,8 +15330,6 @@ window.vektorMyAlertsInit_ = function () {
 
       window.__myAl_lojasPorTime = res.lojasPorTime || {};
 
-      // popula times
-      const teamSel = document.getElementById("myAl_team");
       if (teamSel) {
         teamSel.innerHTML =
           "<option value='__ALL__'>Todos os times</option>" +
@@ -14944,53 +15347,53 @@ window.vektorMyAlertsInit_ = function () {
           const box = document.getElementById("myAl_storesBox");
 
           if (val === "__ALL__") {
-            // ✅ Todos os times => todas as lojas (não precisa selecionar nada)
             if (box) {
               box.innerHTML =
                 "<div style='opacity:0.95; font-size:12px; font-weight:900; color:#B5FF20;'>Aplicado para todas as lojas</div>" +
                 "<div style='opacity:0.75; font-size:11px; margin-top:4px; color:#E2E8F0;'>Selecione um time específico para escolher lojas.</div>";
-
-              // efeito visual de desativado
               box.style.pointerEvents = "none";
               box.style.opacity = "0.75";
             }
             return;
           }
 
-          // ✅ Time específico => habilita e renderiza lojas
           if (box) {
             box.style.pointerEvents = "auto";
             box.style.opacity = "1";
           }
+
           window.vektorMyAlertsRenderStores_(window.__myAl_lojasPorTime || {}, val);
         };
       }
 
-      // default: limpa lojas
       window.vektorMyAlertsRenderStores_(window.__myAl_lojasPorTime || {}, "");
     })
     .withFailureHandler(function (err) {
+      const teamSel = document.getElementById("myAl_team");
+      if (teamSel) {
+        teamSel.innerHTML = "<option value=''>Erro ao carregar times</option>";
+      }
+
       const msg = "Erro ao carregar Times/Lojas: " + (err && err.message ? err.message : err);
       if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
     })
-    .getTimesELojasParaAlertasVektor(); // Code.gs
+    .getTimesELojasParaAlertasVektor({ empresa: vektorEmpresaAtual_() });
 
   // 1.1) carrega etiquetas
   google.script.run
     .withSuccessHandler(function (res2) {
-      // ✅ NÃO falhar silencioso
+      const sel = document.getElementById("myAl_label");
+      if (!sel) return;
+
       if (!res2 || !res2.ok) {
+        sel.innerHTML = "<option value='__ALL__'>Falha ao carregar etiquetas</option>";
         const msg = "Falha ao carregar Etiquetas: " + (res2 && res2.error ? res2.error : "sem permissão ou erro desconhecido");
         if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
         return;
       }
 
-      const sel = document.getElementById("myAl_label");
-      if (!sel) return;
-
       sel.innerHTML = "";
 
-      // opção "todas"
       const opAll = document.createElement("option");
       opAll.value = "__ALL__";
       opAll.textContent = "Todas";
@@ -15003,7 +15406,6 @@ window.vektorMyAlertsInit_ = function () {
         sel.appendChild(op);
       });
 
-      // ✅ UX: se selecionar "Todas", seleciona visualmente tudo
       sel.onchange = function () {
         const pickedAll = Array.from(sel.selectedOptions || []).some(op => op.value === "__ALL__");
         if (!pickedAll) return;
@@ -15011,108 +15413,114 @@ window.vektorMyAlertsInit_ = function () {
       };
     })
     .withFailureHandler(function (err) {
+      const sel = document.getElementById("myAl_label");
+      if (sel) {
+        sel.innerHTML = "<option value='__ALL__'>Erro ao carregar etiquetas</option>";
+      }
+
       const msg = "Erro ao carregar Etiquetas: " + (err && err.message ? err.message : err);
       if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
     })
-    .getEtiquetasDisponiveisVektor();
+    .getEtiquetasDisponiveisVektor({ empresa: vektorEmpresaAtual_() });
 
   // =========================
-// Tipo de alerta (Transações vs Pendências)
-// =========================
-try {
-  const typeSel = document.getElementById("myAl_alertType");
-  const subtitle = document.getElementById("myAl_subtitle");
-  const hint = document.getElementById("myAl_createHint");
-  const labelWrap = document.getElementById("myAl_labelWrap");
+  // Tipo de alerta (Transações vs Pendências)
+  // =========================
+  try {
+    const typeSel = document.getElementById("myAl_alertType");
+    const subtitle = document.getElementById("myAl_subtitle");
+    const hint = document.getElementById("myAl_createHint");
+    const labelWrap = document.getElementById("myAl_labelWrap");
 
-  const teamWrap = document.getElementById("myAl_team")?.closest("div");
-  const storesWrap = document.getElementById("myAl_storesBox")?.closest("div");
-  const btnValores = document.getElementById("myAl_btnValores");
+    const teamWrap = document.getElementById("myAl_team")?.closest("div");
+    const storesWrap = document.getElementById("myAl_storesBox")?.closest("div");
+    const btnValores = document.getElementById("myAl_btnValores");
 
-  const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "").trim();
-  const roleNorm = roleTxt.toLowerCase();
+    const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "").trim();
+    const roleNorm = roleTxt.toLowerCase();
 
-  const isAdmin = roleNorm === "administrador";
-  const isGerReg = roleNorm === "gerentes_reg";
-  const isCompras = roleNorm === "compras_di";
+    const isAdmin = roleNorm === "administrador";
+    const isGerReg = roleNorm === "gerentes_reg";
+    const isCompras = roleNorm === "compras_di";
 
-  const canUseTransacoes = !isCompras;
-  const canUsePendencias = isAdmin || isGerReg;
-  const canUseItens = true;
-  const canUseValores = isAdmin || isCompras;
+    const canUseTransacoes = !isCompras;
+    const canUsePendencias = isAdmin || isGerReg;
+    const canUseItens = true;
+    const canUseValores = isAdmin || isCompras;
 
-  if (btnValores) {
-    btnValores.style.display = canUseValores ? "inline-flex" : "none";
-  }
-
-  const hydrateTypeOptions = function(forceValue){
-    if (!typeSel) return;
-
-    const current = String(forceValue || typeSel.value || "").trim();
-    let html = "";
-
-    if (canUseTransacoes) {
-      html += "<option value='TRANSACOES'>Transações</option>";
-    }
-    if (canUsePendencias) {
-      html += "<option value='PENDENCIAS'>Pendências</option>";
-    }
-    if (canUseItens) {
-      html += "<option value='ITENS_IRREGULARES'>Itens Irregulares</option>";
+    if (btnValores) {
+      btnValores.style.display = canUseValores ? "inline-flex" : "none";
     }
 
-    typeSel.innerHTML = html;
+    const hydrateTypeOptions = function(forceValue){
+      if (!typeSel) return;
 
-    const allowed = [];
-    if (canUseTransacoes) allowed.push("TRANSACOES");
-    if (canUsePendencias) allowed.push("PENDENCIAS");
-    if (canUseItens) allowed.push("ITENS_IRREGULARES");
+      const current = String(forceValue || typeSel.value || "").trim();
+      let html = "";
 
-    typeSel.value = allowed.indexOf(current) >= 0 ? current : (allowed[0] || "ITENS_IRREGULARES");
-  };
+      if (canUseTransacoes) {
+        html += "<option value='TRANSACOES'>Transações</option>";
+      }
+      if (canUsePendencias) {
+        html += "<option value='PENDENCIAS'>Pendências</option>";
+      }
+      if (canUseItens) {
+        html += "<option value='ITENS_IRREGULARES'>Itens Irregulares</option>";
+      }
 
-  const applyType = () => {
-    const t = String(typeSel?.value || "").trim();
+      typeSel.innerHTML = html;
 
-    const showTeamAndStores = isGerReg;
-    if (teamWrap) teamWrap.style.display = showTeamAndStores ? "block" : "none";
-    if (storesWrap) storesWrap.style.display = showTeamAndStores ? "block" : "none";
+      const allowed = [];
+      if (canUseTransacoes) allowed.push("TRANSACOES");
+      if (canUsePendencias) allowed.push("PENDENCIAS");
+      if (canUseItens) allowed.push("ITENS_IRREGULARES");
 
-    const hideEtiqueta = (t === "PENDENCIAS" || t === "ITENS_IRREGULARES");
-    if (labelWrap) labelWrap.style.display = hideEtiqueta ? "none" : "block";
-
-    if (t === "PENDENCIAS") {
-      if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
-      if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
-    } else if (t === "ITENS_IRREGULARES") {
-      if (subtitle) subtitle.textContent = "Alertas de Itens Irregulares (somente itens com conformidade ALERTA), com execução programada em dias úteis.";
-      if (hint) hint.textContent = "O alerta gera uma tabela (Data, Valor, Loja, Time, Item Comprado, Estabelecimento, Conformidade, Motivo), ordenada da data mais recente para a mais antiga.";
-    } else {
-      if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
-      if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
-    }
-  };
-
-  hydrateTypeOptions();
-
-  if (typeSel) {
-    typeSel.onchange = function () {
-      window.__myAl_editingAlertId = "";
-      const btn = document.getElementById("myAl_saveBtn");
-      if (btn) btn.textContent = "Criar alerta";
-      applyType();
+      typeSel.value = allowed.indexOf(current) >= 0 ? current : (allowed[0] || "ITENS_IRREGULARES");
     };
-  }
 
-  applyType();
+    const applyType = () => {
+      const t = String(typeSel?.value || "").trim();
 
-  window.vektorMyAlertsHydrateTypeOptions_ = hydrateTypeOptions;
-  window.vektorMyAlertsCanUsePendencias_ = canUsePendencias;
-  window.vektorMyAlertsCanUseTransacoes_ = canUseTransacoes;
-  window.vektorMyAlertsCanUseItensIrregulares_ = canUseItens;
-  window.vektorMyAlertsCanUseValores_ = canUseValores;
-  window.vektorMyAlertsIsGerReg_ = isGerReg;
-} catch (_) {}
+      const showTeamAndStores = (t === "TRANSACOES" || t === "PENDENCIAS");
+      if (teamWrap) teamWrap.style.display = showTeamAndStores ? "block" : "none";
+      if (storesWrap) storesWrap.style.display = showTeamAndStores ? "block" : "none";
+
+      const hideEtiqueta = (t === "PENDENCIAS" || t === "ITENS_IRREGULARES");
+      if (labelWrap) labelWrap.style.display = hideEtiqueta ? "none" : "block";
+
+      if (t === "PENDENCIAS") {
+        if (subtitle) subtitle.textContent = "Alertas de Pendências por Lojas e Times (com histórico e execução programada), disparado sempre em dias úteis.";
+        if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Valor, Estabelecimento, Titular, Pendências).";
+      } else if (t === "ITENS_IRREGULARES") {
+        if (subtitle) subtitle.textContent = "Alertas de Itens Irregulares (somente itens com conformidade ALERTA), com execução programada em dias úteis.";
+        if (hint) hint.textContent = "O alerta gera uma tabela (Data, Valor, Loja, Time, Item Comprado, Estabelecimento, Conformidade, Motivo), ordenada da data mais recente para a mais antiga.";
+      } else {
+        if (subtitle) subtitle.textContent = "Alertas de Transações por Lojas, Times e Tags (com histórico e execução programada), disparado sempre em dias úteis.";
+        if (hint) hint.textContent = "O alerta gera uma tabela (Loja, Time, Data, Estabelecimento, Valor, Etiqueta, Descrição).";
+      }
+    };
+
+    hydrateTypeOptions();
+
+    if (typeSel) {
+      typeSel.onchange = function () {
+        window.__myAl_editingAlertId = "";
+        const btn = document.getElementById("myAl_saveBtn");
+        if (btn) btn.textContent = "Criar alerta";
+        applyType();
+        window.vektorMyAlertsRefresh(); // ✅ agora também refiltra a lista
+      };
+    }
+
+    applyType();
+
+    window.vektorMyAlertsHydrateTypeOptions_ = hydrateTypeOptions;
+    window.vektorMyAlertsCanUsePendencias_ = canUsePendencias;
+    window.vektorMyAlertsCanUseTransacoes_ = canUseTransacoes;
+    window.vektorMyAlertsCanUseItensIrregulares_ = canUseItens;
+    window.vektorMyAlertsCanUseValores_ = canUseValores;
+    window.vektorMyAlertsIsGerReg_ = isGerReg;
+  } catch (_) {}
 
   // ✅ Filtros Admin: popular "Área" + atualizar lista ao mudar filtros
   try {
@@ -15125,7 +15533,6 @@ try {
     if (emailInp) emailInp.oninput = function () { window.vektorMyAlertsRefresh(); };
     if (roleSel)  roleSel.onchange = function () { window.vektorMyAlertsRefresh(); };
 
-    // popula as áreas só para Admin
     if (isAdmin && roleSel && typeof google !== "undefined" && google.script && google.script.run) {
       roleSel.innerHTML = "<option value=''>Todas as áreas</option>";
 
@@ -15400,8 +15807,10 @@ window.vektorMyAlertsCreate = function () {
 
     if (editingId) {
       payload.alertId = editingId;
+      payload.empresa = vektorEmpresaAtual_();
       runner.atualizarAlertaEtiquetaVektor(payload);
     } else {
+      payload.empresa = vektorEmpresaAtual_();
       runner.criarAlertaEtiquetaVektor(payload);
     }
 
@@ -15638,6 +16047,8 @@ window.vektorMyAlertsRefresh = function () {
 
   const adminFilterEmail = (isAdmin && adminEmailEl) ? String(adminEmailEl.value || "").trim() : "";
   const adminFilterRole  = (isAdmin && adminRoleEl)  ? String(adminRoleEl.value  || "").trim() : "";
+  const typeEl = document.getElementById("myAl_alertType");
+  const alertTypeFilter = typeEl ? String(typeEl.value || "").trim() : "";
 
   if (typeof google === "undefined" || !google.script || !google.script.run) {
     if (list) list.innerHTML = "<div style='color:rgba(248,113,113,0.95); font-weight:800; font-size:12px;'>google.script.run indisponível.</div>";
@@ -15790,7 +16201,9 @@ window.vektorMyAlertsRefresh = function () {
       email: email,
       role: role,
       adminFilterEmail: adminFilterEmail,
-      adminFilterRole: adminFilterRole
+      adminFilterRole: adminFilterRole,
+      alertType: alertTypeFilter,
+      empresa: vektorEmpresaAtual_()
     });
 };
 
@@ -16110,7 +16523,7 @@ function myAlValoresInitOnce_(){
           setSelectLoading_(selLoja, "Sem lojas (erro)");
           renderNeedPeriod_();
         })
-        .getTimesELojasParaAlertasVektor();
+        .getTimesELojasParaAlertasVektor({ empresa: vektorEmpresaAtual_() });
     } else {
       setSelectLoading_(selTime, "Sem times (google.script.run indisponível)");
       setSelectLoading_(selLoja, "Sem lojas (google.script.run indisponível)");
@@ -17300,6 +17713,13 @@ const USER_EMAIL_REPLACED = (USER_EMAIL_RAW || "")
   .trim();
 const USER_ROLE_CLEAN     = (USER_ROLE_RAW  || "").replace(/^"+|"+$/g, "").trim();
 const USER_ROLE_REPLACED = USER_ROLE_CLEAN;
+const USER_EMPRESA_DEFAULT_RAW = <?= JSON.stringify(userEmpresaDefault || "CENTAURO") ?>;
+const USER_EMPRESA_DEFAULT = String(USER_EMPRESA_DEFAULT_RAW || "").replace(/^"+|"+$/g, "").trim().toUpperCase() || "CENTAURO";
+
+const USER_PODE_TROCAR_EMPRESA_RAW = <?= JSON.stringify(!!userPodeTrocarEmpresa) ?>;
+const USER_PODE_TROCAR_EMPRESA = !!USER_PODE_TROCAR_EMPRESA_RAW;
+
+window.__vektorEmpresaAtual = USER_EMPRESA_DEFAULT;
 
 // ================== MÉTRICAS VEKTOR → GOOGLE SHEETS ==================
 
@@ -27292,7 +27712,7 @@ window.vektorExecutarUsoIrregular = function (modo) {
       .withFailureHandler(function(err){
         renderBotMessage("HTML:<p class='text-sm text-red-700'>Falha ao consultar BaseClara: " + (err && err.message ? err.message : err) + "</p>");
       })
-      .getPossivelUsoIrregularParaChat(modo);  // <- AGORA com parâmetro
+      .getPossivelUsoIrregularParaChat(modo, vektorEmpresaAtual_()); // <- AGORA com parâmetro
   } catch (e) {
     console.error(e);
   }
@@ -29385,7 +29805,7 @@ window.vektorAuxLoadSaldos = function () {
       const msg = (err && err.message) ? err.message : String(err || "");
       box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao consultar saldos: " + msg + "</p>";
     })
-    .getRelacaoSaldosClara("geral", "");
+    .getRelacaoSaldosClara("geral", "", vektorEmpresaAtual_());
 };
 
 function vektorAuxSaldosBuildMaps_(rows) {
@@ -29715,7 +30135,7 @@ window.vektorAuxOpenSaldosTx = function (aliasLoja) {
       const msg = (err && err.message) ? err.message : String(err || "");
       body.innerHTML = "<p class='text-sm' style='color:#b91c1c; font-weight:900;'>Falha ao consultar transações: " + msg + "</p>";
     })
-    .getTransacoesLojaPeriodoAberto(aliasLoja);
+    .getTransacoesLojaPeriodoAberto(aliasLoja, vektorEmpresaAtual_());
 };
 
 window.vektorAuxCloseSaldosTxModal = function () {
