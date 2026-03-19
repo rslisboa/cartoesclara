@@ -103,6 +103,14 @@ function vektorGetEmpresaContext_(empresaReq) {
   };
 }
 
+function vektorBuildSubject_(empresa, assuntoBase) {
+  var emp = vektorNormEmpresa_(empresa || "CENTAURO");
+  var base = String(assuntoBase || "").trim();
+  return emp === "FISIA"
+    ? "[FISIA - " + base + "]"
+    : "[" + base + "]";
+}
+
 function vektorTrocarEmpresaAtual(empresa) {
   vektorAssertWhitelisted_();
   var ctx = vektorGetUserRole_();
@@ -242,11 +250,18 @@ function vektorSapGetClaraMetaByLoja_(allowedSet, empresa) {
 
 var PROP_LAST_SNAPSHOT_SIG = "VEKTOR_HISTPEND_LAST_SIG";
 
-function LIMPAR_ANTI_SPAM() {
-var props = PropertiesService.getScriptProperties();
+function LIMPAR_ANTI_SPAM(empresa) {
+  var props = PropertiesService.getScriptProperties();
   var cicloKey = getCicloKey06a05_();
-  props.deleteProperty("VEKTOR_ALERTS_SENT_" + cicloKey);
-  Logger.log("Limpou anti-spam do ciclo: " + cicloKey);
+
+  var empresas = empresa
+    ? [vektorNormEmpresa_(empresa)]
+    : [VEKTOR_EMPRESA_CENTAURO, VEKTOR_EMPRESA_FISIA];
+
+  empresas.forEach(function(emp){
+    props.deleteProperty("VEKTOR_ALERTS_SENT_" + emp + "_" + cicloKey);
+    Logger.log("Limpou anti-spam do ciclo: " + emp + " | " + cicloKey);
+  });
 }
 
 function isAdminEmail(email) {
@@ -1014,7 +1029,8 @@ if (seed.length > 6) seed = seed.slice(0, 6);
           sectionsCsv: sectionsCsv,
           question: question,
           answer: finalAnswer,
-          model: sig
+          model: sig,
+          empresa: vektorGetEmpresaContext_().empresaAtual
         });
       } catch (eLog) {
         // não quebra resposta por erro de log
@@ -1047,16 +1063,16 @@ function vektorPolicyHistEnsureHeader_(){
   var hdr = sh.getRange(1, 1, 1, lastCol).getValues()[0] || [];
   var hdrTxt = hdr.map(function(x){ return String(x||"").trim(); });
 
-  // header esperado
-  var exp = ["createdAt","userEmail","assunto","sectionsCsv","question","answer","model"];
+  // header esperado agora com EMPRESA
+  var exp = ["createdAt","userEmail","assunto","sectionsCsv","question","answer","model","empresa"];
   var ok = exp.every(function(name){ return hdrTxt.indexOf(name) >= 0; });
 
   if (!ok) {
-    // Se a planilha está vazia ou header diferente, sobrescreve a linha 1 com o padrão.
     sh.getRange(1,1,1,exp.length).setValues([exp]);
     sh.getRange(1,1,1,exp.length).setFontWeight("bold");
     sh.setFrozenRows(1);
   }
+
   return sh;
 }
 
@@ -1085,8 +1101,15 @@ function vektorPolicyHistAppend_(payload){
   var answer = String(payload.answer || "").trim();
   var model = String(payload.model || "").trim();
 
-  // grava
-  sh.appendRow([ts, userEmail, assunto, sectionsCsv, question, answer, model]);
+  var empresa = String(payload.empresa || "").trim().toUpperCase();
+  if (!empresa) {
+    try {
+      empresa = String(vektorGetEmpresaContext_().empresaAtual || "").trim().toUpperCase();
+    } catch (_) {}
+  }
+  if (!empresa) empresa = "CENTAURO";
+
+  sh.appendRow([ts, userEmail, assunto, sectionsCsv, question, answer, model, empresa]);
 }
 
 /**
@@ -1112,7 +1135,7 @@ function vektorPolicyHistGet(email, limit){
     var lastRow = sh.getLastRow();
     if (lastRow < 2) return { ok:true, rows: [] };
 
-    var values = sh.getRange(2, 1, lastRow - 1, 7).getValues(); // 7 cols fixas do header esperado
+    var values = sh.getRange(2, 1, lastRow - 1, 8).getValues(); // 7 cols fixas do header esperado
     // [createdAt,userEmail,assunto,sectionsCsv,question,answer,model]
 
     var out = [];
@@ -1128,7 +1151,8 @@ function vektorPolicyHistGet(email, limit){
         sectionsCsv: String(r[3] || ""),
         question: String(r[4] || ""),
         answer: String(r[5] || ""),
-        model: String(r[6] || "")
+        model: String(r[6] || ""),
+        empresa: String(r[7] || "")
       });
 
       if (out.length >= limit) break;
@@ -3257,15 +3281,15 @@ function executarAlertaEtiquetaVektor(req) {
         var htmlBody = "";
 
         if (alertType === "PENDENCIAS") {
-          assunto = "[Vektor - Grupo SBF] Alerta de Pendências Clara — " + periodo.inicio + " a " + periodo.fim;
+          assunto = vektorBuildSubject_(empresaAlerta, "Vektor - Grupo SBF") + " Alerta de Pendências Clara — " + periodo.inicio + " a " + periodo.fim;
           htmlBody = montarEmailUserAlertPendencias_(alertId, time, periodo, rows);
 
         } else if (alertType === "ITENS_IRREGULARES") {
-          assunto = "[Vektor - Grupo SBF] Alerta de Itens Irregulares Clara — " + periodo.inicio + " a " + periodo.fim;
+          assunto = vektorBuildSubject_(empresaAlerta, "Vektor - Grupo SBF") + " Alerta de Itens Irregulares Clara — " + periodo.inicio + " a " + periodo.fim;
           htmlBody = buildEmailItensIrregularesProgramado_(rows, periodo, ownerRole);
 
         } else {
-          assunto = "[Vektor - Grupo SBF] Alerta de Transações Clara — " + periodo.inicio + " a " + periodo.fim;
+          assunto = vektorBuildSubject_(empresaAlerta, "Vektor - Grupo SBF") + " Alerta de Transações Clara — " + periodo.inicio + " a " + periodo.fim;
           htmlBody = montarEmailUserAlert_(alertId, time, etiquetaCsv, periodo, rows);
         }
 
@@ -6516,6 +6540,8 @@ function previewEnvioPendenciasClaraRecusadasDetalhado(dataInicioIso, dataFimIso
 
 function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFimIso, txKeys, empresa) {
   vektorAssertFunctionAllowed_("dispararEnvioPendenciasClaraRecusadasSelecionadas");
+      var empCtx = vektorGetEmpresaContext_(empresa);
+      var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
 
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) {
@@ -6590,7 +6616,10 @@ function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFi
         return;
       }
 
-      var assunto = "CLARA | JUSTIFICATIVAS PENDENTES | " + lojaKey + " - " + dataCobrancaBR;
+      var assunto = vektorBuildSubject_(
+          empresaAtual,
+          "ALERTA CLARA | JUSTIFICATIVAS PENDENTES | " + lojaKey + " - " + dataCobrancaBR
+        );
 
       var tabela = vektorMontarTabelaPendenciasEmail_(itens);
       var tipos = vektorTiposPendenciasDoGrupo_(itens);
@@ -6667,8 +6696,11 @@ function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFi
   }
 }
 
-function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
+function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas, empresa) {
   vektorAssertFunctionAllowed_("dispararNotificacaoItensIrregularesSelecionados");
+
+  var empCtx = vektorGetEmpresaContext_(empresa);
+  var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
 
   rowsSelecionadas = Array.isArray(rowsSelecionadas) ? rowsSelecionadas : [];
   if (!rowsSelecionadas.length) return { ok: false, error: "Nenhuma linha selecionada." };
@@ -6680,24 +6712,11 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
   var CC_FIXO = "contasareceber@gruposbf.com.br";
   var SENDER_NAME = "Vektor - Grupo SBF";
 
-  var mapEmails = vektorCarregarMapaEmailsLojas_();
-
-  function normLojaKey_(lojaRaw) {
-    var s = String(lojaRaw || "").trim().toUpperCase();
-    if (!s) return "";
-
-    var m1 = s.match(/^CE\s*0*(\d{1,4})/);
-    if (m1 && m1[1]) return "CE" + ("0000" + m1[1]).slice(-4);
-
-    var m2 = s.match(/(\d{1,4})/);
-    if (m2 && m2[1]) return "CE" + ("0000" + m2[1]).slice(-4);
-
-    return "";
-  }
+  var mapEmails = vektorCarregarMapaEmailsLojas_(empresaAtual);
 
   var grupos = {};
-  rowsSelecionadas.forEach(function (r) {
-    var lk = normLojaKey_(r && r.loja);
+  rowsSelecionadas.forEach(function(r) {
+    var lk = vektorNormLojaKey_(r && r.loja);
     if (!lk) return;
     if (!grupos[lk]) grupos[lk] = [];
     grupos[lk].push(r || {});
@@ -6834,7 +6853,6 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
     }
 
     h += '</tbody></table></div>';
-
     h += '<div style="height:16px;"></div>';
     h += '<div style="height:16px;"></div>';
 
@@ -6853,20 +6871,15 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
   var skipped = [];
   var erros = [];
 
-  lojaKeys.forEach(function (lojaKey) {
-    var pack = [];
-    var to = "";
-    var cc = [];
-    var subject = "";
-
+  lojaKeys.forEach(function(lojaKey){
     try {
-      pack = Array.isArray(grupos[lojaKey]) ? grupos[lojaKey] : [];
+      var pack = Array.isArray(grupos[lojaKey]) ? grupos[lojaKey] : [];
       if (!pack.length) return;
 
       var info = mapEmails ? mapEmails[lojaKey] : null;
 
-      to = info && info.emailGerente ? String(info.emailGerente).trim() : "";
-      cc = [];
+      var to = info && info.emailGerente ? String(info.emailGerente).trim() : "";
+      var cc = [];
 
       if (info && info.emailRegional) cc.push(String(info.emailRegional).trim());
       cc.push(CC_FIXO);
@@ -6874,10 +6887,10 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
       if (!to && info && info.emailRegional) to = String(info.emailRegional).trim();
       if (!to) to = CC_FIXO;
 
-      cc = cc.filter(function (x) { return x && x.indexOf("@") > 0; });
+      cc = cc.filter(function(x){ return x && x.indexOf("@") > 0; });
 
       var ccUniq = {};
-      cc = cc.filter(function (x) {
+      cc = cc.filter(function(x){
         var k = String(x || "").toLowerCase();
         if (!k) return false;
         if (ccUniq[k]) return false;
@@ -6885,16 +6898,13 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
         return true;
       });
 
-      cc = cc.filter(function (x) {
+      cc = cc.filter(function(x){
         return String(x || "").toLowerCase() !== String(to || "").toLowerCase();
       });
 
       var qtdItens = pack.length;
-
-      subject = "[ALERTA CLARA | ITENS IRREGULARES] "
-        + lojaKey + " | "
-        + qtdItens + " " + (qtdItens === 1 ? "item" : "itens")
-        + " | " + hoje;
+      var subject = vektorBuildSubject_(empresaAtual, "ALERTA CLARA | ITENS IRREGULARES") +
+        " " + lojaKey + " | " + qtdItens + " " + (qtdItens === 1 ? "item" : "itens") + " | " + hoje;
 
       var htmlBody = montarTabelaHtml_(pack, lojaKey);
 
@@ -6908,72 +6918,46 @@ function dispararNotificacaoItensIrregularesSelecionados(rowsSelecionadas) {
 
       var timeResumo = "";
       for (var tt = 0; tt < pack.length; tt++) {
-        if (String(pack[tt].time || "").trim()) {
-          timeResumo = String(pack[tt].time || "").trim();
-          break;
+        if (pack[tt] && pack[tt].time) {
+          timeResumo = String(pack[tt].time).trim();
+          if (timeResumo) break;
         }
       }
 
-      var totalLoja2 = pack.reduce(function (acc, r) {
-        return acc + (Number((r || {}).valor || 0) || 0);
-      }, 0);
+      var valorTotal = 0;
+      pack.forEach(function(r){
+        valorTotal += Number(r && r.valor || 0) || 0;
+      });
 
-      vektorLogEnvioItensIrreg_({
+      registrarEnvioItensIrregulares_({
         lojaKey: lojaKey,
-        lojaRaw: (pack[0] && pack[0].loja) ? pack[0].loja : "",
         time: timeResumo,
-        qtdItens: pack.length,
-        valorTotal: totalLoja2,
-        to: to,
-        cc: cc.join(","),
-        temViagemHosp: pack.some(function (r) {
-          var txt = String(((r || {}).item || "") + " " + ((r || {}).estabelecimento || ""))
-            .toLowerCase();
-          return /viagem|hosped|hotel|passagem|aere/.test(txt);
-        }),
-        temCartaoBloqueado: pack.some(function (r) {
-          return r && r.cartaoBloqueado === true;
-        }),
+        qtdItens: qtdItens,
+        valorTotal: valorTotal,
+        destinatarioTo: to,
+        destinatarioCc: cc.join(","),
         assunto: subject,
-        status: "SENT",
-        error: ""
+        status: "ENVIADO",
+        empresa: empresaAtual
       });
 
       enviados++;
 
-    } catch (e) {
-      var msgErro = String(e && e.message ? e.message : e);
-      erros.push({ lojaKey: lojaKey, error: msgErro });
-
-      try {
-        var packSafe = Array.isArray(pack) ? pack : [];
-        vektorLogEnvioItensIrreg_({
-          lojaKey: lojaKey,
-          lojaRaw: (packSafe[0] && packSafe[0].loja) ? packSafe[0].loja : "",
-          time: (packSafe[0] && packSafe[0].time) ? packSafe[0].time : "",
-          qtdItens: packSafe.length,
-          valorTotal: packSafe.reduce(function (acc, r) {
-            return acc + (Number((r || {}).valor || 0) || 0);
-          }, 0),
-          to: to || "",
-          cc: (cc && cc.join) ? cc.join(",") : "",
-          temViagemHosp: false,
-          temCartaoBloqueado: packSafe.some(function (r) {
-            return r && r.cartaoBloqueado === true;
-          }),
-          assunto: subject || "",
-          status: "FAIL",
-          error: msgErro
-        });
-      } catch (_) {}
+    } catch (e1) {
+      erros.push({
+        loja: lojaKey,
+        erro: (e1 && e1.message) ? e1.message : String(e1)
+      });
     }
   });
 
-  if (erros.length) {
-    return { ok: true, enviados: enviados, lojas: lojaKeys.length, erros: erros, skipped: skipped };
-  }
-
-  return { ok: true, enviados: enviados, lojas: lojaKeys.length, skipped: skipped };
+  return {
+    ok: erros.length === 0,
+    empresa: empresaAtual,
+    enviados: enviados,
+    skipped: skipped,
+    erros: erros
+  };
 }
 
 var VEKTOR_ITENS_IRREG_LOG_TAB = "Itens Irreg.";
@@ -9761,98 +9745,97 @@ const VEKTOR_ALERT_MAX_ADMIN = 20;           // Limite de itens no e-mail (admin
 const VEKTOR_ALERT_TOL_PCT = 0.0000001;
 
 // Disparo principal (use no gatilho diário)
-function enviarAlertasLimitesClaraDiario() {
+function enviarAlertasLimitesClaraDiario(empresa) {
+  var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
 
-  if (typeof periodoStr !== "string") {
-  try {
-    if (periodoStr && (periodoStr.inicio || periodoStr.fim)) {
-      periodoStr = (periodoStr.inicio || "06") + " a " + (periodoStr.fim || "05");
-    } else {
-      periodoStr = "06→05";
-    }
-  } catch (e) {
-    periodoStr = "06→05";
-  }
-}
-
-  // Segurança: só roda para Admin
   var email = Session.getEffectiveUser().getEmail();
   if (!isAdminEmail(email)) {
     return { ok: false, error: "Acesso restrito: apenas Administrador pode disparar alertas." };
   }
 
-  // Pega base já calculada (mesma da tabela)
-  var res = getRelacaoSaldosClara("geral", "");
+  var res = getRelacaoSaldosClara("geral", "", empresaAtual);
   if (!res || !res.ok) {
     return { ok: false, error: (res && res.error) ? res.error : "Falha ao obter relação de saldos." };
   }
 
   var periodo = "";
-if (typeof res.periodo === "string") {
-  periodo = res.periodo;
-} else if (res.periodo && (res.periodo.inicio || res.periodo.fim)) {
-  periodo = (res.periodo.inicio || "06") + " a " + (res.periodo.fim || "05");
-} else {
-  periodo = "06→05";
-}
+  if (typeof res.periodo === "string") {
+    periodo = res.periodo;
+  } else if (res.periodo && (res.periodo.inicio || res.periodo.fim)) {
+    periodo = (res.periodo.inicio || "06") + " a " + (res.periodo.fim || "05");
+  } else {
+    periodo = "06→05";
+  }
+
   var rows = res.rows || [];
-  if (!rows.length) return { ok: true, sent: false, msg: "Sem dados para alertar." };
+  if (!rows.length) {
+    return { ok: true, sent: false, empresa: empresaAtual, msg: "Sem dados para alertar." };
+  }
 
-  // Classifica
   var packs = classificarAlertasLimites_(rows);
-
-  // Anti-spam por ciclo (06->05)
-  var cicloKey = getCicloKey06a05_(); // ex: "2025-12-06_2026-01-05"
-  var filtrados = aplicarAntiSpamCiclo_(cicloKey, packs);
+  var cicloKey = getCicloKey06a05_();
+  var filtrados = aplicarAntiSpamCiclo_(cicloKey, packs, empresaAtual);
 
   var risco = filtrados.risco;
   var monitoramento = filtrados.monitoramento;
   var eficiencia = filtrados.eficiencia;
   var admin = filtrados.admin;
 
-  Logger.log("ALERT COUNTS: risco=%s monitoramento=%s eficiencia=%s admin=%s",
-  risco.length, monitoramento.length, eficiencia.length, admin.length);
+  Logger.log(
+    "ALERT COUNTS [%s]: risco=%s monitoramento=%s eficiencia=%s admin=%s",
+    empresaAtual, risco.length, monitoramento.length, eficiencia.length, admin.length
+  );
 
   if (!risco.length && !monitoramento.length && !eficiencia.length && !admin.length) {
-    return { ok: true, sent: false, msg: "Sem alertas novos (anti-spam por ciclo)." };
+    return {
+      ok: true,
+      sent: false,
+      empresa: empresaAtual,
+      msg: "Sem alertas novos (anti-spam por ciclo)."
+    };
   }
 
-
-  // Monta e-mail
   var assunto = risco.length
-    ? "⚠️ [ALERTA CLARA | LIMITE] Risco de estouro"
-    : "⚠️ [ALERTA] Ajustes de limite recomendados – Vektor";
+    ? vektorBuildSubject_(empresaAtual, "ALERTA CLARA | LIMITE") + " Risco de estouro"
+    : vektorBuildSubject_(empresaAtual, "ALERTA") + " Ajustes de limite recomendados – Vektor";
 
   var html = montarEmailAlertasLimites_(periodo, risco, monitoramento, eficiencia, admin);
 
-  // Envia somente para ADM’s
   var destinatarios = getAdminEmails_();
   if (!destinatarios.length) return { ok: false, error: "Lista de admins vazia." };
 
   GmailApp.sendEmail(destinatarios.join(","), assunto, " ", {
-  from: "vektor@gruposbf.com.br",
-  htmlBody: html,
-  name: "Vektor – Grupo SBF"
+    from: "vektor@gruposbf.com.br",
+    htmlBody: html,
+    name: "Vektor – Grupo SBF"
   });
 
-  // Após MailApp.sendEmail(...)
   registrarAlertaEnviado_(
-  "LIMITE",
-  "",
-  "",
-  "Envio consolidado de alertas de limite. Risco=" + (risco.length) +
-    ", Monitoramento=" + (monitoramento.length) + ", Eficiência=" + (eficiencia.length) + ", Admin=" + (admin.length),
-  destinatarios.join(","),
-  "enviarAlertasLimitesClaraDiario"
-);
+    "LIMITE",
+    "",
+    "",
+    "Envio consolidado de alertas de limite. Empresa=" + empresaAtual +
+      ". Risco=" + risco.length +
+      ", Monitoramento=" + monitoramento.length +
+      ", Eficiência=" + eficiencia.length +
+      ", Admin=" + admin.length,
+    destinatarios.join(","),
+    "enviarAlertasLimitesClaraDiario",
+    empresaAtual
+  );
 
-  // Registra enviados no ciclo para anti-spam
-  registrarEnviadosCiclo_(cicloKey, filtrados._enviadosKeys);
+  registrarEnviadosCiclo_(cicloKey, filtrados._enviadosKeys, empresaAtual);
 
   return {
     ok: true,
     sent: true,
-    counts: { risco: risco.length, eficiencia: eficiencia.length, admin: admin.length },
+    empresa: empresaAtual,
+    counts: {
+      risco: risco.length,
+      monitoramento: monitoramento.length,
+      eficiencia: eficiencia.length,
+      admin: admin.length
+    },
     ciclo: cicloKey
   };
 }
@@ -9860,45 +9843,70 @@ if (typeof res.periodo === "string") {
 // ======================================
 // RELATÓRIO OFENSORAS - PENDÊNCIAS CLARA
 // ======================================
-function gerarRelatorioOfensorasPendencias_(diasJanela) {
+function gerarRelatorioOfensorasPendencias_(diasJanela, empresa) {
   diasJanela = Number(diasJanela) || 60;
+  var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
 
   var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
   var hist = ss.getSheetByName(HIST_PEND_CLARA_RAW);
   if (!hist) throw new Error("Aba " + HIST_PEND_CLARA_RAW + " não encontrada.");
 
   var lr = hist.getLastRow();
-  if (lr < 2) return { ok: true, rows: [], msg: "Histórico vazio.", janelaDias: diasJanela };
+  var lc = hist.getLastColumn();
+  if (lr < 2) {
+    return { ok: true, empresa: empresaAtual, rows: [], msg: "Histórico vazio.", janelaDias: diasJanela };
+  }
 
-  // Colunas: A Data_snapshot, B Loja, C Data_transacao, D Valor, E Pendencia_etiqueta, F Pendencia_nf, G Pendencia_descricao, H Qtde Total
-  var data = hist.getRange(2, 1, lr - 1, 8).getValues();
+  var values = hist.getRange(1, 1, lr, lc).getValues();
+  var header = values[0].map(function(h){ return String(h || "").trim(); });
+  var data = values.slice(1);
 
-  // Mapa LojaNum -> Time (BaseClara!V -> BaseClara!R)
-  var mapaTime = construirMapaLojaParaTime_();
+  function idxOf_(possiveis, fallback) {
+    for (var i = 0; i < possiveis.length; i++) {
+      var ix = header.indexOf(possiveis[i]);
+      if (ix >= 0) return ix;
+    }
+    return (typeof fallback === "number") ? fallback : -1;
+  }
+
+  var idxDataSnap = idxOf_(["Data_snapshot"], 0);
+  var idxLoja     = idxOf_(["Loja"], 1);
+  var idxDataTx   = idxOf_(["Data_transacao"], 2);
+  var idxValor    = idxOf_(["Valor"], 3);
+  var idxPendEtiq = idxOf_(["Pendencia_etiqueta"], 4);
+  var idxPendNF   = idxOf_(["Pendencia_nf"], 5);
+  var idxPendDesc = idxOf_(["Pendencia_descricao"], 6);
+  var idxQtde     = idxOf_(["Qtde Total"], 7);
+  var idxEmp      = idxOf_(["EMPRESA"], -1);
+
+  var mapaTime = construirMapaLojaParaTime_(empresaAtual);
 
   var hoje = new Date();
   var inicio = new Date(hoje.getTime() - diasJanela * 24 * 60 * 60 * 1000);
 
-  // agregação por loja
-  var m = {}; // lojaKey -> stats
-  function getLojaKey(loja){ return String(loja || "").trim() || "(N/D)"; }
+  var m = {};
+
+  function getLojaKey_(loja) {
+    return String(loja || "").trim() || "(N/D)";
+  }
 
   data.forEach(function(r){
-    var dtSnap = (r[0] instanceof Date) ? r[0] : (vektorParseDateAny_(r[0]) || new Date(r[0]));
+    var rowEmpresa = idxEmp >= 0 ? vektorNormEmpresa_(r[idxEmp]) : VEKTOR_EMPRESA_CENTAURO;
+    if (rowEmpresa !== empresaAtual) return;
+
+    var dtSnap = (r[idxDataSnap] instanceof Date) ? r[idxDataSnap] : (vektorParseDateAny_(r[idxDataSnap]) || new Date(r[idxDataSnap]));
     if (!(dtSnap instanceof Date) || isNaN(dtSnap.getTime())) return;
     if (dtSnap < inicio) return;
 
-    var lojaKey = getLojaKey(r[1]);
+    var lojaKey = getLojaKey_(r[idxLoja]);
     var lojaNum = normalizarLojaNumero_(lojaKey);
+    var dtTx = (r[idxDataTx] instanceof Date) ? r[idxDataTx] : (vektorParseDateAny_(r[idxDataTx]) || new Date(r[idxDataTx]));
 
-    var dtTx = (r[2] instanceof Date) ? r[2] : (vektorParseDateAny_(r[2]) || new Date(r[2]));
-
-
-    var valor = Number(r[3]) || 0;
-    var pe = Number(r[4]) || 0;
-    var pn = Number(r[5]) || 0;
-    var pd = Number(r[6]) || 0;
-    var qt = Number(r[7]) || (pe + pn + pd);
+    var valor = Number(r[idxValor]) || 0;
+    var pe = Number(r[idxPendEtiq]) || 0;
+    var pn = Number(r[idxPendNF]) || 0;
+    var pd = Number(r[idxPendDesc]) || 0;
+    var qt = Number(r[idxQtde]) || (pe + pn + pd);
 
     if (!m[lojaKey]) {
       m[lojaKey] = {
@@ -9911,13 +9919,12 @@ function gerarRelatorioOfensorasPendencias_(diasJanela) {
         pendEtiqueta: 0,
         pendNF: 0,
         pendDesc: 0,
-        snaps: {},     // dias distintos de snapshot
-        diasTx: {},    // dias distintos de transação (pendência)
-        maxSnap: null  // último snapshot observado
+        snaps: {},
+        diasTx: {},
+        maxSnap: null
       };
     }
 
-    // resolve time (se existir no mapa)
     if (m[lojaKey].lojaNum && mapaTime[m[lojaKey].lojaNum]) {
       m[lojaKey].time = mapaTime[m[lojaKey].lojaNum];
     }
@@ -9929,17 +9936,14 @@ function gerarRelatorioOfensorasPendencias_(diasJanela) {
     m[lojaKey].pendDesc += pd;
     m[lojaKey].txCount += 1;
 
-    // snapshot day key
     var snapKey = Utilities.formatDate(dtSnap, "America/Sao_Paulo", "yyyy-MM-dd");
     m[lojaKey].snaps[snapKey] = true;
 
-    // transação day key (se data válida)
     if (dtTx instanceof Date && !isNaN(dtTx.getTime())) {
       var txKey = Utilities.formatDate(dtTx, "America/Sao_Paulo", "yyyy-MM-dd");
       m[lojaKey].diasTx[txKey] = true;
     }
 
-    // max snapshot
     if (!m[lojaKey].maxSnap || dtSnap > m[lojaKey].maxSnap) {
       m[lojaKey].maxSnap = dtSnap;
     }
@@ -9947,14 +9951,10 @@ function gerarRelatorioOfensorasPendencias_(diasJanela) {
 
   var rows = Object.keys(m).map(function(k){
     var s = m[k];
-
     var diasPend = Object.keys(s.diasTx).length;
     var qtdSnaps = Object.keys(s.snaps).length;
+    var r14 = calcularTrend14dias_(data, s.loja, empresaAtual);
 
-    // aceleração recente (mantém sua lógica)
-    var r14 = calcularTrend14dias_(data, s.loja);
-
-    // score composto (ajuste se quiser outra ponderação)
     var score = (
       (s.qtde || 0) +
       (s.pendEtiqueta || 0) * 2 +
@@ -9971,30 +9971,26 @@ function gerarRelatorioOfensorasPendencias_(diasJanela) {
     return {
       loja: s.loja,
       time: s.time || "N/D",
-
       qtde: s.qtde,
       valor: s.valor,
       diasComPendencia: diasPend,
       pendEtiqueta: s.pendEtiqueta,
       pendNF: s.pendNF,
       pendDesc: s.pendDesc,
-
       qtdeSnapshots: qtdSnaps,
-
-      trend14: r14, // {ult14, ant14, delta}
+      trend14: r14,
       score: score,
       classificacao: classificacao,
-      txCount: (s.txCount || 0),
+      txCount: (s.txCount || 0)
     };
   });
 
-  // ranking por qtde e por valor
   rows.sort(function(a,b){
     if (b.qtde !== a.qtde) return b.qtde - a.qtde;
     return b.valor - a.valor;
   });
 
-  return { ok: true, rows: rows, janelaDias: diasJanela };
+  return { ok: true, empresa: empresaAtual, rows: rows, janelaDias: diasJanela };
 }
 
 function calcularTrend14dias_(histData, lojaKey) {
@@ -10217,29 +10213,33 @@ function montarEmailOfensorasPendencias_(rel) {
   return html;
 }
 
-function enviarEmailOfensorasPendenciasClara(diasJanela) {
+function enviarEmailOfensorasPendenciasClara(diasJanela, empresa) {
   try {
-    // Segurança: só Admin (mesmo padrão do e-mail de limites)
     var email = Session.getActiveUser().getEmail();
     if (!isAdminEmail(email)) {
       return { ok: false, error: "Acesso restrito: apenas Administrador pode disparar esse relatório." };
     }
 
-    var rel = getLojasOfensorasParaChat(diasJanela || 60);
-    if (!rel || !rel.ok) return { ok: false, error: (rel && rel.error) ? rel.error : "Falha no relatório." };
+    var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
+
+    var rel = getLojasOfensorasParaChat(diasJanela || 60, empresaAtual);
+    if (!rel || !rel.ok) {
+      return { ok: false, error: (rel && rel.error) ? rel.error : "Falha no relatório." };
+    }
 
     var destinatarios = getAdminEmails_();
-    if (!destinatarios.length) return { ok: false, error: "Lista de admins vazia." };
+    if (!destinatarios || !destinatarios.length) {
+      return { ok: false, error: "Lista de admins vazia." };
+    }
 
-    // --- ASSUNTO: trocar "60d" por "Ciclo atual" ---
-    var assunto = "📌 [ALERTA CLARA | JUSTIFICATIVAS] Lojas ofensoras (Ciclo atual)";
+    var assunto = vektorBuildSubject_(empresaAtual, "ALERTA CLARA | JUSTIFICATIVAS") +
+      " Lojas ofensoras (Ciclo atual)";
 
     if (rel && rel.periodo && rel.periodo.inicio && rel.periodo.fim) {
       assunto += " | " + rel.periodo.inicio + " a " + rel.periodo.fim;
     }
 
-var html = montarEmailOfensorasPendencias_(rel);
-
+    var html = montarEmailOfensorasPendencias_(rel);
 
     GmailApp.sendEmail(destinatarios.join(","), assunto, " ", {
       from: "vektor@gruposbf.com.br",
@@ -10248,15 +10248,23 @@ var html = montarEmailOfensorasPendencias_(rel);
     });
 
     registrarAlertaEnviado_(
-  "PENDENCIAS",
-  "",
-  "",
-  "Envio do relatório de lojas ofensoras (janela " + ((diasJanela || 60)) + "d). Total lojas=" + ((rel.rows || []).length),
-  destinatarios.join(","),
-  "enviarEmailOfensorasPendenciasClara"
-);
+      "PENDENCIAS",
+      "",
+      "",
+      "Envio do relatório de lojas ofensoras. Empresa=" + empresaAtual +
+        ". Janela=" + (diasJanela || 60) + "d. Total lojas=" + ((rel && rel.rows) ? rel.rows.length : 0),
+      destinatarios.join(","),
+      "enviarEmailOfensorasPendenciasClara",
+      empresaAtual
+    );
 
-    return { ok: true, sent: true, msg: "E-mail enviado para admins.", totalLojas: (rel.rows||[]).length };
+    return {
+      ok: true,
+      sent: true,
+      empresa: empresaAtual,
+      msg: "E-mail enviado para admins.",
+      totalLojas: ((rel && rel.rows) ? rel.rows.length : 0)
+    };
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
@@ -10267,55 +10275,55 @@ var html = montarEmailOfensorasPendencias_(rel);
  * Porteiro: só dispara envio se a aba BaseClara mudou de fato.
  * Coloque o trigger nesta função (não direto no enviarAlertasLimitesClaraDiario).
  */
-
 function ENVIAR_EMAIL_LIMITE_CLARA() {
   var props = PropertiesService.getScriptProperties();
+  var empresas = [VEKTOR_EMPRESA_CENTAURO, VEKTOR_EMPRESA_FISIA];
 
-  // 1) calcula assinatura atual da BaseClara
-  var sigAtual = calcularAssinaturaBaseClara_();
-  if (!sigAtual || sigAtual.error) {
-    Logger.log("Falha ao calcular assinatura BaseClara: " + (sigAtual && sigAtual.error ? sigAtual.error : sigAtual));
-    return;
-  }
+  empresas.forEach(function(empresaAtual){
+    try {
+      var sigAtual = calcularAssinaturaBaseClara_(empresaAtual);
+      if (!sigAtual || sigAtual.error) {
+        Logger.log("Falha ao calcular assinatura da base [%s]: %s", empresaAtual, (sigAtual && sigAtual.error ? sigAtual.error : sigAtual));
+        return;
+      }
 
-  var keySig = "VEKTOR_SIG_BASECLARA_PROCESSADA";
-  var sigAnterior = props.getProperty(keySig) || "";
+      var keySig = "VEKTOR_SIG_BASECLARA_PROCESSADA_" + empresaAtual;
+      var sigAnterior = props.getProperty(keySig) || "";
 
-  // 2) se não mudou, não envia
-  if (sigAtual.sig === sigAnterior) {
-    Logger.log("BaseClara não mudou desde a última verificação. Não envia alertas.");
-    return;
-  }
+      if (sigAtual.sig === sigAnterior) {
+        Logger.log("[%s] Base não mudou desde a última verificação. Não envia alertas.", empresaAtual);
+        return;
+      }
 
-  // 3) janela de segurança opcional (para evitar disparar enquanto carga ainda está em andamento)
-  // Se você não quiser atraso, pode remover este bloco inteiro.
-  var AGUARDAR_MIN = 10; // ajuste aqui (10–20 costuma ser bom)
-  var agora = new Date();
-  var diffMin = (agora.getTime() - sigAtual.maxDataMs) / 60000;
+      var AGUARDAR_MIN = 10;
+      var agora = new Date();
+      var diffMin = (agora.getTime() - sigAtual.maxDataMs) / 60000;
 
-  // Só aplica a janela se maxData veio preenchida (quando a coluna Data é válida)
-  if (sigAtual.maxDataMs > 0 && diffMin >= 0 && diffMin < AGUARDAR_MIN) {
-    Logger.log("BaseClara mudou, mas ainda dentro da janela de segurança (" + diffMin.toFixed(1) + " min).");
-    return;
-  }
+      if (sigAtual.maxDataMs > 0 && diffMin >= 0 && diffMin < AGUARDAR_MIN) {
+        Logger.log("[%s] Base mudou, mas ainda dentro da janela de segurança (%s min).", empresaAtual, diffMin.toFixed(1));
+        return;
+      }
 
-  // 4) marca assinatura como processada e dispara envio
-  props.setProperty(keySig, sigAtual.sig);
+      props.setProperty(keySig, sigAtual.sig);
 
-  // ✅ NOVO: snapshot só quando BaseClara mudou
-try {
-  var snap = REGISTRAR_SNAPSHOT();
-  if (snap && snap.ok) {
-    Logger.log("Snapshot pendências gravado. Linhas: " + (snap.gravados || 0));
-  } else {
-    Logger.log("Snapshot pendências falhou: " + (snap && snap.error ? snap.error : snap));
-  }
-} catch (e) {
-  Logger.log("Snapshot pendências - erro: " + (e && e.message ? e.message : e));
-}
+      try {
+        var snap = REGISTRAR_SNAPSHOT(empresaAtual);
+        if (snap && snap.ok) {
+          Logger.log("[%s] Snapshot pendências gravado. Linhas: %s", empresaAtual, (snap.gravados || 0));
+        } else {
+          Logger.log("[%s] Snapshot pendências falhou: %s", empresaAtual, (snap && snap.error ? snap.error : snap));
+        }
+      } catch (eSnap) {
+        Logger.log("[%s] Snapshot pendências - erro: %s", empresaAtual, (eSnap && eSnap.message ? eSnap.message : eSnap));
+      }
 
-  Logger.log("BaseClara mudou (sig anterior ≠ atual). Enviando alertas...");
-  enviarAlertasLimitesClaraDiario();
+      Logger.log("[%s] Base mudou. Enviando alertas de limite...", empresaAtual);
+      enviarAlertasLimitesClaraDiario(empresaAtual);
+
+    } catch (e) {
+      Logger.log("[%s] Falha em ENVIAR_EMAIL_LIMITE_CLARA: %s", empresaAtual, (e && e.message ? e.message : e));
+    }
+  });
 }
 
 // ==============================
@@ -10345,68 +10353,75 @@ function getPossivelUsoIrregularParaChat(modo, empresa) {
   }
 }
 
-function getRadarIrregularidadeParaChat(modo) {
+function getRadarIrregularidadeParaChat(modo, empresa) {
   vektorAssertFunctionAllowed_("getRadarIrregularidadeParaChat");
-  try {
 
+  try {
     modo = (modo || "7d").toString().toLowerCase().trim();
 
-    // Reaproveita exatamente a mesma base do fluxo atual
-    var rel = detectarUsoIrregularBaseClara_({ modo: modo });
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var empresaAtual = empCtx.empresaAtual;
+
+    // Reaproveita a mesma base do fluxo atual, agora segregada por empresa
+    var rel = detectarUsoIrregularBaseClara_({
+      modo: modo,
+      empresa: empresaAtual
+    });
     if (!rel || !rel.ok) return rel;
 
     var rows = Array.isArray(rel.rows) ? rel.rows : [];
 
-    // ✅ Detalhe por loja: 1 linha “mais crítica” por loja (para tooltip no ranking)
-var detalhesPorLoja = {};
-function toNumberMoney_(v) {
-  if (v === null || v === undefined) return 0;
-  if (typeof v === "number") return v;
-  var s = String(v);
-  s = s.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
-  var n = Number(s);
-  return isFinite(n) ? n : 0;
-}
+    // detalhe por loja: 1 linha mais crítica por loja
+    var detalhesPorLoja = {};
 
-rows.forEach(function (r) {
-  var loja = String(r.loja || "").trim();
-  if (!loja) return;
-
-  var cur = detalhesPorLoja[loja];
-  if (!cur) { detalhesPorLoja[loja] = r; return; }
-
-  var sA = Number(r.score) || 0;
-  var sB = Number(cur.score) || 0;
-  if (sA !== sB) { if (sA > sB) detalhesPorLoja[loja] = r; return; }
-
-  var vA = toNumberMoney_(r.valor);
-  var vB = toNumberMoney_(cur.valor);
-  if (vA !== vB) { if (vA > vB) detalhesPorLoja[loja] = r; return; }
-
-  var sdA = toNumberMoney_(r.somaDia);
-  var sdB = toNumberMoney_(cur.somaDia);
-  if (sdA !== sdB) { if (sdA > sdB) detalhesPorLoja[loja] = r; return; }
-
-  var qA = Number(r.qtdDia) || 0;
-  var qB = Number(cur.qtdDia) || 0;
-  if (qA > qB) detalhesPorLoja[loja] = r;
-});
-
-    var mapa = {}; // loja -> agg
-
-    function toNumberMoney_(s) {
-      // "R$ 1.980,00" -> 1980.00
-      if (s == null) return 0;
-      var t = String(s).replace(/[^\d,.-]/g, "");
-      // troca separador milhar/ponto
-      // casos comuns: "1.980,00" -> remove "." e troca "," por "."
-      t = t.replace(/\./g, "").replace(",", ".");
-      var n = Number(t);
-      return isNaN(n) ? 0 : n;
+    function toNumberMoney_(v) {
+      if (v === null || v === undefined) return 0;
+      if (typeof v === "number") return v;
+      var s = String(v);
+      s = s.replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+      var n = Number(s);
+      return isFinite(n) ? n : 0;
     }
 
+    rows.forEach(function (r) {
+      var loja = String(r.loja || "").trim();
+      if (!loja) return;
+
+      var cur = detalhesPorLoja[loja];
+      if (!cur) {
+        detalhesPorLoja[loja] = r;
+        return;
+      }
+
+      var sA = Number(r.score) || 0;
+      var sB = Number(cur.score) || 0;
+      if (sA !== sB) {
+        if (sA > sB) detalhesPorLoja[loja] = r;
+        return;
+      }
+
+      var vA = toNumberMoney_(r.valor);
+      var vB = toNumberMoney_(cur.valor);
+      if (vA !== vB) {
+        if (vA > vB) detalhesPorLoja[loja] = r;
+        return;
+      }
+
+      var sdA = toNumberMoney_(r.somaDia);
+      var sdB = toNumberMoney_(cur.somaDia);
+      if (sdA !== sdB) {
+        if (sdA > sdB) detalhesPorLoja[loja] = r;
+        return;
+      }
+
+      var qA = Number(r.qtdDia) || 0;
+      var qB = Number(cur.qtdDia) || 0;
+      if (qA > qB) detalhesPorLoja[loja] = r;
+    });
+
+    var mapa = {};
+
     function pendCount_(txt) {
-      // "Sim (2)" -> 2; "Não" -> 0
       var s = String(txt || "").toLowerCase();
       var m = s.match(/\((\d+)\)/);
       if (m) return Number(m[1]) || 0;
@@ -10435,7 +10450,7 @@ rows.forEach(function (r) {
 
       var score = Number(r.score) || 0;
       var qtdDia = Number(r.qtdDia) || 0;
-      var valor = toNumberMoney_(r.valor); // no seu retorno, "valor" já vem como money_()
+      var valor = toNumberMoney_(r.valor);
       var pendCount = pendCount_(r.pendenciasTxt);
 
       a.casos += 1;
@@ -10448,7 +10463,6 @@ rows.forEach(function (r) {
       if (pendCount > 0) a.pendEventos += 1;
       a.pendCountSum += pendCount;
 
-      // mantém último time não vazio
       if (!a.time && r.time) a.time = String(r.time || "").trim();
     });
 
@@ -10471,7 +10485,6 @@ rows.forEach(function (r) {
       };
     });
 
-    // ordena por “proximidade” simples (maxScore e casos)
     lojas.sort(function (x, y) {
       if (y.maxScore !== x.maxScore) return y.maxScore - x.maxScore;
       return y.casos - x.casos;
@@ -10479,10 +10492,12 @@ rows.forEach(function (r) {
 
     return {
       ok: true,
+      empresa: empresaAtual,
       meta: rel.meta || {},
       lojas: lojas,
       detalhesPorLoja: detalhesPorLoja
     };
+
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
@@ -10492,70 +10507,77 @@ rows.forEach(function (r) {
  * Porteiro (igual ao limite): só roda se BaseClara mudou.
  * Coloque o gatilho nesta função.
  */
-function ENVIAR_EMAIL_USO_IRREGULAR_CLARA() {
+function ENVIAR_EMAIL_USO_IRREGULAR_CLARA(empresa) {
   var props = PropertiesService.getScriptProperties();
 
-  // 1) assinatura da BaseClara (reaproveita o mesmo método do limite)
-  var sigAtual = calcularAssinaturaBaseClara_();
-  if (!sigAtual || sigAtual.error) {
-    Logger.log("Falha ao calcular assinatura BaseClara: " + (sigAtual && sigAtual.error ? sigAtual.error : sigAtual));
-    return;
-  }
+  var empresas = empresa
+    ? [vektorNormEmpresa_(empresa)]
+    : [VEKTOR_EMPRESA_CENTAURO, VEKTOR_EMPRESA_FISIA];
 
-  var keySig = "VEKTOR_SIG_BASECLARA_IRREGULAR";
-  var sigAnterior = props.getProperty(keySig) || "";
+  empresas.forEach(function(empresaAtual){
+    try {
+      var sigAtual = calcularAssinaturaBaseClara_(empresaAtual);
+      if (!sigAtual || sigAtual.error) {
+        Logger.log("Falha ao calcular assinatura da base [%s]: %s", empresaAtual, (sigAtual && sigAtual.error ? sigAtual.error : sigAtual));
+        return;
+      }
 
-  if (sigAtual.sig === sigAnterior) {
-    Logger.log("BaseClara não mudou desde a última verificação (uso irregular). Não envia.");
-    return;
-  }
+      var keySig = "VEKTOR_SIG_BASECLARA_IRREGULAR_" + empresaAtual;
+      var sigAnterior = props.getProperty(keySig) || "";
 
-  // 2) processa e envia
-  var rel = detectarUsoIrregularBaseClara_();
-  if (!rel || !rel.ok) {
-    Logger.log("Relatório uso irregular falhou: " + (rel && rel.error ? rel.error : rel));
-    return;
-  }
+      if (sigAtual.sig === sigAnterior) {
+        Logger.log("[%s] Base não mudou desde a última verificação (uso irregular). Não envia.", empresaAtual);
+        return;
+      }
 
-  // 3) anti-spam por ciclo (igual seus padrões)
-  var cicloKey = getCicloKey06a05_(); // já existe no seu arquivo :contentReference[oaicite:3]{index=3}
-  var sentKey = "VEKTOR_IRREGULAR_SENT_" + cicloKey;
+      var rel = detectarUsoIrregularBaseClara_({ empresa: empresaAtual });
+      if (!rel || !rel.ok) {
+        Logger.log("[%s] Relatório uso irregular falhou: %s", empresaAtual, (rel && rel.error ? rel.error : rel));
+        return;
+      }
 
-  // Se não tem alertas, atualiza assinatura e sai
-  if (!rel.rows || rel.rows.length === 0) {
-    props.setProperty(keySig, sigAtual.sig);
-    props.deleteProperty(sentKey);
-    Logger.log("Sem casos de uso irregular no ciclo. OK.");
-    return;
-  }
+      var cicloKey = getCicloKey06a05_();
+      var sentKey = "VEKTOR_IRREGULAR_SENT_" + empresaAtual + "_" + cicloKey;
 
-  // Se já enviou neste ciclo, não manda de novo
-  if (props.getProperty(sentKey) === "1") {
-    props.setProperty(keySig, sigAtual.sig);
-    Logger.log("Uso irregular já enviado neste ciclo. Não reenvia.");
-    return;
-  }
+      if (!rel.rows || rel.rows.length === 0) {
+        props.setProperty(keySig, sigAtual.sig);
+        props.deleteProperty(sentKey);
+        Logger.log("[%s] Sem casos de uso irregular no ciclo.", empresaAtual);
+        return;
+      }
 
-  var envio = enviarEmailUsoIrregularClara_(rel);
-  if (envio && envio.ok) {
-    props.setProperty(sentKey, "1");
-    props.setProperty(keySig, sigAtual.sig);
-  }
+      if (props.getProperty(sentKey) === "1") {
+        props.setProperty(keySig, sigAtual.sig);
+        Logger.log("[%s] Uso irregular já enviado neste ciclo. Não reenvia.", empresaAtual);
+        return;
+      }
+
+      var envio = enviarEmailUsoIrregularClara_(rel, empresaAtual);
+      if (envio && envio.ok) {
+        props.setProperty(sentKey, "1");
+        props.setProperty(keySig, sigAtual.sig);
+      }
+
+    } catch (e) {
+      Logger.log("[%s] Erro em ENVIAR_EMAIL_USO_IRREGULAR_CLARA: %s", empresaAtual, (e && e.message ? e.message : e));
+    }
+  });
 }
 
-function enviarEmailUsoIrregularClara_(rel) {
-  // 🔒 RBAC por ROLE (VEKTOR_ACESSOS)
+function enviarEmailUsoIrregularClara_(rel, empresa) {
   vektorAssertFunctionAllowed_("enviarEmailUsoIrregularClara_");
+
+  var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
+
   try {
-    var destinatarios = getAdminEmails_(); // já existe no seu arquivo :contentReference[oaicite:4]{index=4}
+    var destinatarios = getAdminEmails_();
     if (!destinatarios || !destinatarios.length) {
       return { ok: false, error: "Lista de admins vazia." };
     }
 
-    var assunto = "📌 [ALERTA CLARA | POSSÍVEL USO IRREGULAR] " +
-      (rel.meta && rel.meta.periodo ? ("| " + rel.meta.periodo) : "");
+    var assunto = vektorBuildSubject_(empresaAtual, "ALERTA CLARA | POSSÍVEL USO IRREGULAR") +
+      ((rel && rel.meta && rel.meta.periodo) ? (" | " + rel.meta.periodo) : "");
 
-    // Tabela HTML (resumo)
     var html = montarEmailUsoIrregular_(rel);
 
     GmailApp.sendEmail(destinatarios.join(","), assunto, " ", {
@@ -10565,16 +10587,23 @@ function enviarEmailUsoIrregularClara_(rel) {
     });
 
     registrarAlertaEnviado_(
-  "USO_IRREGULAR",
-  "", // não é alerta por loja única (é consolidado)
-  "",
-  "Possível uso irregular (modelo conservador). Casos=" + ((rel.rows || []).length) +
-    (rel.meta && rel.meta.periodo ? (" | " + rel.meta.periodo) : ""),
-  destinatarios.join(","),
-  "enviarEmailUsoIrregularClara_"
-);
+      "USO_IRREGULAR",
+      "",
+      "",
+      "Possível uso irregular (modelo conservador). Empresa=" + empresaAtual +
+        ". Casos=" + ((rel && rel.rows) ? rel.rows.length : 0) +
+        ((rel && rel.meta && rel.meta.periodo) ? (" | " + rel.meta.periodo) : ""),
+      destinatarios.join(","),
+      "enviarEmailUsoIrregularClara_",
+      empresaAtual
+    );
 
-    return { ok: true, sent: true, total: (rel.rows || []).length };
+    return {
+      ok: true,
+      sent: true,
+      empresa: empresaAtual,
+      total: ((rel && rel.rows) ? rel.rows.length : 0)
+    };
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
@@ -10635,51 +10664,41 @@ function montarEmailUsoIrregular_(rel) {
 function detectarUsoIrregularBaseClara_(opts) {
   opts = opts || {};
   var empCtx = vektorGetEmpresaContext_(opts.empresa);
-  var sh = vektorGetBaseSheetByEmpresa_(empCtx.empresaAtual);
+  var empresaAtual = empCtx.empresaAtual;
+  var sh = vektorGetBaseSheetByEmpresa_(empresaAtual);
 
   var lastRow = sh.getLastRow();
-  if (lastRow < 2) return { ok: true, rows: [], meta: { periodo: "" } };
+  if (lastRow < 2) return { ok: true, rows: [], meta: { periodo: "", empresa: empresaAtual } };
 
-  var values = sh.getRange(2, 1, lastRow - 1, 23).getValues(); // A..W = 23 cols
+  var values = sh.getRange(2, 1, lastRow - 1, 23).getValues();
 
-  // Índices zero-based (A..W)
-  var IDX_DATA   = 0;   // A
-  var IDX_TRANS  = 2;   // C (estabelecimento)
-  var IDX_VALOR  = 5;   // F (R$)
-  var IDX_CARTAO = 6;   // G (4 dígitos)
-  var IDX_AUT    = 12;  // M (cód. autorização)
-  var IDX_RECIBO = 14;  // O
-  var IDX_TITULAR = 16;
-  var IDX_GRUPO  = 17;  // R
-  var IDX_ETIQ   = 19;  // T
-  var IDX_DESC   = 20;  // U
-  var IDX_LOJA   = 21;  // V
+  var IDX_DATA    = 0;
+  var IDX_TRANS   = 2;
+  var IDX_VALOR   = 5;
+  var IDX_CARTAO  = 6;
+  var IDX_RECIBO  = 14;
+  var IDX_GRUPO   = 17;
+  var IDX_ETIQ    = 19;
+  var IDX_DESC    = 20;
+  var IDX_LOJA    = 21;
 
-  // ------------------------------
-  // ✅ Janela de análise por "modo"
-  // ------------------------------
-  opts = opts || {};
-  var modo = String(opts.modo || "ciclo").toLowerCase().trim(); // default: ciclo (compatível)
-
+  var modo = String(opts.modo || "ciclo").toLowerCase().trim();
   var tz = "America/Sao_Paulo";
   var ini = null;
   var fim = null;
   var periodoLabel = "";
 
   if (modo === "7d") {
-    // últimos 7 dias (inclui hoje)
     var hoje = new Date();
     var hoje0 = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
     ini = new Date(hoje0.getFullYear(), hoje0.getMonth(), hoje0.getDate() - 6);
     fim = hoje0;
     periodoLabel = Utilities.formatDate(ini, tz, "dd/MM/yyyy") + " a " + Utilities.formatDate(fim, tz, "dd/MM/yyyy");
   } else if (modo === "full") {
-    // base toda
     ini = null;
     fim = null;
     periodoLabel = "Base toda (investigação)";
   } else {
-    // ciclo 06–05 (padrão atual)
     var pc = getPeriodoCicloClara_();
     ini = pc.inicio;
     fim = pc.fim;
@@ -10687,50 +10706,30 @@ function detectarUsoIrregularBaseClara_(opts) {
   }
 
   function norm_(s){
-    return normalizarTexto_ ? normalizarTexto_(s) : String(s||"").toLowerCase();
+    return normalizarTexto_ ? normalizarTexto_(s) : String(s || "").toLowerCase();
   }
+
   function money_(n){
     var v = Number(n) || 0;
-    return v.toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+    return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   }
+
   function isPendencia_(row){
-    // conservador: pendência se vazio OU “sim”
     function p(v){
-      var s = String(v||"").trim().toUpperCase();
+      var s = String(v || "").trim().toUpperCase();
       return (!s || s === "SIM");
     }
     return p(row[IDX_RECIBO]) || p(row[IDX_ETIQ]) || p(row[IDX_DESC]);
   }
-  function pendTxt_(row){
-    var p = [];
-    function chk(v, nome){
-      var s = String(v||"").trim().toUpperCase();
-      if (!s || s === "SIM") p.push(nome);
-    }
-    chk(row[IDX_RECIBO], "Recibo");
-    chk(row[IDX_ETIQ],   "Etiqueta");
-    chk(row[IDX_DESC],   "Descrição");
-    return p.join(", ");
-  }
 
-  // ========== 1) Indexação por (data|cartão|estab) para fracionamento ==========
-  var gruposDia = {}; // key -> { loja,time, dataKey, cartao, estab, qtd, soma, maxValor, pendCount }
-
-  // ========== 2) Stats auxiliares ==========
-  var valoresJanela = [];     // percentil 95 dentro da janela (7d/ciclo/full)
-  var byCartaoEstab = {};     // cartao||estab -> count + pend
-
-    // ------------------------------
-  // NOVO: estatísticas por loja (janela atual)
-  // - para "Etiqueta rara por loja"
-  // - para "Novo estabelecimento por loja"
-  // ------------------------------
-  var byLojaTotal = {};     // loja -> total trans na janela
-  var byLojaEtiq  = {};     // loja -> { etiquetaNorm: count }
-  var byLojaEstab = {};     // loja -> { estabNorm: count }
+  var gruposDia = {};
+  var valoresJanela = [];
+  var byCartaoEstab = {};
+  var byLojaTotal = {};
+  var byLojaEtiq = {};
+  var byLojaEstab = {};
 
   function normKey_(s) {
-    // normalização conservadora (evita estourar falso-positivo por variações pequenas)
     return String(s || "")
       .toUpperCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -10741,10 +10740,7 @@ function detectarUsoIrregularBaseClara_(opts) {
   function splitEtiqs_(raw) {
     var s = String(raw || "").trim();
     if (!s) return [];
-    // separadores comuns: vírgula, ponto e vírgula, barra vertical
     var parts = s.split(/[;,|]/g).map(function(x){ return normKey_(x); }).filter(Boolean);
-
-    // fallback: se vier uma etiqueta única sem separador
     if (!parts.length) {
       var one = normKey_(s);
       return one ? [one] : [];
@@ -10752,39 +10748,39 @@ function detectarUsoIrregularBaseClara_(opts) {
     return parts;
   }
 
-  for (var i=0;i<values.length;i++){
+  for (var i = 0; i < values.length; i++) {
     var r = values[i];
     if (!r) continue;
 
     var d = parseDateClara_(r[IDX_DATA]);
     if (!d || isNaN(d.getTime())) continue;
-
-    // aplica janela se existir
     if (ini && d < ini) continue;
     if (fim && d > fim) continue;
 
-    var lojaDigits = String(r[IDX_LOJA]||"").replace(/\D/g,"");
+    var lojaDigits = String(r[IDX_LOJA] || "").replace(/\D/g, "");
     if (!lojaDigits) continue;
-    var loja = ("0000"+lojaDigits).slice(-4);
+    var loja = ("0000" + lojaDigits).slice(-4);
 
-    var time = String(r[IDX_GRUPO]||"").trim();
-    var cartao = String(r[IDX_CARTAO]||"").trim();
-    var estab = String(r[IDX_TRANS]||"").trim();
+    var time = String(r[IDX_GRUPO] || "").trim();
+    var cartao = String(r[IDX_CARTAO] || "").trim();
+    var estab = String(r[IDX_TRANS] || "").trim();
 
-        // NOVO: captura etiqueta(s) e atualiza estatísticas por loja
     var etiqRaw = String(r[IDX_ETIQ] || "").trim();
     var etiqs = splitEtiqs_(etiqRaw);
 
-    var lojaK = loja;
-    if (!byLojaTotal[lojaK]) { byLojaTotal[lojaK] = 0; byLojaEtiq[lojaK] = {}; byLojaEstab[lojaK] = {}; }
-    byLojaTotal[lojaK]++;
+    if (!byLojaTotal[loja]) {
+      byLojaTotal[loja] = 0;
+      byLojaEtiq[loja] = {};
+      byLojaEstab[loja] = {};
+    }
+    byLojaTotal[loja]++;
 
     var estabK2 = normKey_(estab);
-    if (estabK2) byLojaEstab[lojaK][estabK2] = (byLojaEstab[lojaK][estabK2] || 0) + 1;
+    if (estabK2) byLojaEstab[loja][estabK2] = (byLojaEstab[loja][estabK2] || 0) + 1;
 
     etiqs.forEach(function(t){
       if (!t) return;
-      byLojaEtiq[lojaK][t] = (byLojaEtiq[lojaK][t] || 0) + 1;
+      byLojaEtiq[loja][t] = (byLojaEtiq[loja][t] || 0) + 1;
     });
 
     var v = parseNumberSafe_(r[IDX_VALOR]);
@@ -10792,23 +10788,27 @@ function detectarUsoIrregularBaseClara_(opts) {
 
     valoresJanela.push(v);
 
-    // chave dia (dd/MM/yyyy) + cartao + estab
     var dataKey = Utilities.formatDate(d, tz, "dd/MM/yyyy");
     var kDia = dataKey + "||" + cartao + "||" + norm_(estab);
 
     if (!gruposDia[kDia]) {
       gruposDia[kDia] = {
-        loja: loja, time: time, dataKey: dataKey, cartao: cartao, estab: estab,
-        qtd: 0, soma: 0, maxValor: 0, pendCount: 0,
+        loja: loja,
+        time: time,
+        dataKey: dataKey,
+        cartao: cartao,
+        estab: estab,
+        qtd: 0,
+        soma: 0,
+        maxValor: 0,
+        pendCount: 0,
         etiqSet: {}
       };
     }
 
-        // NOVO: agrega etiquetas por agrupamento
     if (etiqs && etiqs.length) {
-      var gTmp = gruposDia[kDia];
       etiqs.forEach(function(t){
-        if (t) gTmp.etiqSet[t] = true;
+        if (t) gruposDia[kDia].etiqSet[t] = true;
       });
     }
 
@@ -10823,53 +10823,39 @@ function detectarUsoIrregularBaseClara_(opts) {
     if (isPendencia_(r)) byCartaoEstab[kCE].pend++;
   }
 
-  // percentil 95 (conservador) dentro da janela escolhida
-  valoresJanela.sort(function(a,b){return a-b;});
-  var p95 = valoresJanela.length ? valoresJanela[Math.floor(valoresJanela.length*0.95)] : 999999;
+  valoresJanela.sort(function(a,b){ return a - b; });
+  var p95 = valoresJanela.length ? valoresJanela[Math.floor(valoresJanela.length * 0.95)] : 999999;
 
-  // ========== 3) Gerar alertas com regra 2+ critérios ==========
   var rows = [];
 
   Object.keys(gruposDia).forEach(function(k){
     var g = gruposDia[k];
-
     var regras = [];
     var score = 0;
 
-    // Critério A: fracionamento
     if (g.qtd >= 3 && g.soma >= 800) {
       regras.push("Fracionamento (>=3 no dia)");
       score += 40;
     }
 
-    // Critério B: pendência + valor alto (p95 da janela ou >=1500)
     if (g.pendCount > 0 && (g.maxValor >= 1500 || g.maxValor >= p95)) {
       regras.push("Pendência + valor alto");
       score += 25;
     }
 
-    // Critério C: recorrência por cartão+estab na janela (ciclo/7d/full)
     var ce = byCartaoEstab[g.cartao + "||" + norm_(g.estab)];
     if (ce && ce.count >= 8 && ce.pend >= 2) {
       regras.push("Recorrência cartão/estab");
       score += 15;
     }
 
-        // ------------------------------
-    // ✅ NOVOS CRITÉRIOS (AUXILIARES)
-    // Só entram se JÁ houver 2+ critérios fortes (A/B/C)
-    // ------------------------------
     var criteriosFortes = regras.length;
 
     if (criteriosFortes >= 2) {
-      // D) Etiqueta rara por loja (na janela)
-      // Regras conservadoras:
-      // - exige histórico mínimo na janela (>= 30 trans) para não “inventar rareza”
-      // - etiqueta precisa ser MUITO rara: count <= 1 e share <= 2%
       try {
-        var totalLoja = byLojaTotal[loja] || 0;
+        var totalLoja = byLojaTotal[g.loja] || 0;
         if (totalLoja >= 30) {
-          var etiqCounts = byLojaEtiq[loja] || {};
+          var etiqCounts = byLojaEtiq[g.loja] || {};
           var tagsGrupo = g.etiqSet ? Object.keys(g.etiqSet) : [];
           var raras = [];
 
@@ -10882,7 +10868,6 @@ function detectarUsoIrregularBaseClara_(opts) {
           });
 
           if (raras.length) {
-            // limita para não poluir regrasTxt
             var show = raras.slice(0, 2).join(", ");
             regras.push("Etiqueta rara (" + show + ")");
             score += 5;
@@ -10890,15 +10875,11 @@ function detectarUsoIrregularBaseClara_(opts) {
         }
       } catch (_) {}
 
-      // E) Novo estabelecimento por loja (na janela)
-      // Regras conservadoras:
-      // - exige histórico mínimo na janela (>= 30 trans)
-      // - estabelecimento do grupo só aparece 1 vez no período para essa loja
       try {
-        var totalLoja2 = byLojaTotal[loja] || 0;
+        var totalLoja2 = byLojaTotal[g.loja] || 0;
         if (totalLoja2 >= 30) {
-          var estabNorm = normKey_(estabelecimento);
-          var cEst = (byLojaEstab[loja] && estabNorm) ? (byLojaEstab[loja][estabNorm] || 0) : 0;
+          var estabNorm = normKey_(g.estab);
+          var cEst = (byLojaEstab[g.loja] && estabNorm) ? (byLojaEstab[g.loja][estabNorm] || 0) : 0;
           if (cEst === 1) {
             regras.push("Novo estabelecimento");
             score += 5;
@@ -10907,10 +10888,7 @@ function detectarUsoIrregularBaseClara_(opts) {
       } catch (_) {}
     }
 
-    // Conservador: exige 2 critérios
     if (regras.length < 2) return;
-
-    // Threshold final
     if (score < 50) return;
 
     rows.push({
@@ -10928,10 +10906,8 @@ function detectarUsoIrregularBaseClara_(opts) {
     });
   });
 
-  // ordenação por score e soma
   rows.sort(function(a,b){
     if (b.score !== a.score) return b.score - a.score;
-    // fallback simples (não perfeito, mas mantém compatível com seu retorno atual)
     return (String(b.somaDia).length - String(a.somaDia).length);
   });
 
@@ -10939,6 +10915,7 @@ function detectarUsoIrregularBaseClara_(opts) {
     ok: true,
     rows: rows,
     meta: {
+      empresa: empresaAtual,
       periodo: periodoLabel,
       p95: p95,
       modo: modo
@@ -10946,35 +10923,32 @@ function detectarUsoIrregularBaseClara_(opts) {
   };
 }
 
-function calcularAssinaturaBaseClara_() {
+function calcularAssinaturaBaseClara_(empresa) {
   try {
-    var info = carregarLinhasBaseClara_(); // seu helper
+    var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
+    var info = carregarLinhasBaseClara_(empresaAtual);
     if (info.error) return { error: info.error };
 
     var header = info.header || [];
     var linhas = info.linhas || [];
     var lastRow = linhas.length;
-    if (lastRow <= 0) return { sig: "EMPTY", maxDataMs: 0, lastRow: 0 };
+    if (lastRow <= 0) {
+      return { sig: "EMPTY", maxDataMs: 0, lastRow: 0, empresa: empresaAtual };
+    }
 
-    // Índices
-    var idxAlias = 7; // Alias do Cartão (fixo)
+    var idxAlias = 7;
     var idxValor = encontrarIndiceColuna_(header, ["Valor em R$", "Valor (R$)", "Valor", "Total"]);
     var idxData  = encontrarIndiceColuna_(header, ["Data da Transação", "Data Transação", "Data"]);
 
-    if (idxValor < 0) return { error: "Não encontrei a coluna de Valor na BaseClara para assinatura." };
-    if (idxData < 0)  return { error: "Não encontrei a coluna de Data na BaseClara para assinatura." };
+    if (idxValor < 0) return { error: "Não encontrei a coluna de Valor na base para assinatura." };
+    if (idxData < 0)  return { error: "Não encontrei a coluna de Data na base para assinatura." };
 
-    // -------------------------------
-    // (A) Agregados robustos (varre tudo 1x)
-    // -------------------------------
     var maxDataMs = 0;
     var minDataMs = 0;
-    var sumCents = 0;         // soma do valor em centavos (inteiro)
-    var cntValid = 0;         // qtde de linhas com data válida (para robustez)
-    var cntAlias = 0;         // qtde de linhas com alias preenchido (para robustez)
+    var sumCents = 0;
+    var cntValid = 0;
+    var cntAlias = 0;
 
-    // Sample determinístico ao longo de toda a base
-    // Queremos ~400 pontos no máximo (barato e cobre o dataset)
     var maxSamples = 400;
     var step = Math.max(1, Math.floor(lastRow / maxSamples));
     var samples = [];
@@ -10982,7 +10956,6 @@ function calcularAssinaturaBaseClara_() {
     function normDateKey_(dt) {
       var d = (dt instanceof Date) ? dt : new Date(dt);
       if (!(d instanceof Date) || isNaN(d.getTime())) return "";
-      // yyyy-MM-dd (estável)
       return d.toISOString().slice(0, 10);
     }
 
@@ -11010,37 +10983,27 @@ function calcularAssinaturaBaseClara_() {
       var cents = normMoneyCents_(r[idxValor]);
       sumCents += cents;
 
-      // amostragem espalhada: pega linha 0, step, 2*step...
       if (i % step === 0) {
         var dKey = normDateKey_(r[idxData]);
-        // valor como cents é mais estável do que toFixed / string
         samples.push(alias + "|" + dKey + "|" + cents);
       }
     }
 
-    // -------------------------------
-    // (B) Tail (últimas N linhas)
-    // -------------------------------
-    var N = 250; // 200–500 ok
+    var N = 250;
     var start = Math.max(0, lastRow - N);
-
     var tailParts = [];
+
     for (var j = start; j < lastRow; j++) {
       var rr = linhas[j];
-
       var alias2 = (rr[idxAlias] || "").toString().trim();
       var d2s = normDateKey_(rr[idxData]);
       var cents2 = normMoneyCents_(rr[idxValor]);
-
       tailParts.push(alias2 + "|" + d2s + "|" + cents2);
     }
 
-    // -------------------------------
-    // (C) Payload final e MD5
-    // -------------------------------
-    // samples cobre o dataset; tail cobre o “fim”; agregados cobrem tendências gerais
     var payload =
-      "LR=" + lastRow +
+      "EMP=" + empresaAtual +
+      ";LR=" + lastRow +
       ";MAX=" + maxDataMs +
       ";MIN=" + minDataMs +
       ";SUM=" + sumCents +
@@ -11061,10 +11024,15 @@ function calcularAssinaturaBaseClara_() {
       return v.length === 1 ? "0" + v : v;
     }).join("");
 
-    return { sig: sig, maxDataMs: maxDataMs, lastRow: lastRow };
+    return {
+      sig: sig,
+      maxDataMs: maxDataMs,
+      lastRow: lastRow,
+      empresa: empresaAtual
+    };
 
   } catch (e) {
-    return { error: "Falha ao calcular assinatura BaseClara: " + (e && e.message ? e.message : e) };
+    return { error: "Falha ao calcular assinatura da base: " + (e && e.message ? e.message : e) };
   }
 }
 
@@ -11079,49 +11047,34 @@ var PROP_HISTPEND_CICLO_KEY = "VEKTOR_HISTPEND_CICLO_KEY";
  * Faz snapshot das pendências atuais da BaseClara e grava em HIST_PEND_CLARA_RAW.
  * Recomendado: chamar apenas quando BaseClara foi atualizada (pelo seu gatilho já existente).
  */
-function REGISTRAR_SNAPSHOT() {
+function REGISTRAR_SNAPSHOT(empresa) {
   try {
-
-    // (1) Lê BaseClara (reaproveite sua forma atual de abrir a planilha BaseClara)
-    // Se você já tem BASE_CLARA_ID e nome da aba BaseClara em constantes, use-as.
-
+    var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
     var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
-    if (!sh) throw new Error("Aba BaseClara não encontrada.");
-
+    var sh = vektorGetBaseSheetByEmpresa_(empresaAtual);
 
     var lastRow = sh.getLastRow();
     var lastCol = sh.getLastColumn();
     if (lastRow < 2) {
-      Logger.log(">>> BaseClara sem linhas (lastRow=" + lastRow + ")");
-      return { ok: true, msg: "BaseClara sem linhas." };
+      Logger.log(">>> Base sem linhas (" + empresaAtual + ")");
+      return { ok: true, empresa: empresaAtual, msg: "Base sem linhas." };
     }
-
 
     var values = sh.getRange(1, 1, lastRow, lastCol).getValues();
     var header = values[0].map(function(h){ return String(h || "").trim(); });
     var rows = values.slice(1);
 
-    Logger.log("Rows lidas da BaseClara: " + rows.length);
-    Logger.log("Headers BaseClara: " + JSON.stringify(header));
-
-
-    // (2) Anti-duplicação por assinatura (evita gravar o mesmo snapshot repetidamente)
-    // Reaproveita a mesma lógica: se você já tem uma função calcularAssinaturaBaseClara_(), use-a.
-    var sigObj = calcularAssinaturaBaseClara_(); // se sua função exigir args, ajuste
+    var sigObj = calcularAssinaturaBaseClara_(empresaAtual);
     if (sigObj && sigObj.error) throw new Error(sigObj.error);
 
     var props = PropertiesService.getScriptProperties();
-    var lastSig = props.getProperty(PROP_LAST_SNAPSHOT_SIG) || "";
-    //if (sigObj && sigObj.sig && sigObj.sig === lastSig) {
-      //return { ok: true, msg: "Snapshot ignorado (assinatura igual à última)." };
-    //}
+    var propLastSig = PROP_LAST_SNAPSHOT_SIG + "_" + empresaAtual;
+    var cicloKey = getCicloKey06a05_();
+    var cicloLast = props.getProperty(PROP_HISTPEND_CICLO_KEY) || "";
 
-    // (3) Índices por nome de coluna (tolerante a variação)
     function idxOf(possiveis) {
       for (var i = 0; i < possiveis.length; i++) {
-        var p = possiveis[i];
-        var ix = header.indexOf(p);
+        var ix = header.indexOf(possiveis[i]);
         if (ix >= 0) return ix;
       }
       return -1;
@@ -11134,70 +11087,72 @@ function REGISTRAR_SNAPSHOT() {
     var idxRecibo     = idxOf(["Recibo"]);
     var idxDescricao  = idxOf(["Descrição", "Descricao"]);
 
-    if (idxDataTrans < 0) throw new Error("Não encontrei a coluna 'Data da Transação' na BaseClara.");
-    if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna 'Valor em R$' na BaseClara.");
-    if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna 'LojaNum' na BaseClara.");
-    if (idxEtiquetas < 0) throw new Error("Não encontrei a coluna 'Etiquetas' na BaseClara.");
-    if (idxRecibo    < 0) throw new Error("Não encontrei a coluna 'Recibo' na BaseClara.");
-    if (idxDescricao < 0) throw new Error("Não encontrei a coluna 'Descrição' na BaseClara.");
-
-    // (4) Monta linhas pendentes
-    // Regra objetiva (do jeito que você descreveu):
-    // - Pendencia_etiqueta = 1 se Etiquetas vazia
-    // - Pendencia_nf       = 1 se Recibo vazio
-    // - Pendencia_descricao= 1 se Descrição vazia
-    // - Qtde Total = soma das 3
-    var snapshotDate = new Date();
-    var out = [];
+    if (idxDataTrans < 0) throw new Error("Não encontrei a coluna 'Data da Transação' na base.");
+    if (idxValorBRL  < 0) throw new Error("Não encontrei a coluna 'Valor em R$' na base.");
+    if (idxLojaNum   < 0) throw new Error("Não encontrei a coluna 'LojaNum' na base.");
+    if (idxEtiquetas < 0) throw new Error("Não encontrei a coluna 'Etiquetas' na base.");
+    if (idxRecibo    < 0) throw new Error("Não encontrei a coluna 'Recibo' na base.");
+    if (idxDescricao < 0) throw new Error("Não encontrei a coluna 'Descrição' na base.");
 
     function isVazio_(v) {
-  if (v === null || v === undefined) return true;
-  if (v === false) return true; // IMPORTANTÍSSIMO: checkbox/boolean
-  var s = String(v).trim().toLowerCase();
+      if (v === null || v === undefined) return true;
+      if (v === false) return true;
+      var s = String(v).trim().toLowerCase();
+      if (!s) return true;
+      if (s === "-" || s === "—" || s === "n/a" || s === "na") return true;
+      if (s === "false" || s === "0") return true;
+      if (s === "não" || s === "nao") return true;
+      if (s.indexOf("sem recibo") >= 0) return true;
+      if (s.indexOf("sem etiqueta") >= 0) return true;
+      return false;
+    }
 
-  // placeholders comuns
-  if (!s) return true;
-  if (s === "-" || s === "—" || s === "n/a" || s === "na") return true;
-  if (s === "false" || s === "0") return true;
-  if (s === "não" || s === "nao") return true;
-  if (s.indexOf("sem recibo") >= 0) return true;
-  if (s.indexOf("sem etiqueta") >= 0) return true;
+    var hist = ss.getSheetByName(HIST_PEND_CLARA_RAW);
+    if (!hist) throw new Error("Aba " + HIST_PEND_CLARA_RAW + " não encontrada.");
 
-  return false;
-}
+    if (cicloKey !== cicloLast) {
+      var lrHist = hist.getLastRow();
+      if (lrHist >= 2) {
+        hist.getRange(2, 1, lrHist - 1, hist.getLastColumn()).clearContent();
+      }
 
-// ==============================
-// RESET AUTOMÁTICO POR CICLO (06→05)
-// ==============================
-var props = PropertiesService.getScriptProperties();
+      props.deleteProperty(PROP_LAST_SNAPSHOT_SIG + "_" + VEKTOR_EMPRESA_CENTAURO);
+      props.deleteProperty(PROP_LAST_SNAPSHOT_SIG + "_" + VEKTOR_EMPRESA_FISIA);
+      props.setProperty(PROP_HISTPEND_CICLO_KEY, cicloKey);
 
-var cicloKey = getCicloKey06a05_();  // já existe no projeto :contentReference[oaicite:10]{index=10}
-var cicloLast = props.getProperty(PROP_HISTPEND_CICLO_KEY) || "";
+      Logger.log("HIST_PEND_CLARA_RAW resetada para novo ciclo: " + cicloKey);
+    }
 
-// se mudou o ciclo, limpa a HIST_PEND_CLARA_RAW (mantém header)
-if (cicloKey !== cicloLast) {
-  var ssHist = SpreadsheetApp.openById(BASE_CLARA_ID);
-  var histSh = ssHist.getSheetByName(HIST_PEND_CLARA_RAW);
-  if (!histSh) throw new Error("Aba " + HIST_PEND_CLARA_RAW + " não encontrada.");
+    var histHeader = [];
+    if (hist.getLastRow() >= 1) {
+      histHeader = hist.getRange(1, 1, 1, hist.getLastColumn()).getValues()[0].map(function(h){
+        return String(h || "").trim();
+      });
+    }
 
-  var lr = histSh.getLastRow();
-  if (lr >= 2) {
-    histSh.getRange(2, 1, lr - 1, histSh.getLastColumn()).clearContent();
-  }
+    if (!histHeader.length) {
+      histHeader = [
+        "Data_snapshot",
+        "Loja",
+        "Data_transacao",
+        "Valor",
+        "Pendencia_etiqueta",
+        "Pendencia_nf",
+        "Pendencia_descricao",
+        "Qtde Total",
+        "EMPRESA"
+      ];
+      hist.getRange(1, 1, 1, histHeader.length).setValues([histHeader]);
+    } else if (histHeader.indexOf("EMPRESA") < 0) {
+      hist.getRange(1, histHeader.length + 1).setValue("EMPRESA");
+      histHeader.push("EMPRESA");
+    }
 
-  // reseta travas do snapshot
-  props.deleteProperty(PROP_LAST_SNAPSHOT_SIG);
-
-  // grava novo ciclo ativo
-  props.setProperty(PROP_HISTPEND_CICLO_KEY, cicloKey);
-
-  Logger.log("HIST_PEND_CLARA_RAW resetada para novo ciclo: " + cicloKey);
-}
-
+    var snapshotDate = new Date();
+    var out = [];
     var ciclo = getPeriodoCicloClaraCompleto_();
     var cicloIni = ciclo.inicio;
     var cicloFim = ciclo.fim;
-
 
     for (var r = 0; r < rows.length; r++) {
       var row = rows[r];
@@ -11211,17 +11166,12 @@ if (cicloKey !== cicloLast) {
       var desc = String(row[idxDescricao] || "").trim();
 
       var pendEtiqueta = isVazio_(etiquetas) ? 1 : 0;
-      var pendNF       = isVazio_(recibo)   ? 1 : 0;
-      var pendDesc     = isVazio_(desc)     ? 1 : 0;
-
-
+      var pendNF       = isVazio_(recibo) ? 1 : 0;
+      var pendDesc     = isVazio_(desc) ? 1 : 0;
       var qtde = pendEtiqueta + pendNF + pendDesc;
-      if (qtde <= 0) continue; // só grava se houver pendência
+      if (qtde <= 0) continue;
 
-      // Guarda data transação como Date se vier string
       var dt2 = (dt instanceof Date) ? dt : (vektorParseDateAny_(dt) || new Date(dt));
-
-      // ✅ filtro do ciclo: só grava transações dentro do 06→05
       if (!(dt2 instanceof Date) || isNaN(dt2.getTime())) continue;
       if (dt2 < cicloIni || dt2 > cicloFim) continue;
 
@@ -11233,24 +11183,25 @@ if (cicloKey !== cicloLast) {
         pendEtiqueta,
         pendNF,
         pendDesc,
-        qtde
+        qtde,
+        empresaAtual
       ]);
     }
-
-    // (5) Grava na HIST_PEND_CLARA_RAW
-    var hist = ss.getSheetByName(HIST_PEND_CLARA_RAW);
-    if (!hist) throw new Error("Aba " + HIST_PEND_CLARA_RAW + " não encontrada.");
 
     if (out.length) {
       hist.getRange(hist.getLastRow() + 1, 1, out.length, out[0].length).setValues(out);
     }
 
-    // (6) Atualiza assinatura salva
-    if (sigObj && sigObj.sig) props.setProperty(PROP_LAST_SNAPSHOT_SIG, sigObj.sig);
+    if (sigObj && sigObj.sig) props.setProperty(propLastSig, sigObj.sig);
 
-    Logger.log("Snapshot pendências - linhas geradas: " + out.length);
+    Logger.log("Snapshot pendências - empresa=" + empresaAtual + " | linhas=" + out.length);
 
-    return { ok: true, gravados: out.length, msg: "Snapshot gravado com sucesso." };
+    return {
+      ok: true,
+      empresa: empresaAtual,
+      gravados: out.length,
+      msg: "Snapshot gravado com sucesso."
+    };
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
@@ -11471,16 +11422,17 @@ var saldoCriticoValor = 500;
 // -------------------------
 // Anti-spam por ciclo (06→05)
 // -------------------------
-function aplicarAntiSpamCiclo_(cicloKey, packs) {
+function aplicarAntiSpamCiclo_(cicloKey, packs, empresa) {
+  var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
   var props = PropertiesService.getScriptProperties();
-  var raw = props.getProperty("VEKTOR_ALERTS_SENT_" + cicloKey) || "[]";
+  var raw = props.getProperty("VEKTOR_ALERTS_SENT_" + empresaAtual + "_" + cicloKey) || "[]";
   var sentKeys = {};
+
   try {
     JSON.parse(raw).forEach(function(k){ sentKeys[k] = true; });
-  } catch(e) {}
+  } catch (e) {}
 
   function rowKey(r) {
-    // chave estável: cartaoKey + loja + time + tipoAlerta
     var loja = (r.loja || "").toString().trim();
     var time = (r.time || "").toString().trim();
     var cartao = (r.nomeCartao || "").toString().trim();
@@ -11505,20 +11457,26 @@ function aplicarAntiSpamCiclo_(cicloKey, packs) {
   var eficiencia = filtrar(packs.eficiencia || [], "eficiencia");
   var admin = filtrar(packs.admin || [], "admin");
 
-  return { risco: risco, monitoramento: monitoramento, eficiencia: eficiencia, admin: admin, _enviadosKeys: enviadosKeys };
-
+  return {
+    risco: risco,
+    monitoramento: monitoramento,
+    eficiencia: eficiencia,
+    admin: admin,
+    _enviadosKeys: enviadosKeys
+  };
 }
 
-function registrarEnviadosCiclo_(cicloKey, keys) {
+function registrarEnviadosCiclo_(cicloKey, keys, empresa) {
   if (!keys || !keys.length) return;
+
+  var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
   var props = PropertiesService.getScriptProperties();
-  var propName = "VEKTOR_ALERTS_SENT_" + cicloKey;
+  var propName = "VEKTOR_ALERTS_SENT_" + empresaAtual + "_" + cicloKey;
 
   var raw = props.getProperty(propName) || "[]";
   var arr = [];
-  try { arr = JSON.parse(raw) || []; } catch(e) { arr = []; }
+  try { arr = JSON.parse(raw) || []; } catch (e) { arr = []; }
 
-  // evita crescer infinito
   keys.forEach(function(k){ arr.push(k); });
   arr = arr.slice(-1000);
 
@@ -11684,7 +11642,7 @@ function getAdminEmails_() {
   // Se você tiver a lista em outro lugar, adapte aqui.
   // Estratégia: varrer lista conhecida — se você já tem array interno em isAdminEmail, replique.
   var admins = [
-    "rodrigo.lisboa@gruposbf.com.br"
+    "contasareceber@gruposbf.com.br"
     // adicione aqui os outros admins que já existem no isAdminEmail
   ];
 
@@ -15363,26 +15321,25 @@ function registrarMetricaVektor(payload) {
   }
 }
 
-function getLojasOfensorasParaChat(diasJanela) {
+function getLojasOfensorasParaChat(diasJanela, empresa) {
   vektorAssertFunctionAllowed_("getLojasOfensorasParaChat");
 
-  // ✅ Janela agora é o ciclo atual (06 → hoje). "diasJanela" vira apenas o tamanho do ciclo até hoje.
-  const tz = "America/Sao_Paulo";
-  const ciclo = getPeriodoCicloClara_(); // já existe no projeto (inicio=dia 06 do ciclo, fim=hoje 23:59:59)
-  const hoje = new Date();
-  const inicioCiclo = ciclo.inicio;
+  var empresaAtual = vektorNormEmpresa_(empresa || "CENTAURO");
+  var tz = "America/Sao_Paulo";
+  var ciclo = getPeriodoCicloClara_();
+  var hoje = new Date();
+  var inicioCiclo = ciclo.inicio;
 
   diasJanela = Math.max(
     1,
     Math.ceil((hoje.getTime() - inicioCiclo.getTime()) / (24 * 60 * 60 * 1000))
   );
 
-  const rel = gerarRelatorioOfensorasPendencias_(diasJanela);
+  var rel = gerarRelatorioOfensorasPendencias_(diasJanela, empresaAtual);
   if (!rel || !rel.ok) {
     return { ok: false, error: "Falha ao gerar relatório." };
   }
 
-  // período (ciclo atual: 06 → hoje)
   var periodo = {
     inicio: Utilities.formatDate(inicioCiclo, tz, "dd/MM/yyyy"),
     fim: Utilities.formatDate(hoje, tz, "dd/MM/yyyy")
@@ -15390,22 +15347,20 @@ function getLojasOfensorasParaChat(diasJanela) {
 
   return {
     ok: true,
+    empresa: empresaAtual,
     periodo: periodo,
     meta: {
       janela: "Ciclo atual",
       diasJanela: diasJanela,
       totalLojas: (rel.rows || []).length
     },
-    rows: (rel.rows || []).map(r => {
-      const t14 = r.trend14 || {};
-
-      // ✅ delta absoluto (compatível com versões antigas)
-      const deltaAbs = (t14.deltaAbs != null) ? t14.deltaAbs : (t14.delta != null ? t14.delta : 0);
+    rows: (rel.rows || []).map(function(r){
+      var t14 = r.trend14 || {};
+      var deltaAbs = (t14.deltaAbs != null) ? t14.deltaAbs : (t14.delta != null ? t14.delta : 0);
 
       return {
         loja: r.loja,
         time: r.time || "N/D",
-
         qtde: r.qtde,
         valor: r.valor,
         txCount: (r.txCount != null ? r.txCount : 0),
@@ -15413,17 +15368,11 @@ function getLojasOfensorasParaChat(diasJanela) {
         pendEtiqueta: r.pendEtiqueta,
         pendNF: r.pendNF,
         pendDesc: r.pendDesc,
-
-        // ✅ não force 0: se não existe, deixa null para o front/email mostrar "—"
         qtdeSnapshots: (r.qtdeSnapshots != null ? r.qtdeSnapshots : null),
-
         ult14: t14.ult14 || 0,
         ant14: t14.ant14 || 0,
-
-        // ✅ opção C
         delta14: deltaAbs,
         delta14Pct: (t14.deltaPct != null ? t14.deltaPct : null),
-
         score: (r.score != null ? r.score : null),
         classificacao: r.classificacao || "—"
       };
@@ -16928,114 +16877,135 @@ function getPreviewArquivoZFIVektor(req) {
   }
 }
 
-function DISPARAR_EMAIL_OFENSORAS_SEMANA() {
+function DISPARAR_EMAIL_OFENSORAS_SEMANA(empresa) {
   var props = PropertiesService.getScriptProperties();
+  var empresas = empresa
+    ? [vektorNormEmpresa_(empresa)]
+    : [VEKTOR_EMPRESA_CENTAURO, VEKTOR_EMPRESA_FISIA];
 
-  // assinatura atual da BaseClara
-  var sigAtual = calcularAssinaturaBaseClara_();
-  if (!sigAtual || sigAtual.error) {
-    Logger.log("Falha ao calcular assinatura BaseClara");
-    return;
-  }
+  empresas.forEach(function(empresaAtual){
+    try {
+      var sigAtual = calcularAssinaturaBaseClara_(empresaAtual);
+      if (!sigAtual || sigAtual.error) {
+        Logger.log("Falha ao calcular assinatura da base [%s] para ofensoras.", empresaAtual);
+        return;
+      }
 
-  var KEY_ULT_ENVIO = "VEKTOR_OFENSORAS_SIG_ULT_ENVIO";
-  var sigUltEnvio = props.getProperty(KEY_ULT_ENVIO) || "";
+      var keyUltEnvio = "VEKTOR_OFENSORAS_SIG_ULT_ENVIO_" + empresaAtual;
+      var sigUltEnvio = props.getProperty(keyUltEnvio) || "";
 
-  // Se BaseClara NÃO mudou desde o último envio semanal → não envia
-  if (sigAtual.sig === sigUltEnvio) {
-    Logger.log("BaseClara não mudou desde o último e-mail semanal. Não envia.");
-    return;
-  }
+      if (sigAtual.sig === sigUltEnvio) {
+        Logger.log("[%s] Base não mudou desde o último e-mail semanal de ofensoras. Não envia.", empresaAtual);
+        return;
+      }
 
-  // Envia o e-mail (admins)
-  var res = enviarEmailOfensorasPendenciasClara(0);
-  if (!res || !res.ok) {
-    Logger.log("Falha ao enviar e-mail de ofensoras");
-    return;
-  }
+      var res = enviarEmailOfensorasPendenciasClara(0, empresaAtual);
+      if (!res || !res.ok) {
+        Logger.log("[%s] Falha ao enviar e-mail de ofensoras.", empresaAtual);
+        return;
+      }
 
-  // Marca assinatura como já enviada
-  props.setProperty(KEY_ULT_ENVIO, sigAtual.sig);
+      props.setProperty(keyUltEnvio, sigAtual.sig);
+      Logger.log("[%s] E-mail semanal de lojas ofensoras enviado com sucesso.", empresaAtual);
 
-  Logger.log("E-mail semanal de lojas ofensoras enviado com sucesso.");
+    } catch (e) {
+      Logger.log("[%s] Erro em DISPARAR_EMAIL_OFENSORAS_SEMANA: %s", empresaAtual, (e && e.message ? e.message : e));
+    }
+  });
 }
 
-function DISPARAR_EMAIL_ITENS_IRREGULARES_SEMANA() {
+function DISPARAR_EMAIL_ITENS_IRREGULARES_SEMANA(empresa) {
   var props = PropertiesService.getScriptProperties();
+  var empresas = empresa
+    ? [vektorNormEmpresa_(empresa)]
+    : [VEKTOR_EMPRESA_CENTAURO, VEKTOR_EMPRESA_FISIA];
 
-  // assinatura atual da BaseClara
-  var sigAtual = calcularAssinaturaBaseClara_();
-  if (!sigAtual || sigAtual.error) {
-    Logger.log("Falha ao calcular assinatura BaseClara (itens irregulares)");
-    return;
-  }
+  empresas.forEach(function(empresaAtual){
+    try {
+      var sigAtual = calcularAssinaturaBaseClara_(empresaAtual);
+      if (!sigAtual || sigAtual.error) {
+        Logger.log("Falha ao calcular assinatura da base [%s] (itens irregulares)", empresaAtual);
+        return;
+      }
 
-  var KEY_ULT_ENVIO = "VEKTOR_ITENS_IRREG_SIG_ULT_ENVIO";
-  var sigUltEnvio = props.getProperty(KEY_ULT_ENVIO) || "";
+      var keyUltEnvio = "VEKTOR_ITENS_IRREG_SIG_ULT_ENVIO_" + empresaAtual;
+      var sigUltEnvio = props.getProperty(keyUltEnvio) || "";
 
-  // Se BaseClara NÃO mudou desde o último envio semanal → não envia
-  if (sigAtual.sig === sigUltEnvio) {
-    Logger.log("BaseClara não mudou desde o último e-mail semanal (itens irregulares). Não envia.");
-    return;
-  }
+      if (sigAtual.sig === sigUltEnvio) {
+        Logger.log("[%s] Base não mudou desde o último e-mail semanal (itens irregulares). Não envia.", empresaAtual);
+        return;
+      }
 
-  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
-  var hoje = new Date();
-  var fim = new Date(hoje); fim.setHours(23,59,59,999);
-  var ini = new Date(hoje); ini.setDate(ini.getDate() - 6); ini.setHours(0,0,0,0);
+      var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+      var hoje = new Date();
+      var fim = new Date(hoje); fim.setHours(23,59,59,999);
+      var ini = new Date(hoje); ini.setDate(ini.getDate() - 6); ini.setHours(0,0,0,0);
 
-  // usa o mesmo motor de conformidade do chat e filtra ALERTA
-  var res = getListaItensCompradosClara("", "", ini, fim, 2500);
-  if (!res || !res.ok) {
-    Logger.log("Falha ao listar itens comprados para e-mail semanal: " + (res && res.error ? res.error : ""));
-    return;
-  }
+      var res = getListaItensCompradosClara("", "", ini, fim, 2500, empresaAtual);
+      if (!res || !res.ok) {
+        Logger.log("[%s] Falha ao listar itens comprados para e-mail semanal: %s", empresaAtual, (res && res.error ? res.error : ""));
+        return;
+      }
 
-  var rows = Array.isArray(res.rows) ? res.rows : [];
-  rows = rows.filter(function(r){
-    return String(r.conformidade || r.status || "").toUpperCase() === "ALERTA";
+      var rows = Array.isArray(res.rows) ? res.rows : [];
+      rows = rows.filter(function(r){
+        return String(r.conformidade || r.status || "").toUpperCase() === "ALERTA";
+      });
+
+      if (rows.length > 500) rows = rows.slice(0, 500);
+
+      var admins = vektorGetAdminEmails_();
+      var to = (admins && admins.join) ? admins.join(",") : "";
+      if (!to) {
+        Logger.log("[%s] Sem e-mails de admin para envio (itens irregulares).", empresaAtual);
+        return;
+      }
+
+      var periodoTxt = Utilities.formatDate(ini, tz, "dd/MM/yyyy") + " → " + Utilities.formatDate(fim, tz, "dd/MM/yyyy");
+      var html = buildEmailItensIrregulares_(rows, periodoTxt);
+
+      GmailApp.sendEmail(
+        to,
+        vektorBuildSubject_(empresaAtual, "ALERTA CLARA | ITENS IRREGULARES") + " Semanal | " + periodoTxt,
+        " ",
+        {
+          from: "vektor@gruposbf.com.br",
+          htmlBody: html
+        }
+      );
+
+      try {
+        registrarAlertaEnviado_(
+          "ITENS_IRREGULARES",
+          "",
+          "",
+          "Semanal | Empresa=" + empresaAtual + " | ALERTA | período " + periodoTxt + " | linhas=" + rows.length,
+          to,
+          "AUTO_SEMANAL",
+          empresaAtual
+        );
+      } catch (eLog) {}
+
+      props.setProperty(keyUltEnvio, sigAtual.sig);
+      Logger.log("[%s] E-mail semanal de itens irregulares enviado com sucesso.", empresaAtual);
+
+    } catch (e) {
+      Logger.log("[%s] Erro em DISPARAR_EMAIL_ITENS_IRREGULARES_SEMANA: %s", empresaAtual, (e && e.message ? e.message : e));
+    }
+  });
+}
+
+function RESETAR_GATE_EMAIL_ITENS_IRREGULARES_SEMANA(empresa) {
+  var props = PropertiesService.getScriptProperties();
+  var empresas = empresa
+    ? [vektorNormEmpresa_(empresa)]
+    : [VEKTOR_EMPRESA_CENTAURO, VEKTOR_EMPRESA_FISIA];
+
+  empresas.forEach(function(emp){
+    props.deleteProperty("VEKTOR_ITENS_IRREG_SIG_ULT_ENVIO_" + emp);
   });
 
-  // limita para não explodir email/quota
-  if (rows.length > 500) rows = rows.slice(0, 500);
-
-  // se não tem alerta, ainda registra o gate para evitar spam repetido
-  var admins = vektorGetAdminEmails_();
-  var to = (admins && admins.join) ? admins.join(",") : "";
-  if (!to) {
-    Logger.log("Sem e-mails de admin para envio (itens irregulares).");
-    return;
-  }
-
-  var periodoTxt = Utilities.formatDate(ini, tz, "dd/MM/yyyy") + " → " + Utilities.formatDate(fim, tz, "dd/MM/yyyy");
-  var html = buildEmailItensIrregulares_(rows, periodoTxt);
-
-  GmailApp.sendEmail(to, "Vektor — Possíveis itens irregulares (ALERTA) — " + periodoTxt, " ", {
-      from: "vektor@gruposbf.com.br",
-      htmlBody: html
-    });
-
-  // ✅ registra no log para aparecer no modal “Disparo de Ocorrências”
-  try {
-    registrarAlertaEnviado_(
-      "ITENS_IRREGULARES",
-      "", // loja (agregado)
-      "", // time (agregado)
-      "Semanal | ALERTA | período " + periodoTxt + " | linhas=" + rows.length,
-      to,
-      "AUTO_SEMANAL"
-    );
-  } catch (eLog) {}
-
-  // Marca assinatura como já enviada
-  props.setProperty(KEY_ULT_ENVIO, sigAtual.sig);
-
-  Logger.log("E-mail semanal de itens irregulares enviado com sucesso.");
-}
-
-function RESETAR_GATE_EMAIL_ITENS_IRREGULARES_SEMANA() {
-  PropertiesService.getScriptProperties().deleteProperty("VEKTOR_ITENS_IRREG_SIG_ULT_ENVIO");
-  Logger.log("Gate resetado: VEKTOR_ITENS_IRREG_SIG_ULT_ENVIO removida. Próximo disparo enviará novamente.");
+  Logger.log("Gate resetado para itens irregulares. Empresas: " + empresas.join(", "));
 }
 
 function buildEmailItensIrregulares_(rows, periodoTxt) {
@@ -17305,27 +17275,36 @@ function vektorGetHistoricoEnviosItensIrregularesResumo() {
   return vektorGetHistoricoEnviosItensIrregularesResumo_();
 }
 
-function RESETAR_GATE_EMAIL_OFENSORAS_SEMANA() {
-  PropertiesService.getScriptProperties().deleteProperty("VEKTOR_OFENSORAS_SIG_ULT_ENVIO");
-  Logger.log("Gate resetado: VEKTOR_OFENSORAS_SIG_ULT_ENVIO removida. Próximo disparo enviará novamente.");
+function RESETAR_GATE_EMAIL_OFENSORAS_SEMANA(empresa) {
+  var props = PropertiesService.getScriptProperties();
+  var empresas = empresa
+    ? [vektorNormEmpresa_(empresa)]
+    : [VEKTOR_EMPRESA_CENTAURO, VEKTOR_EMPRESA_FISIA];
+
+  empresas.forEach(function(emp){
+    props.deleteProperty("VEKTOR_OFENSORAS_SIG_ULT_ENVIO_" + emp);
+  });
+
+  Logger.log("Gate resetado para ofensoras. Empresas: " + empresas.join(", "));
 }
 
-function LIMPAR_ALERTA_LIMITE() {
+function LIMPAR_ALERTA_LIMITE(empresa) {
   var props = PropertiesService.getScriptProperties();
+  var cicloKey = getCicloKey06a05_();
 
-  // 1) Gate do envio de limite (porteiro ENVIAR_EMAIL_LIMITE_CLARA)
-  props.deleteProperty("VEKTOR_SIG_BASECLARA_PROCESSADA");
+  var empresas = empresa
+    ? [vektorNormEmpresa_(empresa)]
+    : [VEKTOR_EMPRESA_CENTAURO, VEKTOR_EMPRESA_FISIA];
 
-  // 2) Anti-spam do ciclo (se existir no seu fluxo)
-  try {
-    var cicloKey = getCicloKey06a05_();
-    props.deleteProperty("VEKTOR_ALERTS_SENT_" + cicloKey);
-  } catch (e) {}
+  empresas.forEach(function(emp){
+    props.deleteProperty("VEKTOR_SIG_BASECLARA_PROCESSADA_" + emp);
+    props.deleteProperty("VEKTOR_ALERTS_SENT_" + emp + "_" + cicloKey);
+    props.deleteProperty(PROP_LAST_SNAPSHOT_SIG + "_" + emp);
+  });
 
-  // 3) Mantém sua limpeza antiga (se ainda for usada em outra parte)
   props.deleteProperty("VEKTOR_HISTPEND_LAST_SIG");
 
-  Logger.log("Gate do alerta de LIMITE limpo com sucesso.");
+  Logger.log("Gate do alerta de LIMITE limpo com sucesso. Empresas: " + empresas.join(", "));
 }
 
 function vektorStatusSistema() {
@@ -18535,11 +18514,11 @@ function getFluxoNumerarioSapData(req) {
     var lojaSel = String(req.loja || "").trim().toUpperCase();
 
     if (!dtIni) {
-      var hoje = new Date();
-      var ini = new Date(hoje);
-      ini.setMonth(ini.getMonth() - 3);
-      dtIni = Utilities.formatDate(ini, Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
-    }
+    var hoje = new Date();
+    var ini = new Date(hoje);
+    ini.setDate(ini.getDate() - 29);
+    dtIni = Utilities.formatDate(ini, Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
+  }
 
     if (!dtFim) {
       dtFim = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
