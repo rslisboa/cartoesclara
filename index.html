@@ -8958,49 +8958,24 @@ window.vektorOpenFluxoNumerarioSap = function () {
   vektorFluxoNumerarioSapInitOnce_();
 
   try {
-    var hasCache =
-      Array.isArray(window.__fluxoNumerarioSapData) &&
-      window.__fluxoNumerarioSapData.length > 0;
-
-    if (hasCache) {
-      try {
-        if (typeof vektorFluxoNumerarioSapRebuildDependentFilters_ === "function") {
-          vektorFluxoNumerarioSapRebuildDependentFilters_();
-        }
-      } catch (_) {}
-
-      try {
-        if (window.__fluxoNumerarioSapLastCards) {
-          vektorFluxoNumerarioSapRenderCards_(window.__fluxoNumerarioSapLastCards);
-        }
-      } catch (_) {}
-
-      try {
-        vektorFluxoNumerarioSapRenderTable_();
-      } catch (_) {}
-
-      try {
-        if (window.__fluxoNumerarioSapLastChart) {
-          vektorFluxoNumerarioSapRenderChart_(window.__fluxoNumerarioSapLastChart);
-        }
-      } catch (_) {}
-
-      return;
+    // sempre reabre com o período padrão correto
+    if (typeof vektorFluxoNumerarioSapAplicarPeriodoPadrao_ === "function") {
+      vektorFluxoNumerarioSapAplicarPeriodoPadrao_();
     }
 
+    // não reaproveita cache antigo para não manter período/dados velhos
+    window.__fluxoNumerarioSapData = null;
+    window.__fluxoNumerarioSapBaseRows = null;
+    window.__fluxoNumerarioSapLastCards = null;
+    window.__fluxoNumerarioSapLastChart = null;
+
     vektorFluxoNumerarioSapResetVisual_();
+    vektorFluxoNumerarioSapBuscar_({ fromOpen: true });
 
-    vektorFluxoNumerarioSapShowOverlay_(
-      "Carregando Fluxo Numerário SAP…",
-      "Buscando dados padrão dos últimos 3 meses."
-    );
-
-    vektorFluxoNumerarioSapEnsureMeta_(function(){
-      vektorFluxoNumerarioSapBuscar_({ fromOpen: true });
-    });
   } catch (e) {
-    console.error("Erro ao abrir Fluxo Numerário SAP:", e);
-    vektorFluxoNumerarioSapHideOverlay_();
+    console.error("[SAP open] erro:", e);
+    vektorFluxoNumerarioSapResetVisual_();
+    vektorFluxoNumerarioSapBuscar_({ fromOpen: true });
   }
 };
 
@@ -11622,12 +11597,10 @@ function vektorFluxoNumerarioSapBuscar_(opts){
     return;
   }
 
-  if (!fromOpen) {
-    vektorFluxoNumerarioSapShowOverlay_(
-      "Buscando lançamentos de sangria…",
-      "Consultando dados do SAP e atualizando a visão."
-    );
-  }
+  vektorFluxoNumerarioSapShowOverlay_(
+    "Carregando Fluxo Numerário SAP…",
+    "Buscando lançamentos no período..."
+  );
 
   google.script.run
     .withSuccessHandler(function(res){
@@ -11717,22 +11690,31 @@ function vektorFluxoNumerarioSapInitOnce_(){
     var dtIni = document.getElementById("fluxoNumerarioSap_dtIni");
     var dtFim = document.getElementById("fluxoNumerarioSap_dtFim");
 
-    if (dtIni && dtFim && !dtIni.value && !dtFim.value) {
-      var hoje = new Date();
-      var fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
-      var ini = new Date(fim);
-      ini.setMonth(ini.getMonth() - 3);
+    if (typeof window.vektorFluxoNumerarioSapAplicarPeriodoPadrao_ !== "function") {
+      window.vektorFluxoNumerarioSapAplicarPeriodoPadrao_ = function() {
+        var dtIniEl = document.getElementById("fluxoNumerarioSap_dtIni");
+        var dtFimEl = document.getElementById("fluxoNumerarioSap_dtFim");
+        if (!dtIniEl || !dtFimEl) return;
 
-      function fmtDateInput_(d) {
-        var yyyy = d.getFullYear();
-        var mm = String(d.getMonth() + 1).padStart(2, "0");
-        var dd = String(d.getDate()).padStart(2, "0");
-        return yyyy + "-" + mm + "-" + dd;
-      }
+        var hoje = new Date();
+        var fim = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+        var ini = new Date(fim);
+        ini.setDate(ini.getDate() - 29); // 30 dias contando hoje
 
-      dtIni.value = fmtDateInput_(ini);
-      dtFim.value = fmtDateInput_(fim);
+        function fmtDateInput_(d) {
+          var yyyy = d.getFullYear();
+          var mm = String(d.getMonth() + 1).padStart(2, "0");
+          var dd = String(d.getDate()).padStart(2, "0");
+          return yyyy + "-" + mm + "-" + dd;
+        }
+
+        dtIniEl.value = fmtDateInput_(ini);
+        dtFimEl.value = fmtDateInput_(fim);
+      };
     }
+
+    // aplica no primeiro bind
+    window.vektorFluxoNumerarioSapAplicarPeriodoPadrao_();
 
     if (btnBuscar) {
       btnBuscar.addEventListener("click", function(){
@@ -11760,8 +11742,8 @@ function vektorFluxoNumerarioSapInitOnce_(){
         }
 
         vektorFluxoNumerarioSapShowOverlay_(
-          "Ordenando dados…",
-          "Atualizando a tabela."
+          "Ordenando lançamentos…",
+          "Atualizando a tabela do Fluxo Numerário SAP."
         );
 
         setTimeout(function(){
@@ -13388,6 +13370,9 @@ function vektorDrawFluxogramaConnectors_() {
 // RADAR (tela cheia)
 // ===============================
 window.vektorOpenRadar = function (modo) {
+  modo = String(modo || "7d").toLowerCase().trim();
+  window.__vektorRadarModoAtual = modo;
+
   vektorSetActiveNavBtn_("navRadarBtn");
   vektorShowRadarView_();
 
@@ -13400,11 +13385,16 @@ window.vektorOpenRadar = function (modo) {
   setRadarActiveBtn_(modo);
   window.vektorSetRadarViewMode_("RADAR");
 
-  window.__radarCacheByModo = window.__radarCacheByModo || {};
+  const empresaAtual = (typeof window.vektorEmpresaAtual_ === "function")
+    ? window.vektorEmpresaAtual_()
+    : "CENTAURO";
 
-  // ✅ reaproveita cache se já carregou esse modo
-  if (window.__radarCacheByModo[modo]) {
-    const cached = window.__radarCacheByModo[modo];
+  window.__radarCacheByModoEmpresa = window.__radarCacheByModoEmpresa || {};
+  const cacheKey = empresaAtual + "|" + modo;
+
+  // reaproveita cache se já carregou esse modo PARA a empresa atual
+  if (window.__radarCacheByModoEmpresa[cacheKey]) {
+    const cached = window.__radarCacheByModoEmpresa[cacheKey];
     renderRadarHeatmap_(cached.lojas || []);
     renderRadarRanking_(cached.lojas || [], cached.detalhesPorLoja || {});
     renderRadarInsights_(cached.lojas || []);
@@ -13441,7 +13431,7 @@ window.vektorOpenRadar = function (modo) {
         return;
       }
 
-      window.__radarCacheByModo[modo] = {
+      window.__radarCacheByModoEmpresa[cacheKey] = {
         lojas: lojas,
         detalhesPorLoja: res.detalhesPorLoja || {}
       };
@@ -13458,7 +13448,7 @@ window.vektorOpenRadar = function (modo) {
         heat.innerHTML = `<div style="color:rgba(248,113,113,0.95); font-weight:800; font-size:13px;">Falha: ${msg}</div>`;
       }
     })
-    .getRadarIrregularidadeParaChat(modo);
+    .getRadarIrregularidadeParaChat(modo, empresaAtual);
 };
 
 // ===============================
@@ -14248,7 +14238,7 @@ window.vektorEnviarNotificacaoItensIrregularesSelecionados_ = function () {
       const msg = (err && err.message) ? err.message : String(err || "Erro");
       alert("Falha ao enviar e-mails: " + msg);
     })
-    .dispararNotificacaoItensIrregularesSelecionados(selected);
+    .dispararNotificacaoItensIrregularesSelecionados(selected, vektorEmpresaAtual_());
 };
 
 window.vektorClosePreviewItensIrregDet_ = function () {
