@@ -6812,6 +6812,32 @@ window.vektorSelecionarEmpresa_ = function(empresa) {
 
         window.__vektorEmpresaAtual = String(res.empresaAtual || emp).toUpperCase();
 
+                    try {
+              window.vektorAuxResetState_ && window.vektorAuxResetState_();
+            } catch(e) {
+              console.error(e);
+            }
+
+            try {
+              const aux = document.getElementById("consultasAuxView");
+              if (aux) {
+                aux.classList.add("hidden");
+                aux.style.display = "none";
+              }
+            } catch(e) {
+              console.error(e);
+            }
+
+            try {
+              const home = document.getElementById("homeView");
+              if (home) {
+                home.classList.remove("hidden");
+                home.style.display = "flex";
+              }
+            } catch(e) {
+              console.error(e);
+            }
+
         if (typeof window.vektorRefreshEmpresaChecks_ === "function") {
           window.vektorRefreshEmpresaChecks_();
         }
@@ -14853,17 +14879,28 @@ function vektorShowConsultasAuxView_(){
   if (radarView) radarView.classList.remove("is-open");
 }
 
+window.vektorAuxResetState_ = function(){
+  try {
+    window.__auxFaturasLista = [];
+    window.__auxViewMode = "FATURAS";
+
+    const fatBox = document.getElementById("auxFaturasConteudo");
+    const demBox = document.getElementById("auxDemConteudo");
+    const salBox = document.getElementById("auxSaldosConteudo");
+
+    if (fatBox) fatBox.innerHTML = "";
+    if (demBox) demBox.innerHTML = "";
+    if (salBox) salBox.innerHTML = "";
+  } catch (e) {
+    console.error("Erro ao resetar estado de Consultas Auxiliares:", e);
+  }
+};
+
 window.vektorOpenConsultasAuxiliares = function(){
   vektorSetActiveNavBtn_("navConsultasAuxBtn");
   vektorShowConsultasAuxView_();
-  window.vektorAuxShowFaturas();
-
-  if (window.__auxFaturasLoaded === true) {
-    return;
-  }
-
-  window.__auxFaturasLoaded = true;
-  window.vektorAuxLoadFaturas();
+  window.vektorAuxResetState_ && window.vektorAuxResetState_();
+  window.vektorAuxShowFaturas(true);
 };
 
 function vektorShowBasesVektorView_(){
@@ -28567,41 +28604,41 @@ window.vektorAuxGerarPreviewZfi = function(){
       "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Montando prévia da ZFI…</span></div>"
     );
 
-    google.script.run
-      .withSuccessHandler(function(res){
-        try {
-          if (!res || !res.ok) {
-            const msg = (res && res.error) ? res.error : "Não consegui montar a prévia do arquivo ZFI.";
-            window.vektorAuxOpenZfiModal_(
-              "Prévia — Arquivo ZFI",
-              "<p class='text-sm text-slate-700'>" + window.vektorAuxEscapeHtml_(msg) + "</p>"
-            );
-            return;
-          }
-
-          window.vektorAuxOpenZfiModal_(
-            "Prévia pronta para a fatura “" + extrato + "”.",
-            "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Renderizando prévia…</span></div>"
-          );
-
-          window.vektorAuxRenderPreviewZfi_(res);
-        } catch (e) {
-          console.error("Erro ao renderizar prévia ZFI:", e);
-          window.vektorAuxOpenZfiModal_(
-            "Prévia — Arquivo ZFI",
-            "<p class='text-sm text-slate-700'>Erro ao renderizar a prévia do arquivo ZFI.</p>"
-          );
-        }
-      })
-      .withFailureHandler(function(err){
-        console.error("Erro Apps Script (getPreviewArquivoZFIVektor):", err);
-        const msg = (err && err.message) ? err.message : String(err || "");
+      google.script.run
+  .withSuccessHandler(function(res){
+    try {
+      if (!res || !res.ok) {
+        const msg = (res && res.error) ? res.error : "Não consegui montar a prévia do arquivo ZFI.";
         window.vektorAuxOpenZfiModal_(
           "Prévia — Arquivo ZFI",
-          "<p class='text-sm text-slate-700'>Erro ao consultar dados do ZFI: " + window.vektorAuxEscapeHtml_(msg) + "</p>"
+          "<p class='text-sm text-slate-700'>" + window.vektorAuxEscapeHtml_(msg) + "</p>"
         );
-      })
-      .getPreviewArquivoZFIVektor({ extrato: extrato });
+        return;
+      }
+
+      window.vektorAuxOpenZfiModal_(
+        "Prévia pronta para a fatura “" + extrato + "”.",
+        "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Renderizando prévia…</span></div>"
+      );
+
+      window.vektorAuxRenderPreviewZfi_(res);
+    } catch (e) {
+      console.error("Erro ao renderizar prévia ZFI:", e);
+      window.vektorAuxOpenZfiModal_(
+        "Prévia — Arquivo ZFI",
+        "<p class='text-sm text-slate-700'>Erro ao renderizar a prévia do arquivo ZFI.</p>"
+      );
+    }
+  })
+  .withFailureHandler(function(err){
+    console.error("Erro Apps Script (getPreviewArquivoZFIVektor):", err);
+    const msg = (err && err.message) ? err.message : String(err || "");
+    window.vektorAuxOpenZfiModal_(
+      "Prévia — Arquivo ZFI",
+      "<p class='text-sm text-slate-700'>Erro ao consultar dados do ZFI: " + window.vektorAuxEscapeHtml_(msg) + "</p>"
+    );
+  })
+  .getPreviewArquivoZFIVektor({ extrato: extrato, empresa: "" });
 
   } catch (e) {
     console.error("Erro ao montar preview ZFI:", e);
@@ -28730,6 +28767,13 @@ window.vektorAuxAbrirAnaliseTemporal = function(){
       return;
     }
 
+    const empresaAtual =
+      (window.__vektorSession && window.__vektorSession.empresaAtual)
+        ? String(window.__vektorSession.empresaAtual).trim().toUpperCase()
+        : ((window.vektorSession && window.vektorSession.empresaAtual)
+            ? String(window.vektorSession.empresaAtual).trim().toUpperCase()
+            : "CENTAURO");
+
     window.vektorAuxOpenAnaliseTemporalModal_(
       "Análise Temporal de Faturas",
       "Comparando “" + extratoAtual + "” com “" + extratoAnterior + "”",
@@ -28773,7 +28817,7 @@ window.vektorAuxAbrirAnaliseTemporal = function(){
           "<p class='text-sm text-slate-700'>Erro ao consultar a análise temporal: " + msg.replace(/</g,"&lt;").replace(/>/g,"&gt;") + "</p>"
         );
       })
-      .getAnaliseTemporalFaturasVektor(extratoAtual, extratoAnterior);
+      .getAnaliseTemporalFaturasVektor(extratoAtual, extratoAnterior, empresaAtual);
 
   } catch (e) {
     console.error("Erro em vektorAuxAbrirAnaliseTemporal:", e);
@@ -29552,6 +29596,24 @@ function vektorMontarTabelaFaturas_(titulo, faturas) {
   return partes.join("");
 }
 
+window.vektorGetEmpresaAtualFront_ = function(){
+  try {
+    if (window.__vektorSession && window.__vektorSession.empresaAtual) {
+      return String(window.__vektorSession.empresaAtual || "").trim().toUpperCase();
+    }
+
+    if (window.vektorSession && window.vektorSession.empresaAtual) {
+      return String(window.vektorSession.empresaAtual || "").trim().toUpperCase();
+    }
+
+    if (window.__empresaAtualVektor) {
+      return String(window.__empresaAtualVektor || "").trim().toUpperCase();
+    }
+  } catch (_) {}
+
+  return "CENTAURO";
+};
+
 window.vektorAuxLoadFaturas = function(){
   const box = document.getElementById("auxFaturasConteudo");
   if (!box) return;
@@ -29656,10 +29718,12 @@ function vektorAuxSetView_(mode){
   window.__auxViewMode = mode;
 }
 
-window.vektorAuxShowFaturas = function(){
+window.vektorAuxShowFaturas = function(forceReload){
   vektorAuxSetView_("FATURAS");
-  // opcional: se quiser recarregar faturas ao voltar
-  // window.vektorAuxLoadFaturas && window.vektorAuxLoadFaturas();
+
+  if (forceReload !== false) {
+    window.vektorAuxLoadFaturas && window.vektorAuxLoadFaturas();
+  }
 };
 
 window.vektorAuxShowDemissoes = function(){
@@ -30607,17 +30671,6 @@ window.vektorDrillTimesFatura = function (tr) {
   try {
     if (!tr) return;
 
-    const auxView = document.getElementById("consultasAuxView");
-    const auxAtivo = auxView && !auxView.classList.contains("hidden") && (auxView.style.display !== "none");
-
-    // Se não estiver na página Aux, mantém o comportamento antigo (não quebra o resto do sistema)
-    if (!auxAtivo) {
-      // ---- fallback (se você quiser zerar o chat de vez, apague este bloco) ----
-      var extratoOld = tr.getAttribute("data-extrato-fatura") || "";
-      renderBotMessage("HTML:<p class='text-sm text-slate-700'>Abra a página <b>Consultas Auxiliares</b> para detalhar faturas por time.</p>");
-      return;
-    }
-
     var extrato = tr.getAttribute("data-extrato-fatura") || "";
     var dataInicioIso = tr.getAttribute("data-inicio-fatura") || "";
     var dataFimIso = tr.getAttribute("data-fim-fatura") || "";
@@ -30627,7 +30680,7 @@ window.vektorDrillTimesFatura = function (tr) {
       const ini = dataInicioIso ? new Date(dataInicioIso).toLocaleDateString("pt-BR") : "";
       const fim = dataFimIso ? new Date(dataFimIso).toLocaleDateString("pt-BR") : "";
       if (ini || fim) periodoTexto = "Período: " + ini + (fim ? " até " + fim : "");
-    } catch(_) {}
+    } catch (_) {}
 
     window.vektorAuxOpenTimesModal(
       "Times da fatura",
@@ -30647,10 +30700,8 @@ window.vektorDrillTimesFatura = function (tr) {
             return;
           }
 
-          // res.times esperado: [{time, total, valorTotal}, ...]
           const linhas = res.times.slice();
 
-          // ordena por valorTotal desc
           linhas.sort(function(a,b){
             return (Number(b.valorTotal)||0) - (Number(a.valorTotal)||0);
           });
@@ -30825,7 +30876,7 @@ window.vektorBaixarTransacoesFatura = function (ev, extrato) {
   try {
     if (ev) {
       ev.preventDefault();
-      ev.stopPropagation(); // ✅ evita disparar o drilldown da <tr>
+      ev.stopPropagation();
     }
 
     extrato = (extrato || "").toString().trim();
@@ -30834,16 +30885,19 @@ window.vektorBaixarTransacoesFatura = function (ev, extrato) {
       return false;
     }
 
+    renderBotMessage(
+      "HTML:<p class='text-sm text-slate-700'>Gerando arquivo em excel da fatura <b>" + extrato + "</b>.</p>"
+    );
+
     google.script.run
       .withSuccessHandler(function (res) {
-                if (!res || !res.ok || !res.xlsxBase64) {
-                var msg = (res && res.error) ? res.error : "Não consegui gerar o Excel dessa fatura.";
-                renderBotMessage("HTML:<p class='text-sm text-slate-700'><b>Falha ao exportar:</b> " + msg + "</p>");
-                console.error("Resposta export XLSX:", res);
-                return;
-              }
+        if (!res || !res.ok || !res.xlsxBase64) {
+          var msg = (res && res.error) ? res.error : "Não consegui gerar o Excel dessa fatura.";
+          renderBotMessage("HTML:<p class='text-sm text-slate-700'><b>Falha ao exportar:</b> " + msg + "</p>");
+          console.error("Resposta export XLSX:", res);
+          return;
+        }
 
-        // base64 -> bytes
         var b64 = res.xlsxBase64;
         var byteChars = atob(b64);
         var byteNumbers = new Array(byteChars.length);
@@ -30874,7 +30928,6 @@ window.vektorBaixarTransacoesFatura = function (ev, extrato) {
     return false;
   }
 };
-
 
 /**
  * Filtra a lista completa de faturas segundo o modo de pergunta.
