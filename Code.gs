@@ -12504,10 +12504,11 @@ function getResumoTransacoesPorTime(dataInicioStr, dataFimStr, criterio) {
  *   top: { ... }
  * }
  */
-function getResumoTransacoesPorTimeExtrato(extratoConta, criterio) {
+function getResumoTransacoesPorTimeExtrato(extratoConta, criterio, empresa) {
   vektorAssertFunctionAllowed_("getResumoTransacoesPorTimeExtrato");
   try {
-    var info = carregarLinhasBaseClara_();
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var info = carregarLinhasBaseClara_(empCtx.empresaAtual);
     if (info.error) {
       return { ok: false, error: info.error };
     }
@@ -12624,16 +12625,21 @@ function getResumoTransacoesPorTimeExtrato(extratoConta, criterio) {
 
   } catch (e) {
     return {
-      ok: false,
-      error: e && e.message ? e.message : e
-    };
+        ok: true,
+        empresa: empCtx.empresaAtual,
+        criterio: criterio,
+        extratoOriginal: alvoOriginal,
+        times: timesArr,
+        top: top
+      };
   }
 }
 
-function exportarTransacoesFaturaXlsx(extratoConta) {
+function exportarTransacoesFaturaXlsx(extratoConta, empresa) {
   vektorAssertFunctionAllowed_("exportarTransacoesFaturaXlsx");
   try {
-    var info = carregarLinhasBaseClara_();
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var info = carregarLinhasBaseClara_(empCtx.empresaAtual);
     if (info.error) {
       return { ok: false, error: info.error };
     }
@@ -12641,7 +12647,6 @@ function exportarTransacoesFaturaXlsx(extratoConta) {
     var header = info.header || [];
     var linhas = info.linhas || [];
 
-    // Coluna B = "Extrato da conta"
     var idxExtrato = encontrarIndiceColuna_(header, ["Extrato da conta", "Extrato"]);
     if (idxExtrato < 0) {
       return { ok: false, error: "Coluna 'Extrato da conta' não encontrada." };
@@ -12653,7 +12658,6 @@ function exportarTransacoesFaturaXlsx(extratoConta) {
       return { ok: false, error: "Extrato não informado." };
     }
 
-    // A até W = 23 colunas
     var COLS = 23;
     var dados = [];
     dados.push(header.slice(0, COLS));
@@ -12662,9 +12666,9 @@ function exportarTransacoesFaturaXlsx(extratoConta) {
       var row = linhas[i];
       if (!row) continue;
 
-        var extratoLinha = String(row[idxExtrato] || "").trim();
-        var extratoNorm = normalizarTexto_(extratoLinha);
-        if (!extratoNorm || extratoNorm !== alvoNorm) continue;
+      var extratoLinha = String(row[idxExtrato] || "").trim();
+      var extratoNorm = normalizarTexto_(extratoLinha);
+      if (!extratoNorm || extratoNorm !== alvoNorm) continue;
 
       dados.push(row.slice(0, COLS));
     }
@@ -12673,61 +12677,51 @@ function exportarTransacoesFaturaXlsx(extratoConta) {
       return { ok: false, error: "Nenhuma transação encontrada para essa fatura." };
     }
 
-    // Cria planilha temporária
-var ss = SpreadsheetApp.create("TMP_EXPORT_FATURA");
-var sh = ss.getActiveSheet();
-sh.getRange(1, 1, dados.length, dados[0].length).setValues(dados);
+    var ss = SpreadsheetApp.create("TMP_EXPORT_FATURA");
+    var sh = ss.getActiveSheet();
+    sh.getRange(1, 1, dados.length, dados[0].length).setValues(dados);
 
-// Garante que os dados foram gravados
-SpreadsheetApp.flush();
+    SpreadsheetApp.flush();
 
-// URL oficial de exportação do Drive (XLSX)
-var fileId = ss.getId();
-var url =
-  "https://www.googleapis.com/drive/v3/files/" +
-  fileId +
-  "/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    var fileId = ss.getId();
+    var url =
+      "https://www.googleapis.com/drive/v3/files/" +
+      fileId +
+      "/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-// Token OAuth do script
-var token = ScriptApp.getOAuthToken();
+    var token = ScriptApp.getOAuthToken();
 
-// Faz download do XLSX
-var resp = UrlFetchApp.fetch(url, {
-  headers: {
-    Authorization: "Bearer " + token
-  },
-  muteHttpExceptions: true
-});
+    var resp = UrlFetchApp.fetch(url, {
+      headers: {
+        Authorization: "Bearer " + token
+      },
+      muteHttpExceptions: true
+    });
 
-// Apaga planilha temporária
-DriveApp.getFileById(fileId).setTrashed(true);
+    DriveApp.getFileById(fileId).setTrashed(true);
 
-// Valida resposta
-if (resp.getResponseCode() !== 200) {
-  return {
-    ok: false,
-    error: "Falha ao exportar XLSX (HTTP " + resp.getResponseCode() + ")"
-  };
-}
+    if (resp.getResponseCode() < 200 || resp.getResponseCode() >= 300) {
+      return {
+        ok: false,
+        error: "Falha ao exportar XLSX. HTTP " + resp.getResponseCode() + ": " + resp.getContentText()
+      };
+    }
 
-// Converte para Base64
-var bytes = resp.getBlob().getBytes();
-var base64 = Utilities.base64Encode(bytes);
+    var bytes = resp.getBlob().getBytes();
+    var b64 = Utilities.base64Encode(bytes);
 
-// Nome do arquivo
-var filename =
-  "transacoes_fatura_" +
-  alvo.replace(/[^\w]+/g, "_") +
-  ".xlsx";
+    var nomeEmp = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+    var nomeArq = "transacoes_fatura_" + nomeEmp.toLowerCase() + ".xlsx";
 
-return {
-  ok: true,
-  filename: filename,
-  xlsxBase64: base64
-};
+    return {
+      ok: true,
+      empresa: nomeEmp,
+      filename: nomeArq,
+      xlsxBase64: b64
+    };
 
   } catch (e) {
-    return { ok: false, error: e.message || String(e) };
+    return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
 }
 
@@ -14916,10 +14910,11 @@ function parseExtratoContaPeriodo_(texto) {
  *   ]
  * }
  */
-function getResumoFaturasClara() {
+function getResumoFaturasClara(empresa) {
   vektorAssertFunctionAllowed_("getResumoFaturasClara");
   try {
-    var info = carregarLinhasBaseClara_();
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var info = carregarLinhasBaseClara_(empCtx.empresaAtual);
     if (info.error) {
       return { ok: false, error: info.error };
     }
@@ -14992,6 +14987,7 @@ function getResumoFaturasClara() {
 
     return {
       ok: true,
+      empresa: empCtx.empresaAtual,
       faturas: faturas
     };
 
@@ -15771,9 +15767,10 @@ function getResumoCicloPendenciasDetalheLojaResumo(loja) {
   }
 }
 
-function getComparativoFaturasClaraCore_(extratoAtualOpt, extratoAnteriorOpt) {
+function getComparativoFaturasClara(extratoAtualOpt, extratoAnteriorOpt, empresa) {
   try {
-    var info = carregarLinhasBaseClara_();
+    var empCtx = vektorGetEmpresaContext_(empresa);
+    var info = carregarLinhasBaseClara_(empCtx.empresaAtual);
     if (info.error) return { ok: false, error: info.error };
 
     var header = info.header || [];
@@ -16276,7 +16273,8 @@ function getComparativoFaturasClaraCore_(extratoAtualOpt, extratoAnteriorOpt) {
         extratoAtual: extratoAtual,
         extratoAnterior: extratoAnterior,
         totalLojas: rows.length,
-        ultimaDataConsiderada: ultimaDataConsideradaTxt
+        ultimaDataConsiderada: ultimaDataConsideradaTxt,
+        empresa: empCtx.empresaAtual
       },
       insights: insights,
       summary: {
@@ -16306,9 +16304,9 @@ function getComparativoFaturasClaraParaChat() {
   return getComparativoFaturasClaraCore_("", "");
 }
 
-function getAnaliseTemporalFaturasVektor(extratoAtual, extratoAnterior) {
+function getAnaliseTemporalFaturasVektor(extratoAtual, extratoAnterior, empresa) {
   vektorAssertFunctionAllowed_("getAnaliseTemporalFaturasVektor");
-  return getComparativoFaturasClaraCore_(extratoAtual, extratoAnterior);
+  return getComparativoFaturasClaraCore_(extratoAtual, extratoAnterior, empresa);
 }
 
 // =====================================================
@@ -16369,6 +16367,81 @@ function vektorZfiLocNeg_(v) {
   var n = normalizarLojaNumero_(v);
   if (!n) return "";
   return VEKTOR_ZFI_LOCNEG_SEM_PAD4 ? String(n) : String(n).padStart(4, "0");
+}
+
+//--- RELAÇÃO DE CENTRO DE CUSTOS FISIA---//
+
+var VEKTOR_ZFI_FISIA_CC_MAP = {
+  "2084": "140431",
+  "2086": "140433",
+  "2087": "140452",
+  "2088": "140455",
+  "2091": "140460",
+  "2092": "140461",
+  "2095": "140469",
+  "2099": "140473",
+  "2098": "140472",
+  "2097": "140471",
+  "2072": "140560",
+  "2075": "140554",
+  "2077": "140556",
+  "2076": "140555",
+  "2032": "140590",
+  "2033": "140591",
+  "2034": "140592",
+  "2055": "140598",
+  "2090": "140459",
+  "2085": "140432",
+  "2070": "140468",
+  "2058": "140601",
+  "2071": "140482",
+  "2036": "140594",
+  "2056": "140599",
+  "2029": "140587",
+  "2078": "140557",
+  "2079": "140558",
+  "2054": "140597",
+  "2057": "140600",
+  "2093": "140652",
+  "2050": "142059",
+  "2089": "140462",
+  "2030": "140588",
+  "2052": "140595",
+  "2100": "142057",
+  "2094": "140653",
+  "2035": "140651",
+  "2102": "142058",
+  "2083": "140654",
+  "2101": "142053",
+  "2110": "142062",
+  "2107": "142063",
+  "2104": "142061",
+  "2108": "142067",
+  "2105": "142060",
+  "2109": "142068",
+  "2111": "140374",
+  "2106": "142066",
+  "2112": "140371"
+};
+
+function vektorZfiCentroCustoFisiaPorLoja_(lojaNum) {
+  var loja4 = vektorZfiLoja4_(lojaNum);
+  if (!loja4) return "";
+  return String(VEKTOR_ZFI_FISIA_CC_MAP[loja4] || "").trim();
+}
+
+function vektorZfiCentroCustoPorLoja_(empresaAtual, lojaNum, ccOverride) {
+  var ccManual = String(ccOverride || "").trim().toUpperCase();
+  if (ccManual) return ccManual;
+
+  var emp = String(empresaAtual || "").trim().toUpperCase();
+
+  if (emp === "FISIA") {
+    return vektorZfiCentroCustoFisiaPorLoja_(lojaNum);
+  }
+
+  var loja4 = vektorZfiLoja4_(lojaNum);
+  return loja4 ? ("7010" + loja4 + "01") : "";
 }
 
 function vektorZfiResolverEtiquetas_(etiquetaRaw) {
@@ -16594,10 +16667,12 @@ function vektorZfiCsvExcelSafeText_(s) {
 }
 
 function vektorZfiBuildCsvRow_(obj) {
+  var empresaCodigo = String(obj && obj.empresaCodigo ? obj.empresaCodigo : "7010").trim();
+
   return [
     vektorZfiCsvExcelSafeText_(obj.dataTransacaoArquivo), // Data
     "CC",                     // Tipo Doc
-    "7010",                   // Empresa
+    empresaCodigo,            // Empresa
     vektorZfiCsvExcelSafeText_(obj.dataLancamentoArquivo), // Data Lanç.
     obj.mesLancamento,        // Mês
     "BRL",                    // Moeda
@@ -16640,7 +16715,11 @@ function getPreviewArquivoZFIVektor(req) {
       return { ok:false, error:"Período da fatura não informado." };
     }
 
-    var info = carregarLinhasBaseClara_();
+    var empCtx = vektorGetEmpresaContext_(req.empresa);
+    var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+    var empresaCodigo = (empresaAtual === "FISIA") ? "7170" : "7010";
+
+    var info = carregarLinhasBaseClara_(empresaAtual);
     if (info.error) return { ok:false, error: info.error };
 
     var header = info.header || [];
@@ -16796,12 +16875,15 @@ function getPreviewArquivoZFIVektor(req) {
             statusCode = "CC_SOBRESCRITO_DESCRICAO";
           }
 
-        var centroCustoFinal = ccOverride || (loja4 ? ("7010" + loja4 + "01") : "");
+        var centroCustoFinal = vektorZfiCentroCustoPorLoja_(empresaAtual, itemTx.lojaNum, ccOverride);
         var valorLinha = Number(itemTx.valor || 0) || 0;
 
         valorTotal = Number((valorTotal + valorLinha).toFixed(2));
 
         var obj = {
+          empresa: empresaAtual,
+          empresaCodigo: empresaCodigo,
+
           dataTransacaoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(itemTx.dataTx, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
           dataTransacaoBr: vektorZfiFmtDateBr_(itemTx.dataTx),
 
@@ -16854,6 +16936,8 @@ function getPreviewArquivoZFIVektor(req) {
 
     return {
       ok: true,
+      empresa: empresaAtual,
+      empresaCodigo: empresaCodigo,
       extrato: extratoAlvo,
       previewRows: previewRows,
       csvRows: csvRows,
