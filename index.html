@@ -6831,31 +6831,43 @@ window.vektorSelecionarEmpresa_ = function(empresa) {
 
         window.__vektorEmpresaAtual = String(res.empresaAtual || emp).toUpperCase();
 
-                    try {
-              window.vektorAuxResetState_ && window.vektorAuxResetState_();
+        try {
+          window.vektorAuxResetState_ && window.vektorAuxResetState_();
+        } catch(e) {
+          console.error(e);
+        }
+
+        try {
+          window.vektorAnaliseGastosResetState_ && window.vektorAnaliseGastosResetState_({ keepPeriodo: false });
+        } catch(e) {
+          console.error(e);
+        }
+
+        try {
+              window.vektorMyAlertsResetState_ && window.vektorMyAlertsResetState_();
             } catch(e) {
               console.error(e);
             }
 
-            try {
-              const aux = document.getElementById("consultasAuxView");
-              if (aux) {
-                aux.classList.add("hidden");
-                aux.style.display = "none";
-              }
-            } catch(e) {
-              console.error(e);
-            }
+        try {
+          const aux = document.getElementById("consultasAuxView");
+          if (aux) {
+            aux.classList.add("hidden");
+            aux.style.display = "none";
+          }
+        } catch(e) {
+          console.error(e);
+        }
 
-            try {
-              const home = document.getElementById("homeView");
-              if (home) {
-                home.classList.remove("hidden");
-                home.style.display = "flex";
-              }
-            } catch(e) {
-              console.error(e);
-            }
+        try {
+          const home = document.getElementById("homeView");
+          if (home) {
+            home.classList.remove("hidden");
+            home.style.display = "flex";
+          }
+        } catch(e) {
+          console.error(e);
+        }
 
         if (typeof window.vektorRefreshEmpresaChecks_ === "function") {
           window.vektorRefreshEmpresaChecks_();
@@ -6936,8 +6948,30 @@ window.vektorEmpresaAtual_ = function() {
 window.vektorResetCachesEmpresa_ = function() {
   window.__analiseGastosMeta = null;
   window.__analiseGastosMetaLoading = false;
+
   window.__fluxoNumerarioSapMeta = null;
   window.__fluxoNumerarioSapBusy = false;
+
+  window.__myAlertsInited = false;
+  window.__myAlertsEmpresaLoaded = "";
+  window.__myAl_lojasPorTime = {};
+  window.__myAl_editingAlertId = "";
+  window.__myAl_valores_last = { ok:false, rows:[], categorias:[], total:0 };
+  window.__myAl_valores_filterCategoria = "";
+
+  try {
+    if (window.__myAl_catChartInst) {
+      window.__myAl_catChartInst.destroy();
+      window.__myAl_catChartInst = null;
+    }
+  } catch(_) {}
+
+  try {
+    if (window.__myAl_serie12mChartInst) {
+      window.__myAl_serie12mChartInst.destroy();
+      window.__myAl_serie12mChartInst = null;
+    }
+  } catch(_) {}
 };
 
 window.vektorRecarregarViewAtualPorEmpresa_ = function() {
@@ -9008,16 +9042,110 @@ window.vektorOpenFluxoNumerarioSap = function () {
   }
 };
 
+function vektorAnaliseGastosResetState_(opts){
+  opts = opts || {};
+  var keepPeriodo = !!opts.keepPeriodo;
+
+  try {
+    window.__analiseGastosMeta = null;
+    window.__analiseGastosMetaLoading = false;
+    window.__analiseGastosData = null;
+    window.__analiseGastosTx = null;
+
+    window.__analiseGastosMacroLastRes = null;
+    window.__analiseGastosMacroLoading = false;
+
+    // mantém sort padrão
+    window.__analiseGastosSort = { col: "valor", dir: "desc" };
+
+    var selTime  = document.getElementById("analiseGastos_selTime");
+    var selLoja  = document.getElementById("analiseGastos_selLoja");
+    var selCat   = document.getElementById("analiseGastos_selCategoria");
+    var selConta = document.getElementById("analiseGastos_selContaContabil");
+    var selAno   = document.getElementById("analiseGastos_selAno");
+    var selMes   = document.getElementById("analiseGastos_selMes");
+
+    var macroSelLoja = document.getElementById("analiseGastos_macro_selLoja");
+    var macroSelCat  = document.getElementById("analiseGastos_macro_selCategoria");
+    var macroSelAno  = document.getElementById("analiseGastos_macro_selAno");
+
+    var dtIni = document.getElementById("analiseGastos_dtIni");
+    var dtFim = document.getElementById("analiseGastos_dtFim");
+
+    function resetMulti_(sel, label){
+      if (!sel) return;
+      sel.innerHTML = '<option value="">' + label + '</option>';
+      try { sel.value = ""; } catch(_) {}
+    }
+
+    resetMulti_(selTime,  "Todos");
+    resetMulti_(selLoja,  "Todas");
+    resetMulti_(selCat,   "Todas");
+    resetMulti_(selConta, "Todas");
+
+    if (selAno) selAno.innerHTML = '<option value="">Todos os anos</option>';
+    if (selMes) selMes.innerHTML = '<option value="">Todos os meses</option>';
+
+    if (macroSelLoja) macroSelLoja.innerHTML = '<option value="">Todas</option>';
+    if (macroSelCat)  macroSelCat.innerHTML  = '<option value="">Todas</option>';
+    if (macroSelAno)  macroSelAno.innerHTML  = '<option value="">Último ano</option>';
+
+    if (!keepPeriodo) {
+      if (dtIni) dtIni.value = "";
+      if (dtFim) dtFim.value = "";
+    }
+
+    var cLoja = document.getElementById("analiseGastos_cardLojaTop");
+    var cLojaSub = document.getElementById("analiseGastos_cardLojaTopSub");
+    var cTot = document.getElementById("analiseGastos_cardTotal");
+    var cTotSub = document.getElementById("analiseGastos_cardTotalSub");
+    var cCatTop = document.getElementById("analiseGastos_cardCategoriaTop");
+    var cCatTopSub = document.getElementById("analiseGastos_cardCategoriaTopSub");
+    var cEst = document.getElementById("analiseGastos_cardEstabTop");
+    var cEstSub = document.getElementById("analiseGastos_cardEstabTopSub");
+
+    if (cLoja) cLoja.textContent = "—";
+    if (cLojaSub) cLojaSub.textContent = "—";
+    if (cTot) cTot.textContent = "—";
+    if (cTotSub) cTotSub.textContent = "—";
+    if (cCatTop) cCatTop.textContent = "—";
+    if (cCatTopSub) cCatTopSub.textContent = "—";
+    if (cEst) cEst.textContent = "—";
+    if (cEstSub) cEstSub.textContent = "—";
+
+    var tb = document.getElementById("analiseGastos_tbody");
+    if (tb) {
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Informe o período e clique em Buscar para consultar os gastos.</td></tr>';
+    }
+  } catch (e) {
+    console.error("Erro ao resetar estado da Análise de Gastos:", e);
+  }
+}
+
 let __analiseGastos_inited = false;
 
 function vektorAnaliseGastosEnsureMeta_(cb, opts){
-  if (window.__analiseGastosMeta && window.__analiseGastosMeta.ok) {
+  opts = opts || {};
+  var silent = !!opts.silent;
+  var empresaAtual = String((typeof vektorEmpresaAtual_ === "function" ? vektorEmpresaAtual_() : "") || "CENTAURO").trim().toUpperCase();
+
+  // se existir cache de outra empresa, invalida antes de reutilizar
+  if (
+    window.__analiseGastosMeta &&
+    window.__analiseGastosMeta.ok &&
+    String(window.__analiseGastosMeta.empresa || "").trim().toUpperCase() !== empresaAtual
+  ) {
+    try { vektorAnaliseGastosResetState_({ keepPeriodo: true }); } catch(_) {}
+  }
+
+  if (
+    window.__analiseGastosMeta &&
+    window.__analiseGastosMeta.ok &&
+    String(window.__analiseGastosMeta.empresa || "").trim().toUpperCase() === empresaAtual
+  ) {
     try { cb && cb(); } catch(_) {}
     return;
   }
-
-  opts = opts || {};
-  var silent = !!opts.silent;
 
   // Se já existe uma chamada em andamento, só espera ela terminar
   if (window.__analiseGastosMetaLoading) {
@@ -9025,7 +9153,11 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
     var t = setInterval(function(){
       tries++;
 
-      if (window.__analiseGastosMeta && window.__analiseGastosMeta.ok) {
+      if (
+        window.__analiseGastosMeta &&
+        window.__analiseGastosMeta.ok &&
+        String(window.__analiseGastosMeta.empresa || "").trim().toUpperCase() === empresaAtual
+      ) {
         clearInterval(t);
         try { cb && cb(); } catch(_) {}
         return;
@@ -9037,7 +9169,7 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
         return;
       }
 
-      if (tries >= 100) { // ~12s
+      if (tries >= 100) {
         clearInterval(t);
       }
     }, 120);
@@ -9074,13 +9206,8 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
       vektorBuildOptions_(selCat,   (res.categorias || []), "Todas");
       vektorBuildOptions_(selConta, (res.contasContabeis || []), "Todas");
 
-      // Primeiro reconstrói filtros dependentes (se necessário)
       try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
-
-      // ✅ Depois hidrata Ano/Mês (para não ser sobrescrito)
       try { vektorAnaliseGastosHydrateAnoMes_(res); } catch(e){ console.error(e); }
-
-      // ✅ Depois hidrata filtros do modal Macro
       try { vektorAnaliseGastosMacroHydrateFilters_(res); } catch(e){ console.error(e); }
 
       try { cb && cb(); } catch(_) {}
@@ -9093,7 +9220,7 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
       const tb = document.getElementById("analiseGastos_tbody");
       if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
     })
-    .getAnaliseGastosMeta({ empresa: vektorEmpresaAtual_() });
+    .getAnaliseGastosMeta({ empresa: empresaAtual });
 }
 
 function vektorAnaliseGastosBuscar_(){
@@ -15469,6 +15596,52 @@ function vektorVertexCostRenderChart_(monthly){
     });
   });
 })();
+
+window.vektorMyAlertsResetState_ = function () {
+  try {
+    window.__myAlertsInited = false;
+    window.__myAlertsEmpresaLoaded = "";
+    window.__myAl_lojasPorTime = {};
+    window.__myAl_editingAlertId = "";
+    window.__myAl_valores_last = { ok:false, rows:[], categorias:[], total:0 };
+    window.__myAl_valores_filterCategoria = "";
+    window.__myAl_barTimer = null;
+
+    try {
+      if (window.__myAl_catChartInst) {
+        window.__myAl_catChartInst.destroy();
+        window.__myAl_catChartInst = null;
+      }
+    } catch(_) {}
+
+    try {
+      if (window.__myAl_serie12mChartInst) {
+        window.__myAl_serie12mChartInst.destroy();
+        window.__myAl_serie12mChartInst = null;
+      }
+    } catch(_) {}
+
+    const list = document.getElementById("myAl_list");
+    if (list) {
+      list.innerHTML = "<div style='color:rgba(226,232,240,0.85); font-size:12px;'>Carregando…</div>";
+    }
+
+    const timeSel = document.getElementById("myAl_time");
+    const lojaSel = document.getElementById("myAl_loja");
+    const etqSel = document.getElementById("myAl_etiquetas");
+    const emailInp = document.getElementById("myAl_adminEmail");
+    const roleSel = document.getElementById("myAl_adminRole");
+
+    if (timeSel) timeSel.innerHTML = '<option value="">Todos os times</option>';
+    if (lojaSel) lojaSel.innerHTML = '<option value="">Todas as lojas</option>';
+    if (etqSel) etqSel.selectedIndex = -1;
+    if (emailInp) emailInp.value = "";
+    if (roleSel) roleSel.value = "";
+
+  } catch (e) {
+    console.error("Erro ao resetar My Alerts:", e);
+  }
+};
 
 window.vektorOpenMyAlerts = function () {
   vektorSetActiveNavBtn_("navMyAlertsBtn");
