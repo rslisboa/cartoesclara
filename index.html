@@ -716,7 +716,8 @@ display: none;
 /* ✅ Multi-select: opções com texto branco e fundo preto */
 #analiseGastos_selTime option,
 #analiseGastos_selLoja option,
-#analiseGastos_selCategoria option{
+#analiseGastos_selCategoria option,
+#analiseGastos_selContaContabil option{
   color:#ffffff !important;
   background:#020f2b !important;
 }
@@ -724,7 +725,8 @@ display: none;
 /* ✅ Opção selecionada: realce para ficar legível */
 #analiseGastos_selTime option:checked,
 #analiseGastos_selLoja option:checked,
-#analiseGastos_selCategoria option:checked{
+#analiseGastos_selCategoria option:checked,
+#analiseGastos_selContaContabil option:checked{
   background:#0b2a5a !important;  /* azul escuro (realce) */
   color:#ffffff !important;
 }
@@ -854,6 +856,8 @@ display: none;
 
 #analiseGastosTable{
   width: 100%;
+  min-width: 1460px;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   background: #ffffff;
@@ -3339,6 +3343,10 @@ display: none;
 
           <!-- Direita superior: botões -->
           <div style="display:flex; align-items:flex-start; gap:8px; margin-left:auto;">
+            <button id="analiseGastos_btnCsv" type="button"
+                  style="height:36px; padding:0 14px; border:1px solid rgba(148,163,184,0.35); border-radius:10px; font-weight:900; font-size:12px; background:rgba(255,255,255,0.06); color:#ffffff; cursor:pointer; white-space:nowrap;">
+            Download CSV
+          </button>
             <button id="analiseGastos_btnMediana" type="button"
                   style="height:36px; padding:0 14px; border:1px solid rgba(148,163,184,0.35); border-radius:10px; font-weight:900; font-size:12px; background:rgba(255,255,255,0.06); color:#ffffff; cursor:pointer; white-space:nowrap;">
             Média de Gastos
@@ -3417,6 +3425,15 @@ display: none;
               <option value="">Carregue os filtros...</option>
             </select>
           </div>
+
+          <!-- Conta Contábil -->
+            <div style="display:flex; flex-direction:column; gap:6px; flex:0 0 190px; min-width:190px;">
+              <div style="font-size:11px;font-weight:1000;color:rgba(226,232,240,0.85);">Conta Contábil</div>
+              <select id="analiseGastos_selContaContabil" multiple size="1"
+                      style="height:40px; width:100%; border:1px solid rgba(148,163,184,0.45); background:#020f2b; color:#fff; border-radius:10px; padding:0 10px; font-weight:800; font-size:12px;">
+                <option value="">Carregue os filtros...</option>
+              </select>
+            </div>
         </div>
       </div>
 
@@ -3750,12 +3767,13 @@ display: none;
             <table id="analiseGastosTable">
               <colgroup>
                 <col style="width:110px;">  <!-- Data -->
-                <col style="width:90px;">   <!-- Loja (↑ aumentada) -->
+                <col style="width:90px;">   <!-- Loja -->
                 <col style="width:170px;">  <!-- Time -->
                 <col style="width:170px;">  <!-- Categoria -->
+                <col style="width:340px;">  <!-- Etiqueta -->
                 <col style="width:260px;">  <!-- Estabelecimento -->
                 <col style="width:120px;">  <!-- Valor -->
-                <col style="width:auto;">   <!-- Descrição -->
+                <col style="width:360px;">  <!-- Descrição -->
               </colgroup>
               <thead>
                 <tr>
@@ -3763,6 +3781,7 @@ display: none;
                   <th data-sort="loja">Loja</th>
                   <th data-sort="time">Time</th>
                   <th data-sort="categoria">Categoria</th>
+                  <th data-sort="etiqueta">Etiqueta</th>
                   <th data-sort="estab">Estabelecimento</th>
                   <th data-sort="valor">Valor (R$)</th>
                   <th data-sort="descricao">Descrição</th>
@@ -3770,7 +3789,7 @@ display: none;
               </thead>
               <tbody id="analiseGastos_tbody">
                 <tr>
-                  <td colspan="7" style="text-align:center; padding:14px; font-weight:900; color:#334155;">
+                  <td colspan="8" style="text-align:center; padding:14px; font-weight:900; color:#334155;">
                     Carregue os filtros e clique em Buscar.
                   </td>
                 </tr>
@@ -7757,36 +7776,25 @@ function vektorSetActiveNavBtn_(btnId) {
   } catch (_) {}
 }
 
-window.vektorOpenPolicyAssistant = function () {
-  window.__vektorChatMode = "policy";
-  window.vektorShowChatView();
-  window.vektorApplyChatMode_();
-};
-
 // ===============================
 // VIEW CONTROL (Chat <-> Radar)
 // ===============================
 window.vektorShowChatView = function () {
-    if (typeof USER_ROLE_REPLACED !== "undefined") {
-  const roleAtual = String(USER_ROLE_REPLACED || "").trim();
   const podeAbrirChatLegacy =
-    roleAtual === "Administrador" ||
-    roleAtual === "Analista Pro";
+    (typeof USER_ROLE_REPLACED === "undefined") ||
+    USER_ROLE_REPLACED === "Administrador";
 
   if (!podeAbrirChatLegacy && window.__vektorChatMode !== "policy") {
     return;
   }
-}
+
   const chatView = document.getElementById("chatView");
   const radarView = document.getElementById("radarView");
   const feedbackView = document.getElementById("feedbackView");
   const myAlertsView = document.getElementById("myAlertsView");
   const fluxView = document.getElementById("fluxogramaView");
-
-  // ✅ Envio de Pendências
   const envioPendView = document.getElementById("envioPendView");
   const envPendModal = document.getElementById("envPendModal");
-
   const homeView = document.getElementById("homeView");
   const cicloResumoView = document.getElementById("cicloResumoView");
   const analiseGastosView = document.getElementById("analiseGastosView");
@@ -7795,7 +7803,6 @@ window.vektorShowChatView = function () {
   const basesVektorView = document.getElementById("basesVektorView");
   const fluxoNumerarioSapView = document.getElementById("fluxoNumerarioSapView");
 
-  // fecha outras views
   [
     radarView,
     feedbackView,
@@ -7816,20 +7823,18 @@ window.vektorShowChatView = function () {
     v.style.display = "none";
   });
 
-  // fecha modal envio pendências (se estiver aberto)
   if (envPendModal) {
     envPendModal.classList.add("hidden");
     envPendModal.style.display = "none";
   }
 
-  // ✅ abre chat de verdade
   if (chatView) {
-    chatView.classList.remove("hidden"); 
+    chatView.classList.remove("hidden");
     chatView.classList.add("is-open");
     chatView.style.display = "flex";
   }
 
-    try {
+  try {
     if (!window.__vektorChatMode) {
       window.__vektorChatMode = "default";
     }
@@ -7838,7 +7843,6 @@ window.vektorShowChatView = function () {
     console.warn("Falha ao aplicar modo do chat:", e);
   }
 
-  // ✅ abrir modal "Como usar o Vektor?" apenas 1x por dia (por navegador)
   try {
     const now = new Date();
     const yyyy = String(now.getFullYear());
@@ -7856,10 +7860,9 @@ window.vektorShowChatView = function () {
         if (typeof openAjudaVektorModal === "function") openAjudaVektorModal();
       }, 80);
     }
-  } catch (e) {}
-
-  const input = document.getElementById("userInput");
-  if (input && !input.disabled) setTimeout(() => input.focus(), 50);
+  } catch (e) {
+    console.warn("Falha ao abrir modal diário de ajuda:", e);
+  }
 };
 
 function vektorShowRadarView_() {
@@ -9055,19 +9058,21 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
 
       if (!res || !res.ok) {
         const tb = document.getElementById("analiseGastos_tbody");
-        if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
+        if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
         return;
       }
 
       window.__analiseGastosMeta = res;
 
-      const selTime = document.getElementById("analiseGastos_selTime");
-      const selLoja = document.getElementById("analiseGastos_selLoja");
-      const selCat  = document.getElementById("analiseGastos_selCategoria");
+      const selTime  = document.getElementById("analiseGastos_selTime");
+      const selLoja  = document.getElementById("analiseGastos_selLoja");
+      const selCat   = document.getElementById("analiseGastos_selCategoria");
+      const selConta = document.getElementById("analiseGastos_selContaContabil");
 
-      vektorBuildOptions_(selTime, (res.times || []), "Todos");
-      vektorBuildOptions_(selLoja, (res.lojas || []), "Todas");
-      vektorBuildOptions_(selCat,  (res.categorias || []), "Todas");
+      vektorBuildOptions_(selTime,  (res.times || []), "Todos");
+      vektorBuildOptions_(selLoja,  (res.lojas || []), "Todas");
+      vektorBuildOptions_(selCat,   (res.categorias || []), "Todas");
+      vektorBuildOptions_(selConta, (res.contasContabeis || []), "Todas");
 
       // Primeiro reconstrói filtros dependentes (se necessário)
       try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
@@ -9086,7 +9091,7 @@ function vektorAnaliseGastosEnsureMeta_(cb, opts){
       if (!silent) vektorAnaliseGastosSetBusy_(false);
 
       const tb = document.getElementById("analiseGastos_tbody");
-      if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
+      if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
     })
     .getAnaliseGastosMeta({ empresa: vektorEmpresaAtual_() });
 }
@@ -9101,12 +9106,12 @@ function vektorAnaliseGastosBuscar_(){
   // ✅ NÃO carrega nada sem período completo
   if (!String(dtIni).trim() || !String(dtFim).trim()) {
     const tb = document.getElementById("analiseGastos_tbody");
-    if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:1000;color:#334155;">Informe início e fim do período para buscar.</td></tr>`;
+    if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:1000;color:#334155;">Informe início e fim do período para buscar.</td></tr>`;
     return;
   }
   if (dtIni > dtFim) {
     const tb = document.getElementById("analiseGastos_tbody");
-    if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:1000;color:#b91c1c;">Período inválido: início maior que fim.</td></tr>`;
+    if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:1000;color:#b91c1c;">Período inválido: início maior que fim.</td></tr>`;
     return;
   }
 
@@ -9114,14 +9119,15 @@ function vektorAnaliseGastosBuscar_(){
   vektorAnaliseGastosEnsureMeta_(function(){
     try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
 
-    const selTime = document.getElementById("analiseGastos_selTime");
-    const selLoja = document.getElementById("analiseGastos_selLoja");
-    const selCat  = document.getElementById("analiseGastos_selCategoria");
+    const selTime  = document.getElementById("analiseGastos_selTime");
+    const selLoja  = document.getElementById("analiseGastos_selLoja");
+    const selCat   = document.getElementById("analiseGastos_selCategoria");
+    const selConta = document.getElementById("analiseGastos_selContaContabil");
 
-    // ✅ MULTI: lê seleção como array (vazio = "Todos/Todas")
-    const time = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selTime) : [];
-    const loja = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selLoja) : [];
-    const cat  = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selCat)  : [];
+    const time  = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selTime)  : [];
+    const loja  = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selLoja)  : [];
+    const cat   = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selCat)   : [];
+    const conta = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selConta) : [];;
 
     vektorAnaliseGastosSetBusy_(true, "Buscando dados…", "Aplicando permissões e filtros");
 
@@ -9131,7 +9137,7 @@ function vektorAnaliseGastosBuscar_(){
 
         if (!res || !res.ok) {
           const tb = document.getElementById("analiseGastos_tbody");
-          if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:1000;color:#b91c1c;">Falha: ${vektorSafe_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
+          if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:1000;color:#b91c1c;">Falha: ${vektorSafe_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
           return;
         }
 
@@ -9145,7 +9151,7 @@ function vektorAnaliseGastosBuscar_(){
       .withFailureHandler(function(err){
         vektorAnaliseGastosSetBusy_(false);
         const tb = document.getElementById("analiseGastos_tbody");
-        if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:1000;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
+        if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:1000;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
       })
       .getAnaliseGastosDataset({
         empresa: vektorEmpresaAtual_(),
@@ -9153,7 +9159,8 @@ function vektorAnaliseGastosBuscar_(){
         dtFim: dtFim,
         time: time,
         loja: loja,
-        categoria: cat
+        categoria: cat,
+        contaContabil: conta
       });
   });
 }
@@ -9251,6 +9258,7 @@ function vektorAnaliseGastosInitOnce_(){
   const btnBuscar = document.getElementById("analiseGastos_btnBuscar");
 
   const btnMediana = document.getElementById("analiseGastos_btnMediana");
+  const btnCsv = document.getElementById("analiseGastos_btnCsv");
   const medModal = document.getElementById("analiseGastos_medModal");
   const medModalClose = document.getElementById("analiseGastos_medModalClose");
   const medModalBackdrop = document.getElementById("analiseGastos_medModalBackdrop");
@@ -9258,6 +9266,7 @@ function vektorAnaliseGastosInitOnce_(){
   const selTime = document.getElementById("analiseGastos_selTime");
   const selLoja = document.getElementById("analiseGastos_selLoja");
   const selCat  = document.getElementById("analiseGastos_selCategoria");
+  const selConta = document.getElementById("analiseGastos_selContaContabil");
 
   const dtIniEl = document.getElementById("analiseGastos_dtIni");
   const dtFimEl = document.getElementById("analiseGastos_dtFim");
@@ -9284,7 +9293,7 @@ function vektorAnaliseGastosInitOnce_(){
   // Estado inicial da tabela (sem carregar automaticamente)
   const tb = document.getElementById("analiseGastos_tbody");
   if (tb && !tb.dataset.initMsgDone) {
-    tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Informe o período e clique em Buscar para consultar os gastos.</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Informe o período e clique em Buscar para consultar os gastos.</td></tr>`;
     tb.dataset.initMsgDone = "1";
   }
 
@@ -9391,6 +9400,20 @@ if (btnMediana && !btnMediana.__bindMedianaOpen) {
   btnMediana.__bindMedianaOpen = true;
   btnMediana.addEventListener("click", function(){
     try { vektorAnaliseGastosOpenMedianaModal_(); } catch(e){ console.error(e); }
+  });
+}
+
+if (btnCsv && !btnCsv.__bindAnaliseCsv) {
+  btnCsv.__bindAnaliseCsv = true;
+  btnCsv.addEventListener("click", function(){
+    try { vektorAnaliseGastosExportCsv_(); } catch(e){ console.error(e); }
+  });
+}
+
+if (selConta && !selConta.__bindAGConta) {
+  selConta.__bindAGConta = true;
+  selConta.addEventListener("change", function(){
+    try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
   });
 }
 
@@ -9524,7 +9547,7 @@ function vektorAnaliseGastosLoadMeta_(){
 
       if (!res || !res.ok) {
         const tb = document.getElementById("analiseGastos_tbody");
-        if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
+        if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(res && res.error ? res.error : "erro desconhecido")}</td></tr>`;
         return;
       }
 
@@ -9544,12 +9567,12 @@ function vektorAnaliseGastosLoadMeta_(){
       vektorAnaliseGastosRebuildFilterOptions_();
 
       const tb = document.getElementById("analiseGastos_tbody");
-      if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Agora selecione filtros e clique em Buscar.</td></tr>`;
+      if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Agora selecione filtros e clique em Buscar.</td></tr>`;
     })
     .withFailureHandler(function(err){
       vektorAnaliseGastosSetBusy_(false);
       const tb = document.getElementById("analiseGastos_tbody");
-      if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
+      if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
     })
     .getAnaliseGastosMeta({ empresa: vektorEmpresaAtual_() });
 }
@@ -9559,7 +9582,7 @@ function vektorAnaliseGastosFetchData_(){
   const meta = window.__analiseGastosMeta;
   if (!meta || !meta.ok) {
     const tb = document.getElementById("analiseGastos_tbody");
-    if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Antes de Buscar, clique em “Carregar filtros”.</td></tr>`;
+    if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Antes de Buscar, clique em “Carregar filtros”.</td></tr>`;
     return;
   }
 
@@ -9567,12 +9590,12 @@ function vektorAnaliseGastosFetchData_(){
   const dtFim = document.getElementById("analiseGastos_dtFim")?.value || "";
   if (!dtIni || !dtFim) {
     const tb = document.getElementById("analiseGastos_tbody");
-    if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Informe Início e Fim (período completo) antes de Buscar.</td></tr>`;
+    if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Informe Início e Fim (período completo) antes de Buscar.</td></tr>`;
     return;
   }
   if (dtIni > dtFim) {
     const tb = document.getElementById("analiseGastos_tbody");
-    if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Período inválido: Início maior que Fim.</td></tr>`;
+    if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Período inválido: Início maior que Fim.</td></tr>`;
     return;
   }
 
@@ -9591,7 +9614,7 @@ function vektorAnaliseGastosFetchData_(){
     .withFailureHandler(function(err){
       vektorAnaliseGastosSetBusy_(false);
       const tb = document.getElementById("analiseGastos_tbody");
-      if (tb) tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
+      if (tb) tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#b91c1c;">Falha: ${vektorSafe_(err && err.message ? err.message : err)}</td></tr>`;
     })
     .getAnaliseGastosDataset({
       empresa: vektorEmpresaAtual_(),
@@ -9607,57 +9630,73 @@ function vektorAnaliseGastosRebuildFilterOptions_(){
   var meta = window.__analiseGastosMeta || {};
   var combos = Array.isArray(meta.combos) ? meta.combos : [];
 
-  var selTime = document.getElementById("analiseGastos_selTime");
-  var selLoja = document.getElementById("analiseGastos_selLoja");
-  var selCat  = document.getElementById("analiseGastos_selCategoria");
+  var selTime  = document.getElementById("analiseGastos_selTime");
+  var selLoja  = document.getElementById("analiseGastos_selLoja");
+  var selCat   = document.getElementById("analiseGastos_selCategoria");
+  var selConta = document.getElementById("analiseGastos_selContaContabil");
 
-  if (!selTime || !selLoja || !selCat) return;
+  if (!selTime || !selLoja || !selCat || !selConta) return;
 
-  // normaliza "Todos" no multi
   try { vektorNormalizeMultiAll_(selTime); } catch(_) {}
   try { vektorNormalizeMultiAll_(selLoja); } catch(_) {}
   try { vektorNormalizeMultiAll_(selCat); } catch(_) {}
+  try { vektorNormalizeMultiAll_(selConta); } catch(_) {}
 
-  var curTimes = vektorGetMultiValues_(selTime); // [] = todos
-  var curLojas = vektorGetMultiValues_(selLoja);
-  var curCats  = vektorGetMultiValues_(selCat);
+  var curTimes  = vektorGetMultiValues_(selTime);
+  var curLojas  = vektorGetMultiValues_(selLoja);
+  var curCats   = vektorGetMultiValues_(selCat);
+  var curContas = vektorGetMultiValues_(selConta);
 
   function inSet_(arr, v){
     if (!arr || !arr.length) return true; // vazio = todos
     return arr.indexOf(String(v||"")) >= 0;
   }
 
-  // 1) LOJAS possíveis respeitando Times e Cats selecionados
-  var lojasSet = {};
-  combos.forEach(function(c){
-    if (!inSet_(curTimes, c.time)) return;
-    if (!inSet_(curCats,  c.categoria)) return;
-    lojasSet[String(c.loja || "")] = true;
-  });
-  var lojas = Object.keys(lojasSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  // 1) LOJAS possíveis respeitando Times, Cats e Contas selecionadas
+var lojasSet = {};
+combos.forEach(function(c){
+  if (!inSet_(curTimes,  c.time)) return;
+  if (!inSet_(curCats,   c.categoria)) return;
+  if (!inSet_(curContas, c.contaContabil)) return;
+  lojasSet[String(c.loja || "")] = true;
+});
+var lojas = Object.keys(lojasSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
 
-  // 2) TIMES possíveis respeitando Lojas e Cats selecionados
-  var timesSet = {};
-  combos.forEach(function(c){
-    if (!inSet_(curLojas, c.loja)) return;
-    if (!inSet_(curCats,  c.categoria)) return;
-    timesSet[String(c.time || "")] = true;
-  });
-  var times = Object.keys(timesSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+// 2) TIMES possíveis respeitando Lojas, Cats e Contas selecionadas
+var timesSet = {};
+combos.forEach(function(c){
+  if (!inSet_(curLojas,  c.loja)) return;
+  if (!inSet_(curCats,   c.categoria)) return;
+  if (!inSet_(curContas, c.contaContabil)) return;
+  timesSet[String(c.time || "")] = true;
+});
+var times = Object.keys(timesSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
 
-  // 3) CATEGORIAS possíveis respeitando Times e Lojas selecionados
-  var catsSet = {};
-  combos.forEach(function(c){
-    if (!inSet_(curTimes, c.time)) return;
-    if (!inSet_(curLojas, c.loja)) return;
-    catsSet[String(c.categoria || "")] = true;
-  });
-  var cats = Object.keys(catsSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+// 3) CATEGORIAS possíveis respeitando Times, Lojas e Contas selecionadas
+var catsSet = {};
+combos.forEach(function(c){
+  if (!inSet_(curTimes,  c.time)) return;
+  if (!inSet_(curLojas,  c.loja)) return;
+  if (!inSet_(curContas, c.contaContabil)) return;
+  catsSet[String(c.categoria || "")] = true;
+});
+var cats = Object.keys(catsSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
+
+// 4) CONTAS possíveis respeitando Times, Lojas e Categorias selecionadas
+var contasSet = {};
+combos.forEach(function(c){
+  if (!inSet_(curTimes, c.time)) return;
+  if (!inSet_(curLojas, c.loja)) return;
+  if (!inSet_(curCats,  c.categoria)) return;
+  contasSet[String(c.contaContabil || "")] = true;
+});
+var contas = Object.keys(contasSet).filter(Boolean).sort((a,b)=>a.localeCompare(b,"pt-BR"));
 
   // rebuild preservando o que ainda existir
-  vektorBuildOptions_(selTime, times, "Todos");
-  vektorBuildOptions_(selLoja, lojas, "Todas");
-  vektorBuildOptions_(selCat,  cats,  "Todas");
+  vektorBuildOptions_(selTime,  times,  "Todos");
+  vektorBuildOptions_(selLoja,  lojas,  "Todas");
+  vektorBuildOptions_(selCat,   cats,   "Todas");
+  vektorBuildOptions_(selConta, contas, "Todas");
 
   // remove seleções inválidas (multi)
   function dropInvalid_(sel, allowed){
@@ -9679,6 +9718,7 @@ function vektorAnaliseGastosRebuildFilterOptions_(){
   dropInvalid_(selTime, times);
   dropInvalid_(selLoja, lojas);
   dropInvalid_(selCat,  cats);
+  dropInvalid_(selConta, contas);
 }
 
 /* --------- Apply (filtros locais + sort + render cards/tabela) --------- */
@@ -9730,6 +9770,7 @@ function vektorAnaliseGastosApply_(){
     else if (col === "loja") r = cmpStr(a.loja, b.loja);
     else if (col === "time") r = cmpStr(a.time, b.time);
     else if (col === "categoria") r = cmpStr(a.categoria, b.categoria);
+    else if (col === "etiqueta") r = cmpStr(a.etiqueta, b.etiqueta);
     else if (col === "estab") r = cmpStr(a.estabelecimento, b.estabelecimento);
     else if (col === "descricao") r = cmpStr(a.descricao, b.descricao);
     else if (col === "valor") r = cmpNum(a.valor, b.valor);
@@ -9818,24 +9859,142 @@ function vektorAnaliseGastosRender_(tx, meta){
   if (!tb) return;
 
   if (!tx.length) {
-    tb.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Sem dados para os filtros selecionados.</td></tr>`;
+  tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Sem dados para os filtros selecionados.</td></tr>`;
+  return;
+}
+
+tb.innerHTML = tx.map(t=>{
+  const dataTxt = t.dataBR || (t.dataISO ? String(t.dataISO).split("-").reverse().join("/") : "—");
+  return `
+    <tr class="analiseGastosRow">
+      <td style="text-align:center;">${vektorSafe_(dataTxt)}</td>
+      <td style="text-align:center;font-weight:900;">${vektorSafe_(t.loja||"—")}</td>
+      <td style="text-align:center;">${vektorSafe_(t.time||"—")}</td>
+      <td style="text-align:center;">${vektorSafe_(t.categoria||"—")}</td>
+      <td style="text-align:left;">${vektorSafe_(t.etiqueta||"—")}</td>
+      <td style="text-align:left;">${vektorSafe_(t.estabelecimento||"—")}</td>
+      <td style="text-align:right;font-weight:900;">${vektorFmtBRL_(t.valor||0)}</td>
+      <td style="text-align:left;">${vektorSafe_(t.descricao||"—")}</td>
+    </tr>
+  `;
+}).join("");
+}
+
+function vektorAnaliseGastosBuildExportMatrix_(){
+  let tx = Array.isArray(window.__analiseGastosTx) ? window.__analiseGastosTx.slice() : [];
+
+  const dtIni = document.getElementById("analiseGastos_dtIni")?.value || "";
+  const dtFim = document.getElementById("analiseGastos_dtFim")?.value || "";
+  const time = (typeof vektorGetMultiValues_ === "function")
+    ? vektorGetMultiValues_(document.getElementById("analiseGastos_selTime"))
+    : [];
+  const loja = (typeof vektorGetMultiValues_ === "function")
+    ? vektorGetMultiValues_(document.getElementById("analiseGastos_selLoja"))
+    : [];
+  const cat = (typeof vektorGetMultiValues_ === "function")
+    ? vektorGetMultiValues_(document.getElementById("analiseGastos_selCategoria"))
+    : [];
+
+  const ano = document.getElementById("analiseGastos_selAno")?.value || "";
+  const mes = document.getElementById("analiseGastos_selMes")?.value || "";
+
+  tx = tx.filter(function(t){
+    const d = String(t.dataISO || "");
+    if (dtIni && d < dtIni) return false;
+    if (dtFim && d > dtFim) return false;
+    if (time.length && time.indexOf(String(t.time || "")) < 0) return false;
+    if (loja.length && loja.indexOf(String(t.loja || "")) < 0) return false;
+    if (cat.length && cat.indexOf(String(t.categoria || "")) < 0) return false;
+    if (ano && String(d).slice(0,4) !== String(ano)) return false;
+    if (mes && String(d).slice(5,7) !== String(mes)) return false;
+    return true;
+  });
+
+  const s = window.__analiseGastosSort || { col: "valor", dir: "desc" };
+  const dir = (s.dir === "asc") ? 1 : -1;
+
+  function cmpStr(a,b){ return String(a||"").localeCompare(String(b||""), "pt-BR"); }
+  function cmpNum(a,b){ return Number(a||0) - Number(b||0); }
+
+  tx.sort(function(a,b){
+    const col = s.col;
+    let r = 0;
+
+    if (col === "data") r = cmpStr(a.dataISO, b.dataISO);
+    else if (col === "loja") r = cmpStr(a.loja, b.loja);
+    else if (col === "time") r = cmpStr(a.time, b.time);
+    else if (col === "categoria") r = cmpStr(a.categoria, b.categoria);
+    else if (col === "etiqueta") r = cmpStr(a.etiqueta, b.etiqueta);
+    else if (col === "estab") r = cmpStr(a.estabelecimento, b.estabelecimento);
+    else if (col === "descricao") r = cmpStr(a.descricao, b.descricao);
+    else if (col === "valor") r = cmpNum(a.valor, b.valor);
+    else r = cmpNum(a.valor, b.valor);
+
+    return r * dir;
+  });
+
+  const header = ["Data","Loja","Time","Categoria","Etiqueta","Estabelecimento","Valor (R$)","Descrição"];
+
+  const rows = tx.map(function(t){
+    return [
+      t.dataBR || (t.dataISO ? String(t.dataISO).split("-").reverse().join("/") : "—"),
+      t.loja || "—",
+      t.time || "—",
+      t.categoria || "—",
+      t.etiqueta || "—",
+      t.estabelecimento || "—",
+      Number(t.valor || 0) || 0,
+      t.descricao || "—"
+    ];
+  });
+
+  return {
+    header: header,
+    rows: rows,
+    matrix: [header].concat(rows)
+  };
+}
+
+function vektorAnaliseGastosExportCsv_(){
+  var data = vektorAnaliseGastosBuildExportMatrix_();
+  if (!data || !Array.isArray(data.rows) || !data.rows.length) {
+    alert("Não há dados para exportar.");
     return;
   }
 
-  tb.innerHTML = tx.map(t=>{
-    const dataTxt = t.dataBR || (t.dataISO ? String(t.dataISO).split("-").reverse().join("/") : "—");
-    return `
-      <tr class="analiseGastosRow">
-        <td style="text-align:center;">${vektorSafe_(dataTxt)}</td>
-        <td style="text-align:center;font-weight:900;">${vektorSafe_(t.loja||"—")}</td>
-        <td style="text-align:center;">${vektorSafe_(t.time||"—")}</td>
-        <td style="text-align:center;">${vektorSafe_(t.categoria||"—")}</td>
-        <td style="text-align:left;">${vektorSafe_(t.estabelecimento||"—")}</td>
-        <td style="text-align:right;font-weight:900;">${vektorFmtBRL_(t.valor||0)}</td>
-        <td style="text-align:left;">${vektorSafe_(t.descricao||"—")}</td>
-      </tr>
-    `;
-  }).join("");
+  var lines = data.matrix.map(function(row){
+    return row.map(function(cell, idx){
+      if (idx === 6) {
+        return String(Number(cell || 0) || 0);
+      }
+      var s = String(cell == null ? "" : cell);
+      s = s.replace(/"/g, '""');
+      return '"' + s + '"';
+    }).join(";");
+  });
+
+  var csvContent = "\uFEFF" + lines.join("\r\n");
+  var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+
+  var now = new Date();
+  var fn = "analise_gastos_" +
+    now.getFullYear() +
+    String(now.getMonth()+1).padStart(2,"0") +
+    String(now.getDate()).padStart(2,"0") + "_" +
+    String(now.getHours()).padStart(2,"0") +
+    String(now.getMinutes()).padStart(2,"0") + ".csv";
+
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = fn;
+  document.body.appendChild(a);
+  a.click();
+
+  setTimeout(function(){
+    try { document.body.removeChild(a); } catch(_) {}
+    try { URL.revokeObjectURL(url); } catch(_) {}
+  }, 120);
 }
 
 // =========================
@@ -18015,37 +18174,63 @@ function vektorTypeHtml_(el, html, onDone){
   tick();
 }
 
-function vektorPolicyTodayKey_(){
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return y + "-" + m + "-" + day;
+function vektorPolicyHasInteraction_(){
+  try {
+    var hist = Array.isArray(window.__vektorPolicyHistory) ? window.__vektorPolicyHistory : [];
+    if (!hist.length) return false;
+
+    for (var i = 0; i < hist.length; i++) {
+      var item = hist[i] || {};
+      var role = String(item.role || "").toLowerCase();
+      var text = String(item.text || "").trim();
+
+      if ((role === "user" || role === "assistant") && text) {
+        return true;
+      }
+    }
+
+    return false;
+  } catch(e) {
+    console.error("Falha ao verificar interação do Assistente de Política:", e);
+    return false;
+  }
 }
 
 function vektorPolicyIntroStorageKey_(){
   const email = (typeof USER_EMAIL_REPLACED !== "undefined" && USER_EMAIL_REPLACED)
     ? String(USER_EMAIL_REPLACED).trim().toLowerCase()
     : "anon";
-  return "vektor_policy_intro_seen_" + email + "_" + vektorPolicyTodayKey_();
+  return "vektor_policy_intro_last_animated_" + email;
 }
 
-function vektorPolicyShouldAnimateToday_(){
+function vektorPolicyShouldAnimateOnOpen_(){
   try {
-    return localStorage.getItem(vektorPolicyIntroStorageKey_()) !== "1";
+    if (vektorPolicyHasInteraction_()) return false;
+
+    const LS_KEY = vektorPolicyIntroStorageKey_();
+    const lastTs = Number(localStorage.getItem(LS_KEY) || 0);
+    const nowTs = Date.now();
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+
+    if (!lastTs) return true;
+
+    return (nowTs - lastTs) >= ONE_HOUR_MS;
   } catch(e) {
-    return true;
+    console.error("Falha ao decidir animação da intro policy:", e);
+    return !vektorPolicyHasInteraction_();
   }
 }
 
-function vektorPolicyMarkAnimatedToday_(){
+function vektorPolicyMarkAnimatedNow_(){
   try {
-    localStorage.setItem(vektorPolicyIntroStorageKey_(), "1");
-  } catch(e) {}
+    localStorage.setItem(vektorPolicyIntroStorageKey_(), String(Date.now()));
+  } catch(e) {
+    console.error("Falha ao gravar timestamp da intro policy:", e);
+  }
 }
 
-  window.__vektorChatMode = window.__vektorChatMode || "policy";
-// "legacy" | "policy"
+  window.__vektorChatMode = window.__vektorChatMode || "default";
+// "default" | "policy"
 
 window.vektorApplyChatMode_ = function () {
   const greetingEl = document.getElementById("vektorGreeting");
@@ -18066,7 +18251,7 @@ window.vektorApplyChatMode_ = function () {
         : ("Olá! Eu sou o <b>Assistente da Política Clara</b>. " +
            "Pergunte sobre uso do cartão (o que <b>pode</b> e o que <b>não pode</b> comprar), restrições, prestação de contas, justificativas, responsabilidades e consequências.");
 
-      const deveAnimar = vektorPolicyShouldAnimateToday_();
+      const deveAnimar = vektorPolicyShouldAnimateOnOpen_();
 
       if (deveAnimar) {
         greetingEl.innerHTML = vektorPolicyIntroHtml_(nome);
@@ -18076,7 +18261,7 @@ window.vektorApplyChatMode_ = function () {
 
         vektorTypeHtml_(introTextEl, textoHtml, function () {
           if (histWrapEl) histWrapEl.style.display = "block";
-          vektorPolicyMarkAnimatedToday_();
+          vektorPolicyMarkAnimatedNow_();
           try { vektorPolicyHistBindOnce_(); } catch (e) { console.error(e); }
         });
 
@@ -18118,7 +18303,7 @@ window.vektorApplyChatMode_ = function () {
 };
 
 window.vektorOpenLegacyChat = function () {
-  window.__vektorChatMode = "legacy";
+  window.__vektorChatMode = "default";
   window.vektorShowChatView();
 };
 
