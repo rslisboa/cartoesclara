@@ -17644,7 +17644,6 @@ function vektorGetAllowedLojasFromEmails_(email, empresa) {
  * Dataset da página: retorna tx já filtradas por ACL e pelo recorte solicitado.
  * req: {dtIni, dtFim, time, loja, categoria}
  */
-
 function getAnaliseGastosMeta(req) {
   vektorAssertFunctionAllowed_("getAnaliseGastosMeta");
 
@@ -17674,6 +17673,7 @@ function getAnaliseGastosMeta(req) {
         lojas: [],
         times: [],
         categorias: [],
+        contasContabeis: [],
         combos: [],
         anos: [],
         mesesPorAno: {}
@@ -17686,13 +17686,15 @@ function getAnaliseGastosMeta(req) {
     var iLojaAlias = 7;
     var iCategoria = 13;
     var iTime      = 17;
+    var iEtiqueta  = 19;
     var iLojaNum   = 21;
 
-    var lojasSet = {};
-    var timesSet = {};
-    var catsSet  = {};
-    var comboMap = {};
-    var anosSet = {};
+    var lojasSet   = {};
+    var timesSet   = {};
+    var catsSet    = {};
+    var contasSet  = {};
+    var comboMap   = {};
+    var anosSet    = {};
     var mesesPorAnoMap = {};
 
     var allowedSet = null;
@@ -17730,11 +17732,25 @@ function getAnaliseGastosMeta(req) {
       return "";
     }
 
+    function extrairContaContabilDaEtiqueta_(v){
+      var s = String(v || "").trim();
+      if (!s) return "";
+
+      var m = s.match(/^(\d{4,})\s*-/);
+      if (m && m[1]) return m[1];
+
+      var m2 = s.match(/^(\d{4,})$/);
+      if (m2 && m2[1]) return m2[1];
+
+      return "";
+    }
+
     values.forEach(function(row){
       var lojaNum = row[iLojaNum];
       var lojaAlias = row[iLojaAlias];
       var time = String(row[iTime] || "").trim();
       var categoria = String(row[iCategoria] || "").trim();
+      var contaContabil = extrairContaContabilDaEtiqueta_(row[iEtiqueta]);
 
       var lojaKey = vektorNormLojaKey_(lojaAlias) || vektorNormLojaKey_(lojaNum);
       if (!lojaKey) {
@@ -17751,15 +17767,18 @@ function getAnaliseGastosMeta(req) {
       if (lojaKey) lojasSet[lojaKey] = true;
       if (time) timesSet[time] = true;
       if (categoria) catsSet[categoria] = true;
+      if (contaContabil) contasSet[contaContabil] = true;
 
       if (time && lojaKey && categoria) {
-          var comboKey = time + "||" + lojaKey + "||" + categoria;
-          comboMap[comboKey] = {
-            time: time,
-            loja: lojaKey,
-            categoria: categoria
-          };
-        }
+        var contaKey = contaContabil || "";
+        var comboKey = time + "||" + lojaKey + "||" + categoria + "||" + contaKey;
+        comboMap[comboKey] = {
+          time: time,
+          loja: lojaKey,
+          categoria: categoria,
+          contaContabil: contaKey
+        };
+      }
 
       var iso = toISODateMeta_(row[iData]);
       if (iso) {
@@ -17783,6 +17802,7 @@ function getAnaliseGastosMeta(req) {
       lojas: Object.keys(lojasSet).sort(),
       times: Object.keys(timesSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
       categorias: Object.keys(catsSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
+      contasContabeis: Object.keys(contasSet).sort(function(a,b){ return a.localeCompare(b, "pt-BR"); }),
       combos: Object.keys(comboMap).map(function(k){ return comboMap[k]; }),
       anos: anos,
       mesesPorAno: mesesPorAno
@@ -17802,13 +17822,15 @@ function getAnaliseGastosDataset(req){
     var dtIni = String(req.dtIni || "").trim();
     var dtFim = String(req.dtFim || "").trim();
 
-    var fTimeArr = Array.isArray(req.time) ? req.time.map(String) : (req.time ? [String(req.time)] : []);
-    var fLojaArr = Array.isArray(req.loja) ? req.loja.map(String) : (req.loja ? [String(req.loja)] : []);
-    var fCatArr  = Array.isArray(req.categoria) ? req.categoria.map(String) : (req.categoria ? [String(req.categoria)] : []);
+    var fTimeArr  = Array.isArray(req.time) ? req.time.map(String) : (req.time ? [String(req.time)] : []);
+    var fLojaArr  = Array.isArray(req.loja) ? req.loja.map(String) : (req.loja ? [String(req.loja)] : []);
+    var fCatArr   = Array.isArray(req.categoria) ? req.categoria.map(String) : (req.categoria ? [String(req.categoria)] : []);
+    var fContaArr = Array.isArray(req.contaContabil) ? req.contaContabil.map(String) : (req.contaContabil ? [String(req.contaContabil)] : []);
 
-    fTimeArr = fTimeArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
-    fLojaArr = fLojaArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
-    fCatArr  = fCatArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
+    fTimeArr  = fTimeArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
+    fLojaArr  = fLojaArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
+    fCatArr   = fCatArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
+    fContaArr = fContaArr.map(function(s){ return String(s || "").trim(); }).filter(Boolean);
 
     if (!dtIni || !dtFim) throw new Error("Informe dtIni e dtFim.");
     if (dtIni > dtFim) throw new Error("Período inválido: dtIni > dtFim.");
@@ -17848,6 +17870,7 @@ function getAnaliseGastosDataset(req){
     var iLojaAlias = 7;
     var iCategoria = 13;
     var iTime      = 17;
+    var iEtiqueta  = 19;
     var iDesc      = 20;
     var iLojaNum   = 21;
 
@@ -17876,6 +17899,19 @@ function getAnaliseGastosDataset(req){
       var p = String(iso).split("-");
       if (p.length === 3) return p[2] + "/" + p[1] + "/" + p[0];
       return iso;
+    }
+
+    function extrairContaContabilDaEtiqueta_(v){
+      var s = String(v || "").trim();
+      if (!s) return "";
+
+      var m = s.match(/^(\d{4,})\s*-/);
+      if (m && m[1]) return m[1];
+
+      var m2 = s.match(/^(\d{4,})$/);
+      if (m2 && m2[1]) return m2[1];
+
+      return "";
     }
 
     var allowedSet = null;
@@ -17926,6 +17962,12 @@ function getAnaliseGastosDataset(req){
       var estabelecimento = String(row[iEstab] || "").trim();
       if (!estabelecimento) estabelecimento = "—";
 
+      var etiqueta = String(row[iEtiqueta] || "").trim();
+      if (!etiqueta) etiqueta = "—";
+
+      var contaContabil = extrairContaContabilDaEtiqueta_(row[iEtiqueta]);
+      if (!contaContabil) contaContabil = "—";
+
       var descricao = String(row[iDesc] || "").trim();
       if (!descricao) descricao = "—";
 
@@ -17934,6 +17976,7 @@ function getAnaliseGastosDataset(req){
       if (fTimeArr.length && fTimeArr.indexOf(time) < 0) return;
       if (fLojaArr.length && fLojaArr.indexOf(lojaKey) < 0) return;
       if (fCatArr.length  && fCatArr.indexOf(categoria) < 0) return;
+      if (fContaArr.length && fContaArr.indexOf(contaContabil) < 0) return;
 
       tx.push({
         dataISO: dataISO,
@@ -17941,6 +17984,8 @@ function getAnaliseGastosDataset(req){
         loja: lojaKey,
         time: time,
         categoria: categoria,
+        etiqueta: etiqueta,
+        contaContabil: contaContabil,
         estabelecimento: estabelecimento,
         valor: valor,
         descricao: descricao
