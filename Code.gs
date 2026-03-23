@@ -17697,7 +17697,8 @@ function vektorGetAllowedLojasFromEmails_(email, empresa) {
     role === "administrador" ||
     role === "analista pro" ||
     role === "marketing" ||
-    role === "analista"
+    role === "analista" ||
+    role === "operacoes_lojas"
   ) {
     return null;
   }
