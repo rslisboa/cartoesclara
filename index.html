@@ -2055,6 +2055,182 @@ display: none;
 }
 
 /* =========================
+   HOME - PRELOAD BAR
+   ========================= */
+#vektorHomePreloadWrap{
+  position:absolute;
+  left: 4.2%;
+  top: 33.8%;
+  width: min(450px, 38vw);
+  z-index: 4;
+  pointer-events: none;
+
+  padding: 11px 13px 10px;
+  border-radius: 14px;
+  background: linear-gradient(
+    180deg,
+    rgba(4,10,20,0.46) 0%,
+    rgba(4,10,20,0.62) 100%
+  );
+  border: 1px solid rgba(181,255,32,0.22);
+  box-shadow:
+    0 14px 34px rgba(0,0,0,0.24),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  backdrop-filter: blur(8px);
+
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity .35s ease, transform .35s ease, filter .35s ease;
+}
+
+#vektorHomePreloadWrap.is-visible{
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#vektorHomePreloadWrap.is-done{
+  border-color: rgba(181,255,32,0.42);
+  box-shadow:
+    0 16px 38px rgba(0,0,0,0.28),
+    0 0 0 1px rgba(181,255,32,0.10) inset;
+}
+
+#vektorHomePreloadLabel{
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 1000;
+  letter-spacing: .2px;
+  line-height: 1.2;
+}
+
+#vektorHomePreloadBar{
+  position: relative;
+  margin-top: 10px;
+  height: 14px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03)),
+    rgba(15,23,42,0.72);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.28),
+    0 1px 0 rgba(255,255,255,0.04);
+}
+
+#vektorHomePreloadFill{
+  position:absolute;
+  inset:0 auto 0 0;
+  width: 0%;
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(0,94,39,0.95) 0%,
+      rgba(96,214,26,0.98) 48%,
+      rgba(181,255,32,1) 100%
+    );
+  box-shadow:
+    0 0 16px rgba(181,255,32,0.28),
+    inset 0 -1px 0 rgba(0,0,0,0.18);
+  transition: width .45s cubic-bezier(.22,.61,.36,1);
+}
+
+#vektorHomePreloadGlow{
+  position:absolute;
+  top:-30%;
+  left:-18%;
+  width: 18%;
+  height: 160%;
+  opacity: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0),
+    rgba(255,255,255,0.42),
+    rgba(255,255,255,0)
+  );
+  transform: skewX(-18deg);
+  pointer-events:none;
+}
+
+#vektorHomePreloadWrap.is-loading #vektorHomePreloadGlow{
+  opacity: .9;
+  animation: vektorHomePreloadGlow 1.7s linear infinite;
+}
+
+@keyframes vektorHomePreloadGlow{
+  from { left:-18%; }
+  to   { left:105%; }
+}
+
+#vektorHomePreloadMeta{
+  margin-top: 8px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+#vektorHomePreloadPct{
+  color:#B5FF20;
+  font-size: 12px;
+  font-weight: 1000;
+  min-width: 40px;
+}
+
+#vektorHomePreloadStatus{
+  color: rgba(255,255,255,0.86);
+  font-size: 12px;
+  font-weight: 800;
+  text-align:right;
+  flex:1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1200px){
+  #vektorHomePreloadWrap{
+    top: 34.5%;
+    width: min(500px, 52vw);
+  }
+}
+
+@media (max-width: 980px){
+  #vektorHomePreloadWrap{
+    top: 36%;
+    left: 4.5%;
+    width: min(430px, 62vw);
+  }
+}
+
+@media (max-width: 720px){
+  #vektorHomePreloadWrap{
+    top: auto;
+    left: 16px;
+    right: 16px;
+    bottom: 22px;
+    width: auto;
+  }
+
+  #vektorHomePreloadLabel{
+    font-size: 13px;
+  }
+
+  #vektorHomePreloadStatus{
+    white-space: normal;
+    text-align:left;
+  }
+
+  #vektorHomePreloadMeta{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:4px;
+  }
+}
+
+/* =========================
    TOPBAR PREMIUM STRIP (faixa + checkboxes)
    ========================= */
 
@@ -2944,6 +3120,7 @@ display: none;
 </header>
 
 <!-- HOME (aparece ao carregar o sistema) -->
+<!-- HOME (aparece ao carregar o sistema) -->
 <div id="homeView"
      style="position:absolute; inset:0; width:100%; height:100%; display:flex; align-items:stretch; justify-content:stretch; overflow:hidden; opacity:0; filter:blur(10px); transition:opacity 900ms ease, filter 900ms ease; z-index:1;">
   <img id="homeHeroImg"
@@ -2951,7 +3128,22 @@ display: none;
        alt="Vektor"
        style="width:100%; height:100%; object-fit:cover; object-position:center center; display:block;"/>
 
-         <!-- Overlay SVG da borda animada da Home (somente menu expandido via CSS) -->
+  <!-- PRELOAD GLOBAL DA HOME -->
+  <div id="vektorHomePreloadWrap" aria-live="polite">
+    <div id="vektorHomePreloadLabel">Loading system, wait...</div>
+
+    <div id="vektorHomePreloadBar">
+      <div id="vektorHomePreloadFill"></div>
+      <div id="vektorHomePreloadGlow"></div>
+    </div>
+
+    <div id="vektorHomePreloadMeta">
+      <span id="vektorHomePreloadPct">0%</span>
+      <span id="vektorHomePreloadStatus">Inicializando módulos...</span>
+    </div>
+  </div>
+
+  <!-- Overlay SVG da borda animada da Home (somente menu expandido via CSS) -->
   <svg id="homeBorderFx"
        viewBox="0 0 100 100"
        preserveAspectRatio="none"
@@ -2966,7 +3158,7 @@ display: none;
           x="1.2" y="1.2" width="97.6" height="97.6"
           rx="2.2" ry="2.2"
           pathLength="100" />
-  </svg> 
+  </svg>
 
 </div>
 
@@ -6730,6 +6922,12 @@ function hideMaintenance_() {
         closeModal_();
         showApp_();
 
+        try {
+            vektorGlobalPreloadStart_();
+          } catch(e) {
+            console.error("Falha ao iniciar preload global:", e);
+          }
+
         if (window.vektorPlayTopbarPremiumStrip) {
           requestAnimationFrame(function(){
             requestAnimationFrame(function(){
@@ -7105,6 +7303,217 @@ function bindLoginHandlers_() {
   });
 }
 
+window.__vektorGlobalPreloadState = {
+  running: false,
+  done: false,
+  tasks: {},
+  total: 0,
+  completed: 0
+};
+
+window.__vektorResumoCicloPreloaded = window.__vektorResumoCicloPreloaded || null;
+
+function vektorCanPreloadByNavBtn_(btnId){
+  try {
+    const btn = document.getElementById(btnId);
+    if (!btn) return false;
+
+    const st = window.getComputedStyle(btn);
+    if (st.display === "none" || st.visibility === "hidden") return false;
+
+    return true;
+  } catch(_) {
+    return false;
+  }
+}
+
+function vektorHomePreloadReset_(){
+  const wrap   = document.getElementById("vektorHomePreloadWrap");
+  const fill   = document.getElementById("vektorHomePreloadFill");
+  const pct    = document.getElementById("vektorHomePreloadPct");
+  const label  = document.getElementById("vektorHomePreloadLabel");
+  const status = document.getElementById("vektorHomePreloadStatus");
+
+  if (wrap) {
+    wrap.classList.remove("is-done");
+    wrap.classList.add("is-loading");
+    wrap.classList.add("is-visible");
+  }
+  if (fill) fill.style.width = "0%";
+  if (pct) pct.textContent = "0%";
+  if (label) label.textContent = "Loading system, wait...";
+  if (status) status.textContent = "Inicializando módulos...";
+}
+
+function vektorHomePreloadHide_(){
+  const wrap = document.getElementById("vektorHomePreloadWrap");
+  if (!wrap) return;
+  wrap.classList.remove("is-visible");
+}
+
+function vektorHomePreloadSetProgress_(completed, total, statusTxt){
+  const wrap   = document.getElementById("vektorHomePreloadWrap");
+  const fill   = document.getElementById("vektorHomePreloadFill");
+  const pct    = document.getElementById("vektorHomePreloadPct");
+  const label  = document.getElementById("vektorHomePreloadLabel");
+  const status = document.getElementById("vektorHomePreloadStatus");
+
+  const safeTotal = Math.max(1, Number(total || 0));
+  const safeComp  = Math.min(safeTotal, Math.max(0, Number(completed || 0)));
+  const percent   = Math.round((safeComp / safeTotal) * 100);
+
+  if (wrap) wrap.classList.add("is-visible");
+  if (fill) fill.style.width = percent + "%";
+  if (pct) pct.textContent = percent + "%";
+  if (status && statusTxt) status.textContent = String(statusTxt);
+
+  if (safeComp >= safeTotal) {
+    if (label) label.textContent = "System ready!";
+    if (status) status.textContent = "Filtros principais disponíveis.";
+    if (wrap) {
+      wrap.classList.remove("is-loading");
+      wrap.classList.add("is-done");
+    }
+  } else {
+    if (label) label.textContent = "Loading system, wait...";
+    if (wrap) wrap.classList.add("is-loading");
+  }
+}
+
+function vektorGlobalPreloadFinishTask_(key, ok, statusTxt){
+  const st = window.__vektorGlobalPreloadState || {};
+
+  if (!st.tasks || !st.tasks[key]) {
+    console.warn("Preload task não encontrada:", key, st);
+    return;
+  }
+
+  if (st.tasks[key].done) return;
+
+  st.tasks[key].done = true;
+  st.tasks[key].ok = !!ok;
+  st.completed = Number(st.completed || 0) + 1;
+
+  vektorHomePreloadSetProgress_(
+    st.completed,
+    st.total,
+    statusTxt || (ok ? "Módulo carregado." : "Módulo indisponível para o perfil.")
+  );
+
+  if (st.completed >= st.total) {
+    st.running = false;
+    st.done = true;
+
+    window.clearTimeout(window.__vektorHomePreloadHideTmr);
+    window.__vektorHomePreloadHideTmr = window.setTimeout(function(){
+      vektorHomePreloadHide_();
+    }, 2200);
+  }
+}
+
+function vektorGlobalPreloadStart_(){
+  const st = window.__vektorGlobalPreloadState || {};
+
+  if (st.running) return;
+
+  if (st.done) {
+    vektorHomePreloadSetProgress_(st.total || 1, st.total || 1, "Filtros principais disponíveis.");
+    return;
+  }
+
+  const tasks = {};
+
+  if (vektorCanPreloadByNavBtn_("navResumoCicloBtn")) {
+    tasks.resumoCiclo = { done:false, ok:false };
+  }
+  if (vektorCanPreloadByNavBtn_("navAnaliseGastosBtn")) {
+    tasks.analiseGastos = { done:false, ok:false };
+  }
+  if (vektorCanPreloadByNavBtn_("navMyAlertsBtn")) {
+    tasks.myAlerts = { done:false, ok:false };
+  }
+
+  const keys = Object.keys(tasks);
+
+  if (!keys.length) {
+    vektorHomePreloadHide_();
+    return;
+  }
+
+  window.__vektorGlobalPreloadState = {
+    running: true,
+    done: false,
+    tasks: tasks,
+    total: keys.length,
+    completed: 0
+  };
+
+  vektorHomePreloadReset_();
+  vektorHomePreloadSetProgress_(0, keys.length, "Inicializando módulos...");
+
+  // 1) Resumo do Ciclo
+  if (tasks.resumoCiclo) {
+    try {
+      google.script.run
+        .withSuccessHandler(function(res){
+          try {
+            window.__vektorResumoCicloPreloaded = res || null;
+          } catch(_) {}
+          vektorGlobalPreloadFinishTask_(
+            "resumoCiclo",
+            !!(res && res.ok),
+            (res && res.ok) ? "Pendências do ciclo prontas." : "Pendências do ciclo indisponíveis."
+          );
+        })
+        .withFailureHandler(function(){
+          vektorGlobalPreloadFinishTask_("resumoCiclo", false, "Pendências do ciclo indisponíveis.");
+        })
+        .getResumoCicloPendencias();
+    } catch(_) {
+      vektorGlobalPreloadFinishTask_("resumoCiclo", false, "Pendências do ciclo indisponíveis.");
+    }
+  }
+
+  // 2) Análise de Gastos
+  if (tasks.analiseGastos) {
+    try {
+      vektorAnaliseGastosEnsureMeta_(function(){
+        vektorGlobalPreloadFinishTask_("analiseGastos", true, "Filtros da Análise de Gastos prontos.");
+      }, { silent: true });
+    } catch(_) {
+      vektorGlobalPreloadFinishTask_("analiseGastos", false, "Análise de Gastos indisponível.");
+    }
+  }
+
+  // 3) Alertas Programados
+  if (tasks.myAlerts) {
+    try {
+      const empresaAtual = (typeof window.vektorEmpresaAtual_ === "function")
+        ? window.vektorEmpresaAtual_()
+        : "CENTAURO";
+
+      if (window.__myAlertsBaseLoaded === true && window.__myAlertsEmpresaLoaded === empresaAtual) {
+        vektorGlobalPreloadFinishTask_("myAlerts", true, "Alertas Programados prontos.");
+      } else {
+        window.vektorMyAlertsLoadTimesLojas_(function(ok){
+          if (ok) {
+            window.__myAlertsBaseLoaded = true;
+            window.__myAlertsEmpresaLoaded = empresaAtual;
+          }
+
+          vektorGlobalPreloadFinishTask_(
+            "myAlerts",
+            !!ok,
+            ok ? "Alertas Programados prontos." : "Alertas Programados indisponíveis."
+          );
+        });
+      }
+    } catch(_) {
+      vektorGlobalPreloadFinishTask_("myAlerts", false, "Alertas Programados indisponíveis.");
+    }
+  }
+}
+
 document.addEventListener("DOMContentLoaded", function () {
   bindLoginHandlers_(); // ✅ garante listeners sempre
 
@@ -7307,6 +7716,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
           // sessão válida: libera sem modal
           showApp_();
+          try {
+              vektorGlobalPreloadStart_();
+            } catch(e) {
+              console.error("Falha ao iniciar preload global:", e);
+            }
           if (window.vektorPlayTopbarPremiumStrip) {
             requestAnimationFrame(function(){
               requestAnimationFrame(function(){
@@ -8169,64 +8583,46 @@ window.vektorLoadResumoCiclo = function (force) {
   const content = document.getElementById("cicloResumoContent");
   const tbody = document.getElementById("cicloResumo_tbody");
 
-  if (!force && window.__cicloResumoData && window.__cicloResumoData.ok) {
-  try {
-    const res = window.__cicloResumoData;
-    const tbody = document.getElementById("cicloResumo_tbody");
-    if (tbody) tbody.innerHTML = "";
-    // reaproveita dados já carregados
-    const selTime = document.getElementById("cicloResumo_selTime");
-    if (selTime) selTime.dispatchEvent(new Event("change"));
-    return;
-  } catch (_) {}
-}
-
-setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
-
-  if (tbody) tbody.innerHTML = "";
-
   const fmtBRL = (n) => {
     try { return (Number(n || 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
     catch (e) { return String(n || 0); }
   };
 
   function setResumoCicloBusy_(isBusy, msg){
-  const loading = document.getElementById("cicloResumoLoading");
-  const content = document.getElementById("cicloResumoContent");
+    const loading = document.getElementById("cicloResumoLoading");
+    const content = document.getElementById("cicloResumoContent");
 
-  const ov = document.getElementById("cicloResumo_overlay"); // <<< precisa existir no HTML
-  const ovTitle = document.getElementById("cicloResumo_overlayTitle");
-  const ovSub = document.getElementById("cicloResumo_overlaySub");
+    const ov = document.getElementById("cicloResumo_overlay");
+    const ovTitle = document.getElementById("cicloResumo_overlayTitle");
+    const ovSub = document.getElementById("cicloResumo_overlaySub");
 
-  // overlay (trava tela)
-  if (ov) ov.style.display = isBusy ? "block" : "none";
-  if (ovTitle) ovTitle.textContent = msg || (isBusy ? "Carregando…" : "");
-  if (ovSub) ovSub.textContent = isBusy ? "Aguarde um instante." : "";
+    if (ov) ov.style.display = isBusy ? "block" : "none";
+    if (ovTitle) ovTitle.textContent = msg || (isBusy ? "Carregando…" : "");
+    if (ovSub) ovSub.textContent = isBusy ? "Aguarde um instante." : "";
 
-  // mensagem / loading (texto “Carregando pendências do ciclo…”)
-  if (loading) {
-    loading.textContent = msg || (isBusy ? "Carregando pendências do ciclo… aguarde." : "");
-    loading.style.display = isBusy ? "block" : "none";
+    if (loading) {
+      loading.textContent = msg || (isBusy ? "Carregando pendências do ciclo… aguarde." : "");
+      loading.style.display = isBusy ? "block" : "none";
+    }
+
+    if (content) content.style.opacity = isBusy ? "0.55" : "1";
+
+    const dtIniEl = document.getElementById("cicloResumo_dtIni");
+    const dtFimEl = document.getElementById("cicloResumo_dtFim");
+    const selTime = document.getElementById("cicloResumo_selTime");
+    const selLoja = document.getElementById("cicloResumo_selLoja");
+    const btnLimpar = document.getElementById("cicloResumo_btnLimpar");
+    const btnAtualizar = document.getElementById("cicloResumo_btnAtualizar");
+    const btnAI = document.getElementById("cicloResumo_aiBtn");
+    const btnCsv = document.getElementById("cicloResumo_btnCsv");
+
+    [dtIniEl, dtFimEl, selTime, selLoja, btnLimpar, btnAtualizar, btnAI, btnCsv].forEach(function(el){
+      if (!el) return;
+      el.disabled = !!isBusy;
+      el.style.pointerEvents = isBusy ? "none" : "auto";
+      el.style.opacity = isBusy ? "0.65" : "1";
+    });
   }
-
-  if (content) content.style.opacity = isBusy ? "0.55" : "1";
-
-  const dtIniEl = document.getElementById("cicloResumo_dtIni");
-  const dtFimEl = document.getElementById("cicloResumo_dtFim");
-  const selTime = document.getElementById("cicloResumo_selTime");
-  const selLoja = document.getElementById("cicloResumo_selLoja");
-  const btnLimpar = document.getElementById("cicloResumo_btnLimpar");
-  const btnAtualizar = document.getElementById("cicloResumo_btnAtualizar");
-  const btnAI = document.getElementById("cicloResumo_aiBtn");
-  const btnCsv = document.getElementById("cicloResumo_btnCsv");
-
-  [dtIniEl, dtFimEl, selTime, selLoja, btnLimpar, btnAtualizar, btnAI, btnCsv].forEach(el => {
-    if (!el) return;
-    el.disabled = !!isBusy;
-    el.style.pointerEvents = isBusy ? "none" : "auto";
-    el.style.opacity = isBusy ? "0.65" : "1";
-  });
-}
 
   function applyFiltros_(){
     const res = window.__cicloResumoData || {};
@@ -8243,50 +8639,47 @@ setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
     const dtIni = (dtIniEl && dtIniEl.value) ? dtIniEl.value : "";
     const dtFim = (dtFimEl && dtFimEl.value) ? dtFimEl.value : "";
 
-    // 1) filtro por datas (ISO yyyy-mm-dd)
-    let tx = txAll.filter(r => {
+    let tx = txAll.filter(function(r){
       const d = String(r.dataISO || r.dataIso || "");
       if (dtIni && d < dtIni) return false;
       if (dtFim && d > dtFim) return false;
       return true;
     });
 
-    // 2) repopula TIME com base no recorte de data
-    const times = Array.from(new Set(tx.map(r => String(r.time || "N/D"))))
+    const times = Array.from(new Set(tx.map(function(r){ return String(r.time || "N/D"); })))
       .filter(Boolean)
-      .sort((a,b)=>a.localeCompare(b, "pt-BR"));
+      .sort(function(a,b){ return a.localeCompare(b, "pt-BR"); });
 
     if (selTime) {
       const cur = timeSel;
       selTime.innerHTML = "<option value=''>Todos</option>" +
-        times.map(t => `<option value="${String(t).replace(/"/g,"&quot;")}">${t}</option>`).join("");
+        times.map(function(t){
+          return `<option value="${String(t).replace(/"/g,"&quot;")}">${t}</option>`;
+        }).join("");
       selTime.value = (cur && times.includes(cur)) ? cur : "";
     }
 
-    // aplica TIME
     const timeNow = selTime ? (selTime.value || "") : "";
-    if (timeNow) tx = tx.filter(r => String(r.time || "") === timeNow);
+    if (timeNow) tx = tx.filter(function(r){ return String(r.time || "") === timeNow; });
 
-    // 3) repopula LOJA com base no recorte (data + time)
-    const lojas = Array.from(new Set(tx.map(r => String(r.loja || ""))))
+    const lojas = Array.from(new Set(tx.map(function(r){ return String(r.loja || ""); })))
       .filter(Boolean)
-      .sort((a,b)=>Number(a)-Number(b));
+      .sort(function(a,b){ return Number(a)-Number(b); });
 
     if (selLoja) {
       const curL = lojaSel;
       selLoja.innerHTML = "<option value=''>Todas</option>" +
-        lojas.map(l => `<option value="${l}">${l}</option>`).join("");
+        lojas.map(function(l){
+          return `<option value="${l}">${l}</option>`;
+        }).join("");
       selLoja.value = (curL && lojas.includes(curL)) ? curL : "";
     }
 
-    // aplica LOJA
     const lojaNow = selLoja ? (selLoja.value || "") : "";
-    if (lojaNow) tx = tx.filter(r => String(r.loja || "") === lojaNow);
+    if (lojaNow) tx = tx.filter(function(r){ return String(r.loja || "") === lojaNow; });
 
-    // ✅ fonte única do recorte atual (IA usa isso)
-      window.__cicloResumoTxFiltered = tx;
+    window.__cicloResumoTxFiltered = tx;
 
-    // 4) recalcula cards (consistente com filtros)
     const lojasSet = {};
     let totalPend = 0;
     let totalValor = 0;
@@ -8294,7 +8687,7 @@ setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
     const aggTime = {};
     const aggLoja = {};
 
-    tx.forEach(r => {
+    tx.forEach(function(r){
       const loja = String(r.loja || "");
       const time = String(r.time || "N/D");
       const pend = Number(r.pendCount || 0);
@@ -8313,7 +8706,7 @@ setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
 
     function pickTop(obj){
       let best = null;
-      Object.keys(obj).forEach(k=>{
+      Object.keys(obj).forEach(function(k){
         if (!best || obj[k].pend > best.pend) best = obj[k];
       });
       return best;
@@ -8340,7 +8733,6 @@ setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
     if (elTopLoja) elTopLoja.textContent = topL ? topL.k : "—";
     if (elTopLojaSub) elTopLojaSub.textContent = topL ? `${topL.pend} pendências` : "—";
 
-    // 5) ordenação
     window.__cicloResumoSort = window.__cicloResumoSort || { col: "valor", dir: "desc" };
     const sort = window.__cicloResumoSort;
 
@@ -8354,7 +8746,6 @@ setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
       if (col === "valor" || col === "pendCount") return (Number(va||0) - Number(vb||0)) * dir;
       if (col === "loja") return (Number(va||0) - Number(vb||0)) * dir;
 
-      // dataISO é yyyy-mm-dd: comparar string funciona
       return String(va||"").localeCompare(String(vb||""), "pt-BR") * dir;
     }
 
@@ -8362,7 +8753,6 @@ setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
 
     window.__cicloResumoTxExport = tx.slice();
 
-    // 6) render tabela (detalhada)
     if (!tbody) return;
 
     if (!tx.length) {
@@ -8370,230 +8760,231 @@ setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
       return;
     }
 
-    tbody.innerHTML = tx.map(r => `
-      <tr class="cicloResumoRow">
-        <td>${r.loja || "—"}</td>
-        <td>${r.time || "N/D"}</td>
-        <td style="white-space:nowrap;">${r.dataBR || "—"}</td>
-        <td style="max-width:420px;">${(r.estabelecimento || "—")}</td>
-        <td style="text-align:right; white-space:nowrap;">${r.valorBRL || fmtBRL(r.valor)}</td>
-        <td style="max-width:260px;">${(r.categoria || "—")}</td>
-        <td style="max-width:320px;">${(r.pendencias || "—")}</td>
-      </tr>
-    `).join("");
+    tbody.innerHTML = tx.map(function(r){
+      return `
+        <tr class="cicloResumoRow">
+          <td>${r.loja || "—"}</td>
+          <td>${r.time || "N/D"}</td>
+          <td style="white-space:nowrap;">${r.dataBR || "—"}</td>
+          <td style="max-width:420px;">${(r.estabelecimento || "—")}</td>
+          <td style="text-align:right; white-space:nowrap;">${r.valorBRL || fmtBRL(r.valor)}</td>
+          <td style="max-width:260px;">${(r.categoria || "—")}</td>
+          <td style="max-width:320px;">${(r.pendencias || "—")}</td>
+        </tr>
+      `;
+    }).join("");
   }
 
-  // expõe limpar filtros (se você tiver botão de limpar)
   window.vektorResumoCicloLimparFiltros = function () {
     const selTime = document.getElementById("cicloResumo_selTime");
     const selLoja = document.getElementById("cicloResumo_selLoja");
-    const dtIniEl = document.getElementById("cicloResumo_dtIni");
-    const dtFimEl = document.getElementById("cicloResumo_dtFim");
 
     if (selTime) selTime.value = "";
     if (selLoja) selLoja.value = "";
-    // datas: mantém como estão (ou zera se você quiser)
     applyFiltros_();
   };
 
   function exportCsv_(rows){
-  rows = Array.isArray(rows) ? rows : [];
-  if (!rows.length) {
-    alert("Sem dados para exportar no filtro atual.");
-    return;
+    rows = Array.isArray(rows) ? rows : [];
+    if (!rows.length) {
+      alert("Sem dados para exportar no filtro atual.");
+      return;
+    }
+
+    const header = ["Loja", "Time", "Data da transação", "Estabelecimento", "Valor", "Categoria", "Pendências"];
+
+    const esc = function(v){
+      const s = String(v ?? "");
+      if (/[",\n;]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+      return s;
+    };
+
+    const lines = [];
+    lines.push(header.join(";"));
+
+    rows.forEach(function(r){
+      lines.push([
+        esc(r.loja || "—"),
+        esc(r.time || "N/D"),
+        esc(r.dataBR || r.dataTxt || "—"),
+        esc(r.estabelecimento || "—"),
+        esc(r.valorBRL || (typeof r.valor === "number" ? r.valor.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : (r.valor || ""))),
+        esc(r.categoria || "—"),
+        esc(r.pendencias || "—")
+      ].join(";"));
+    });
+
+    const csv = "\uFEFF" + lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+
+    const dtIniEl = document.getElementById("cicloResumo_dtIni");
+    const dtFimEl = document.getElementById("cicloResumo_dtFim");
+    const dtIni = dtIniEl && dtIniEl.value ? dtIniEl.value : "";
+    const dtFim = dtFimEl && dtFimEl.value ? dtFimEl.value : "";
+
+    const fileName = `resumo_ciclo_pendencias_${dtIni || "ini"}_${dtFim || "fim"}.csv`;
+
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 0);
   }
 
-  const header = ["Loja", "Time", "Data da transação", "Estabelecimento", "Valor", "Categoria", "Pendências"];
+  function hydrateResumoFromRes_(res){
+    if (!res || !res.ok) {
+      if (loading) loading.style.display = "none";
+      if (content) content.style.display = "block";
+      if (tbody) tbody.innerHTML = "<tr><td colspan='7' style='padding:10px;color:#111;'>Não disponível para o seu perfil.</td></tr>";
+      return;
+    }
 
-  const esc = (v) => {
-    const s = String(v ?? "");
-    if (/[",\n;]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
-    return s;
-  };
+    if (content) content.style.display = "block";
 
-  const lines = [];
-  lines.push(header.join(";"));
+    try {
+      if (res && Array.isArray(res.tx)) {
+        res.tx = res.tx.map(function(r){
+          const pendNF = Number(r.pendNF || 0);
+          const pendEtiqueta = Number(r.pendEtiqueta || 0);
+          const pendDesc = Number(r.pendDesc || 0);
 
-  rows.forEach(r => {
-    lines.push([
-      esc(r.loja || "—"),
-      esc(r.time || "N/D"),
-      esc(r.dataBR || r.dataTxt || "—"),
-      esc(r.estabelecimento || "—"),
-      esc(r.valorBRL || (typeof r.valor === "number" ? r.valor.toLocaleString("pt-BR",{style:"currency",currency:"BRL"}) : (r.valor || ""))),
-      esc(r.categoria || "—"),
-      esc(r.pendencias || "—")
-    ].join(";"));
-  });
+          return {
+            ...r,
+            dataISO: r.dataISO || r.dataIso || "",
+            dataBR:  r.dataBR  || r.dataTxt || "",
+            valorBRL: r.valorBRL || r.valorTxt || "",
+            pendCount: (r.pendCount != null) ? Number(r.pendCount || 0) : (pendNF + pendEtiqueta + pendDesc),
+            pendencias: r.pendencias || ""
+          };
+        });
+      }
+    } catch(_) {}
 
-  const csv = "\uFEFF" + lines.join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    window.__cicloResumoData = res;
 
-  const dtIniEl = document.getElementById("cicloResumo_dtIni");
-  const dtFimEl = document.getElementById("cicloResumo_dtFim");
-  const dtIni = dtIniEl && dtIniEl.value ? dtIniEl.value : "";
-  const dtFim = dtFimEl && dtFimEl.value ? dtFimEl.value : "";
+    try {
+      const btnCsv = document.getElementById("cicloResumo_btnCsv");
+      if (btnCsv && !btnCsv.__bindCsv) {
+        btnCsv.__bindCsv = true;
+        btnCsv.addEventListener("click", function(){
+          const rows = Array.isArray(window.__cicloResumoTxExport) ? window.__cicloResumoTxExport : [];
+          exportCsv_(rows);
+        });
+      }
+    } catch(_) {}
 
-  const fileName = `resumo_ciclo_pendencias_${dtIni || "ini"}_${dtFim || "fim"}.csv`;
+    const sub = document.getElementById("cicloResumoSubTitle");
+    if (sub && res.periodo && res.periodo.inicio && res.periodo.fim) {
+      sub.textContent = `Consolidado das pendências no ciclo atual (${res.periodo.inicio} → ${res.periodo.fim})`;
+    }
 
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    URL.revokeObjectURL(a.href);
-    a.remove();
-  }, 0);
-}
+    try {
+      const dtIniEl = document.getElementById("cicloResumo_dtIni");
+      const dtFimEl = document.getElementById("cicloResumo_dtFim");
 
-setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
+      if (dtIniEl && dtFimEl && res && res.periodo && res.periodo.inicio && res.periodo.fim) {
+        function br2iso(br){
+          const m = String(br||"").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          if (!m) return "";
+          return `${m[3]}-${m[2]}-${m[1]}`;
+        }
+        const min = br2iso(res.periodo.inicio);
+        const max = br2iso(res.periodo.fim);
+
+        if (min) { dtIniEl.min = min; dtFimEl.min = min; }
+        if (max) { dtIniEl.max = max; dtFimEl.max = max; }
+
+        if (!dtIniEl.value && min) dtIniEl.value = min;
+        if (!dtFimEl.value && max) dtFimEl.value = max;
+
+        if (!dtIniEl.__bindResumo) {
+          dtIniEl.__bindResumo = true;
+          dtIniEl.addEventListener("change", applyFiltros_);
+        }
+        if (!dtFimEl.__bindResumo) {
+          dtFimEl.__bindResumo = true;
+          dtFimEl.addEventListener("change", applyFiltros_);
+        }
+      }
+    } catch(_) {}
+
+    try {
+      const selTime = document.getElementById("cicloResumo_selTime");
+      const selLoja = document.getElementById("cicloResumo_selLoja");
+
+      if (selTime && !selTime.__bindResumo) {
+        selTime.__bindResumo = true;
+        selTime.addEventListener("change", function () {
+          if (selLoja) selLoja.value = "";
+          applyFiltros_();
+        });
+      }
+
+      if (selLoja && !selLoja.__bindResumo) {
+        selLoja.__bindResumo = true;
+        selLoja.addEventListener("change", function () {
+          applyFiltros_();
+        });
+      }
+    } catch (_) {}
+
+    try {
+      const thead = document.querySelector("#cicloResumoTable thead");
+      if (thead && !thead.__bindSortResumo) {
+        thead.__bindSortResumo = true;
+        thead.addEventListener("click", function(ev){
+          const th = ev.target && ev.target.closest ? ev.target.closest("th[data-sort]") : null;
+          if (!th) return;
+
+          const col = th.getAttribute("data-sort") || "";
+          if (!col) return;
+
+          window.__cicloResumoSort = window.__cicloResumoSort || { col: "valor", dir: "desc" };
+
+          if (window.__cicloResumoSort.col === col) {
+            window.__cicloResumoSort.dir = (window.__cicloResumoSort.dir === "desc") ? "asc" : "desc";
+          } else {
+            window.__cicloResumoSort.col = col;
+            window.__cicloResumoSort.dir = "desc";
+          }
+
+          applyFiltros_();
+        });
+      }
+    } catch(_) {}
+
+    applyFiltros_();
+  }
+
+  if (!force && window.__cicloResumoData && window.__cicloResumoData.ok) {
+    try {
+      hydrateResumoFromRes_(window.__cicloResumoData);
+      return;
+    } catch (_) {}
+  }
+
+  if (!force && window.__vektorResumoCicloPreloaded && window.__vektorResumoCicloPreloaded.ok) {
+    try {
+      hydrateResumoFromRes_(window.__vektorResumoCicloPreloaded);
+      window.__cicloResumoData = window.__vektorResumoCicloPreloaded;
+      return;
+    } catch (_) {}
+  }
+
+  setResumoCicloBusy_(true, "Carregando pendências do ciclo…");
+  if (tbody) tbody.innerHTML = "";
 
   google.script.run
     .withSuccessHandler(function (res) {
       setResumoCicloBusy_(false);
-
-      if (!res || !res.ok) {
-        if (content) content.style.display = "block";
-        if (tbody) tbody.innerHTML = "<tr><td colspan='7' style='padding:10px;color:#111;'>Não disponível para o seu perfil.</td></tr>";
-        return;
-      }
-
-      if (content) content.style.display = "block";
-
-            // ✅ NORMALIZA tx (back devolve dataIso/dataTxt/valorTxt e flags; front usa dataISO/dataBR/valorBRL/pendCount)
-      try {
-        if (res && Array.isArray(res.tx)) {
-          res.tx = res.tx.map(r => {
-            const pendNF = Number(r.pendNF || 0);
-            const pendEtiqueta = Number(r.pendEtiqueta || 0);
-            const pendDesc = Number(r.pendDesc || 0);
-
-            return {
-              ...r,
-              // datas
-              dataISO: r.dataISO || r.dataIso || "",
-              dataBR:  r.dataBR  || r.dataTxt || "",
-              // valor
-              valorBRL: r.valorBRL || r.valorTxt || "",
-              // contagem de pendências
-              pendCount: (r.pendCount != null) ? Number(r.pendCount || 0) : (pendNF + pendEtiqueta + pendDesc),
-              // string pendências (garante)
-              pendencias: r.pendencias || "",
-            };
-          });
-        }
-      } catch(_) {}
-
-      // ✅ guarda dataset inteiro para filtros
-      window.__cicloResumoData = res;
-
-      // ✅ bind botão CSV (1x)
-        try {
-          const btnCsv = document.getElementById("cicloResumo_btnCsv");
-          if (btnCsv && !btnCsv.__bindCsv) {
-            btnCsv.__bindCsv = true;
-            btnCsv.addEventListener("click", function(){
-              const rows = Array.isArray(window.__cicloResumoTxExport) ? window.__cicloResumoTxExport : [];
-              exportCsv_(rows);
-            });
-          }
-        } catch(_) {}
-
-      // cabeçalho (período)
-      const sub = document.getElementById("cicloResumoSubTitle");
-      if (sub && res.periodo && res.periodo.inicio && res.periodo.fim) {
-        sub.textContent = `Consolidado das pendências no ciclo atual (${res.periodo.inicio} → ${res.periodo.fim})`;
-      }
-
-      // =========================================================
-      // 3) DATE RANGE (dtIni/dtFim) — BLOCO COMPLETO (min/max + bind)
-      // (cole aqui mesmo: depois do subtítulo e antes do bind dos filtros)
-      // =========================================================
-      try {
-        const dtIniEl = document.getElementById("cicloResumo_dtIni");
-        const dtFimEl = document.getElementById("cicloResumo_dtFim");
-
-        if (dtIniEl && dtFimEl && res && res.periodo && res.periodo.inicio && res.periodo.fim) {
-          function br2iso(br){
-            const m = String(br||"").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-            if (!m) return "";
-            return `${m[3]}-${m[2]}-${m[1]}`;
-          }
-          const min = br2iso(res.periodo.inicio);
-          const max = br2iso(res.periodo.fim);
-
-          if (min) { dtIniEl.min = min; dtFimEl.min = min; }
-          if (max) { dtIniEl.max = max; dtFimEl.max = max; }
-
-          if (!dtIniEl.value && min) dtIniEl.value = min;
-          if (!dtFimEl.value && max) dtFimEl.value = max;
-
-          if (!dtIniEl.__bindResumo) {
-            dtIniEl.__bindResumo = true;
-            dtIniEl.addEventListener("change", applyFiltros_);
-          }
-          if (!dtFimEl.__bindResumo) {
-            dtFimEl.__bindResumo = true;
-            dtFimEl.addEventListener("change", applyFiltros_);
-          }
-        }
-      } catch(_) {}
-
-      // ✅ bind dos filtros (uma vez só)
-      try {
-        const selTime = document.getElementById("cicloResumo_selTime");
-        const selLoja = document.getElementById("cicloResumo_selLoja");
-
-        if (selTime && !selTime.__bindResumo) {
-          selTime.__bindResumo = true;
-          selTime.addEventListener("change", function () {
-            if (selLoja) selLoja.value = "";
-            applyFiltros_();
-          });
-        }
-
-        if (selLoja && !selLoja.__bindResumo) {
-          selLoja.__bindResumo = true;
-          selLoja.addEventListener("change", function () {
-            applyFiltros_();
-          });
-        }
-      } catch (e) {}
-
-      // =========================================================
-      // 4.2) SORT NO THEAD — BLOCO COMPLETO (bind 1x)
-      // (cole aqui: depois do bind dos filtros e antes do applyFiltros_())
-      // =========================================================
-      try {
-        const thead = document.querySelector("#cicloResumoTable thead");
-        if (thead && !thead.__bindSortResumo) {
-          thead.__bindSortResumo = true;
-          thead.addEventListener("click", function(ev){
-            const th = ev.target && ev.target.closest ? ev.target.closest("th[data-sort]") : null;
-            if (!th) return;
-
-            const col = th.getAttribute("data-sort") || "";
-            if (!col) return;
-
-            window.__cicloResumoSort = window.__cicloResumoSort || { col: "valor", dir: "desc" };
-
-            if (window.__cicloResumoSort.col === col) {
-              window.__cicloResumoSort.dir = (window.__cicloResumoSort.dir === "desc") ? "asc" : "desc";
-            } else {
-              window.__cicloResumoSort.col = col;
-              window.__cicloResumoSort.dir = "desc";
-            }
-
-            applyFiltros_();
-          });
-        }
-      } catch(_) {}
-
-      // ✅ render inicial
-      applyFiltros_();
+      window.__vektorResumoCicloPreloaded = res || null;
+      hydrateResumoFromRes_(res);
     })
-    .withFailureHandler(function (err) {
+    .withFailureHandler(function () {
       setResumoCicloBusy_(false);
       if (loading) loading.style.display = "none";
       if (content) content.style.display = "block";
@@ -15699,9 +16090,11 @@ window.vektorOpenMyAlerts = function () {
   window.vektorMyAlertsInit_();
 };
 
-window.vektorMyAlertsInit_ = function () {
-  // 1) carrega times/lojas
-  if (typeof google === "undefined" || !google.script || !google.script.run) return;
+window.vektorMyAlertsLoadTimesLojas_ = function (done) {
+  if (typeof google === "undefined" || !google.script || !google.script.run) {
+    try { done && done(false); } catch(_) {}
+    return;
+  }
 
   google.script.run
     .withSuccessHandler(function (res) {
@@ -15713,6 +16106,7 @@ window.vektorMyAlertsInit_ = function () {
         }
         const msg = "Falha ao carregar Times/Lojas: " + (res && res.error ? res.error : "sem permissão ou erro desconhecido");
         if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
+        try { done && done(false); } catch(_) {}
         return;
       }
 
@@ -15723,7 +16117,7 @@ window.vektorMyAlertsInit_ = function () {
           "<option value='__ALL__'>Todos os times</option>" +
           "<option value='' disabled>Selecione…</option>";
 
-        (res.times || []).forEach(t => {
+        (res.times || []).forEach(function(t) {
           const op = document.createElement("option");
           op.value = t;
           op.textContent = t;
@@ -15755,6 +16149,7 @@ window.vektorMyAlertsInit_ = function () {
       }
 
       window.vektorMyAlertsRenderStores_(window.__myAl_lojasPorTime || {}, "");
+      try { done && done(true); } catch(_) {}
     })
     .withFailureHandler(function (err) {
       const teamSel = document.getElementById("myAl_team");
@@ -15764,8 +16159,27 @@ window.vektorMyAlertsInit_ = function () {
 
       const msg = "Erro ao carregar Times/Lojas: " + (err && err.message ? err.message : err);
       if (window.vektorMyAlertsToast_) window.vektorMyAlertsToast_(msg, "error");
+      try { done && done(false); } catch(_) {}
     })
     .getTimesELojasParaAlertasVektor({ empresa: vektorEmpresaAtual_() });
+};
+
+window.vektorMyAlertsInit_ = function () {
+  // 1) carrega times/lojas
+  if (typeof google === "undefined" || !google.script || !google.script.run) return;
+
+  try {
+    window.vektorMyAlertsLoadTimesLojas_(function(ok){
+      if (ok) {
+        window.__myAlertsBaseLoaded = true;
+        window.__myAlertsEmpresaLoaded = (typeof window.vektorEmpresaAtual_ === "function")
+          ? window.vektorEmpresaAtual_()
+          : "CENTAURO";
+      }
+    });
+  } catch (e) {
+    console.error("Erro ao iniciar carga base do My Alerts:", e);
+  }
 
   // 1.1) carrega etiquetas
   google.script.run
@@ -15795,9 +16209,9 @@ window.vektorMyAlertsInit_ = function () {
       });
 
       sel.onchange = function () {
-        const pickedAll = Array.from(sel.selectedOptions || []).some(op => op.value === "__ALL__");
+        const pickedAll = Array.from(sel.selectedOptions || []).some(function(op){ return op.value === "__ALL__"; });
         if (!pickedAll) return;
-        Array.from(sel.options || []).forEach(op => { op.selected = true; });
+        Array.from(sel.options || []).forEach(function(op){ op.selected = true; });
       };
     })
     .withFailureHandler(function (err) {
@@ -15870,7 +16284,7 @@ window.vektorMyAlertsInit_ = function () {
       typeSel.value = allowed.indexOf(current) >= 0 ? current : (allowed[0] || "ITENS_IRREGULARES");
     };
 
-    const applyType = () => {
+    const applyType = function () {
       const t = String(typeSel?.value || "").trim();
 
       const showTeamAndStores = (t === "TRANSACOES" || t === "PENDENCIAS");
@@ -15900,7 +16314,7 @@ window.vektorMyAlertsInit_ = function () {
         const btn = document.getElementById("myAl_saveBtn");
         if (btn) btn.textContent = "Criar alerta";
         applyType();
-        window.vektorMyAlertsRefresh(); // ✅ agora também refiltra a lista
+        window.vektorMyAlertsRefresh();
       };
     }
 
@@ -15912,6 +16326,7 @@ window.vektorMyAlertsInit_ = function () {
     window.vektorMyAlertsCanUseItensIrregulares_ = canUseItens;
     window.vektorMyAlertsCanUseValores_ = canUseValores;
     window.vektorMyAlertsIsGerReg_ = isGerReg;
+    window.vektorMyAlertsIsMarketing_ = isMarketing;
   } catch (_) {}
 
   // ✅ Filtros Admin: popular "Área" + atualizar lista ao mudar filtros
