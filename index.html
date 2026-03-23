@@ -5068,62 +5068,91 @@ display: none;
             ">
             <div style="color:#fff; font-weight:900; font-size:13px; margin-bottom:10px;">Filtros</div>
 
-            <div style="display:grid; grid-template-columns: 0.85fr 0.95fr 0.75fr 160px 160px auto; gap:10px; align-items:end;">
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Time</div>
-                <select id="myAl_val_time"
-                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
-                         border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
-                </select>
-              </div>
-
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Loja</div>
-                <select id="myAl_val_loja"
-                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
-                         border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
-                </select>
-              </div>
-
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Conta Contábil</div>
-                <select id="myAl_val_conta"
-                  style="height:36px; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
-                        border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
-                  <option value="__ALL__">Todas</option>
-                </select>
-              </div>
-
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Período (Início)</div>
-                <input id="myAl_val_dtIni" type="date"
-                  style="height:34px; border-radius:10px; background:#e5e7eb; color:#0b1220;
-                    border:1px solid #cbd5e1; padding:0 10px; font-weight:900; font-size:12px;"/>
-              </div>
-
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Período (Fim)</div>
-                <input id="myAl_val_dtFim" type="date"
-                  style="height:34px; border-radius:10px; background:#e5e7eb; color:#0b1220;
-       border:1px solid #cbd5e1; padding:0 10px; font-weight:900; font-size:12px;"/>
-              </div>
-
-              <button
-                type="button"
-                onclick="myAlValoresClearFilters()"
-                style="
-                  height:36px;
-                  padding:0 12px;
-                  border-radius:10px;
-                  border:1px solid rgba(148,163,184,0.22);
-                  background:rgba(255,255,255,0.06);
-                  color:#fff;
-                  font-weight:900;
-                  font-size:12px;
-                ">
-                Limpar
-              </button>
+          <div style="display:grid; grid-template-columns: minmax(180px,1fr) minmax(180px,1fr) minmax(220px,1.1fr) 160px 160px auto; gap:10px; align-items:end;">
+            <!-- Time -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Time</div>
+              <select id="myAl_val_time"
+                style="height:36px; width:100%; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
+                      border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
+              </select>
             </div>
+
+            <!-- Loja -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Loja</div>
+              <select id="myAl_val_loja"
+                style="height:36px; width:100%; border-radius:10px; background:rgba(255,255,255,0.06); color:#fff;
+                      border:1px solid rgba(148,163,184,0.18); padding:0 10px; font-weight:900; font-size:12px;">
+              </select>
+            </div>
+
+            <!-- Conta Contábil -->
+            <div style="display:flex; flex-direction:column; gap:6px; min-width:220px; position:relative;">
+              <div style="font-size:12px; font-weight:900; color:rgba(226,232,240,0.85);">
+                Conta Contábil
+              </div>
+
+              <div id="myAl_val_contaWrap" style="position:relative;">
+                <button id="myAl_val_contaBtn" type="button"
+                        style="width:100%; height:36px; border:1px solid rgba(148,163,184,0.18); background:rgba(255,255,255,0.06); color:#fff; border-radius:10px; padding:0 36px 0 12px; font-weight:900; font-size:12px; text-align:left; position:relative; cursor:pointer;">
+                  Carregando contas...
+                  <span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:11px; opacity:0.9;">▼</span>
+                </button>
+
+                  <div id="myAl_val_contaPanel" style="display:none; position:absolute; top:calc(100% + 6px); left:0; width:320px; max-height:320px; background:#001b4d; border:1px solid rgba(148,163,184,0.22); border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,0.35); z-index:60; overflow:hidden;">
+                    <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(255,255,255,0.08);">
+                      <input
+                        id="myAl_val_contaSearch"
+                        type="text"
+                        placeholder="Pesquisar conta..."
+                        style="width:100%; height:34px; border:1px solid rgba(148,163,184,0.22); background:rgba(255,255,255,0.08); color:#ffffff; border-radius:10px; padding:0 10px; font-size:12px; font-weight:700; outline:none;"
+                      >
+                    </div>
+
+                    <label style="display:flex; align-items:center; gap:8px; padding:10px; cursor:pointer; color:#ffffff; font-weight:800; border-bottom:1px solid rgba(255,255,255,0.08);">
+                      <input id="myAl_val_contaAll" type="checkbox">
+                      <span>Todas</span>
+                    </label>
+
+                    <div id="myAl_val_contaList" style="max-height:220px; overflow:auto; padding:4px 0;"></div>
+                  </div>
+              </div>
+            </div>
+
+            <!-- Período (Início) -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Período (Início)</div>
+              <input id="myAl_val_dtIni" type="date"
+                style="height:36px; width:160px; min-width:160px; max-width:160px; box-sizing:border-box; border-radius:10px; background:#e5e7eb; color:#0b1220;
+                      border:1px solid #cbd5e1; padding:0 10px; font-weight:900; font-size:12px;"/>
+            </div>
+
+            <!-- Período (Fim) -->
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="color:rgba(226,232,240,0.85); font-size:12px; font-weight:900;">Período (Fim)</div>
+              <input id="myAl_val_dtFim" type="date"
+                style="height:36px; width:160px; min-width:160px; max-width:160px; box-sizing:border-box; border-radius:10px; background:#e5e7eb; color:#0b1220;
+                      border:1px solid #cbd5e1; padding:0 10px; font-weight:900; font-size:12px;"/>
+            </div>
+
+            <!-- Limpar -->
+            <button
+              type="button"
+              onclick="myAlValoresClearFilters()"
+              style="
+                height:36px;
+                padding:0 12px;
+                border-radius:10px;
+                border:1px solid rgba(148,163,184,0.22);
+                background:rgba(255,255,255,0.06);
+                color:#fff;
+                font-weight:900;
+                font-size:12px;
+              ">
+              Limpar
+            </button>
+          </div>
           </div>
 
             <!-- Loading (Valores Contabilizados) -->
@@ -16661,7 +16690,6 @@ function myAlValoresInitOnce_(){
 
   const selTime  = document.getElementById("myAl_val_time");
   const selLoja  = document.getElementById("myAl_val_loja");
-  const selConta = document.getElementById("myAl_val_conta");
   const dtIniEl  = document.getElementById("myAl_val_dtIni");
   const dtFimEl  = document.getElementById("myAl_val_dtFim");
 
@@ -16674,42 +16702,17 @@ function myAlValoresInitOnce_(){
   }
 
   // ✅ popula contas a partir do último dataset retornado (se existir)
-  function fillContasFromLast_(){
-    if (!selConta) return;
+        function fillContasFromLast_(){
+        const rows = (window.__myAl_valores_last && Array.isArray(window.__myAl_valores_last.rows))
+          ? window.__myAl_valores_last.rows
+          : [];
 
-    const cur = String(selConta.value || "__ALL__");
-    const rows = (window.__myAl_valores_last && Array.isArray(window.__myAl_valores_last.rows))
-      ? window.__myAl_valores_last.rows
-      : [];
+        // sem dados ainda: não apaga a lista atual
+        if (!rows.length) return;
 
-    // sem dados ainda: deixa somente "Todas"
-    if (!rows.length) {
-      selConta.innerHTML = `<option value="__ALL__">Todas</option>`;
-      selConta.value = "__ALL__";
-      return;
-    }
+        myAlValoresFillContasFromRows_(rows);
+      }
 
-    const seen = {};
-    rows.forEach(function(r){
-      const c = (r && r.conta != null) ? String(r.conta).trim() : "";
-      if (c) seen[c] = true;
-    });
-
-    const contas = Object.keys(seen).sort(function(a,b){
-      return String(a).localeCompare(String(b), "pt-BR");
-    });
-
-    selConta.innerHTML =
-      `<option value="__ALL__">Todas</option>` +
-      contas.map(c => `<option value="${escAttr_(c)}">${escHtml_(c)}</option>`).join("");
-
-    // tenta manter o valor atual
-    if (cur && Array.prototype.some.call(selConta.options, o => o.value === cur)) {
-      selConta.value = cur;
-    } else {
-      selConta.value = "__ALL__";
-    }
-  }
 
     // ✅ NÃO MEXE no innerHTML do myAl_funilWrap (não destrói o canvas)
     function renderNeedPeriod_(){
@@ -16833,10 +16836,31 @@ function myAlValoresInitOnce_(){
   // =========================
   // ✅ init Conta Contábil (placeholder) + tenta popular se já houver dataset
   // =========================
-  if (selConta) {
-    selConta.innerHTML = `<option value="__ALL__">Todas</option>`;
-    // se já tem resultado anterior (ex.: usuário voltou pra view), tenta popular
-    fillContasFromLast_();
+  try { myAlValoresBindContaDropdown_(); } catch(_) {}
+  try { fillContasFromLast_(); } catch(_) {}
+  try { myAlValoresUpdateContaBtnText_(); } catch(_) {}
+
+      // =========================
+  // ✅ carrega contas contábeis logo na abertura da view
+  // =========================
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res){
+        if (!res || !res.ok) return;
+
+        const contas = Array.isArray(res.contas) ? res.contas : [];
+        const rowsFake = contas.map(function(c){
+          return { conta: String(c || "").trim() };
+        });
+
+        myAlValoresFillContasFromRows_(rowsFake);
+      })
+      .withFailureHandler(function(err){
+        console.error("Falha ao carregar contas contábeis iniciais:", err);
+      })
+      .getContasContabeisParaAlertasVektor({
+        empresa: vektorEmpresaAtual_()
+      });
   }
 
   // =========================
@@ -16907,12 +16931,6 @@ function myAlValoresInitOnce_(){
     try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
   });
 
-  // ✅ filtro Conta Contábil
-  selConta && selConta.addEventListener("change", function(){
-    tryLoad_();
-    try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
-  });
-
   dtIniEl && dtIniEl.addEventListener("change", function(){
     tryLoad_();
     try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
@@ -16927,34 +16945,263 @@ function myAlValoresInitOnce_(){
   renderNeedPeriod_();
 }
 
-function myAlValoresFillContasFromRows_(rows){
-  const selConta = document.getElementById("myAl_val_conta");
-  if (!selConta) return;
+function myAlValoresGetContasSelecionadas_(){
+  const list = document.getElementById("myAl_val_contaList");
+  const all  = document.getElementById("myAl_val_contaAll");
+  if (!list) return [];
 
-  const cur = String(selConta.value || "__ALL__");
+  // se "Todas" estiver marcado, trata como sem filtro
+  if (all && all.checked) return [];
+
+  const vals = [];
+  list.querySelectorAll("input[type='checkbox'][data-conta]").forEach(function(cb){
+    if (cb.checked) {
+      const v = String(cb.getAttribute("data-conta") || "").trim();
+      if (v) vals.push(v);
+    }
+  });
+
+  return vals;
+}
+
+function myAlValoresUpdateContaBtnText_(){
+  const btn  = document.getElementById("myAl_val_contaBtn");
+  const list = document.getElementById("myAl_val_contaList");
+  const vals = myAlValoresGetContasSelecionadas_();
+
+  if (!btn) return;
+
+  const totalOpcoes = list
+    ? list.querySelectorAll("input[type='checkbox'][data-conta]").length
+    : 0;
+
+  const arrow = '<span style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:11px; opacity:0.9;">▼</span>';
+
+  // ainda carregando / sem opções renderizadas
+  if (!totalOpcoes) {
+    btn.innerHTML = 'Carregando contas... ' + arrow;
+    return;
+  }
+
+  // carregou opções, mas nada selecionado
+  if (!vals.length) {
+    btn.innerHTML = 'Selecione' + arrow;
+    return;
+  }
+
+  if (vals.length === 1) {
+    btn.innerHTML = escHtml_(vals[0]) + ' ' + arrow;
+    return;
+  }
+
+  btn.innerHTML = (vals.length + " selecionadas") + ' ' + arrow;
+}
+
+function myAlValoresBindContaDropdown_(){
+  const wrap   = document.getElementById("myAl_val_contaWrap");
+  const btn    = document.getElementById("myAl_val_contaBtn");
+  const panel  = document.getElementById("myAl_val_contaPanel");
+  const all    = document.getElementById("myAl_val_contaAll");
+  const list   = document.getElementById("myAl_val_contaList");
+  const search = document.getElementById("myAl_val_contaSearch");
+
+  if (!wrap || !btn || !panel || !all || !list) return;
+  if (wrap.__bindContaDropdown) return;
+  wrap.__bindContaDropdown = true;
+
+  function openPanel_(){
+    panel.style.display = "block";
+    panel.classList.remove("hidden");
+
+    if (search) {
+      search.value = "";
+      try { myAlValoresFilterContaOptions_(); } catch(_) {}
+      setTimeout(function(){ search.focus(); }, 0);
+    }
+  }
+
+  function closePanel_(){
+    panel.style.display = "none";
+    panel.classList.add("hidden");
+  }
+
+  btn.addEventListener("click", function(ev){
+    ev.preventDefault();
+    ev.stopPropagation();
+
+    const isOpen = panel.style.display !== "none" && !panel.classList.contains("hidden");
+    if (isOpen) {
+      closePanel_();
+    } else {
+      openPanel_();
+    }
+  });
+
+  document.addEventListener("click", function(ev){
+    if (!wrap.contains(ev.target)) {
+      closePanel_();
+    }
+  });
+
+  if (search) {
+    search.addEventListener("click", function(ev){
+      ev.stopPropagation();
+    });
+
+    search.addEventListener("input", function(){
+      try { myAlValoresFilterContaOptions_(); } catch(_) {}
+    });
+  }
+
+  all.addEventListener("change", function(ev){
+    if (ev) ev.stopPropagation();
+
+    if (all.checked) {
+      list.querySelectorAll("input[type='checkbox'][data-conta]").forEach(function(cb){
+        cb.checked = false;
+      });
+    }
+
+    myAlValoresUpdateContaBtnText_();
+    // não carrega aqui; só no botão Aplicar
+  });
+
+  list.addEventListener("change", function(ev){
+    const t = ev.target;
+    if (!t || t.type !== "checkbox") return;
+
+    if (t.checked && all.checked) {
+      all.checked = false;
+    }
+
+    const anyChecked = Array.from(
+      list.querySelectorAll("input[type='checkbox'][data-conta]")
+    ).some(function(cb){
+      return cb.checked;
+    });
+
+    if (!anyChecked) {
+      all.checked = true;
+    } else {
+      all.checked = false;
+    }
+
+    myAlValoresUpdateContaBtnText_();
+    // não carrega aqui; só no botão Aplicar
+  });
+}
+
+function myAlValoresFillContasFromRows_(rows){
+  const list = document.getElementById("myAl_val_contaList");
+  const all  = document.getElementById("myAl_val_contaAll");
+  if (!list) return;
+
+  function extrairNumeroConta_(raw){
+    let s = String(raw || "").trim();
+    if (!s) return "";
+
+    // se vier no padrão "5102505001 | MARKETING ..."
+    if (s.indexOf("|") >= 0) {
+      s = s.split("|")[0].trim();
+    }
+
+    // se vier no padrão "5102505001 - MARKETING ..."
+    if (s.indexOf(" - ") >= 0) {
+      s = s.split(" - ")[0].trim();
+    }
+
+    // mantém só o primeiro bloco numérico, se existir
+    const m = s.match(/\d{4,}/);
+    return m ? String(m[0]).trim() : s;
+  }
+
+  const selecionadasAntes = {};
+  list.querySelectorAll("input[type='checkbox'][data-conta]").forEach(function(cb){
+    const v = String(cb.getAttribute("data-conta") || "").trim();
+    if (v && cb.checked) selecionadasAntes[v] = true;
+  });
 
   const seen = {};
   (rows || []).forEach(function(r){
-    const c = (r && r.conta != null) ? String(r.conta).trim() : "";
+    const bruto = (r && r.conta != null) ? String(r.conta).trim() : "";
+    const c = extrairNumeroConta_(bruto);
     if (c) seen[c] = true;
   });
 
-  const contas = Object.keys(seen).sort(function(a,b){
+  const contas = Object.keys(seen).sort(function(a, b){
     return String(a).localeCompare(String(b), "pt-BR");
   });
 
-  selConta.innerHTML =
-    `<option value="__ALL__">Todas</option>` +
-    contas.map(function(c){
-      return `<option value="${escAttr_(c)}">${escHtml_(c)}</option>`;
+    list.innerHTML = contas.map(function(c){
+      const checked = selecionadasAntes[c] ? "checked" : "";
+      return `
+        <label
+          data-conta-item="1"
+          data-conta-text="${escAttr_(c)}"
+          style="display:flex; align-items:center; gap:8px; padding:6px 8px; cursor:pointer; color:#ffffff;"
+        >
+          <input type="checkbox" data-conta="${escAttr_(c)}" ${checked}>
+          <span style="color:#ffffff; font-size:13px; font-weight:700;">${escHtml_(c)}</span>
+        </label>
+      `;
     }).join("");
 
-  // mantém seleção se ainda existir
-  if (cur && Array.prototype.some.call(selConta.options, function(o){ return o.value === cur; })) {
-    selConta.value = cur;
-  } else {
-    selConta.value = "__ALL__";
+  list.querySelectorAll("input[type='checkbox'][data-conta]").forEach(function(cb){
+    cb.addEventListener("change", function(){
+      const allEl = document.getElementById("myAl_val_contaAll");
+      if (allEl) allEl.checked = false;
+
+      const search = document.getElementById("myAl_val_contaSearch");
+        if (search) {
+          search.oninput = function(){
+            myAlValoresFilterContaOptions_();
+          };
+
+          // reaplica filtro atual caso já exista texto digitado
+          myAlValoresFilterContaOptions_();
+        }
+
+      myAlValoresUpdateContaBtnText_();
+      tryLoad_();
+      try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
+    });
+  });
+
+  if (all) {
+    all.checked = false;
   }
+
+  myAlValoresUpdateContaBtnText_();
+}
+
+function myAlValoresFilterContaOptions_(){
+  const input = document.getElementById("myAl_val_contaSearch");
+  const list  = document.getElementById("myAl_val_contaList");
+  if (!input || !list) return;
+
+  const termo = String(input.value || "").trim().toUpperCase();
+  let visiveis = 0;
+
+  list.querySelectorAll("label[data-conta-item='1']").forEach(function(label){
+    const txt = String(label.getAttribute("data-conta-text") || "").toUpperCase();
+    const show = !termo || txt.indexOf(termo) >= 0;
+    label.style.display = show ? "flex" : "none";
+    if (show) visiveis++;
+  });
+
+  let empty = document.getElementById("myAl_val_contaEmpty");
+  if (!empty) {
+    empty = document.createElement("div");
+    empty.id = "myAl_val_contaEmpty";
+    empty.style.padding = "10px";
+    empty.style.color = "rgba(255,255,255,0.72)";
+    empty.style.fontSize = "12px";
+    empty.style.fontWeight = "700";
+    empty.textContent = "Nenhuma conta encontrada.";
+    list.appendChild(empty);
+  }
+
+  empty.style.display = visiveis ? "none" : "block";
 }
 
 function myAlValoresOnPeriodChange_(){
@@ -16979,14 +17226,25 @@ function myAlValoresOnPeriodChange_(){
 function myAlValoresClearFilters() {
   const selTime = document.getElementById("myAl_val_time");
   const selLoja = document.getElementById("myAl_val_loja");
-  const selConta = document.getElementById("myAl_val_conta");
-  const dtIni   = document.getElementById("myAl_val_dtIni");
-  const dtFim   = document.getElementById("myAl_val_dtFim");
+  const contaAll = document.getElementById("myAl_val_contaAll");
+  const contaList = document.getElementById("myAl_val_contaList");
+  const dtIni = document.getElementById("myAl_val_dtIni");
+  const dtFim = document.getElementById("myAl_val_dtFim");
 
-  // volta para "Todos/Todas" (se você usar "__ALL__" nos options)
+  // volta para "Todos/Todas"
   if (selTime) selTime.value = "__ALL__";
   if (selLoja) selLoja.value = "__ALL__";
-  if (selConta) selConta.value = "__ALL__";
+
+  // limpa conta contábil no dropdown customizado
+  if (contaAll) contaAll.checked = true;
+
+  if (contaList) {
+    contaList.querySelectorAll("input[type='checkbox'][data-conta]").forEach(function(cb){
+      cb.checked = false;
+    });
+  }
+
+  try { myAlValoresUpdateContaBtnText_(); } catch(_) {}
 
   // limpa período
   if (dtIni) dtIni.value = "";
@@ -17020,10 +17278,19 @@ function myAlValoresClearFilters() {
   if (meta) meta.textContent = "";
 }
 
+function myAlGetMultiValues_(sel){
+  if (!sel) return [];
+  return Array.from(sel.options || [])
+    .filter(function(o){
+      return o.selected && String(o.value || "").trim() && String(o.value || "").trim() !== "__ALL__";
+    })
+    .map(function(o){ return String(o.value || "").trim(); });
+}
+
 function myAlValoresLoad_() {
-  const time  = document.getElementById("myAl_val_time")?.value  || "__ALL__";
-  const loja  = document.getElementById("myAl_val_loja")?.value  || "__ALL__";
-  const conta = document.getElementById("myAl_val_conta")?.value || "__ALL__";
+  const time = document.getElementById("myAl_val_time")?.value || "__ALL__";
+  const loja = document.getElementById("myAl_val_loja")?.value || "__ALL__";
+  const contas = myAlValoresGetContasSelecionadas_();
   const dtIni = document.getElementById("myAl_val_dtIni")?.value || "";
   const dtFim = document.getElementById("myAl_val_dtFim")?.value || "";
 
@@ -17041,16 +17308,16 @@ function myAlValoresLoad_() {
     const hint = document.getElementById("myAl_catHint");
     if (hint) hint.innerHTML = `Defina o período para exibir o gráfico.`;
 
-    // ✅ NOVO: a série 12m NÃO depende de período → carrega mesmo sem dtIni/dtFim
-        try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
+    // ✅ série 12m não depende de dtIni/dtFim
+    try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
 
-        return;
+    return;
   }
 
-  // ✅ loading da página (barra “Carregando valores contabilizados…”)
+  // ✅ loading da página
   myAlValLoading_(true);
 
-  // ✅ (opcional) overlay do MyAlerts
+  // ✅ overlay opcional
   try { window.vektorMyAlertsShowLoading_ && window.vektorMyAlertsShowLoading_("Carregando valores contabilizados."); } catch(_) {}
 
   google.script.run
@@ -17064,36 +17331,35 @@ function myAlValoresLoad_() {
         window.__myAl_valores_last = res0;
 
         // ✅ preenche filtro de contas a partir do retorno real
-        // (mantém a seleção se ela ainda existir)
         try {
           myAlValoresFillContasFromRows_(Array.isArray(res0.rows) ? res0.rows : []);
         } catch (_) {}
 
         if (!res0.ok) {
           const tb = document.getElementById("myAl_valoresTbody");
-          if (tb) tb.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
-            ${escHtml_(res0.error || "Falha ao carregar dados.")}
-          </td></tr>`;
+          if (tb) {
+            tb.innerHTML = `<tr><td colspan="4" style="border:1px solid #000; padding:10px;">
+              ${escHtml_(res0.error || "Falha ao carregar dados.")}
+            </td></tr>`;
+          }
 
-          // esconde gráfico se falhou
           const canvas = document.getElementById("myAl_catChart");
           if (canvas) canvas.style.display = "none";
           return;
         }
 
         // ============================================================
-        // ✅ Fallback de filtro no FRONT por Conta (se backend não filtrar)
+        // ✅ Fallback de filtro no FRONT por múltiplas Contas
         // ============================================================
         let res = res0;
 
-        const contaSel = String(conta || "__ALL__");
-        if (contaSel !== "__ALL__") {
+        const contasSel = Array.isArray(contas) ? contas.slice() : [];
+        if (contasSel.length) {
           const rowsAll = Array.isArray(res0.rows) ? res0.rows : [];
 
-          // filtra por conta
           const rowsFiltradas = rowsAll.filter(function(r){
             const c = (r && r.conta != null) ? String(r.conta).trim() : "";
-            return c === contaSel;
+            return contasSel.indexOf(c) >= 0;
           });
 
           // recalcula total
@@ -17110,7 +17376,7 @@ function myAlValoresLoad_() {
             });
           });
 
-          // recalcula categorias (para o gráfico de barras)
+          // recalcula categorias
           const sumCat = {};
           for (let i = 0; i < rowsOut.length; i++) {
             const cat = String(rowsOut[i].categoria || "").trim();
@@ -17120,8 +17386,14 @@ function myAlValoresLoad_() {
 
           const catsOut = Object.keys(sumCat).map(function(k){
             const v = Number(sumCat[k] || 0) || 0;
-            return { categoria: k, valor: v, pct: (total > 0 ? (v / total) : 0) };
-          }).sort(function(a,b){ return (b.valor||0) - (a.valor||0); });
+            return {
+              categoria: k,
+              valor: v,
+              pct: (total > 0 ? (v / total) : 0)
+            };
+          }).sort(function(a,b){
+            return (b.valor || 0) - (a.valor || 0);
+          });
 
           res = {
             ok: true,
@@ -17136,7 +17408,7 @@ function myAlValoresLoad_() {
         if (typeof myAlValoresRenderFunil_ === "function") myAlValoresRenderFunil_(res);
         if (typeof myAlValoresRenderCategoriasBar_ === "function") myAlValoresRenderCategoriasBar_(res);
 
-                // ✅ NOVO: render série 12 meses (total + variação)
+        // ✅ render série 12 meses
         try { myAlValoresLoadSerie12m_ && myAlValoresLoadSerie12m_(); } catch(_) {}
 
       } finally {
@@ -17152,7 +17424,7 @@ function myAlValoresLoad_() {
     .getValoresContabilizadosEtiquetas({
       time: time,
       loja: loja,
-      conta: conta,
+      conta: contas,
       dataInicioIso: dtIni,
       dataFimIso: dtFim
     });
@@ -17419,14 +17691,13 @@ function myAlValoresRenderCategoriasBar_(res){
 function myAlValoresLoadSerie12m_(){
   const selTime  = document.getElementById("myAl_val_time");
   const selLoja  = document.getElementById("myAl_val_loja");
-  const selConta = document.getElementById("myAl_val_conta");
 
   const hint = document.getElementById("myAl_serie12mHint");
   const canvas = document.getElementById("myAl_serie12mChart");
 
   const time  = selTime  ? String(selTime.value || "__ALL__") : "__ALL__";
   const loja  = selLoja  ? String(selLoja.value || "__ALL__") : "__ALL__";
-  const conta = selConta ? String(selConta.value || "__ALL__") : "__ALL__";
+  const contas = myAlValoresGetContasSelecionadas_();
 
   // categoria selecionada no gráfico de cluster (se existir)
   const catSel = (window.__myAl_valores_filterCategoria != null)
@@ -17474,7 +17745,7 @@ function myAlValoresLoadSerie12m_(){
     .getValoresContabilizadosSerie12m({
       time: time,
       loja: loja,
-      conta: conta,
+      conta: contas,
       categoria: catSel,
       // mantidos só por compatibilidade (backend vai ignorar)
       dataInicioIso: "",
@@ -18862,102 +19133,6 @@ setTimeout(function () {
         });
     }
 
-    // =========================
-// AUTOCOMPLETE VEKTOR
-// =========================
-
-// 1) Lista de intenções (VOCÊ JÁ TEM — basta mover pra cá)
-const VEKTOR_INTENTS = [
-  "Consultar pendências de uma loja",
-  "Gerente está de férias",
-  "Gerente foi demitido",
-  "Sangria",
-  "Gerente foi desligado",
-  "Gerente mudou de loja",
-  "Troca de gerente entre lojas",
-  "Servicenow",
-  "Como abrir chamado no servicenow?",  
-  "Lojas com mais pendências do time",
-  "Pendências do time",
-  "Pendências da loja",
-  "Time com mais pendências",
-  "Vídeo de justificativas",
-  "Como justificar uma transação",
-  "Loja com maior valor de transações neste mês",
-  "Loja com mais transações neste mês",
-  "Treinamento Clara",
-  "Termo de responsabilidade Clara",
-  "Maiores transações do time",
-  "Maiores transações da loja",
-  "Maiores transações",
-  "Valor da fatura atual",
-  "Valor da fatura do mês passado",
-  "Valor das últimas 3 faturas",
-  "Valor das últimas 6 faturas",
-  "Valor de todas as faturas",
-  "Qual é o ciclo da fatura da Clara?",
-  "Qual etiqueta usar para compra de",
-  "Listagem de etiquetas cadastradas na Clara",
-  "Ranking de lojas com mais transações",
-  "Ranking de lojas com maior valor",
-  "Ranking de times com mais transações",
-  "Ranking de times com maior valor",
-  "Top 3 lojas de um time",
-  "Top 5 lojas do período",
-  "Resumo da loja xxxx neste mês",
-  "Resumo de uma loja na última semana",
-  "Transações de uma loja no período",
-  "Quais lojas fazem parte de um time?",
-  "Resumo de um time neste mês",
-  "Resumo de um time no período",
-  "Time com maior valor de transações",
-  "Time com maior número de transações",
-  "Categorias com maior valor de transações",
-  "Estabelecimentos mais usados",
-  "O que posso comprar com o cartão Clara?",
-  "Tipos de compra permitidos",
-  "Tipos de compra proibidos",
-  "Regras da Política de Uso dos Cartões Clara",
-  "Quando o cartão é bloqueado?",
-  "Lojas ofensoras",
-  "Frequência de uso Clara para o time",
-  "Frequência de uso Clara para a loja",
-  "Perdi meu cartão Clara, o que fazer?",
-  "Comparar fatura atual vs anterior",
-  "Cartão Clara bloqueado, como resolver?",
-  "Como desbloquear o cartão Clara?",
-  "Meu cartão não passou, o que pode ser?",
-  "Abrir relatório gerencial da Clara",
-  "Como aumento o limite do cartão?",
-  "Itens comprados para o time",
-  "Itens comprados para a loja",
-  "Itens comprados no geral",
-  "Relação de saldos geral",
-  "Relação de saldos do time",
-  "Tabela de estornos",
-  "Tabela de estornos do time",
-  "Como usar bem o limite do cartão Clara?",
-  "Gastos por etiquetas",
-  "Quero gráficos das transações",
-  "O que o Vektor pode fazer?",
-  "Como anexar nota fiscal na Clara?",
-  "Possível uso irregular",
-  "Emissão de 1ª via",
-  "Emissão de 2ª via",
-  "Novo cartão Clara",
-  "Como justificar compras na Clara?"
-];
-
-// 2) Normalização
-function vektorNormAutocomplete(str) {
-  if (!str) return "";
-  return str
-    .toString()
-    .trim()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-}
 
 // 3) Campos HTML
 const vektorInput = document.getElementById("userInput");
