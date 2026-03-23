@@ -2776,7 +2776,7 @@ display: none;
 
   <? } ?>
 
-  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Analista" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg")  { ?>
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Analista Pro" || (userRole || "") === "Analista" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg" || (userRole || "") === "Operacoes_Lojas")  { ?>
     <button
     id="navAnaliseGastosBtn"
     type="button"
@@ -2801,7 +2801,7 @@ display: none;
     <span class="vektor-nav-label">Fluxograma</span>
   </button>
 
-  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg" || (userRole || "") === "Compras_DI")  { ?>
+  <? if ((userRole || "") === "Administrador" || (userRole || "") === "Marketing" || (userRole || "") === "Gerentes_Reg" || (userRole || "") === "Compras_DI" || (userRole || "") === "Operacoes_Lojas")  { ?>
 
   <button
     id="navMyAlertsBtn"
@@ -15830,11 +15830,15 @@ window.vektorMyAlertsInit_ = function () {
     const isAdmin = roleNorm === "administrador";
     const isGerReg = roleNorm === "gerentes_reg";
     const isCompras = roleNorm === "compras_di";
+    const isOperacoesLojas = roleNorm === "operacoes_lojas";
+    const isMarketing = roleNorm === "marketing";
 
     const canUseTransacoes = !isCompras;
     const canUsePendencias = isAdmin || isGerReg;
-    const canUseItens = true;
-    const canUseValores = isAdmin || isCompras;
+
+    // Itens Irregulares só para estes perfis
+    const canUseItens = isAdmin || isGerReg || isCompras;
+    const canUseValores = isAdmin || isCompras || isOperacoesLojas;
 
     if (btnValores) {
       btnValores.style.display = canUseValores ? "inline-flex" : "none";
