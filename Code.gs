@@ -3450,6 +3450,101 @@ function queryPendenciasBaseClaraAlert_(ini, fim, timeFiltro, lojasFiltro, empre
   return out;
 }
 
+function getContasContabeisParaAlertasVektor(req) {
+  vektorAssertFunctionAllowed_("getContasContabeisParaAlertasVektor");
+
+  var ctxAcl = vektorGetUserRole_(); // {email, role}
+  var emailAcl = String((ctxAcl && ctxAcl.email) || "").trim().toLowerCase();
+  var roleAcl  = String((ctxAcl && ctxAcl.role)  || "").trim();
+
+  req = req || {};
+
+  var empCtx = vektorGetEmpresaContext_(req.empresa);
+  var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+
+  var allowedLojas = null;
+  if (roleAcl === "Gerentes_Reg") {
+    allowedLojas = vektorGetAllowedLojasFromEmails_(emailAcl, empresaAtual); // array ou null
+  }
+
+  try {
+    var sh = vektorGetBaseSheetByEmpresa_(empresaAtual);
+    if (!sh) throw new Error("Aba da base não encontrada para a empresa: " + empresaAtual);
+
+    var lr = sh.getLastRow();
+    if (lr < 2) return { ok:true, contas:[], empresa: empresaAtual };
+
+    // A..W (23 colunas)
+    var values = sh.getRange(2, 1, lr - 1, 23).getValues();
+
+    var IDX_ETIQUETA = 19;  // T
+    var IDX_LOJA_NUM = 21;  // V
+
+    function normLoja4_(x) {
+      var s = String(x || "").trim();
+      if (!s) return "";
+      var m = s.match(/(\d{1,4})/);
+      if (!m) return "";
+      return String(Number(m[1])).padStart(4, "0");
+    }
+
+    var setAllowed = null;
+    if (Array.isArray(allowedLojas)) {
+      setAllowed = {};
+      allowedLojas.forEach(function(x){
+        var s = String(x || "").trim();
+        if (!s) return;
+        var dig = s.replace(/\D/g, "");
+        if (!dig) return;
+        var n = String(Number(dig) || "").trim();
+        if (!n) return;
+        setAllowed[n] = true;
+        setAllowed[n.padStart(4, "0")] = true;
+      });
+    }
+
+    var contasSet = {};
+
+    for (var i = 0; i < values.length; i++) {
+      var row = values[i];
+
+      var loja4 = normLoja4_(row[IDX_LOJA_NUM]);
+      if (setAllowed && !setAllowed[loja4] && !setAllowed[String(Number(loja4) || "")]) {
+        continue;
+      }
+
+      var etiquetaRaw = String(row[IDX_ETIQUETA] || "").trim();
+      if (!etiquetaRaw) continue;
+
+      // mesmo padrão do fluxo existente:
+      // a conta está antes do primeiro " | "
+      var conta = etiquetaRaw.split("|")[0];
+      conta = String(conta || "").trim();
+
+      if (!conta) continue;
+      contasSet[conta] = true;
+    }
+
+    var contas = Object.keys(contasSet).sort(function(a, b){
+      return String(a).localeCompare(String(b), "pt-BR");
+    });
+
+    return {
+      ok: true,
+      contas: contas,
+      empresa: empresaAtual
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: (e && e.message) ? e.message : String(e),
+      contas: [],
+      empresa: empresaAtual
+    };
+  }
+}
+
 // =====================================================
 // VALORES CONTABILIZADOS (BaseClara) - Back-end
 // =====================================================
@@ -3460,24 +3555,35 @@ function getValoresContabilizadosEtiquetas(req) {
   var emailAcl = String((ctxAcl && ctxAcl.email) || "").trim().toLowerCase();
   var roleAcl  = String((ctxAcl && ctxAcl.role)  || "").trim();
 
-  var allowedLojas = null;
-  if (roleAcl === "Gerentes_Reg") {
-    allowedLojas = vektorGetAllowedLojasFromEmails_(emailAcl); // array ou null
-  }
+ req = req || {};
+
+var empCtx = vektorGetEmpresaContext_(req.empresa);
+var empresaAtual = String(empCtx.empresaAtual || "CENTAURO").trim().toUpperCase();
+
+var allowedLojas = null;
+if (roleAcl === "Gerentes_Reg") {
+  allowedLojas = vektorGetAllowedLojasFromEmails_(emailAcl, empresaAtual); // array ou null
+}
 
   try {
     req = req || {};
 
-    var timeSel = String(req.time || "").trim();     // "" = todos
-    var lojaSel = String(req.loja || "").trim();     // "" = todas
-    var contaSel = String(req.conta || "").trim();   // "" = todas
-    var iniIso  = String(req.dataInicioIso || "").trim();
-    var fimIso  = String(req.dataFimIso || "").trim();
+      var timeSel = String(req.time || "").trim();     // "" = todos
+      var lojaSel = String(req.loja || "").trim();     // "" = todas
+      var iniIso  = String(req.dataInicioIso || "").trim();
+      var fimIso  = String(req.dataFimIso || "").trim();
 
-    // ✅ NORMALIZA "__ALL__" (front manda isso)
-    if (timeSel === "__ALL__") timeSel = "";
-    if (lojaSel === "__ALL__") lojaSel = "";
-    if (contaSel === "__ALL__") contaSel = "";
+      // conta pode vir como string OU array
+      var contasSel = Array.isArray(req.conta)
+        ? req.conta.map(function(x){ return String(x || "").trim(); }).filter(Boolean)
+        : (String(req.conta || "").trim()
+            ? [String(req.conta || "").trim()]
+            : []);
+
+      // ✅ NORMALIZA "__ALL__" (front manda isso)
+      if (timeSel === "__ALL__") timeSel = "";
+      if (lojaSel === "__ALL__") lojaSel = "";
+      contasSel = contasSel.filter(function(c){ return c !== "__ALL__"; });
 
     var ini = iniIso ? vektorParseIsoDateSafe_(iniIso) : null;
     var fim = fimIso ? vektorParseIsoDateSafe_(fimIso) : null;
@@ -3488,11 +3594,10 @@ function getValoresContabilizadosEtiquetas(req) {
 
     // mapa loja->time
     var mapLojaTime = {};
-    try { mapLojaTime = construirMapaLojaParaTime_() || {}; } catch (_) { mapLojaTime = {}; }
+    try { mapLojaTime = construirMapaLojaParaTime_(empresaAtual) || {}; } catch (_) { mapLojaTime = {}; }
 
-    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = ss.getSheetByName("BaseClara");
-    if (!sh) throw new Error("Aba BaseClara não encontrada.");
+    var sh = vektorGetBaseSheetByEmpresa_(empresaAtual);
+    if (!sh) throw new Error("Aba da base não encontrada para a empresa: " + empresaAtual);
 
     var lr = sh.getLastRow();
     if (lr < 2) return { ok:true, total:0, rows:[], categorias:[] };
@@ -3649,7 +3754,7 @@ function getValoresContabilizadosEtiquetas(req) {
         var etiquetaFinal = normEtq_(contaObj.etiqueta || etqPart);
 
         // filtro conta (se houver)
-        if (contaSel && conta !== contaSel) continue;
+        if (contasSel.length && contasSel.indexOf(String(conta || "").trim()) < 0) continue;
 
         // ✅ chave ÚNICA: somente pela etiqueta normalizada (1 linha por etiqueta)
         var etqKey = etiquetaFinal;
@@ -3718,15 +3823,18 @@ function getValoresContabilizadosSerie12m(req) {
 
     var timeSel  = String(req.time || "").trim();
     var lojaSel  = String(req.loja || "").trim();
-    var contaSel = String(req.conta || "").trim();
+    var contaArr = Array.isArray(req.conta) ? req.conta.map(String) : (req.conta ? [String(req.conta)] : []);
     var catSel   = String(req.categoria || "").trim();
 
     if (timeSel === "__ALL__") timeSel = "";
     if (lojaSel === "__ALL__") lojaSel = "";
-    if (contaSel === "__ALL__") contaSel = "";
     if (catSel === "__ALL__") catSel = "";
 
-    // ✅ SEMPRE: últimos 12 meses a partir de hoje
+    contaArr = contaArr
+      .map(function(s){ return String(s || "").trim(); })
+      .filter(function(s){ return s && s !== "__ALL__"; });
+
+    // ✅ últimos 12 meses a partir de hoje
     var now = new Date();
     var endMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     var startMonth = new Date(endMonth.getFullYear(), endMonth.getMonth() - 11, 1);
@@ -3735,6 +3843,7 @@ function getValoresContabilizadosSerie12m(req) {
       var mm = String(d.getMonth() + 1).padStart(2, "0");
       return mm + "/" + String(d.getFullYear());
     }
+
     function ymKey_(d) {
       var mm = String(d.getMonth() + 1).padStart(2, "0");
       return String(d.getFullYear()) + "-" + mm;
@@ -3744,6 +3853,7 @@ function getValoresContabilizadosSerie12m(req) {
     var monthKeys = [];
     var cur = new Date(startMonth.getFullYear(), startMonth.getMonth(), 1);
     var guard = 0;
+
     while (cur <= endMonth && guard < 36) {
       labels.push(mmYYYY_(cur));
       monthKeys.push(ymKey_(cur));
@@ -3761,16 +3871,21 @@ function getValoresContabilizadosSerie12m(req) {
 
     var lr = sh.getLastRow();
     if (lr < 2) {
-      return { ok:true, labels: labels, totais: labels.map(function(){return 0;}), variacoesPct: labels.map(function(){return 0;}) };
+      return {
+        ok: true,
+        labels: labels,
+        totais: labels.map(function(){ return 0; }),
+        variacoesPct: labels.map(function(){ return 0; })
+      };
     }
 
     // A..W (23 colunas)
     var values = sh.getRange(2, 1, lr - 1, 23).getValues();
 
-    var IDX_DATA      = 0;   // A
-    var IDX_VALOR     = 5;   // F
-    var IDX_ETIQUETA  = 19;  // T
-    var IDX_LOJA_NUM  = 21;  // V
+    var IDX_DATA     = 0;   // A
+    var IDX_VALOR    = 5;   // F
+    var IDX_ETIQUETA = 19;  // T
+    var IDX_LOJA_NUM = 21;  // V
 
     function normLoja4_(x) {
       var s = String(x || "").trim();
@@ -3791,15 +3906,16 @@ function getValoresContabilizadosSerie12m(req) {
     function parseConta_(etq) {
       etq = normEtq_(etq);
       if (!etq) return { conta:"", etiqueta:"" };
+
       var m = etq.match(/^(\d{2,})\s*[-–]?\s*(.*)$/);
       if (m) {
         var num = String(m[1] || "").trim();
         return { conta: num, etiqueta: etq };
       }
+
       return { conta: etq, etiqueta: etq };
     }
 
-    // ✅ mesma categorização usada na tabela de valores contabilizados
     var CATS = [
       { cat:"🏛️ Administrativo e Geral", keys:[
         "MATERIAL DE ESCRITÓRIO",
@@ -3842,14 +3958,15 @@ function getValoresContabilizadosSerie12m(req) {
       var s = normEtq_(etq).toUpperCase();
       try { s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (_) {}
 
-      for (var i=0; i<CATS.length; i++) {
-        for (var j=0; j<CATS[i].keys.length; j++) {
+      for (var i = 0; i < CATS.length; i++) {
+        for (var j = 0; j < CATS[i].keys.length; j++) {
           var k = String(CATS[i].keys[j] || "");
           k = normEtq_(k).toUpperCase();
           try { k = k.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (_) {}
           if (k && s.indexOf(k) >= 0) return CATS[i].cat;
         }
       }
+
       return "Outros";
     }
 
@@ -3865,24 +3982,24 @@ function getValoresContabilizadosSerie12m(req) {
       dt = (dt instanceof Date) ? dt : new Date(dt);
       if (!(dt instanceof Date) || isNaN(dt.getTime())) continue;
 
-      // ✅ recorta apenas pela janela 12m (startMonth..agora)
+      // janela 12m
       if (dt < startMonth || dt > now) continue;
 
       // loja
       var loja4 = normLoja4_(row[IDX_LOJA_NUM]);
-      var lojaNum = String(Number(loja4) || "").trim(); // ✅ FIX (evita "lojaNum is not defined")
+      var lojaNum = String(Number(loja4) || "").trim();
 
       if (lojaSel) {
         var lojaSel4 = normLoja4_(lojaSel);
         if (lojaSel4 && loja4 !== lojaSel4) continue;
       }
 
-      // ✅ ACL por email (somente Gerentes_Reg)
+      // ACL por email
       if (Array.isArray(allowedLojas)) {
         if (allowedLojas.indexOf(lojaNum) < 0 && allowedLojas.indexOf(loja4) < 0) continue;
       }
 
-      // time (via map loja->time)
+      // time
       var timeFinal = (loja4 && mapLojaTime[loja4] != null ? String(mapLojaTime[loja4]).trim() : "N/D");
       if (timeSel && timeFinal !== timeSel) continue;
 
@@ -3894,7 +4011,7 @@ function getValoresContabilizadosSerie12m(req) {
       var valor = Number(row[IDX_VALOR] || 0) || 0;
       if (!valor) continue;
 
-      // quebra múltiplas etiquetas e aloca
+      // quebra múltiplas etiquetas
       var parts = etqRaw.split(/\s*\|\s*/).map(normEtq_).filter(function(s){ return !!s; });
       if (!parts.length) parts = [etqRaw];
 
@@ -3911,9 +4028,9 @@ function getValoresContabilizadosSerie12m(req) {
         // filtro conta
         var contaObj = parseConta_(etqPart);
         var conta = contaObj.conta || "";
-        if (contaSel && conta !== contaSel) continue;
+        if (contaArr.length && contaArr.indexOf(String(conta || "").trim()) < 0) continue;
 
-        // filtro categoria (cluster)
+        // filtro categoria
         var cat = categoriaDaEtiqueta_(etqPart) || "";
         if (catSel && cat !== catSel) continue;
 
@@ -3921,9 +4038,11 @@ function getValoresContabilizadosSerie12m(req) {
       }
     }
 
-    var totais = monthKeys.map(function(k){ return Number(sumByMonth[k] || 0) || 0; });
+    var totais = monthKeys.map(function(k){
+      return Number(sumByMonth[k] || 0) || 0;
+    });
 
-    // ✅ variação mensal (MoM) em %
+    // variação mensal (MoM) em %
     var variacoesPct = [];
     for (var j = 0; j < totais.length; j++) {
       if (j === 0) {
@@ -3936,7 +4055,12 @@ function getValoresContabilizadosSerie12m(req) {
       }
     }
 
-    return { ok:true, labels: labels, totais: totais, variacoesPct: variacoesPct };
+    return {
+      ok: true,
+      labels: labels,
+      totais: totais,
+      variacoesPct: variacoesPct
+    };
 
   } catch (e) {
     return { ok:false, error: (e && e.message) ? e.message : String(e) };
