@@ -4671,9 +4671,9 @@ display: none;
               display:flex; flex-direction:column; overflow:hidden;">
 
     <!-- Header -->
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px;
-                border-bottom:1px solid rgba(148,163,184,0.18);
-                background:rgba(255,255,255,0.04);">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px;
+            border-bottom:1px solid rgba(148,163,184,0.18);
+            background:rgba(255,255,255,0.04);">
       <div>
         <div style="color:#fff; font-weight:1000; font-size:14px;">Detalhamento — Itens Irregulares</div>
         <div style="color:rgba(226,232,240,0.75); font-size:12px; margin-top:2px;">
@@ -4681,11 +4681,19 @@ display: none;
         </div>
       </div>
 
-      <button type="button" onclick="window.vektorCloseItensIrregDetalhamentoModal()"
-        style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-               background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
-        Fechar
-      </button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button type="button" onclick="window.vektorExportItensIrregDetalhamentoCSV_()"
+          style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(181,255,32,0.30);
+                background:rgba(181,255,32,0.10); color:#B5FF20; font-weight:1000; font-size:12px; cursor:pointer;">
+          Download CSV
+        </button>
+
+        <button type="button" onclick="window.vektorCloseItensIrregDetalhamentoModal()"
+          style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+                background:rgba(255,255,255,0.06); color:#fff; font-weight:1000; font-size:12px; cursor:pointer;">
+          Fechar
+        </button>
+      </div>
 
     </div>
 
@@ -4731,8 +4739,9 @@ display: none;
     Prévia
   </button>
 
-  <!-- ✅ Espaço do meio: Sel. All / Desel. All -->
-<div style="flex:1 1 auto; display:flex; justify-content:flex-end; gap:10px; padding-right:10px;">
+<!-- ✅ Espaço do meio: Sel. All / Desel. All -->
+<div id="itensIrregDetManageActions"
+     style="flex:1 1 auto; display:flex; justify-content:flex-end; gap:10px; padding-right:10px;">
 
   <button type="button" onclick="window.vektorItensIrregDetSelectAll_()"
     style="height:34px; padding:0 12px; border-radius:10px;
@@ -4752,13 +4761,13 @@ display: none;
 
 </div>
 
-  <!-- ✅ Enviar Notificação no canto direito -->
-  <button type="button" onclick="window.vektorEnviarNotificacaoItensIrregularesSelecionados_()"
-    style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
-           background:rgba(255,255,255,0.06); color:#fff;
-           font-weight:1000; font-size:12px; cursor:pointer;">
-    Enviar Notificação
-  </button>
+<button id="itensIrregDetBtnEnviarNotif"
+  type="button" onclick="window.vektorEnviarNotificacaoItensIrregularesSelecionados_()"
+  style="height:34px; padding:0 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.18);
+         background:rgba(255,255,255,0.06); color:#fff;
+         font-weight:1000; font-size:12px; cursor:pointer;">
+  Enviar Notificação
+</button>
 
 </div>
 
@@ -14527,22 +14536,32 @@ window.vektorItensIrregMakeRowKey_ = function (r) {
   ].join("¦");
 };
 
+window.vektorCanManageItensIrregDet_ = function () {
+  const role = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "").trim() : "");
+  return role === "Administrador" || role === "Analista Pro";
+};
+
 window.vektorOpenItensIrregDetalhamentoModal = function () {
   const m = document.getElementById("itensIrregDetalhamentoModal");
   if (!m) return;
 
   const rows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
+  const canManage = !!window.vektorCanManageItensIrregDet_();
 
-  // abre modal
+  const manageBox = document.getElementById("itensIrregDetManageActions");
+  const btnEnviar = document.getElementById("itensIrregDetBtnEnviarNotif");
+
+  if (manageBox) manageBox.style.display = canManage ? "flex" : "none";
+  if (btnEnviar) btnEnviar.style.display = canManage ? "inline-flex" : "none";
+
   m.style.display = "block";
 
-  // se ainda não carregou nada, só mostra aviso
   if (!rows.length) {
-    const tbody = document.getElementById("itensIrregTbody");
+    const tbody = document.getElementById("itensIrregDetTbody");
     if (tbody) {
       tbody.innerHTML = `
         <tr>
-          <td colspan="8" style="padding:12px; color:rgba(226,232,240,0.80); font-weight:900; font-size:12px;">
+          <td colspan="10" style="padding:12px; color:rgba(15,23,42,0.80); font-weight:900; font-size:12px;">
             Sem dados para detalhar. Selecione o período e clique em <b>Atualizar</b> primeiro.
           </td>
         </tr>`;
@@ -14550,7 +14569,6 @@ window.vektorOpenItensIrregDetalhamentoModal = function () {
     return;
   }
 
-  // popula filtros e renderiza (local, sem backend)
   if (typeof window.vektorItensIrregDetBuildFilters_ === "function") {
     window.vektorItensIrregDetBuildFilters_();
   }
@@ -14741,6 +14759,7 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
   if (!tbody) return;
 
   const baseRowsRaw = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
+  const canManage = !!window.vektorCanManageItensIrregDet_();
 
   // índice estável p/ seleção principal
   const baseRows = baseRowsRaw.map((r, i) => Object.assign({}, r, { __baseIdx: i }));
@@ -14752,7 +14771,6 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
 
   let rows = baseRows.slice();
 
-  // ordenação base por data desc
   rows.sort(function(a, b){
     function toTs_(s){
       const m = String(s || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
@@ -14804,6 +14822,8 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
     return 0;
   });
 
+  window.__itensIrregDetRowsFiltered = rows.slice();
+
   const fmtBRL = (v) =>
     Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -14820,7 +14840,7 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
   if (!rows.length) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="9" style="padding:12px; color:rgba(15,23,42,0.75); font-weight:900; font-size:12px;">
+        <td colspan="10" style="padding:12px; color:rgba(15,23,42,0.75); font-weight:900; font-size:12px;">
           Sem itens para os filtros selecionados.
         </td>
       </tr>`;
@@ -14842,19 +14862,27 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
     return `
       <tr>
         <td style="${td("text-align:center; width:54px; min-width:54px;")}">
-          <input type="checkbox"
-            class="itensIrregDetChk"
-            data-base-idx="${r.__baseIdx}"
-            ${checkedMain}
-            style="width:14px; height:14px; cursor:pointer;" />
+          ${
+            canManage
+              ? `<input type="checkbox"
+                  class="itensIrregDetChk"
+                  data-base-idx="${r.__baseIdx}"
+                  ${checkedMain}
+                  style="width:14px; height:14px; cursor:pointer;" />`
+              : `—`
+          }
         </td>
 
         <td style="${td("text-align:center; width:140px; min-width:140px;")}">
-          <input type="checkbox"
-            class="itensIrregDetChkBloq"
-            data-row-key="${rowKey.replace(/"/g, "&quot;")}"
-            ${checkedBloq}
-            style="width:14px; height:14px; cursor:pointer;" />
+          ${
+            canManage
+              ? `<input type="checkbox"
+                  class="itensIrregDetChkBloq"
+                  data-row-key="${rowKey.replace(/"/g, "&quot;")}"
+                  ${checkedBloq}
+                  style="width:14px; height:14px; cursor:pointer;" />`
+              : `—`
+          }
         </td>
 
         <td style="${td("white-space:nowrap;")}">${r.dataTxt || "—"}</td>
@@ -14868,6 +14896,8 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
       </tr>
     `;
   }).join("");
+
+  if (!canManage) return;
 
   tbody.querySelectorAll('input.itensIrregDetChk').forEach(chk => {
     chk.onchange = function () {
@@ -14889,6 +14919,8 @@ window.vektorRenderItensIrregDetalhamentoFromCache_ = function () {
 };
 
 window.vektorItensIrregDetSelectAll_ = function () {
+  if (!window.vektorCanManageItensIrregDet_()) return;
+
   const baseRows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
   if (!baseRows.length) return;
 
@@ -14898,22 +14930,27 @@ window.vektorItensIrregDetSelectAll_ = function () {
     window.__itensIrregDetSel[i] = true;
   }
 
-  // Atualiza visualmente os checkboxes visíveis
   document.querySelectorAll("#itensIrregDetTbody input.itensIrregDetChk").forEach(chk => {
     chk.checked = true;
   });
 };
 
 window.vektorItensIrregDetDeselectAll_ = function () {
+  if (!window.vektorCanManageItensIrregDet_()) return;
+
   window.__itensIrregDetSel = {};
 
-  // Atualiza visualmente os checkboxes visíveis
   document.querySelectorAll("#itensIrregDetTbody input.itensIrregDetChk").forEach(chk => {
     chk.checked = false;
   });
 };
 
 window.vektorEnviarNotificacaoItensIrregularesSelecionados_ = function () {
+  if (!window.vektorCanManageItensIrregDet_()) {
+    alert("Ação disponível apenas para Administrador e Analista Pro.");
+    return;
+  }
+
   const baseRows = Array.isArray(window.__itensIrregLastRows) ? window.__itensIrregLastRows : [];
   const selMap = window.__itensIrregDetSel || {};
   const bloqMap = window.__itensIrregDetBloq || {};
@@ -15097,6 +15134,55 @@ window.vektorExportRadarItensIrregularesCSV = function() {
   const a = document.createElement("a");
   a.href = url;
   a.download = "itens_irregulares.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 500);
+};
+
+window.vektorExportItensIrregDetalhamentoCSV_ = function() {
+  const rows = Array.isArray(window.__itensIrregDetRowsFiltered)
+    ? window.__itensIrregDetRowsFiltered
+    : [];
+
+  if (!rows.length) {
+    alert("Sem dados para exportar no detalhamento.");
+    return;
+  }
+
+  const esc = (s) => `"${String(s || "").replace(/"/g, '""')}"`;
+
+  const header = [
+    "Data",
+    "Valor (R$)",
+    "Loja",
+    "Time",
+    "Item Comprado",
+    "Estabelecimento",
+    "Conformidade",
+    "Motivo"
+  ];
+
+  const csv = [header.map(esc).join(",")].concat(
+    rows.map(r => {
+      return [
+        r.dataTxt || "",
+        (Number(r.valor || 0)).toFixed(2).replace(".", ","),
+        r.loja || "",
+        r.time || "",
+        r.item || "",
+        r.estabelecimento || "",
+        (r.conformidade || r.status || ""),
+        r.motivo || ""
+      ].map(esc).join(",");
+    })
+  ).join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "itens_irregulares_detalhamento.csv";
   document.body.appendChild(a);
   a.click();
   a.remove();
