@@ -7054,118 +7054,115 @@ window.vektorSelecionarEmpresa_ = function(empresa) {
   setBusyUi_(true, emp, "Trocando empresa...");
 
   google.script.run
-    .withSuccessHandler(function(res){
-      try {
-        if (!res || !res.ok) {
-          window.__vektorEmpresaAtual = anterior;
-          if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
-            window.vektorAtualizarTituloEmpresa_();
-          }
-          unlockUi_(anterior, "Não foi possível trocar a empresa.");
-          return;
-        }
-
-        window.__vektorEmpresaAtual = String(res.empresaAtual || emp).toUpperCase();
-
-        try {
-          window.vektorAuxResetState_ && window.vektorAuxResetState_();
-        } catch(e) {
-          console.error(e);
-        }
-
-        try {
-          window.vektorAnaliseGastosResetState_ && window.vektorAnaliseGastosResetState_({ keepPeriodo: false });
-        } catch(e) {
-          console.error(e);
-        }
-
-        try {
-              window.vektorMyAlertsResetState_ && window.vektorMyAlertsResetState_();
-            } catch(e) {
-              console.error(e);
-            }
-
-        try {
-          const aux = document.getElementById("consultasAuxView");
-          if (aux) {
-            aux.classList.add("hidden");
-            aux.style.display = "none";
-          }
-        } catch(e) {
-          console.error(e);
-        }
-
-        try {
-          const home = document.getElementById("homeView");
-          if (home) {
-            home.classList.remove("hidden");
-            home.style.display = "flex";
-          }
-        } catch(e) {
-          console.error(e);
-        }
-
-        if (typeof window.vektorRefreshEmpresaChecks_ === "function") {
-          window.vektorRefreshEmpresaChecks_();
-        }
-        if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
-          window.vektorAtualizarTituloEmpresa_();
-        }
-
-        if (typeof window.vektorResetCachesEmpresa_ === "function") {
-          window.vektorResetCachesEmpresa_();
-        }
-
-        [
-          "chatView",
-          "cicloResumoView",
-          "analiseGastosView",
-          "fluxogramaView",
-          "myAlertsView",
-          "radarView",
-          "envioPendView",
-          "consultasAuxView",
-          "fluxoNumerarioSapView",
-          "vertexCostView",
-          "basesVektorView"
-        ].forEach(function(id){
-          const el = document.getElementById(id);
-          if (!el) return;
-          el.classList.add("hidden");
-          el.style.display = "none";
-        });
-
-        try {
-          const radarView = document.getElementById("radarView");
-          if (radarView) radarView.classList.remove("is-open");
-        } catch (_) {}
-
-        const homeView = document.getElementById("homeView");
-        if (homeView) {
-          homeView.classList.remove("hidden");
-          homeView.style.display = "flex";
-          homeView.style.opacity = "1";
-          homeView.style.filter = "blur(0)";
-        }
-
-        if (typeof vektorSetActiveNavBtn_ === "function") {
-          vektorSetActiveNavBtn_("");
-        }
-
-        unlockUi_(window.__vektorEmpresaAtual, "");
-        if (typeof window.vektorCloseEmpresaModal_ === "function") {
-          window.vektorCloseEmpresaModal_();
-        }
-
-      } catch (e) {
-        console.error("Erro ao finalizar troca de empresa:", e);
+  .withSuccessHandler(function(res){
+    try {
+      if (!res || !res.ok) {
         window.__vektorEmpresaAtual = anterior;
         if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
           window.vektorAtualizarTituloEmpresa_();
         }
-        unlockUi_(anterior, "Erro ao aplicar a troca.");
+        unlockUi_(anterior, "Não foi possível trocar a empresa.");
+        return;
       }
-    })
+
+      window.__vektorEmpresaAtual = String(res.empresaAtual || emp).toUpperCase();
+
+      try {
+        window.vektorAuxResetState_ && window.vektorAuxResetState_();
+      } catch(e) {
+        console.error(e);
+      }
+
+      try {
+        window.vektorAnaliseGastosResetState_ && window.vektorAnaliseGastosResetState_({ keepPeriodo: false });
+      } catch(e) {
+        console.error(e);
+      }
+
+      try {
+        window.vektorMyAlertsResetState_ && window.vektorMyAlertsResetState_();
+      } catch(e) {
+        console.error(e);
+      }
+
+      if (typeof window.vektorRefreshEmpresaChecks_ === "function") {
+        window.vektorRefreshEmpresaChecks_();
+      }
+
+      if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
+        window.vektorAtualizarTituloEmpresa_();
+      }
+
+      if (typeof window.vektorResetCachesEmpresa_ === "function") {
+        window.vektorResetCachesEmpresa_();
+      }
+
+      [
+        "chatView",
+        "cicloResumoView",
+        "analiseGastosView",
+        "fluxogramaView",
+        "myAlertsView",
+        "radarView",
+        "envioPendView",
+        "consultasAuxView",
+        "fluxoNumerarioSapView",
+        "vertexCostView",
+        "basesVektorView"
+      ].forEach(function(id){
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add("hidden");
+        el.style.display = "none";
+      });
+
+      try {
+        const radarView = document.getElementById("radarView");
+        if (radarView) radarView.classList.remove("is-open");
+      } catch (_) {}
+
+      const homeView = document.getElementById("homeView");
+      if (homeView) {
+        homeView.classList.remove("hidden");
+        homeView.style.display = "flex";
+        homeView.style.opacity = "1";
+        homeView.style.filter = "blur(0)";
+      }
+
+      if (typeof vektorSetActiveNavBtn_ === "function") {
+        vektorSetActiveNavBtn_("");
+      }
+
+      unlockUi_(window.__vektorEmpresaAtual, "");
+
+      if (typeof window.vektorCloseEmpresaModal_ === "function") {
+        window.vektorCloseEmpresaModal_();
+      }
+
+      try {
+        if (typeof window.vektorRestartPreloadAfterEmpresaChange_ === "function") {
+          window.vektorRestartPreloadAfterEmpresaChange_();
+        } else {
+          if (typeof vektorHomePreloadReset_ === "function") {
+            vektorHomePreloadReset_();
+          }
+          if (typeof vektorGlobalPreloadStart_ === "function") {
+            vektorGlobalPreloadStart_();
+          }
+        }
+      } catch (e) {
+        console.error("Falha ao reiniciar preload após troca de empresa:", e);
+      }
+
+    } catch (e) {
+      console.error("Erro ao finalizar troca de empresa:", e);
+      window.__vektorEmpresaAtual = anterior;
+      if (typeof window.vektorAtualizarTituloEmpresa_ === "function") {
+        window.vektorAtualizarTituloEmpresa_();
+      }
+      unlockUi_(anterior, "Erro ao aplicar a troca.");
+    }
+  })
     .withFailureHandler(function(err){
       console.error("Erro ao trocar empresa:", err);
       window.__vektorEmpresaAtual = anterior;
@@ -7177,18 +7174,109 @@ window.vektorSelecionarEmpresa_ = function(empresa) {
     .vektorTrocarEmpresaAtual(emp);
 };
 
+window.vektorRestartPreloadAfterEmpresaChange_ = function () {
+  try {
+    // mata estado anterior do preload
+    window.__vektorGlobalPreloadState = {
+      running: false,
+      done: false,
+      tasks: {},
+      total: 0,
+      completed: 0
+    };
+
+    // limpa caches usados pelo preload global
+    window.__vektorResumoCicloPreloaded = null;
+
+    // My Alerts
+    window.__myAlertsBaseLoaded = false;
+    window.__myAlertsInited = false;
+    window.__myAlertsEmpresaLoaded = "";
+
+    // Análise de Gastos
+    window.__analiseGastosMeta = null;
+    window.__analiseGastosMetaLoading = false;
+
+    // Resumo do Ciclo
+    window.__cicloResumoData = null;
+    window.__cicloResumoTxFiltered = [];
+    window.__cicloResumoTxExport = [];
+
+    // reabre Home visualmente como tela principal
+    const home = document.getElementById("homeView");
+    if (home) {
+      home.classList.remove("hidden");
+      home.style.display = "flex";
+      home.style.opacity = "1";
+      home.style.filter = "blur(0)";
+    }
+
+    // mostra a barra novamente já zerada
+    if (typeof vektorHomePreloadReset_ === "function") {
+      vektorHomePreloadReset_();
+    }
+    if (typeof vektorHomePreloadSetProgress_ === "function") {
+      vektorHomePreloadSetProgress_(0, 1, "Inicializando módulos...");
+    }
+
+    // dispara novamente o preload da empresa atual
+    if (typeof vektorGlobalPreloadStart_ === "function") {
+      vektorGlobalPreloadStart_();
+    }
+  } catch (e) {
+    console.error("Erro ao reiniciar preload após troca de empresa:", e);
+  }
+};
+
 window.vektorEmpresaAtual_ = function() {
   return String(window.__vektorEmpresaAtual || USER_EMPRESA_DEFAULT || "CENTAURO").toUpperCase();
 };
 
 window.vektorResetCachesEmpresa_ = function() {
+  // =========================
+  // PRELOAD GLOBAL / HOME
+  // =========================
+  window.__vektorGlobalPreloadState = {
+    running: false,
+    done: false,
+    tasks: {},
+    total: 0,
+    completed: 0
+  };
+
+  window.clearTimeout(window.__vektorHomePreloadHideTmr);
+
+  window.__vektorResumoCicloPreloaded = null;
+
+  // =========================
+  // ANÁLISE DE GASTOS
+  // =========================
   window.__analiseGastosMeta = null;
   window.__analiseGastosMetaLoading = false;
+  window.__analiseGastosData = null;
+  window.__analiseGastosTx = [];
+  window.__analiseGastosLastFilteredTx = [];
+  window.__analiseGastosLastFilteredMeta = null;
 
+  // =========================
+  // FLUXO NUMERÁRIO SAP
+  // =========================
   window.__fluxoNumerarioSapMeta = null;
   window.__fluxoNumerarioSapBusy = false;
 
+  // =========================
+  // RESUMO DO CICLO
+  // =========================
+  window.__cicloResumoData = null;
+  window.__cicloResumoTxFiltered = [];
+  window.__cicloResumoTxExport = [];
+  window.__cicloResumoSort = { col: "valor", dir: "desc" };
+
+  // =========================
+  // MY ALERTS
+  // =========================
   window.__myAlertsInited = false;
+  window.__myAlertsBaseLoaded = false;
   window.__myAlertsEmpresaLoaded = "";
   window.__myAl_lojasPorTime = {};
   window.__myAl_editingAlertId = "";
@@ -7206,6 +7294,15 @@ window.vektorResetCachesEmpresa_ = function() {
     if (window.__myAl_serie12mChartInst) {
       window.__myAl_serie12mChartInst.destroy();
       window.__myAl_serie12mChartInst = null;
+    }
+  } catch(_) {}
+
+  // =========================
+  // UI DA HOME / BARRA
+  // =========================
+  try {
+    if (typeof vektorHomePreloadReset_ === "function") {
+      vektorHomePreloadReset_();
     }
   } catch(_) {}
 };
@@ -8553,31 +8650,46 @@ window.vektorOpenResumoCiclo = function () {
   vektorSetActiveNavBtn_("navResumoCicloBtn");
   window.vektorShowResumoCicloView_();
 
-  if (window.__cicloResumoData && window.__cicloResumoData.ok) {
-    try {
-      const selTime = document.getElementById("cicloResumo_selTime");
-      const selLoja = document.getElementById("cicloResumo_selLoja");
-      if (selTime && !selTime.__bindResumoCache) {
-        selTime.__bindResumoCache = true;
-        selTime.addEventListener("change", function(){ window.vektorLoadResumoCiclo(true); });
-      }
-      if (selLoja && !selLoja.__bindResumoCache) {
-        selLoja.__bindResumoCache = true;
-        selLoja.addEventListener("change", function(){ window.vektorLoadResumoCiclo(true); });
-      }
-    } catch(_) {}
+  try {
+    const empAtual = (typeof window.vektorEmpresaAtual_ === "function")
+      ? String(window.vektorEmpresaAtual_() || "").trim().toUpperCase()
+      : "CENTAURO";
 
-    // reaproveita dataset já carregado
-    try {
-      const tbody = document.getElementById("cicloResumo_tbody");
-      if (tbody) tbody.innerHTML = "";
-      // reaplica filtros locais sem backend
-      const ev = new Event("change");
-      document.getElementById("cicloResumo_selTime")?.dispatchEvent(ev);
-    } catch(_) {}
+    const dataMem = window.__cicloResumoData;
+    const preloadMem = window.__vektorResumoCicloPreloaded;
 
-    return;
-  }
+    const dataEmp = String(dataMem && dataMem.empresa || "").trim().toUpperCase();
+    const preloadEmp = String(preloadMem && preloadMem.empresa || "").trim().toUpperCase();
+
+    // já existe dataset da empresa atual -> só reaproveita
+    if (dataMem && dataMem.ok && dataEmp === empAtual) {
+      try {
+        const loading = document.getElementById("cicloResumoLoading");
+        const content = document.getElementById("cicloResumoContent");
+        const tbody = document.getElementById("cicloResumo_tbody");
+
+        if (loading) loading.style.display = "none";
+        if (content) content.style.display = "block";
+        if (tbody && !Array.isArray(window.__cicloResumoTxFiltered)) {
+          tbody.innerHTML = "";
+        }
+
+        // reaplica render local sem backend
+        if (typeof window.vektorLoadResumoCiclo === "function") {
+          window.vektorLoadResumoCiclo(false);
+        }
+      } catch (_) {}
+
+      return;
+    }
+
+    // existe preload da empresa atual -> usa ele
+    if (preloadMem && preloadMem.ok && preloadEmp === empAtual) {
+      window.vektorLoadResumoCiclo(false);
+      return;
+    }
+
+  } catch (_) {}
 
   window.vektorLoadResumoCiclo(false);
 };
