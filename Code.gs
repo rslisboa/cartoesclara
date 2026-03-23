@@ -15522,8 +15522,9 @@ function getResumoCicloPendencias() {
 
     // ✅ cache curto (2 min) — evita “demorar pra carregar” em cliques/refresh
     var cache = CacheService.getScriptCache();
+    var empresaAtual = String((empCtx && empCtx.empresaAtual) || "CENTAURO").trim().toUpperCase();
     var cacheSuffix = (allowedLojas === null) ? "ALL" : email; // admin = ALL, demais = email
-    var cacheKey = "RC_BASECLARA_" + getCicloKey06a05_() + "_" + cacheSuffix;
+    var cacheKey = "RC_BASECLARA_" + empresaAtual + "_" + getCicloKey06a05_() + "_" + cacheSuffix;
     var cached = cache.get(cacheKey);
     if (cached) return JSON.parse(cached);
 
@@ -15535,17 +15536,17 @@ function getResumoCicloPendencias() {
     var fimCiclo = pc.fim;
 
     // mapa Loja -> Time
-    var mapaTime = construirMapaLojaParaTime_(empCtx.empresaAtual);
+    var mapaTime = construirMapaLojaParaTime_(empresaAtual);
 
-    var ss = SpreadsheetApp.openById(BASE_CLARA_ID);
-    var sh = vektorGetBaseSheetByEmpresa_(empCtx.empresaAtual);
-    if (!sh) throw new Error("Aba BaseClara não encontrada.");
+    var sh = vektorGetBaseSheetByEmpresa_(empresaAtual);
+    if (!sh) throw new Error("Aba da base não encontrada para a empresa: " + empresaAtual);
 
     var lastRow = sh.getLastRow();
     var lastCol = sh.getLastColumn();
     if (lastRow < 2) {
       var vazio = {
         ok: true,
+        empresa: empresaAtual,
         ciclo: formatPeriodoBR_(iniCiclo, fimCiclo),
         periodo: formatPeriodoBR_(iniCiclo, new Date()),
         meta: {},
@@ -15707,6 +15708,7 @@ function getResumoCicloPendencias() {
 
     var resp = {
       ok: true,
+      empresa: empresaAtual,
       ciclo: formatPeriodoBR_(iniCiclo, fimCiclo),
       periodo: formatPeriodoBR_(iniCiclo, new Date()),
       meta: {
