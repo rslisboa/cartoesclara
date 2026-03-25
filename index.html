@@ -7274,6 +7274,13 @@ window.vektorRestartPreloadAfterEmpresaChange_ = function () {
     window.__cicloResumoTxFiltered = [];
     window.__cicloResumoTxExport = [];
 
+    // Envio de Pendências
+      try {
+        if (typeof window.vektorEnvPendResetState_ === "function") {
+          window.vektorEnvPendResetState_();
+        }
+      } catch (_) {}
+
     // reabre Home visualmente como tela principal
     const home = document.getElementById("homeView");
     if (home) {
@@ -9569,7 +9576,7 @@ window.vektorOpenAnaliseGastos = function () {
     if (cEstSub) cEstSub.textContent = "—";
 
     if (tb) {
-      tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Informe o período e clique em Buscar para consultar os gastos.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Informe o período e clique em Buscar para consultar os gastos.</td></tr>';
     }
   } catch (e) {
     console.error("Erro ao resetar visual da Análise de Gastos:", e);
@@ -10360,7 +10367,7 @@ function vektorAnaliseGastosFetchData_(){
   const loja = document.getElementById("analiseGastos_selLoja")?.value || "";
   const cat  = document.getElementById("analiseGastos_selCategoria")?.value || "";
 
-  vektorAnaliseGastosSetBusy_(true, "Buscando BaseClara…", "Aplicando recortes por perfil e filtros");
+  vektorAnaliseGastosSetBusy_(true, "Buscando Base de transações…", "Aplicando recortes por perfil e filtros");
 
   google.script.run
     .withSuccessHandler(function(res){
@@ -12786,6 +12793,81 @@ window.__envPend = {
   selected: {},    // txKey -> true/false
   resumo: null,
   hist: null
+};
+
+window.vektorEnvPendResetState_ = function () {
+  // fecha modal, popup e tooltip
+  try { window.vektorEnvioPendenciasFecharModal && window.vektorEnvioPendenciasFecharModal(); } catch(_) {}
+  try { window.vektorEnvPendLojasPopupClose_ && window.vektorEnvPendLojasPopupClose_(); } catch(_) {}
+  try { window.vektorEnvPendHistHideTooltip_ && window.vektorEnvPendHistHideTooltip_(); } catch(_) {}
+
+  // fecha overlay
+  try { window.vektorEnvPendOverlayHide_ && window.vektorEnvPendOverlayHide_(); } catch(_) {}
+
+  // destrói gráfico do histórico, se existir
+  try {
+    if (window.__envPendHistChartInst) {
+      window.__envPendHistChartInst.destroy();
+      window.__envPendHistChartInst = null;
+    }
+  } catch(_) {}
+
+  // limpa cache e estado em memória
+  window.__envPendHistCache = null;
+  window.__envPendHistSelectedIndex = null;
+  window.__envPendSendInFlight = false;
+
+  window.__envPend = {
+    periodo: { iniIso: "", fimIso: "" },
+    rows: [],
+    selected: {},
+    resumo: null,
+    hist: null
+  };
+
+  // limpa campos de data
+  try {
+    var dtIni = document.getElementById("envPend_dtIni");
+    var dtFim = document.getElementById("envPend_dtFim");
+    if (dtIni) dtIni.value = "";
+    if (dtFim) dtFim.value = "";
+  } catch(_) {}
+
+  // limpa status/textos
+  try {
+    var st = document.getElementById("envPend_statusText");
+    var resumoEl = document.getElementById("envPend_resumo");
+    var falhasEl = document.getElementById("envPend_falhas");
+    var lastDate = document.getElementById("envPendHist_lastDate");
+    var lastSub  = document.getElementById("envPendHist_lastSub");
+    var tooltip  = document.getElementById("envPendHistTooltip");
+    var statusCards = document.getElementById("envPend_statusCards");
+
+    if (st) st.textContent = "Defina o período e gere a prévia.";
+    if (resumoEl) resumoEl.textContent = "";
+    if (falhasEl) falhasEl.innerHTML = "";
+    if (lastDate) lastDate.textContent = "—";
+    if (lastSub) lastSub.textContent = "Nenhum envio carregado.";
+    if (tooltip) tooltip.style.display = "none";
+    if (statusCards) statusCards.innerHTML = "";
+  } catch(_) {}
+
+  // limpa tabela da prévia
+  try {
+    if (typeof window.__renderEnvPendTbody === "function") {
+      window.__renderEnvPendTbody();
+    }
+  } catch(_) {}
+
+  // limpa filtro do popup de lojas para permitir repopular na nova empresa
+  try {
+    var sel = document.getElementById("envPendLojasTimeFilter");
+    if (sel) {
+      sel.__filled = false;
+      sel.innerHTML = "<option value=''>Todos</option>";
+      sel.value = "";
+    }
+  } catch(_) {}
 };
 
 window.vektorEnvioPendenciasAbrirModal = function () {
@@ -31427,7 +31509,7 @@ window.vektorAuxOpenSaldosTx = function (aliasLoja) {
   modal.setAttribute("aria-hidden", "false");
 
   body.innerHTML =
-    "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Buscando BaseClara…</span></div>";
+    "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Buscando Base de transações…</span></div>";
 
   google.script.run
     .withSuccessHandler(function (res) {
