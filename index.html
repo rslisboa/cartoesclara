@@ -1944,6 +1944,36 @@ display: none;
 }
 
 /* =========================
+   MENU BLOQUEADO DURANTE PRELOAD GLOBAL
+   ========================= */
+#vektorShell.vektor-ui-loading #vektorSidebar{
+  pointer-events: none;
+  user-select: none;
+  opacity: 0.62;
+  transition: opacity .18s ease;
+}
+
+#vektorShell.vektor-ui-loading #vektorSidebar::after{
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.22);
+  backdrop-filter: blur(1.5px);
+  cursor: progress;
+  z-index: 20;
+}
+
+#vektorShell.vektor-ui-loading #vektorSidebar .vektor-nav-btn,
+#vektorShell.vektor-ui-loading #vektorSidebar #vektorSidebarToggleBtn{
+  cursor: not-allowed !important;
+}
+
+#vektorShell.vektor-ui-loading #vektorSidebar .vektor-nav-btn{
+  filter: grayscale(0.10);
+}
+
+/* =========================
    MENU - BOTÃO DE PÁGINA ATIVA
    ========================= */
 .vektor-nav-btn{
@@ -2870,7 +2900,12 @@ display: none;
  <div id="vektorShell" class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
    
-  <aside class="hidden md:flex w-72 shrink-0 flex-none flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 self-stretch min-h-0">
+    <aside
+    id="vektorSidebar"
+    class="hidden md:flex w-72 shrink-0 flex-none flex-col bg-white rounded-xl shadow-lg border border-slate-200 p-4 self-stretch min-h-0"
+    style="position:relative;"
+    aria-busy="false"
+  >
 
   <!-- Bloco Vektor + título -->
   <div class="w-full flex flex-col items-center mb-4">
@@ -7174,8 +7209,45 @@ window.vektorSelecionarEmpresa_ = function(empresa) {
     .vektorTrocarEmpresaAtual(emp);
 };
 
+window.vektorSetSidebarLoadingState_ = function(isLoading){
+  const shell = document.getElementById("vektorShell");
+  const sidebar = document.getElementById("vektorSidebar");
+  const toggleBtn = document.getElementById("vektorSidebarToggleBtn");
+
+  if (!shell || !sidebar) return;
+
+  const on = !!isLoading;
+
+  shell.classList.toggle("vektor-ui-loading", on);
+  sidebar.setAttribute("aria-busy", on ? "true" : "false");
+
+  // bloqueio real de foco/interação
+  if (on) {
+    sidebar.setAttribute("inert", "");
+  } else {
+    sidebar.removeAttribute("inert");
+  }
+
+  // reforço defensivo no botão de recolher
+  if (toggleBtn) {
+    toggleBtn.disabled = on;
+  }
+};
+
+window.vektorFailSafeUnlockSidebar_ = function(){
+  try {
+    const state = window.__vektorGlobalPreloadState || {};
+    if (state && state.running === false) {
+      window.vektorSetSidebarLoadingState_(false);
+    }
+  } catch(_) {}
+};
+
 window.vektorRestartPreloadAfterEmpresaChange_ = function () {
   try {
+          if (typeof window.vektorSetSidebarLoadingState_ === "function") {
+      window.vektorSetSidebarLoadingState_(true);
+    }
     // mata estado anterior do preload
     window.__vektorGlobalPreloadState = {
       running: false,
@@ -7510,6 +7582,12 @@ function vektorGlobalPreloadFinishTask_(key, ok, statusTxt){
     st.running = false;
     st.done = true;
 
+    try {
+      if (typeof window.vektorSetSidebarLoadingState_ === "function") {
+        window.vektorSetSidebarLoadingState_(false);
+      }
+    } catch(_) {}
+
     window.clearTimeout(window.__vektorHomePreloadHideTmr);
     window.__vektorHomePreloadHideTmr = window.setTimeout(function(){
       vektorHomePreloadHide_();
@@ -7526,6 +7604,12 @@ function vektorGlobalPreloadStart_(){
     vektorHomePreloadSetProgress_(st.total || 1, st.total || 1, "Filtros principais disponíveis.");
     return;
   }
+
+    try {
+    if (typeof window.vektorSetSidebarLoadingState_ === "function") {
+      window.vektorSetSidebarLoadingState_(true);
+    }
+  } catch(_) {}
 
   const tasks = {};
 
@@ -7827,6 +7911,11 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch(e) {
               console.error("Falha ao iniciar preload global:", e);
             }
+
+             window.setTimeout(function(){
+            try { window.vektorFailSafeUnlockSidebar_(); } catch(_) {}
+          }, 15000);
+
           if (window.vektorPlayTopbarPremiumStrip) {
             requestAnimationFrame(function(){
               requestAnimationFrame(function(){
