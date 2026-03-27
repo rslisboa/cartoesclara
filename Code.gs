@@ -111,6 +111,109 @@ function vektorBuildSubject_(empresa, assuntoBase) {
     : "[" + base + "]";
 }
 
+// ==============================
+// DIAS ÚTEIS / FERIADOS / EMENDAS
+// ==============================
+
+var VEKTOR_BR_HOLIDAY_CAL_ID = "pt.brazilian#holiday@group.v.calendar.google.com";
+var __vektorHolidayCache = { year: null, map: null };
+
+function vektorDateKey_(d, tz) {
+  return Utilities.formatDate(d, tz || Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
+}
+
+function vektorLoadBrHolidaysMap_(year, tz) {
+  try {
+    if (__vektorHolidayCache.year === year && __vektorHolidayCache.map) {
+      return __vektorHolidayCache.map;
+    }
+
+    var out = {};
+    var cal = CalendarApp.getCalendarById(VEKTOR_BR_HOLIDAY_CAL_ID);
+
+    var ini = new Date(year, 0, 1);  ini.setHours(0,0,0,0);
+    var fim = new Date(year, 11, 31); fim.setHours(23,59,59,999);
+
+    var events = cal.getEvents(ini, fim);
+    events.forEach(function(ev) {
+      var d0 = ev.getStartTime();
+      d0.setHours(0,0,0,0);
+      out[vektorDateKey_(d0, tz)] = true;
+    });
+
+    try {
+      var extraRaw = PropertiesService.getScriptProperties().getProperty("VEKTOR_EXTRA_OFF_DAYS") || "";
+      extraRaw.split(",")
+        .map(function(s){ return String(s||"").trim(); })
+        .filter(Boolean)
+        .forEach(function(k){ out[k] = true; });
+    } catch (_) {}
+
+    __vektorHolidayCache.year = year;
+    __vektorHolidayCache.map = out;
+    return out;
+
+  } catch (e) {
+    return {};
+  }
+}
+
+function vektorIsBridgeDay_(dateObj, holidaysMap, tz) {
+  var d = new Date(dateObj); d.setHours(0,0,0,0);
+  var dow = d.getDay(); // 0 dom, 1 seg, 2 ter, 3 qua, 4 qui, 5 sex, 6 sáb
+
+  var prev = new Date(d); prev.setDate(prev.getDate() - 1);
+  var next = new Date(d); next.setDate(next.getDate() + 1);
+
+  var prevKey = vektorDateKey_(prev, tz);
+  var nextKey = vektorDateKey_(next, tz);
+
+  // segunda vira emenda se terça for feriado
+  if (dow === 1 && holidaysMap[nextKey]) return true;
+
+  // sexta vira emenda se quinta for feriado
+  if (dow === 5 && holidaysMap[prevKey]) return true;
+
+  return false;
+}
+
+function vektorIsBusinessDay_(dateObj, tz) {
+  var d = new Date(dateObj); d.setHours(0,0,0,0);
+  var dow = d.getDay();
+  if (dow === 0 || dow === 6) return false;
+
+  var year = d.getFullYear();
+  var holidaysMap = vektorLoadBrHolidaysMap_(year, tz);
+  var key = vektorDateKey_(d, tz);
+
+  if (holidaysMap[key]) return false;
+
+  return true;
+}
+
+function vektorIsDiaEnvioAjusteLimiteMensal_(today, tz) {
+  var d = new Date(today);
+  d.setHours(0,0,0,0);
+
+  var year = d.getFullYear();
+  var month = d.getMonth();
+
+  // dia-base = 06 do mês corrente
+  var base = new Date(year, month, 6);
+  base.setHours(0,0,0,0);
+
+  // se hoje for antes do dia 06, não envia
+  if (d < base) return false;
+
+  // anda a partir do dia 06 até achar o primeiro dia útil
+  var alvo = new Date(base);
+  while (!vektorIsBusinessDay_(alvo, tz)) {
+    alvo.setDate(alvo.getDate() + 1);
+  }
+
+  return vektorDateKey_(d, tz) === vektorDateKey_(alvo, tz);
+}
+
 function vektorTrocarEmpresaAtual(empresa) {
   vektorAssertWhitelisted_();
   var ctx = vektorGetUserRole_();
@@ -2010,6 +2113,174 @@ function getAlertasRecentes(dias, limit, empresa) {
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
   }
+}
+
+function vektorAjusteLimiteMensalVerificarEnvio_(empresa) {
+  var emp = vektorNormEmpresa_(empresa || "CENTAURO");
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var now = new Date();
+
+  if (!vektorIsDiaEnvioAjusteLimiteMensal_(now, tz)) {
+    Logger.log("Ajuste de limite mensal: hoje não é o dia de envio para " + emp);
+    return { ok: true, empresa: emp, sent: false, skipped: true, reason: "not_business_due_day" };
+  }
+
+  var monthKey = Utilities.formatDate(now, tz, "yyyy-MM");
+  var propKey = "VEKTOR_AJUSTE_LIMITE_SENT_" + emp + "_" + monthKey;
+  var props = PropertiesService.getScriptProperties();
+
+  if (props.getProperty(propKey) === "1") {
+    Logger.log("Ajuste de limite mensal: envio já realizado neste mês para " + emp);
+    return { ok: true, empresa: emp, sent: false, skipped: true, reason: "already_sent_month" };
+  }
+
+  var resp = vektorAjusteLimiteMensalEnviar_(emp);
+
+  if (resp && resp.ok && !resp.skipped) {
+    props.setProperty(propKey, "1");
+  }
+
+  return resp;
+}
+
+function vektorAjusteLimiteMensalEnviar_(empresa) {
+  var emp = vektorNormEmpresa_(empresa || "CENTAURO");
+  var rows = vektorAjusteLimiteGetRowsPendentes_(emp);
+
+  if (!rows.length) {
+    Logger.log("Ajuste de limite mensal: nenhuma linha pendente para " + emp);
+    return { ok: true, empresa: emp, rows: 0, skipped: true };
+  }
+
+  var assunto = vektorAjusteLimiteSubject_(emp);
+  var htmlBody = vektorAjusteLimiteBuildEmailHtml_(emp, rows);
+
+  GmailApp.sendEmail(
+    VEKTOR_AJUSTE_LIMITE_TO,
+    assunto,
+    " ",
+    {
+      htmlBody: htmlBody,
+      name: "Vektor - Grupo SBF",
+      replyTo: VEKTOR_AJUSTE_LIMITE_REPLYTO
+    }
+  );
+
+  registrarAlertaEnviado_(
+    "AJUSTE_DE_LIMITE",
+    "",
+    "",
+    "Ajuste mensal de limite | linhas=" + rows.length,
+    VEKTOR_AJUSTE_LIMITE_TO,
+    "vektorAjusteLimiteMensalEnviar_",
+    emp
+  );
+
+  var payloadKey = VEKTOR_AJUSTE_LIMITE_PROP_PREFIX + emp;
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty(payloadKey, JSON.stringify({
+    empresa: emp,
+    createdAt: Utilities.formatDate(new Date(), Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd HH:mm:ss"),
+    rows: rows.map(function(r) {
+      return {
+        rowNum: r.rowNum,
+        limiteAlterarPara: r.limiteAlterarPara
+      };
+    })
+  }));
+
+  vektorAjusteLimiteAgendarAplicacao_(emp);
+
+  return { ok: true, empresa: emp, rows: rows.length };
+}
+
+function vektorAjusteLimiteAgendarAplicacao_(empresa) {
+  var emp = vektorNormEmpresa_(empresa || "CENTAURO");
+
+  var todos = ScriptApp.getProjectTriggers();
+  todos.forEach(function(t) {
+    var h = t.getHandlerFunction();
+    if (h === (VEKTOR_AJUSTE_LIMITE_TRIGGER_APPLY_PREFIX + emp)) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  var runAt = new Date(Date.now() + 3 * 60 * 60 * 1000);
+  ScriptApp.newTrigger(VEKTOR_AJUSTE_LIMITE_TRIGGER_APPLY_PREFIX + emp)
+    .timeBased()
+    .at(runAt)
+    .create();
+}
+
+function vektorAjusteLimiteMensalAplicar_(empresa) {
+  var emp = vektorNormEmpresa_(empresa || "CENTAURO");
+  var props = PropertiesService.getScriptProperties();
+  var payloadKey = VEKTOR_AJUSTE_LIMITE_PROP_PREFIX + emp;
+  var raw = props.getProperty(payloadKey);
+
+  if (!raw) {
+    Logger.log("Sem payload de ajuste de limite para aplicar em " + emp);
+    return { ok: true, empresa: emp, rows: 0, skipped: true };
+  }
+
+  var payload = JSON.parse(raw);
+  var rows = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!rows.length) {
+    props.deleteProperty(payloadKey);
+    return { ok: true, empresa: emp, rows: 0, skipped: true };
+  }
+
+  var sh = vektorGetInfoLimitesSheet_();
+
+  rows.forEach(function(item) {
+    var rowNum = Number(item.rowNum || 0);
+    if (!rowNum) return;
+
+    var limiteAnterior = Number(item.limiteAlterarPara || 0) || 0;
+
+    sh.getRange(rowNum, INFO_LIMITES_COL_LIMITE).setValue(limiteAnterior);
+    sh.getRange(rowNum, INFO_LIMITES_COL_LIMITE_ANTERIOR).clearContent();
+    sh.getRange(rowNum, INFO_LIMITES_COL_MAX_TRANS_MOMENTANEO).clearContent();
+  });
+
+  // reaplica formato numérico nas colunas E e J apenas nas linhas afetadas
+  rows.forEach(function(item) {
+    var rowNum = Number(item.rowNum || 0);
+    if (!rowNum) return;
+
+    sh.getRange(rowNum, INFO_LIMITES_COL_LIMITE).setNumberFormat('#,##0.00');
+    sh.getRange(rowNum, INFO_LIMITES_COL_MAX_TRANS_MOMENTANEO).setNumberFormat('#,##0.00');
+  });
+
+  props.deleteProperty(payloadKey);
+
+  registrarAlertaEnviado_(
+    "AJUSTE_DE_LIMITE_APLICADO",
+    "",
+    "",
+    "Aplicação automática do ajuste mensal | linhas=" + rows.length,
+    VEKTOR_AJUSTE_LIMITE_TO,
+    "vektorAjusteLimiteMensalAplicar_",
+    emp
+  );
+
+  return { ok: true, empresa: emp, rows: rows.length };
+}
+
+function vektorAjusteLimiteMensalVerificarEnvio_CENTAURO() {
+  return vektorAjusteLimiteMensalVerificarEnvio_("CENTAURO");
+}
+
+function vektorAjusteLimiteMensalVerificarEnvio_FISIA() {
+  return vektorAjusteLimiteMensalVerificarEnvio_("FISIA");
+}
+
+function vektorAjusteLimiteMensalAplicar_CENTAURO() {
+  return vektorAjusteLimiteMensalAplicar_("CENTAURO");
+}
+
+function vektorAjusteLimiteMensalAplicar_FISIA() {
+  return vektorAjusteLimiteMensalAplicar_("FISIA");
 }
 
 /**
@@ -4365,101 +4636,6 @@ function RUN_USER_ALERTS_SCHEDULER() {
   }
 }
 
-// ==============================
-// DIAS ÚTEIS / FERIADOS / EMENDAS
-// ==============================
-
-// Calendário público de feriados do Brasil (Google)
-var VEKTOR_BR_HOLIDAY_CAL_ID = "pt.brazilian#holiday@group.v.calendar.google.com";
-
-// Cache simples (evita bater no Calendar toda hora)
-var __vektorHolidayCache = { year: null, map: null };
-
-// Converte Date -> "yyyy-MM-dd" no TZ do script
-function vektorDateKey_(d, tz) {
-  return Utilities.formatDate(d, tz || Session.getScriptTimeZone() || "America/Sao_Paulo", "yyyy-MM-dd");
-}
-
-// Retorna um Set/mapa { "yyyy-MM-dd": true } com feriados do ano
-function vektorLoadBrHolidaysMap_(year, tz) {
-  try {
-    if (__vektorHolidayCache.year === year && __vektorHolidayCache.map) {
-      return __vektorHolidayCache.map;
-    }
-
-    var out = {};
-    var cal = CalendarApp.getCalendarById(VEKTOR_BR_HOLIDAY_CAL_ID);
-
-    // Range do ano inteiro
-    var ini = new Date(year, 0, 1);  ini.setHours(0,0,0,0);
-    var fim = new Date(year, 11, 31); fim.setHours(23,59,59,999);
-
-    // eventos de dia inteiro (feriados)
-    var events = cal.getEvents(ini, fim);
-    events.forEach(function(ev) {
-      var allDay = ev.isAllDayEvent && ev.isAllDayEvent();
-      // Mesmo se não for all-day, ainda marca o dia do start
-      var d0 = ev.getStartTime();
-      d0.setHours(0,0,0,0);
-      out[vektorDateKey_(d0, tz)] = true;
-    });
-
-    // ✅ Extras manuais (para exceções corporativas, se quiser):
-    // Script Properties: VEKTOR_EXTRA_OFF_DAYS="2026-02-16,2026-02-17"
-    try {
-      var extraRaw = PropertiesService.getScriptProperties().getProperty("VEKTOR_EXTRA_OFF_DAYS") || "";
-      extraRaw.split(",").map(function(s){ return String(s||"").trim(); }).filter(Boolean).forEach(function(k){
-        out[k] = true;
-      });
-    } catch (_) {}
-
-    __vektorHolidayCache.year = year;
-    __vektorHolidayCache.map = out;
-    return out;
-
-  } catch (e) {
-    // Fallback mínimo: sem calendário, considera só fim de semana
-    return {};
-  }
-}
-
-// Emenda nacional (regra simples e explícita):
-// - Se feriado cai na TERÇA => SEGUNDA vira off
-// - Se feriado cai na QUINTA => SEXTA vira off
-function vektorIsBridgeDay_(dateObj, holidaysMap, tz) {
-  var d = new Date(dateObj); d.setHours(0,0,0,0);
-
-  // se amanhã é feriado e amanhã é terça => hoje (segunda) é emenda
-  var tomorrow = new Date(d); tomorrow.setDate(d.getDate() + 1);
-  var keyTomorrow = vektorDateKey_(tomorrow, tz);
-  if (holidaysMap[keyTomorrow] && tomorrow.getDay() === 2) return true; // 2 = terça
-
-  // se ontem foi feriado e ontem foi quinta => hoje (sexta) é emenda
-  var yesterday = new Date(d); yesterday.setDate(d.getDate() - 1);
-  var keyYesterday = vektorDateKey_(yesterday, tz);
-  if (holidaysMap[keyYesterday] && yesterday.getDay() === 4) return true; // 4 = quinta
-
-  return false;
-}
-
-// Dia útil = não sábado/domingo, não feriado e não emenda (regra acima)
-function vektorIsBusinessDay_(dateObj, tz) {
-  var d = new Date(dateObj);
-  d.setHours(0,0,0,0);
-
-  var day = d.getDay();
-  if (day === 0 || day === 6) return false; // domingo/sábado
-
-  var year = d.getFullYear();
-  var holidaysMap = vektorLoadBrHolidaysMap_(year, tz);
-  var key = vektorDateKey_(d, tz);
-
-  if (holidaysMap[key]) return false;
-  if (vektorIsBridgeDay_(d, holidaysMap, tz)) return false;
-
-  return true;
-}
-
 function parseSendAt_(v, tz) {
   // Retorna {hh, mm} ou null
   if (v == null || v === "") return null;
@@ -5492,6 +5668,132 @@ var SPREADSHEET_ID_CLARA = '1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI'; // Ca
 var SHEET_NOME_BASE_CLARA = 'BaseClara';
 var SHEET_NOME_INFO_LIMITES = 'Info_limites';
 
+// =======================
+// AJUSTE DE LIMITE MENSAL
+// =======================
+var VEKTOR_AJUSTE_LIMITE_TO = "contasareceber@gruposbf.com.br";
+var VEKTOR_AJUSTE_LIMITE_REPLYTO = "contasareceber@gruposbf.com.br";
+
+var VEKTOR_AJUSTE_LIMITE_PROP_PREFIX = "VEKTOR_AJUSTE_LIMITE_PAYLOAD_";
+var VEKTOR_AJUSTE_LIMITE_TRIGGER_SEND_PREFIX = "vektorAjusteLimiteMensalEnviar";
+var VEKTOR_AJUSTE_LIMITE_TRIGGER_APPLY_PREFIX = "vektorAjusteLimiteMensalAplicar";
+
+// Colunas da aba Info_limites
+var INFO_LIMITES_COL_NOME_CARTAO = 1;   // A
+var INFO_LIMITES_COL_TIPO = 2;          // B
+var INFO_LIMITES_COL_CARTAO = 3;        // C
+var INFO_LIMITES_COL_TITULAR = 4;       // D
+var INFO_LIMITES_COL_LIMITE = 5;        // E
+var INFO_LIMITES_COL_MAX_TRANSACAO = 6; // F  (Aplicado limite máximo POR TRANSAÇÃO)
+var INFO_LIMITES_COL_EMPRESA = 7;       // G
+var INFO_LIMITES_COL_LIMITE_ANTERIOR = 8; // H
+var INFO_LIMITES_COL_MAX_TRANS_MOMENTANEO = 10; // J
+
+function vektorGetInfoLimitesSheet_() {
+  var ss = SpreadsheetApp.openById(SPREADSHEET_ID_CLARA);
+  var sh = ss.getSheetByName(SHEET_NOME_INFO_LIMITES);
+  if (!sh) throw new Error("Aba '" + SHEET_NOME_INFO_LIMITES + "' não encontrada.");
+  return sh;
+}
+
+function vektorFmtMoneyBr_(v) {
+  var n = Number(v || 0) || 0;
+  return "R$ " + n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function vektorAjusteLimiteGetRowsPendentes_(empresa) {
+  var emp = vektorNormEmpresa_(empresa || "CENTAURO");
+  var sh = vektorGetInfoLimitesSheet_();
+  var lastRow = sh.getLastRow();
+  var lastCol = Math.max(sh.getLastColumn(), INFO_LIMITES_COL_MAX_TRANS_MOMENTANEO);
+
+  if (lastRow < 2) return [];
+
+  var values = sh.getRange(2, 1, lastRow - 1, lastCol).getValues();
+  var out = [];
+
+  for (var i = 0; i < values.length; i++) {
+    var row = values[i];
+    var rowNum = i + 2;
+
+    var empresaRow = vektorNormEmpresa_(row[INFO_LIMITES_COL_EMPRESA - 1] || "CENTAURO");
+    if (empresaRow !== emp) continue;
+
+    var limiteAnterior = row[INFO_LIMITES_COL_LIMITE_ANTERIOR - 1];
+    if (limiteAnterior === "" || limiteAnterior === null || limiteAnterior === undefined) continue;
+
+    out.push({
+      rowNum: rowNum,
+      empresa: empresaRow,
+      nomeCartao: String(row[INFO_LIMITES_COL_NOME_CARTAO - 1] || "").trim(),
+      tipo: String(row[INFO_LIMITES_COL_TIPO - 1] || "").trim(),
+      cartao: String(row[INFO_LIMITES_COL_CARTAO - 1] || "").trim(),
+      titular: String(row[INFO_LIMITES_COL_TITULAR - 1] || "").trim(),
+      limiteAtual: Number(row[INFO_LIMITES_COL_LIMITE - 1] || 0) || 0,
+      limiteAlterarPara: Number(limiteAnterior || 0) || 0,
+      valorMaxTransacaoAtual: Number(row[INFO_LIMITES_COL_MAX_TRANSACAO - 1] || 0) || 0,
+      maxTransMomentaneo: row[INFO_LIMITES_COL_MAX_TRANS_MOMENTANEO - 1]
+    });
+  }
+
+  return out;
+}
+
+function vektorAjusteLimiteBuildEmailHtml_(empresa, rows) {
+  var emp = vektorNormEmpresa_(empresa || "CENTAURO");
+  rows = Array.isArray(rows) ? rows : [];
+
+  function esc_(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  var linhas = rows.map(function(r) {
+    return ''
+      + '<tr>'
+      + '<td style="border:1px solid #dbe2ea; padding:8px;">' + esc_(r.nomeCartao) + '</td>'
+      + '<td style="border:1px solid #dbe2ea; padding:8px;">' + esc_(r.tipo) + '</td>'
+      + '<td style="border:1px solid #dbe2ea; padding:8px;">' + esc_(r.cartao) + '</td>'
+      + '<td style="border:1px solid #dbe2ea; padding:8px;">' + esc_(r.titular) + '</td>'
+      + '<td style="border:1px solid #dbe2ea; padding:8px; text-align:right;">' + esc_(vektorFmtMoneyBr_(r.limiteAtual)) + '</td>'
+      + '<td style="border:1px solid #dbe2ea; padding:8px; text-align:right;">' + esc_(vektorFmtMoneyBr_(r.limiteAlterarPara)) + '</td>'
+      + '<td style="border:1px solid #dbe2ea; padding:8px; text-align:right;">' + esc_(vektorFmtMoneyBr_(r.maxTransMomentaneo || 0)) + '</td>'
+      + '</tr>';
+  }).join("");
+
+  return ''
+    + '<div style="font-family:Arial,sans-serif; color:#0f172a;">'
+    + '<p>Bom dia.</p>'
+    + '<p>Segue relação dos cartões com <b>ajuste mensal de limite</b> a ser realizado para a empresa <b>' + esc_(emp) + '</b>.</p>'
+    + '<div style="overflow:auto; margin-top:12px;">'
+    + '<table style="border-collapse:collapse; width:100%; font-size:12px;">'
+    + '<thead>'
+    + '<tr style="background:#005E27; color:#ffffff;">'
+    + '<th style="border:1px solid #dbe2ea; padding:8px; text-align:left;">Nome do cartão</th>'
+    + '<th style="border:1px solid #dbe2ea; padding:8px; text-align:left;">Tipo</th>'
+    + '<th style="border:1px solid #dbe2ea; padding:8px; text-align:left;">Cartão</th>'
+    + '<th style="border:1px solid #dbe2ea; padding:8px; text-align:left;">Titular</th>'
+    + '<th style="border:1px solid #dbe2ea; padding:8px; text-align:right;">Limite atual</th>'
+    + '<th style="border:1px solid #dbe2ea; padding:8px; text-align:right;">Limite correto</th>'
+    + '<th style="border:1px solid #dbe2ea; padding:8px; text-align:right;">Valor Max Transação</th>'
+    + '</tr>'
+    + '</thead>'
+    + '<tbody>' + linhas + '</tbody>'
+    + '</table>'
+    + '</div>'
+    + '<p style="margin-top:16px;">Atenciosamente,</p>'
+    + '<p><b>Vektor - Grupo SBF</b></p>'
+    + '</div>';
+}
+
+function vektorAjusteLimiteSubject_(empresa) {
+  var emp = vektorNormEmpresa_(empresa || "CENTAURO");
+  return "[ALERTA CLARA - AJUSTE DE LIMITE MENSAL] - " + emp;
+}
+
 // ========= PLANILHA ANTIGA (onde fica a aba CLARA_PEND) ========= //
 var SPREADSHEET_ID_CLARA_PEND = "1jcNdVTxdDYqwHwsOkT7gb_2BdZke9qIb39RiwgTKxUQ"; // planilha antiga
 var SHEET_NOME_CLARA_PEND = "CLARA_PEND";
@@ -5629,8 +5931,8 @@ function vektorGetOrCreateEnvPendLogSheet_() {
   var sh = ss.getSheetByName(VEKTOR_ENV_PEND_LOG_TAB);
   if (!sh) {
     sh = ss.insertSheet(VEKTOR_ENV_PEND_LOG_TAB);
-    sh.appendRow(["sentAt", "txKey", "lojaKey", "dataTransBR", "valorOriginalTxt", "cartao", "codigoAutorizacao", "estabelecimento", "pendenciasTxt", "to", "cc", "status", "error"]);
-    sh.getRange(1, 1, 1, 13).setFontWeight("bold");
+    sh.appendRow(["sentAt", "txKey", "lojaKey", "dataTransBR", "valorOriginalTxt", "cartao", "codigoAutorizacao", "estabelecimento", "pendenciasTxt", "to", "cc", "status", "error", "EMPRESA"]);
+    sh.getRange(1, 1, 1, 14).setFontWeight("bold");
     sh.setFrozenRows(1);
   }
   return sh;
@@ -5692,7 +5994,8 @@ function vektorLogEnvioPendencia_(payload) {
       payload.to || "",
       payload.cc || "",
       payload.status || "",
-      payload.error || ""
+      payload.error || "",
+      payload.empresa || ""
 ]);
   } catch (e) {
     Logger.log("Falha ao logar envio pendência: " + (e && e.message ? e.message : e));
@@ -6774,7 +7077,8 @@ function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFi
             to: toList,
             cc: VEKTOR_CC_CONTAS_A_RECEBER,
             status: "SENT",
-            error: ""
+            error: "",
+            empresa: empresaAtual
           });
           txRegistradas++;
         });
@@ -6798,7 +7102,8 @@ function dispararEnvioPendenciasClaraRecusadasSelecionadas(dataInicioIso, dataFi
             to: toList,
             cc: VEKTOR_CC_CONTAS_A_RECEBER,
             status: "FAIL",
-            error: msg
+            error: msg,
+            empresa: empresaAtual
           });
           txRegistradas++; // opcional: conta como "registrada no log" também
         });
@@ -9459,6 +9764,28 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro, empresa) {
         acao = "Reduzir -" + moneyBR_(-delta);
       }
 
+      var motivo = "Manter monitoramento no ciclo atual.";
+
+      if (limiteAtual <= 0) {
+        motivo = "Cartão com consumo, mas sem limite cadastrado/zerado. Necessário definir limite.";
+      } else if (forcarAumentoPorRisco) {
+        motivo = "Saldo baixo, muitos dias restantes no ciclo e consumo já acima de 50% do limite. Recomendado aumento por risco operacional.";
+      } else if (forcarAumentoPorMediaDias) {
+        motivo = "Ritmo recente de consumo acima da capacidade diária do saldo restante até o fim do ciclo. Recomendado aumento preventivo.";
+      } else if (limiteAtual < (limiteRec * (1 - tol)) && delta >= minDelta) {
+        motivo = "Limite atual abaixo do limite recomendado para o padrão projetado do ciclo.";
+      } else if (!bloqueiaReducao && !travaReducaoTempo && limiteAtual > (limiteRec * (1 + tol)) && (-delta) >= minDelta) {
+        motivo = "Limite atual acima do necessário para a projeção do ciclo. Redução sugerida para eficiência.";
+      } else if (bloqueiaReducao) {
+        motivo = "Cartão temporário/virtual bloqueado para sugestão de redução automática.";
+      } else if (travaReducaoTempo) {
+        motivo = "Já passou da metade do ciclo e o consumo já superou 50% da projeção. Redução travada para evitar risco operacional.";
+      } else if (travaReducaoPorProj) {
+        motivo = "Consumo já atingiu ou superou a projeção do ciclo. Redução não recomendada.";
+      } else if (travaReducaoPorSaldoApertado) {
+        motivo = "Saldo atual apertado. Redução não recomendada.";
+      }
+
       // 🔕 Exclusão pontual: CE0234 - VIRTUAL MARKETING (somente este alias)
       var nomeCartaoFinal = (lim ? lim.nomeCartao : a.nomeCartao) || "";
       var nomeNorm = normalizarTexto_(nomeCartaoFinal);
@@ -9517,6 +9844,7 @@ function getRelacaoSaldosClara(tipoFiltro, valorFiltro, empresa) {
         projecao: projLoja,
         limiteRecomendado: limiteRec,
         acao: acao,
+        motivo: motivo,
         ritmo: ritmo,              // ✅ NOVO
         //ritmoRatio: ritmoRatio,  // opcional (não exibir na tabela)
         saldo: saldo
@@ -19254,6 +19582,51 @@ function monitorarFluxoNumerarioSapSangriaIndevida() {
       error: (e && e.message) ? e.message : String(e)
     };
   }
+}
+
+function instalarTriggersAjusteLimiteMensalVektor() {
+  var handlersDesejados = {
+    "vektorAjusteLimiteMensalVerificarEnvio_CENTAURO": true,
+    "vektorAjusteLimiteMensalVerificarEnvio_FISIA": true
+  };
+
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    var h = t.getHandlerFunction();
+    if (handlersDesejados[h]) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  ScriptApp.newTrigger("vektorAjusteLimiteMensalVerificarEnvio_CENTAURO")
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .create();
+
+  ScriptApp.newTrigger("vektorAjusteLimiteMensalVerificarEnvio_FISIA")
+    .timeBased()
+    .everyDays(1)
+    .atHour(8)
+    .create();
+
+  return { ok: true };
+}
+
+function removerTriggersAjusteLimiteMensalVektor() {
+  var handlers = {
+    "vektorAjusteLimiteMensalVerificarEnvio_CENTAURO": true,
+    "vektorAjusteLimiteMensalVerificarEnvio_FISIA": true,
+    "vektorAjusteLimiteMensalAplicar_CENTAURO": true,
+    "vektorAjusteLimiteMensalAplicar_FISIA": true
+  };
+
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (handlers[t.getHandlerFunction()]) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  return { ok: true };
 }
 
  // ==========TESTES===============//
