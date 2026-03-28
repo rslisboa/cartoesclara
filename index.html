@@ -2263,6 +2263,21 @@ display: none;
 /* =========================
    TOPBAR PREMIUM STRIP (faixa + checkboxes)
    ========================= */
+/* botão Home à esquerda da faixa premium */
+#vektorPremiumStrip{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+}
+
+#vektorTopHomeBtn{
+  flex: 0 0 auto;
+}
+
+#vektorTopHomeBtn img{
+  display:block;
+}
 
 /* container da faixa */
 #vektorPremiumStrip .hps-top-inner{ 
@@ -2472,7 +2487,8 @@ display: none;
 
     <!-- Topbar com login, tipo de acesso, relógio e banner sazonal -->
 <div id="vektor-topbar"
-     class="w-full px-6 pt-3 pb-1 text-[11px] text-black leading-tight flex items-start gap-3">
+     class="w-full px-6 pt-3 pb-1 text-[11px] text-black leading-tight flex items-start gap-3"
+     style="display:none;">
 
   <!-- ESQUERDA: login + relógio + logout -->
 <div class="shrink-0 flex items-start gap-3">
@@ -2505,6 +2521,21 @@ display: none;
     <div id="vektorTopBarWrap"
      class="w-full flex items-center justify-center relative"
      style="min-height:44px;">
+
+     <button
+    id="vektorTopHomeBtn"
+    type="button"
+    class="hidden items-center justify-center"
+    title="Voltar ao menu principal"
+    aria-label="Voltar ao menu principal"
+    style="display:none; position:absolute; left:12px; top:50%; transform:translateY(-50%); width:46px; height:46px; border:none; background:transparent; cursor:pointer; padding:0; z-index:2;"
+  >
+    <img
+      src="https://raw.githubusercontent.com/rslisboa/cartoesclara/0d3b2bc0d1745b5d4da581600343418435df27db/home_1.png"
+      alt="Home"
+      style="width:46px; height:46px; object-fit:contain; display:block;"
+    />
+  </button>
 
       <div id="vektorPremiumStrip" class="w-full flex items-center justify-center" style="display:none;">
         <div class="hps-top-inner">
@@ -2896,8 +2927,95 @@ display: none;
 })();
 </script>
 
- <div id="vektorAppRoot" class="hidden">
- <div id="vektorShell" class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
+<div id="vektorAppRoot" class="hidden">
+
+  <!-- HUB PRINCIPAL / MENU-PAI -->
+  <div id="vektorHubView" class="hidden min-h-screen bg-slate-100 px-6 pt-0 pb-6">
+    <div class="max-w-7xl mx-auto">
+      <div class="rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.10)] overflow-hidden">
+        <div class="relative px-8 py-8 bg-[linear-gradient(135deg,#061a3a_0%,#0f2d5c_58%,#005E27_100%)]">
+          <div class="absolute inset-0 opacity-[0.10]" style="background-image:radial-gradient(circle at 20% 20%, #B5FF20 0, transparent 28%), radial-gradient(circle at 80% 30%, #ffffff 0, transparent 24%);"></div>
+
+          <div class="relative flex items-start justify-between gap-6 flex-wrap">
+            <div>
+              <div class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[11px] font-extrabold tracking-[0.18em] text-white/85 uppercase">
+                Operações Financeiras
+              </div>
+              <h1 class="mt-4 text-4xl font-black tracking-tight text-white">
+                Grupo SBF | Financial Systems Hub
+              </h1>
+              <p class="mt-3 max-w-3xl text-sm font-semibold leading-6 text-slate-200">
+                Ambiente central dos sistemas financeiros corporativos. Selecione o módulo que deseja acessar.
+              </p>
+            </div>
+
+            <div class="rounded-2xl border border-white/15 bg-white/10 px-5 py-4 backdrop-blur-md">
+              <div class="text-xs font-black uppercase tracking-[0.18em] text-slate-200">Usuário</div>
+              <div class="mt-2 text-lg font-extrabold text-white" id="vektorHubUserName"></div>
+              <div class="mt-1 text-xs font-bold text-slate-200" id="vektorHubUserRole"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="px-8 py-8 bg-[linear-gradient(180deg,#f8fafc_0%,#eef3f8_100%)]">
+          <div class="mb-5 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 class="text-lg font-black text-slate-900">Módulos disponíveis</h2>
+              <p class="text-sm font-semibold text-slate-500">Hoje apenas o módulo Clara está habilitado.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <button
+              id="vektorHubCardClara"
+              type="button"
+              class="group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white p-6 text-left shadow-[0_20px_45px_rgba(15,23,42,0.08)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_28px_60px_rgba(15,23,42,0.14)]">
+              <div class="absolute inset-0 opacity-0 transition duration-200 group-hover:opacity-100"
+                   style="background:linear-gradient(135deg, rgba(181,255,32,0.10), rgba(0,94,39,0.06));"></div>
+
+              <div class="relative">
+                <div class="flex items-center justify-between gap-4">
+                  <div class="w-14 h-14 rounded-2xl bg-[#061a3a] text-white flex items-center justify-center text-2xl shadow-lg">💳</div>
+                  <div class="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 border border-emerald-200">
+                    Ativo
+                  </div>
+                </div>
+
+                <h3 class="mt-6 text-2xl font-black tracking-tight text-slate-900">
+                  Gestão do Cartão Clara
+                </h3>
+                <p class="mt-3 text-sm leading-6 font-semibold text-slate-500">
+                  Governança financeira, alertas, pendências, análises e monitoramentos já existentes no Vektor.
+                </p>
+
+                <div class="mt-6 flex items-center justify-between">
+                  <div class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                    Módulo atual
+                  </div>
+                  <div class="inline-flex items-center gap-2 rounded-xl bg-[#061a3a] px-4 py-2 text-sm font-extrabold text-white">
+                    Acessar
+                    <span>→</span>
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <div class="rounded-[24px] border border-dashed border-slate-300 bg-slate-50 p-6 opacity-80">
+              <div class="w-14 h-14 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center text-2xl">＋</div>
+              <h3 class="mt-6 text-2xl font-black tracking-tight text-slate-700">Próximos módulos</h3>
+              <p class="mt-3 text-sm leading-6 font-semibold text-slate-500">
+                Numerário, fluxo de caixa e outros sistemas financeiros poderão ser adicionados aqui sem misturar código com o módulo Clara.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MÓDULO VEKTOR / CLARA -->
+  <div id="vektorShell" class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
+
    <!-- COLUNA ESQUERDA: MENU LATERAL -->
    
     <aside
@@ -6863,6 +6981,101 @@ function scheduleAutoLogout_() {
     document.body.style.overflow = "";
   }
 
+  function vektorIsAdmin_() {
+  return String(USER_ROLE_REPLACED || "").trim() === "Administrador";
+}
+
+function vektorShowHubView_() {
+  var hub = document.getElementById("vektorHubView");
+  var shell = document.getElementById("vektorShell");
+  var topbar = document.getElementById("vektor-topbar");
+
+  if (hub) {
+    hub.classList.remove("hidden");
+    hub.style.display = "block";
+  }
+
+  if (shell) {
+    shell.classList.add("hidden");
+    shell.style.display = "none";
+  }
+
+  // HUB sem o topo inteiro do módulo Clara
+  if (topbar) {
+    topbar.style.display = "none";
+  }
+
+  try {
+    var nm = document.getElementById("vektorHubUserName");
+    var rl = document.getElementById("vektorHubUserRole");
+    if (nm) nm.textContent = String(displayName || USER_EMAIL_REPLACED || "Usuário");
+    if (rl) rl.textContent = String(USER_ROLE_REPLACED || "");
+  } catch (_) {}
+}
+
+function vektorShowClaraModule_() {
+  var hub = document.getElementById("vektorHubView");
+  var shell = document.getElementById("vektorShell");
+  var topbar = document.getElementById("vektor-topbar");
+
+  if (hub) {
+    hub.classList.add("hidden");
+    hub.style.display = "none";
+  }
+
+  if (shell) {
+    shell.classList.remove("hidden");
+    shell.style.display = "flex";
+  }
+
+  if (topbar) {
+    topbar.style.display = "flex";
+  }
+
+  try {
+    if (window.vektorAtualizarBotaoEmpresa_) {
+      window.vektorAtualizarBotaoEmpresa_();
+    }
+    if (window.vektorRefreshEmpresaChecks_) {
+      window.vektorRefreshEmpresaChecks_();
+    }
+    if (window.vektorAtualizarTituloEmpresa_) {
+      window.vektorAtualizarTituloEmpresa_();
+    }
+  } catch (_) {}
+
+  try {
+    if (typeof vektorGlobalPreloadStart_ === "function") {
+      vektorGlobalPreloadStart_();
+    }
+  } catch (e) {
+    console.error("Falha ao iniciar preload global:", e);
+  }
+
+  try {
+    if (window.vektorPlayTopbarPremiumStrip) {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          window.vektorPlayTopbarPremiumStrip();
+        });
+      });
+    }
+  } catch (e) {
+    console.error("Falha ao animar topbar premium:", e);
+  }
+}
+
+function vektorOpenInitialLanding_(landingView) {
+  var landing = String(landingView || "").trim().toUpperCase();
+
+  if (landing === "HUB") {
+    vektorShowHubView_();
+    return;
+  }
+
+  vektorShowClaraModule_();
+}
+
   function showMaintenance_() {
   // esconde app e modal
   hideApp_();
@@ -6967,9 +7180,9 @@ function hideMaintenance_() {
         showApp_();
 
         try {
-            vektorGlobalPreloadStart_();
+            vektorOpenInitialLanding_(res && res.landingView ? res.landingView : "");
           } catch(e) {
-            console.error("Falha ao iniciar preload global:", e);
+            console.error("Falha ao abrir landing inicial:", e);
           }
 
         if (window.vektorPlayTopbarPremiumStrip) {
@@ -7467,11 +7680,15 @@ function bindLoginHandlers_() {
 
   byId("vektorLoginGoogleBtn")?.addEventListener("click", function () {
     try {
-      const emailGoogle = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
+      const emailGoogle = (typeof USER_EMAIL_REPLACED !== "undefined"
+        ? String(USER_EMAIL_REPLACED || "").trim()
+        : "");
+
       if (!emailGoogle) {
         setError_("Não foi possível capturar seu e-mail do Google. Digite manualmente.");
         return;
       }
+
       const inp = byId("vektorLoginEmail");
       if (inp) inp.value = emailGoogle;
       attempt_();
@@ -7486,6 +7703,26 @@ function bindLoginHandlers_() {
       attempt_();
     }
   });
+
+    byId("vektorHubCardClara")?.addEventListener("click", function () {
+      try {
+        vektorShowClaraModule_();
+      } catch (e) {
+        console.error("Erro ao abrir módulo Clara:", e);
+      }
+    });
+
+  (function () {
+    var btn = document.getElementById("vektorTopHomeBtn");
+    if (!btn) return;
+
+    btn.classList.remove("hidden");
+    btn.style.display = "inline-flex";
+
+    btn.addEventListener("click", function () {
+      vektorShowHubView_();
+    });
+  })();
 }
 
 window.__vektorGlobalPreloadState = {
@@ -7896,57 +8133,47 @@ document.addEventListener("DOMContentLoaded", function () {
   const token = getSessionToken_();
 
   if (token && typeof google !== "undefined" && google.script && google.script.run) {
-    // tenta validar sessão silenciosamente
-    google.script.run
-      .withSuccessHandler(function (res) {
-        if (res && res.ok) {
-                    if (res && res.empresaAtual) {
-            window.__vektorEmpresaAtual = String(res.empresaAtual || "").trim().toUpperCase();
-          } else {
-            window.__vektorEmpresaAtual = USER_EMPRESA_DEFAULT;
-          }
-
-          window.__vektorPodeTrocarEmpresa = !!(res && res.podeTrocarEmpresa);
-          window.vektorAtualizarBotaoEmpresa_();
-          window.vektorRefreshEmpresaChecks_();
-          window.vektorAtualizarTituloEmpresa_();
-
-          // sessão válida: libera sem modal
-          showApp_();
-          try {
-              vektorGlobalPreloadStart_();
-            } catch(e) {
-              console.error("Falha ao iniciar preload global:", e);
-            }
-
-             window.setTimeout(function(){
-            try { window.vektorFailSafeUnlockSidebar_(); } catch(_) {}
-          }, 15000);
-
-          if (window.vektorPlayTopbarPremiumStrip) {
-            requestAnimationFrame(function(){
-              requestAnimationFrame(function(){
-                window.vektorPlayTopbarPremiumStrip();
-              });
-            });
-          }
-          closeModal_();
-          scheduleAutoLogout_();
-          return;
+  // tenta validar sessão silenciosamente
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (res && res.ok) {
+        if (res && res.empresaAtual) {
+          window.__vektorEmpresaAtual = String(res.empresaAtual || "").trim().toUpperCase();
+        } else {
+          window.__vektorEmpresaAtual = USER_EMPRESA_DEFAULT;
         }
 
-        // sessão inválida
-        clearSessionToken_();
-        openModal_();
-      })
-      .withFailureHandler(function () {
-        clearSessionToken_();
-        openModal_();
-      })
-      .validarSessaoVektor(token);
+        window.__vektorPodeTrocarEmpresa = !!(res && res.podeTrocarEmpresa);
+        window.vektorAtualizarBotaoEmpresa_();
+        window.vektorRefreshEmpresaChecks_();
+        window.vektorAtualizarTituloEmpresa_();
 
-    return; // IMPORTANTÍSSIMO: não abrir modal agora
-  }
+        // sessão válida
+        showApp_();
+
+        try {
+          vektorOpenInitialLanding_(res && res.landingView ? res.landingView : "");
+        } catch (e) {
+          console.error("Falha ao abrir landing da sessão:", e);
+        }
+
+        closeModal_();
+        scheduleAutoLogout_();
+        return;
+      }
+
+      // sessão inválida
+      clearSessionToken_();
+      openModal_();
+    })
+    .withFailureHandler(function () {
+      clearSessionToken_();
+      openModal_();
+    })
+    .validarSessaoVektor(token);
+
+  return; // IMPORTANTÍSSIMO: não abrir modal agora
+}
 
   // sem token: exige login
   openModal_();
@@ -7977,6 +8204,31 @@ document.addEventListener("DOMContentLoaded", function () {
         attempt_();
       }
     });
+
+    byId("vektorHubCardClara")?.addEventListener("click", function () {
+  try {
+    vektorShowClaraModule_();
+    if (typeof vektorGlobalPreloadStart_ === "function") {
+      vektorGlobalPreloadStart_();
+    }
+  } catch (e) {
+    console.error("Erro ao abrir módulo Clara:", e);
+  }
+});
+
+(function(){
+  var btn = document.getElementById("vektorTopHomeBtn");
+  if (!btn) return;
+
+  if (vektorIsAdmin_()) {
+    btn.classList.remove("hidden");
+    btn.style.display = "inline-flex";
+  }
+
+  btn.addEventListener("click", function(){
+    vektorShowHubView_();
+  });
+})();
 
     setTimeout(function(){ try { byId("vektorLoginEmail")?.focus(); } catch(_){} }, 50);
   });
