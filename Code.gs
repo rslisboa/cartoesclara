@@ -467,6 +467,8 @@ try {
     var empresaDefault = vektorEmpresaDefaultByEmail_(sess);
     var empresaAtual = vektorSetEmpresaAtual_(sess, ctx.role, empresaDefault);
 
+    var landingView = (ctx.role === "Administrador") ? "HUB" : "VEKTOR_CLARA";
+
   return {
     ok: true,
     email: sess,
@@ -475,7 +477,8 @@ try {
     ttlSeconds: VEKTOR_SESSION_TTL_SECONDS,
     empresaDefault: empresaDefault,
     empresaAtual: empresaAtual,
-    podeTrocarEmpresa: vektorPodeTrocarEmpresa_(ctx.role)
+    podeTrocarEmpresa: vektorPodeTrocarEmpresa_(ctx.role),
+    landingView: "HUB"
   };
 
 }
@@ -741,13 +744,16 @@ function vektorValidateSessionToken_(token) {
 
   var empresaAtual = vektorGetEmpresaAtual_(emailSessao, ctx.role);
 
+  var landingView = (ctx.role === "Administrador") ? "HUB" : "VEKTOR_CLARA";
+
   return {
     ok: true,
     email: emailSessao,
     role: ctx.role,
     empresaDefault: vektorEmpresaDefaultByEmail_(emailSessao),
     empresaAtual: empresaAtual,
-    podeTrocarEmpresa: vektorPodeTrocarEmpresa_(ctx.role)
+    podeTrocarEmpresa: vektorPodeTrocarEmpresa_(ctx.role),
+    landingView: "HUB"
   };
 }
 
