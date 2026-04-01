@@ -2789,8 +2789,8 @@ display: none;
 
   <!-- Título superior (acima do card) -->
 <div class="absolute top-10 left-1/2 -translate-x-1/2 w-[95%] max-w-[900px] text-center text-white z-[10020] pointer-events-none">
-  <div class="text-[18px] md:text-[22px] font-extrabold tracking-tight drop-shadow-lg">
-    Plataforma de Governança Financeira do Cartão Clara
+  <div class="text-[22px] md:text-[30px] font-extrabold tracking-tight drop-shadow-lg">
+    Financial Systems Hub
   </div>
 </div>
 
@@ -3221,7 +3221,7 @@ display: none;
                 Gestão do Cartão Clara
               </h3>
               <p class="mt-3 text-sm leading-6 font-semibold text-slate-500">
-                Governança financeira, alertas, pendências, análises e monitoramentos já existentes no Vektor.
+                Governança e procedimentos financeiros, alertas, pendências, análises e monitoramentos.
               </p>
 
               <div class="mt-6 flex items-center justify-between">
@@ -3240,7 +3240,7 @@ display: none;
             <div class="w-14 h-14 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center text-2xl">＋</div>
             <h3 class="mt-6 text-2xl font-black tracking-tight text-slate-700">Próximos módulos</h3>
             <p class="mt-3 text-sm leading-6 font-semibold text-slate-500">
-              Numerário, fluxo de caixa e outros sistemas financeiros poderão ser adicionados aqui sem misturar código com o módulo Clara.
+              Em construção
             </p>
           </div>
         </div>
@@ -8099,9 +8099,16 @@ function bindLoginHandlers_() {
   });
 
    byId("vektorHubCardClara")?.addEventListener("click", function () {
-  try {
-    window.vektorTryOpenModule_("CLARA", function () {
+      try {
+        window.vektorTryOpenModule_("CLARA", function () {
+
+      // 🔥 RESET DO PRELOAD (OBRIGATÓRIO)
+      try {
+        window.__vektorGlobalPreloadState = null;
+      } catch (_) {}
+
       vektorShowClaraModule_();
+
       if (typeof vektorGlobalPreloadStart_ === "function") {
         vektorGlobalPreloadStart_();
       }
