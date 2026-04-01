@@ -18427,10 +18427,10 @@ function getAnaliseGastosDataset(req){
       if (!etiqueta) etiqueta = "—";
 
       var contaContabil = extrairContaContabilDaEtiqueta_(row[iEtiqueta]);
-      if (!contaContabil) contaContabil = "—";
+      if (!contaContabil) contaContabil = "";
 
       var descricao = String(row[iDesc] || "").trim();
-      if (!descricao) descricao = "—";
+      if (!descricao) descricao = "";
 
       var valor = Number(row[iValor]) || 0;
 
@@ -18465,6 +18465,994 @@ function getAnaliseGastosDataset(req){
 
   } catch (e) {
     return { ok: false, error: (e && e.message) ? e.message : String(e) };
+  }
+}
+
+// ===============================
+// LINE-ITEM ANALYSIS (BACKEND) — ANÁLISE DE GASTOS
+// Extração por código, sem Vertex
+// - Extrai o item provável da descrição
+// - Compara a aderência semântica da descrição com a conta selecionada
+// - Sugere a conta mais aderente quando houver divergência
+// - Bloqueio por perfil + VEKTOR_ACESSOS
+// ===============================
+
+var VEKTOR_LINEITEM_ALLOWED_ROLES = {
+  "Administrador": true,
+  "Analista Pro": true,
+  "Analista": true,
+  "Compras_DI": true
+};
+
+var __vektorLineItemCatalogCache = null;
+
+function vektorCanUseLineItemAnalysisRole_(role) {
+  return !!VEKTOR_LINEITEM_ALLOWED_ROLES[String(role || "").trim()];
+}
+
+function vektorAssertLineItemAnalysisRole_() {
+  var ctx = vektorGetUserRole_();
+  if (!vektorCanUseLineItemAnalysisRole_(ctx.role)) {
+    throw new Error("Não disponível para o seu perfil.");
+  }
+  return ctx;
+}
+
+function vektorLineItemNorm_(s) {
+  s = String(s || "").trim().toLowerCase();
+  if (!s) return "";
+  try {
+    s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  } catch (_) {}
+  s = s
+    .replace(/[^\w\s\/\-\+]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s;
+}
+
+function vektorLineItemStemPt_(t) {
+  t = String(t || "").trim();
+  if (!t) return "";
+
+  if (t.length > 6 && /coes$/.test(t)) return t.replace(/coes$/, "cao");
+  if (t.length > 6 && /oes$/.test(t))  return t.replace(/oes$/, "ao");
+  if (t.length > 6 && /ais$/.test(t))  return t.replace(/ais$/, "al");
+  if (t.length > 6 && /eis$/.test(t))  return t.replace(/eis$/, "el");
+  if (t.length > 5 && /res$/.test(t))  return t.replace(/res$/, "r");
+  if (t.length > 5 && /ns$/.test(t))   return t.replace(/ns$/, "m");
+  if (t.length > 4 && /s$/.test(t))    return t.replace(/s$/, "");
+
+  return t;
+}
+
+function vektorLineItemStopwords_() {
+  return {
+    "a":1,"o":1,"os":1,"as":1,"de":1,"da":1,"do":1,"das":1,"dos":1,"e":1,"ou":1,
+    "para":1,"por":1,"com":1,"sem":1,"em":1,"no":1,"na":1,"nos":1,"nas":1,
+    "um":1,"uma":1,"uns":1,"umas":1,"ao":1,"aos":1,
+    "referente":1,"referencia":1,"ref":1,"compra":1,"pagamento":1,"pgto":1,
+    "item":1,"itens":1,"material":1,"servico":1,"servicos":1,
+    "loja":1,"centauro":1,"fisia":1,"clara":1,"cartao":1,"cartaoes":1,
+    "nf":1,"nfe":1,"nota":1,"fiscal":1,"pedido":1,"cupom":1,"recibo":1,
+    "qtde":1,"qtd":1,"quantidade":1,"und":1,"un":1,"cx":1,
+    "diversos":1,"diverso":1,"varios":1,"varias":1,"geral":1,"gerais":1,
+    "ajuste":1,"ajustes":1,"apoio":1,"interno":1,"interna":1,"internos":1,"internas":1
+  };
+}
+
+function vektorLineItemTokenize_(s) {
+  s = vektorLineItemNorm_(s);
+  if (!s) return [];
+
+  var stop = vektorLineItemStopwords_();
+  var raw = s.split(/[^a-z0-9]+/g);
+  var out = [];
+  var seen = {};
+
+  for (var i = 0; i < raw.length; i++) {
+    var tok = String(raw[i] || "").trim();
+    if (!tok) continue;
+    if (/^\d+$/.test(tok)) continue;
+    if (tok.length < 3) continue;
+    if (stop[tok]) continue;
+
+    tok = vektorLineItemStemPt_(tok);
+    if (!tok || tok.length < 3) continue;
+
+    if (!seen[tok]) {
+      seen[tok] = true;
+      out.push(tok);
+    }
+  }
+
+  return out;
+}
+
+function vektorLineItemArrayToMap_(arr) {
+  var m = {};
+  arr = Array.isArray(arr) ? arr : [];
+  for (var i = 0; i < arr.length; i++) {
+    m[String(arr[i] || "").trim()] = true;
+  }
+  return m;
+}
+
+function vektorLineItemIntersect_(a, b) {
+  var bm = vektorLineItemArrayToMap_(b);
+  var out = [];
+  for (var i = 0; i < a.length; i++) {
+    var t = String(a[i] || "").trim();
+    if (t && bm[t]) out.push(t);
+  }
+  return out;
+}
+
+function vektorLineItemWeightedOverlap_(sourceTokens, targetTokens) {
+  var tm = vektorLineItemArrayToMap_(targetTokens);
+  var matched = [];
+  var score = 0;
+
+  for (var i = 0; i < sourceTokens.length; i++) {
+    var tok = String(sourceTokens[i] || "").trim();
+    if (!tok || !tm[tok]) continue;
+
+    matched.push(tok);
+
+    if (tok.length >= 10) score += 1.40;
+    else if (tok.length >= 8) score += 1.25;
+    else if (tok.length >= 6) score += 1.10;
+    else score += 0.90;
+  }
+
+  return {
+    score: Number(score.toFixed(4)),
+    matched: matched
+  };
+}
+
+function vektorLineItemExtractConta_(row) {
+  var cc = String((row && row.contaContabil) || "").trim();
+  if (cc) return cc;
+
+  var et = String((row && row.etiqueta) || "").trim();
+  var m = et.match(/\b(510\d{7})\b/);
+  return m ? String(m[1]) : "";
+}
+
+function vektorLineItemCatalog_() {
+  return {
+    "5102505001": {
+      codigo: "5102505001",
+      nome: "MATERIAL DE VM E MARKETING / 45ANOSCNTO",
+      definicao: "Itens destinados a campanhas de Visual Merchandising, decoração de loja e materiais de marketing para eventos internos ou sazonais.",
+      observacao: "Exemplo citado: Campanha 45 anos Centauro.",
+      proibicoesExplicitas: []
+    },
+    "5103505001": {
+      codigo: "5103505001",
+      nome: "MATERIAL DE LIMPEZA",
+      definicao: "Produtos de higiene e limpeza para manutenção das dependências da loja, como detergentes, desinfetantes, sacos de lixo, vassouras e panos.",
+      observacao: "",
+      proibicoesExplicitas: []
+    },
+    "5103505005": {
+      codigo: "5103505005",
+      nome: "MATERIAL DE INFORMATICA",
+      definicao: "Pequenos suprimentos de tecnologia de uso imediato, como mouses, teclados simples ou cabos, desde que não sejam itens de infraestrutura ou patrimoniais.",
+      observacao: "Infraestrutura e itens patrimoniais devem passar por Compras.",
+      proibicoesExplicitas: ["notebook", "monitor", "impressora grande", "tablet", "celular", "smartphone", "computador", "servidor"]
+    },
+    "5103505006": {
+      codigo: "5103505006",
+      nome: "MATERIAL DE ESCRITORIO / BOBINA ECF",
+      definicao: "Papelaria em geral e suprimentos específicos para operação de frente de caixa, como bobinas para emissão de cupom fiscal.",
+      observacao: "",
+      proibicoesExplicitas: []
+    },
+    "5103505007": {
+      codigo: "5103505007",
+      nome: "MATERIAL DE COPA E COZINHA / AGUA POTAVEL",
+      definicao: "Itens de consumo para a copa e compra de galões de água potável para os colaboradores.",
+      observacao: "Eletrodomésticos como micro-ondas e cafeteiras são proibidos nesta etiqueta e devem ser via Compras.",
+      proibicoesExplicitas: ["microondas", "micro ondas", "cafeteira", "geladeira", "frigobar", "bebedouro", "liquidificador", "sanduicheira"]
+    },
+    "5103510001": {
+      codigo: "5103510001",
+      nome: "MANUTENCAO CIVIL",
+      definicao: "Pequenos reparos de alvenaria ou pintura pontual e emergencial de baixa complexidade.",
+      observacao: "Exemplo citado: tampar buraco na parede ou retoque pontual.",
+      proibicoesExplicitas: ["obra grande", "reforma completa", "projeto civil", "ampliacao", "instalacao estrutural"]
+    },
+    "5103510005": {
+      codigo: "5103510005",
+      nome: "MANUTENCAO ELETRICO",
+      definicao: "Serviços elétricos simples, como troca de lâmpadas, reatores, tomadas, disjuntores ou reparos de fiação de baixa tensão.",
+      observacao: "",
+      proibicoesExplicitas: ["projeto eletrico", "quadros completos", "instalacao completa", "infraestrutura eletrica"]
+    },
+    "5103510007": {
+      codigo: "5103510007",
+      nome: "MANUTENCAO EQUIPAMENTOS / CHAVEIRO EMERGENCIAL / MANUTENCAO MAQ ESTAMPAR",
+      definicao: "Serviços de chaveiro para abertura ou conserto de cofres, portas de estoque e vitrines; e manutenção preventiva ou corretiva simples em máquinas de estampar, impressoras de etiquetas ou PDVs.",
+      observacao: "",
+      proibicoesExplicitas: []
+    },
+    "5103510010": {
+      codigo: "5103510010",
+      nome: "MANUTENCAO AR-CONDICIONADO",
+      definicao: "Apenas reparos simples e emergenciais de baixa complexidade para manter a operação.",
+      observacao: "Instalações completas ou manutenções contratuais são proibidas.",
+      proibicoesExplicitas: ["instalacao completa", "contrato", "manutencao contratual", "mensalidade", "preventiva contratual", "locacao"]
+    },
+    "5103005001": {
+      codigo: "5103005001",
+      nome: "TAXAS E EMOLUMENTOS",
+      definicao: "Pagamento de taxas cartoriais, autenticações de documentos ou carimbos necessários para burocracia da loja.",
+      observacao: "",
+      proibicoesExplicitas: []
+    },
+    "5104007003": {
+      codigo: "5104007003",
+      nome: "TRANSPORTE SERVICOS EMERGENCIAS",
+      definicao: "Fretes e carretos emergenciais para transporte de mercadorias entre lojas quando a logística interna não puder atender em tempo hábil.",
+      observacao: "Transbordo emergencial entre lojas.",
+      proibicoesExplicitas: []
+    },
+    "5104505006": {
+      codigo: "5104505006",
+      nome: "SERVICOS DE COPIADORAS",
+      definicao: "Gastos com xerox, impressões externas de documentos operacionais ou encadernações.",
+      observacao: "",
+      proibicoesExplicitas: []
+    },
+    "5104505007": {
+      codigo: "5104505007",
+      nome: "SERVICOS DE LIMPEZA",
+      definicao: "Contratação pontual de serviço de limpeza pesada ou específica, como pós-obra de pequeno reparo ou limpeza de fachada, que não esteja coberta por contrato fixo.",
+      observacao: "",
+      proibicoesExplicitas: ["contrato fixo", "mensalidade limpeza", "prestacao continua"]
+    },
+    "5104610002": {
+      codigo: "5104610002",
+      nome: "CORREIOS_SEDEX/AR/POSTAGEM",
+      definicao: "Despesas com envio de documentos ou pequenas encomendas via Correios, Sedex, PAC ou AR.",
+      observacao: "",
+      proibicoesExplicitas: []
+    },
+    "5105505008": {
+      codigo: "5105505008",
+      nome: "LANCHES DE REFEICOES",
+      definicao: "Alimentação para eventos internos da loja, reuniões de equipe ou premiações de batimento de meta.",
+      observacao: "É proibido o uso para refeições rotineiras, almoço ou jantar do portador ou de funcionários.",
+      proibicoesExplicitas: ["almoco", "jantar", "refeicao diaria", "refeicao rotineira", "ifood pessoal", "lanche pessoal", "uber eats pessoal"]
+    },
+    "5103505013": {
+      codigo: "5103505013",
+      nome: "AGUA POTAVEL / MATERIAL DE COPA E COZINHA / MATERIAL DE COPA E COZINHA OPERACOES",
+      definicao: "Itens de consumo para copa, cozinha e água potável para a loja, incluindo galões de água, café, açúcar, descartáveis e itens operacionais equivalentes.",
+      observacao: "Eletrodomésticos são proibidos nesta classificação e devem seguir fluxo de Compras.",
+      proibicoesExplicitas: ["microondas", "micro ondas", "cafeteira", "geladeira", "frigobar", "bebedouro", "liquidificador", "sanduicheira"]
+    },
+
+    "5103505014": {
+      codigo: "5103505014",
+      nome: "MATERIAL DE LIMPEZA / MATERIAL DE LIMPEZA OPERACOES",
+      definicao: "Produtos de limpeza, higiene e manutenção das dependências da loja, inclusive itens de limpeza operacional.",
+      observacao: "",
+      proibicoesExplicitas: []
+    },
+
+    "5103505016": {
+      codigo: "5103505016",
+      nome: "SERVICOS GRAFICOS OPERACOES",
+      definicao: "Serviços gráficos operacionais, como impressão de materiais de apoio, placas, comunicados, murais, sinalizações e materiais visuais da operação.",
+      observacao: "Quando se tratar claramente de impressão ou produção gráfica operacional, não deve cair como divergência automática para copiadoras.",
+      proibicoesExplicitas: []
+    },
+  };
+}
+
+function vektorLineItemPreparedCatalog_() {
+  if (__vektorLineItemCatalogCache) return __vektorLineItemCatalogCache;
+
+  function policyHintsByConta_() {
+    return {
+      "5102505001": "visual merchandising marketing campanha decoração loja comunicação visual evento sazonal material de campanha",
+      "5103505001": "higiene limpeza manutenção da loja limpeza das dependências",
+      "5103505005": "suprimentos tecnologia uso imediato sem item patrimonial sem infraestrutura",
+      "5103505006": "papelaria escritório bobina ecf frente de caixa cupom fiscal",
+      "5103505007": "copa cozinha água potável galão descartáveis consumo interno sem eletrodoméstico",
+      "5103505013": "agua potavel copa cozinha material de copa cozinha operacoes galao descartaveis cafe acucar consumo interno loja",
+      "5103505014": "material de limpeza operacoes higiene limpeza manutencao da loja limpeza operacional",
+      "5103505016": "servicos graficos operacoes impressao placa comunicado mural sinalizacao material visual operacional",
+      "5103510001": "pequenos reparos alvenaria pintura reparo emergencial baixa complexidade",
+      "5103510005": "serviços elétricos simples lâmpada tomada disjuntor reator baixa tensão",
+      "5103510007": "chaveiro emergencial manutenção simples de equipamentos máquina de estampar impressora de etiqueta pdv",
+      "5103510010": "reparo simples emergencial ar condicionado baixa complexidade sem contrato sem instalação completa",
+      "5103005001": "taxas cartório autenticação carimbo burocracia da loja",
+      "5104007003": "frete carreto emergencial transporte entre lojas transbordo",
+      "5104505006": "xerox impressão externa encadernação copiadora documentos operacionais",
+      "5104505007": "limpeza pesada limpeza específica pós obra limpeza de fachada sem contrato fixo",
+      "5104610002": "correios sedex ar postagem pac envio de documentos encomenda",
+      "5105505008": "lanche alimentação evento interno reunião equipe premiação meta sem almoço rotineiro sem jantar rotineiro"
+    };
+  }
+
+  function semanticAliasesByConta_() {
+    return {
+      "5102505001": "vm marketing campanha banner faixa adesivo display vitrine comunicação visual",
+      "5103505001": "água sanitária detergente desinfetante pano rodo vassoura saco lixo limpeza",
+      "5103505005": "mouse teclado cabo adaptador usb hdmi informática acessório tecnologia",
+      "5103505006": "caneta papel grampeador grampos sulfite bobina escritório papelaria",
+      "5103505007": "água agua galão galao copo descartável descartável café açucar cozinha copa",
+      "5103505013": "agua água galao galão copo descartavel descartável cafe açúcar acucar cozinha copa",
+      "5103505014": "detergente desinfetante pano rodo vassoura saco lixo limpeza higiene alcool sabao",
+      "5103505016": "impressao impressão placa placas mural informativo comunicados cartaz cartazes adesivo adesivos sinalizacao sinalização grafico gráfico",
+      "5103510001": "massa tinta parede pintura civil alvenaria reparo",
+      "5103510005": "lâmpada lampada tomada disjuntor fiação fiacao reator eletricidade elétrica",
+      "5103510007": "chaveiro fechadura cofre vitrine porta estoque impressora etiqueta pdv",
+      "5103510010": "ar condicionado condensadora evaporadora gás gas manutenção reparo",
+      "5103005001": "cartório cartorio autenticação autenticacao reconhecimento firma emolumento taxa",
+      "5104007003": "frete carreto transporte motoboy emergência emergencia transbordo",
+      "5104505006": "xerox cópia copia impressão impressao encadernação encadernacao",
+      "5104505007": "limpeza pesada faxina higienização higienizacao fachada pós obra pos obra",
+      "5104610002": "correios sedex pac ar postagem envio envelope caixa",
+      "5105505008": "lanche coffee break salgados refrigerante reunião reuniao premiação premiacao"
+    };
+  }
+
+  var raw = vektorLineItemCatalog_();
+  var policyHints = policyHintsByConta_();
+  var aliases = semanticAliasesByConta_();
+  var out = {};
+
+  Object.keys(raw).forEach(function(code){
+    var x = raw[code];
+
+    var baseTxt = [
+      x.nome || "",
+      x.definicao || "",
+      x.observacao || "",
+      policyHints[code] || "",
+      aliases[code] || ""
+    ].join(" ");
+
+    out[code] = {
+      codigo: x.codigo,
+      nome: x.nome,
+      definicao: x.definicao,
+      observacao: x.observacao || "",
+      proibicoesExplicitas: x.proibicoesExplicitas || [],
+      tokens: vektorLineItemTokenize_(baseTxt),
+      forbiddenTokens: vektorLineItemTokenize_((x.proibicoesExplicitas || []).join(" ")),
+      strongTokens: vektorLineItemTokenize_((aliases[code] || "") + " " + (x.nome || ""))
+    };
+  });
+
+  __vektorLineItemCatalogCache = out;
+  return out;
+}
+
+function vektorLineItemHasMeaningfulDescription_(txt) {
+  var s = vektorLineItemNorm_(txt);
+  if (!s) return false;
+
+  s = s
+    .replace(/\b(?:diversos|diverso|geral|gerais|apoio|interno|internos|material|materiais|servico|servicos|compra|compras)\b/g, " ")
+    .replace(/\b\d+[.,]?\d*\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return !!s;
+}
+
+function vektorLineItemStrongMatch_(tokens, entry) {
+  tokens = Array.isArray(tokens) ? tokens : [];
+  if (!entry) return { count: 0, matched: [] };
+
+  var matched = vektorLineItemIntersect_(tokens, entry.strongTokens || []);
+  return { count: matched.length, matched: matched };
+}
+
+function vektorLineItemShouldSkipRow_(row) {
+  var desc = String((row && row.descricao) || "").trim();
+  return !vektorLineItemHasMeaningfulDescription_(desc);
+}
+
+function vektorLineItemStripNoise_(descricao, estabelecimento) {
+  var txt = vektorLineItemNorm_(descricao);
+  var estab = vektorLineItemNorm_(estabelecimento);
+
+  if (estab) {
+    var estabParts = estab.split(/\s+/g).filter(function(t){ return t && t.length >= 4; });
+    estabParts.forEach(function(p){
+      var re = new RegExp("\\b" + p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "g");
+      txt = txt.replace(re, " ");
+    });
+  }
+
+  txt = txt
+    .replace(/\bce\d{4}\b/g, " ")
+    .replace(/\b\d{2}\/\d{2}\/\d{4}\b/g, " ")
+    .replace(/\br\$\s*\d+[.,]?\d*\b/g, " ")
+    .replace(/\b\d+[.,]?\d*\b/g, " ")
+    .replace(/\b(?:nf|nfe|pedido|cupom|recibo|pix|transferencia|debito|credito|voucher)\b/g, " ")
+    .replace(/\b(?:qtde|qtd|quantidade|und|un|cx|pacote|pct|kit)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return txt;
+}
+
+function vektorLineItemExtractItem_(descricao, estabelecimento) {
+  var txt = vektorLineItemStripNoise_(descricao, estabelecimento);
+  if (!txt) return "";
+
+  var parts = txt.split(/\s*(?:\||;|\/|\+|,|\-)\s*/g).filter(Boolean);
+  if (!parts.length) parts = [txt];
+
+  var best = "";
+  var bestScore = -999;
+
+  for (var i = 0; i < parts.length; i++) {
+    var p = String(parts[i] || "").trim();
+    if (!p) continue;
+
+    var tokens = vektorLineItemTokenize_(p);
+    var score = tokens.length;
+
+    if (p.length > 80) score -= 1;
+    if (/\b(diverso|diversos|geral|apoio|interno|internos|material|servico|servicos)\b/.test(p)) score -= 1;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = p;
+    }
+  }
+
+  if (!best) best = txt;
+
+  return best.substring(0, 180);
+}
+
+function vektorLineItemBestMatch_(row, catalog) {
+  var descClean = vektorLineItemStripNoise_(row.descricao, row.estabelecimento);
+  var itemExtraido = vektorLineItemExtractItem_(row.descricao, row.estabelecimento);
+
+  var descTokens = vektorLineItemTokenize_(descClean);
+  var itemTokens = vektorLineItemTokenize_(itemExtraido);
+
+  var scores = [];
+  Object.keys(catalog).forEach(function(code){
+    var entry = catalog[code];
+
+    var a = vektorLineItemWeightedOverlap_(descTokens, entry.tokens);
+    var b = vektorLineItemWeightedOverlap_(itemTokens, entry.tokens);
+
+    var total = a.score + (b.score * 1.35);
+
+    scores.push({
+      codigo: code,
+      nome: entry.nome,
+      score: Number(total.toFixed(4)),
+      matchedDesc: a.matched,
+      matchedItem: b.matched
+    });
+  });
+
+  scores.sort(function(x, y){
+    return y.score - x.score;
+  });
+
+  return {
+    itemExtraido: itemExtraido,
+    descClean: descClean,
+    descTokens: descTokens,
+    itemTokens: itemTokens,
+    best: scores[0] || null,
+    second: scores[1] || null,
+    all: scores
+  };
+}
+
+function vektorLineItemHasExplicitRestriction_(selectedEntry, tokens) {
+  if (!selectedEntry) return false;
+  var inter = vektorLineItemIntersect_(tokens || [], selectedEntry.forbiddenTokens || []);
+  return inter.length > 0;
+}
+
+function vektorLineItemClassifyRow_(row) {
+  var catalog = vektorLineItemPreparedCatalog_();
+
+  var selectedCode = vektorLineItemExtractConta_(row);
+  var selectedEntry = selectedCode ? catalog[selectedCode] : null;
+
+  if (vektorLineItemShouldSkipRow_(row)) {
+    return null; // ✅ não entra nem na tabela nem nas métricas
+  }
+
+  if (!selectedCode) {
+    return {
+      data: row.dataBR || "",
+      loja: row.loja || "",
+      time: row.time || "",
+      etiqueta: row.etiqueta || "",
+      contaContabil: "",
+      valor: Number(row.valor || 0) || 0,
+      valorFmt: (Number(row.valor || 0) || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }),
+      descricao: row.descricao || "",
+      itemExtraido: vektorLineItemExtractItem_(row.descricao, row.estabelecimento),
+      statusAnalise: "Verificar",
+      motivoAnalise: "Não foi possível identificar a conta contábil da etiqueta.",
+      contaSugerida: "",
+      etiquetaSugerida: "",
+      scoreSelecionada: 0,
+      scoreSugerida: 0
+    };
+  }
+
+  if (!selectedEntry) {
+    return {
+      data: row.dataBR || "",
+      loja: row.loja || "",
+      time: row.time || "",
+      etiqueta: row.etiqueta || "",
+      contaContabil: selectedCode,
+      valor: Number(row.valor || 0) || 0,
+      valorFmt: (Number(row.valor || 0) || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }),
+      descricao: row.descricao || "",
+      itemExtraido: vektorLineItemExtractItem_(row.descricao, row.estabelecimento),
+      statusAnalise: "Verificar",
+      motivoAnalise: "Conta contábil ainda não está mapeada no motor de análise.",
+      contaSugerida: "",
+      etiquetaSugerida: "",
+      scoreSelecionada: 0,
+      scoreSugerida: 0
+    };
+  }
+
+  var bestPack = vektorLineItemBestMatch_(row, catalog);
+  var best = bestPack.best;
+  var second = bestPack.second;
+
+  var scoreSelected = 0;
+  for (var i = 0; i < bestPack.all.length; i++) {
+    if (bestPack.all[i].codigo === selectedCode) {
+      scoreSelected = Number(bestPack.all[i].score || 0);
+      break;
+    }
+  }
+
+  var mergedTokens = []
+    .concat(bestPack.descTokens || [])
+    .concat(bestPack.itemTokens || []);
+
+  var explicitRestricted = vektorLineItemHasExplicitRestriction_(selectedEntry, mergedTokens);
+  var strongSelected = vektorLineItemStrongMatch_(mergedTokens, selectedEntry);
+  var strongBest = best ? vektorLineItemStrongMatch_(mergedTokens, catalog[best.codigo]) : { count: 0, matched: [] };
+  var deltaBestVsSelected = Number((best && best.score) || 0) - Number(scoreSelected || 0);
+
+  var descNorm = vektorLineItemNorm_(row.descricao || "");
+var falaEventoOuReuniao =
+  /\b(apresentacao|apresentação|plenaria|plenária|reuniao|reunião|evento|treinamento|encontro|premiacao|premiação|meta)\b/.test(descNorm);
+
+var falaConsumoRotineiro =
+  /\b(almoco|almoço|jantar|refeicao diaria|refeição diária|refeicao rotineira|refeição rotineira|uso pessoal|pessoal)\b/.test(descNorm);
+
+  var status = "Verificar";
+  var motivo = "";
+  var contaSugerida = "";
+  var etiquetaSugerida = "";
+
+  if (!bestPack.descTokens.length && !bestPack.itemTokens.length) {
+      motivo = "Descrição sem conteúdo suficiente para análise.";
+    } else if (selectedCode === "5105505008") {
+      // regra especial: LANCHES DE REFEICOES
+      if (falaEventoOuReuniao && !falaConsumoRotineiro) {
+        status = "De acordo";
+        motivo = "A descrição indica contexto de evento, reunião ou apresentação, aderente à etiqueta de lanches/refeições.";
+      } else if (explicitRestricted || falaConsumoRotineiro) {
+        motivo = "A descrição indica refeição rotineira ou uso não aderente à etiqueta selecionada.";
+      } else if (scoreSelected >= 1.00 || strongSelected.count >= 1) {
+        status = "De acordo";
+        motivo = "A descrição está compatível com a etiqueta selecionada.";
+      } else {
+        motivo = "A descrição não sustenta com segurança a etiqueta selecionada.";
+      }
+    } else if (explicitRestricted) {
+      motivo = "A descrição contém indício de item vedado para a etiqueta selecionada.";
+    } else if (best && best.codigo === selectedCode) {
+      if (strongSelected.count >= 1 || scoreSelected >= 0.90) {
+        status = "De acordo";
+        motivo = "A descrição está aderente à própria etiqueta selecionada.";
+      } else {
+        motivo = "A descrição é curta ou genérica demais para validar com segurança.";
+      }
+    } else if (best && best.codigo !== selectedCode) {
+      contaSugerida = String(best.codigo || "");
+      etiquetaSugerida = String(best.nome || "");
+
+      if (scoreSelected >= 0.95 && strongSelected.count >= 1) {
+        status = "De acordo";
+        motivo = "A descrição segue aderente à etiqueta selecionada, apesar de proximidade com outra conta.";
+        contaSugerida = "";
+        etiquetaSugerida = "";
+      } else if (deltaBestVsSelected >= 0.90 && strongBest.count >= 2) {
+        motivo = "A descrição está mais aderente à conta " + contaSugerida + " - " + etiquetaSugerida + ".";
+      } else if (scoreSelected >= 1.10) {
+        status = "De acordo";
+        motivo = "A descrição ainda é compatível com a etiqueta selecionada.";
+        contaSugerida = "";
+        etiquetaSugerida = "";
+      } else {
+        motivo = "Há indício de conta mais aderente do que a etiqueta selecionada.";
+      }
+    } else {
+      motivo = "Não foi possível identificar aderência suficiente pela descrição.";
+    }
+
+  if (status === "De acordo") {
+    contaSugerida = "";
+    etiquetaSugerida = "";
+  }
+
+  return {
+    data: row.dataBR || "",
+    loja: row.loja || "",
+    time: row.time || "",
+    etiqueta: row.etiqueta || "",
+    contaContabil: selectedCode,
+    valor: Number(row.valor || 0) || 0,
+    valorFmt: (Number(row.valor || 0) || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" }),
+    descricao: row.descricao || "",
+    itemExtraido: bestPack.itemExtraido || "",
+    statusAnalise: status,
+    motivoAnalise: motivo,
+    contaSugerida: contaSugerida,
+    etiquetaSugerida: etiquetaSugerida,
+    scoreSelecionada: Number(scoreSelected || 0),
+    scoreSugerida: Number((best && best.score) || 0)
+  };
+}
+
+function vektorLineItemBuildSummary_(rows) {
+  rows = Array.isArray(rows) ? rows.filter(Boolean) : [];
+
+  var total = rows.length;
+  var deAcordoQtd = 0;
+  var verificarQtd = 0;
+  var deAcordoValor = 0;
+  var verificarValor = 0;
+
+  rows.forEach(function(r){
+    var v = Number(r.valor || 0) || 0;
+    if (String(r.statusAnalise || "") === "De acordo") {
+      deAcordoQtd += 1;
+      deAcordoValor += v;
+    } else {
+      verificarQtd += 1;
+      verificarValor += v;
+    }
+  });
+
+  return {
+    total: total,
+    deAcordoQtd: deAcordoQtd,
+    verificarQtd: verificarQtd,
+    deAcordoPct: total ? Number(((deAcordoQtd / total) * 100).toFixed(1)) : 0,
+    verificarPct: total ? Number(((verificarQtd / total) * 100).toFixed(1)) : 0,
+    deAcordoValor: Number(deAcordoValor.toFixed(2)),
+    verificarValor: Number(verificarValor.toFixed(2))
+  };
+}
+
+function getAnaliseGastosLineItemAnalysis(req) {
+  vektorAssertLineItemAnalysisRole_();
+  vektorAssertFunctionAllowed_("getAnaliseGastosLineItemAnalysis");
+
+  try {
+    req = req || {};
+
+    var base = getAnaliseGastosDataset(req);
+    if (!base || !base.ok) {
+      return { ok:false, error:(base && base.error) ? base.error : "Falha ao consultar base." };
+    }
+
+    var rows = (base.tx || [])
+      .map(function(r){
+        return vektorLineItemClassifyRow_(r);
+      })
+      .filter(Boolean); // ✅ remove descrições em branco/sem conteúdo útil
+
+    rows.sort(function(a, b){
+      if (String(a.statusAnalise || "") !== String(b.statusAnalise || "")) {
+        return String(a.statusAnalise || "") === "Verificar" ? -1 : 1;
+      }
+      var da = String(a.data || "");
+      var db = String(b.data || "");
+      if (da !== db) return db.localeCompare(da);
+      return Number(b.valor || 0) - Number(a.valor || 0);
+    });
+
+    var resumo = vektorLineItemBuildSummary_(rows);
+
+    return {
+      ok: true,
+      empresa: String((base && base.empresa) || ""),
+      meta: base.meta || {},
+      periodo: {
+        dtIni: String(req.dtIni || ""),
+        dtFim: String(req.dtFim || "")
+      },
+      resumo: resumo,
+      rows: rows
+    };
+
+  } catch (e) {
+    return { ok:false, error:(e && e.message) ? e.message : String(e) };
+  }
+}
+
+function vektorLineItemCsvMatrix_(rows) {
+  rows = Array.isArray(rows) ? rows : [];
+
+  var out = [[
+    "Data",
+    "Loja",
+    "Time",
+    "Etiqueta",
+    "Conta Contábil",
+    "Valor",
+    "Descrição",
+    "Item Extraído",
+    "Status Análise",
+    "Motivo Análise",
+    "Conta Sugerida",
+    "Etiqueta Sugerida"
+  ]];
+
+  rows.forEach(function(r){
+    out.push([
+      r.data || "",
+      r.loja || "",
+      r.time || "",
+      r.etiqueta || "",
+      r.contaContabil || "",
+      Number(r.valor || 0) || 0,
+      r.descricao || "",
+      r.itemExtraido || "",
+      r.statusAnalise || "",
+      r.motivoAnalise || "",
+      r.contaSugerida || "",
+      r.etiquetaSugerida || ""
+    ]);
+  });
+
+  return out;
+}
+
+function vektorLineItemXlsxBlob_(rows, empresa, dtIni, dtFim) {
+  var matrix = vektorLineItemCsvMatrix_(rows);
+
+  var ss = SpreadsheetApp.create("Vektor_LineItemAnalysis_TMP");
+  var sh = ss.getSheets()[0];
+  sh.setName("LineItemAnalysis");
+
+  if (matrix && matrix.length) {
+    sh.getRange(1, 1, matrix.length, matrix[0].length).setValues(matrix);
+  }
+
+  sh.setFrozenRows(1);
+  try { sh.autoResizeColumns(1, matrix[0].length); } catch (_) {}
+
+  var fileId = ss.getId();
+
+  var url = "https://www.googleapis.com/drive/v3/files/" + fileId + "/export" +
+            "?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+  var token = ScriptApp.getOAuthToken();
+  var resp = UrlFetchApp.fetch(url, {
+    headers: { Authorization: "Bearer " + token },
+    muteHttpExceptions: true
+  });
+
+  if (resp.getResponseCode() < 200 || resp.getResponseCode() >= 300) {
+    try { DriveApp.getFileById(fileId).setTrashed(true); } catch (_) {}
+    throw new Error("Falha ao gerar arquivo Excel do Line-item analysis.");
+  }
+
+  var nome = "Vektor_LineItemAnalysis_" +
+    String(empresa || "CENTAURO") + "_" +
+    String(dtIni || "").replace(/-/g, "") + "_" +
+    String(dtFim || "").replace(/-/g, "") + ".xlsx";
+
+  var blob = resp.getBlob().setName(nome);
+
+  try { DriveApp.getFileById(fileId).setTrashed(true); } catch (_) {}
+
+  return blob;
+}
+
+function vektorLineItemCsvBlob_(rows, empresa, dtIni, dtFim) {
+  var matrix = vektorLineItemCsvMatrix_(rows);
+
+  function escCsv_(v) {
+    var s = String(v == null ? "" : v);
+    if (/[",;\n]/.test(s)) {
+      s = '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }
+
+  var csv = matrix.map(function(line){
+    return line.map(escCsv_).join(";");
+  }).join("\r\n");
+
+  var nome = "Vektor_LineItemAnalysis_" +
+    String(empresa || "CENTAURO") + "_" +
+    String(dtIni || "").replace(/-/g, "") + "_" +
+    String(dtFim || "").replace(/-/g, "") + ".csv";
+
+  return Utilities.newBlob(csv, "text/csv", nome);
+}
+
+function vektorLineItemEmailHtml_(payload) {
+  payload = payload || {};
+  var resumo = payload.resumo || {};
+  var rows = Array.isArray(payload.rows) ? payload.rows : [];
+  var empresa = String(payload.empresa || "");
+  var dtIni = String(payload.dtIni || "");
+  var dtFim = String(payload.dtFim || "");
+
+  function esc_(s) {
+    return String(s || "")
+      .replace(/&/g,"&amp;")
+      .replace(/</g,"&lt;")
+      .replace(/>/g,"&gt;")
+      .replace(/"/g,"&quot;");
+  }
+
+  function fmtBRL_(n) {
+    return (Number(n || 0) || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+  }
+
+  function badge_(s) {
+    var x = String(s || "");
+    var bg = (x === "De acordo") ? "#dcfce7" : "#fee2e2";
+    var bd = (x === "De acordo") ? "#16a34a" : "#dc2626";
+    var tx = (x === "De acordo") ? "#166534" : "#7f1d1d";
+    return '<span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:999px;border:1px solid ' + bd + ';background:' + bg + ';color:' + tx + ';font-weight:900;font-size:11px;">' + esc_(x) + '</span>';
+  }
+
+  var prev = rows.slice(0, 300);
+
+  var h = "";
+  h += "<div style='font-family:Arial,Helvetica,sans-serif;color:#0f172a;'>";
+  h += "<div style='background:#061a3a;color:#fff;padding:14px 16px;border-radius:14px 14px 0 0;'>";
+  h += "<div style='font-size:16px;font-weight:1000;'>Line-item analysis</div>";
+  h += "<div style='font-size:12px;opacity:.9;margin-top:4px;'>Empresa: " + esc_(empresa) + " | Período: " + esc_(dtIni) + " a " + esc_(dtFim) + "</div>";
+  h += "</div>";
+
+  h += "<div style='border:1px solid #dbeafe;border-top:none;border-radius:0 0 14px 14px;padding:16px;background:#f8fafc;'>";
+  h += "<div style='display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px;'>";
+  h += "<div style='background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:10px;'><div style='font-size:11px;font-weight:900;color:#475569;'>Total</div><div style='margin-top:6px;font-size:20px;font-weight:1000;'>" + esc_(resumo.total) + "</div></div>";
+  h += "<div style='background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:10px;'><div style='font-size:11px;font-weight:900;color:#475569;'>De acordo</div><div style='margin-top:6px;font-size:20px;font-weight:1000;'>" + esc_(resumo.deAcordoQtd) + " (" + esc_(resumo.deAcordoPct) + "%)</div></div>";
+  h += "<div style='background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:10px;'><div style='font-size:11px;font-weight:900;color:#475569;'>Verificar</div><div style='margin-top:6px;font-size:20px;font-weight:1000;'>" + esc_(resumo.verificarQtd) + " (" + esc_(resumo.verificarPct) + "%)</div></div>";
+  h += "<div style='background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:10px;'><div style='font-size:11px;font-weight:900;color:#475569;'>Valor de acordo</div><div style='margin-top:6px;font-size:20px;font-weight:1000;'>" + esc_(fmtBRL_(resumo.deAcordoValor)) + "</div></div>";
+  h += "<div style='background:#fff;border:1px solid #cbd5e1;border-radius:12px;padding:10px;'><div style='font-size:11px;font-weight:900;color:#475569;'>Valor verificar</div><div style='margin-top:6px;font-size:20px;font-weight:1000;'>" + esc_(fmtBRL_(resumo.verificarValor)) + "</div></div>";
+  h += "</div>";
+
+  h += "<div style='font-size:12px;font-weight:900;color:#475569;margin-bottom:8px;'>Prévia do corpo do relatório (máximo 300 linhas). O CSV segue anexo com o conjunto completo.</div>";
+  h += "<div style='overflow:auto;border:1px solid #e2e8f0;border-radius:12px;background:#fff;'>";
+  h += "<table style='width:100%;border-collapse:collapse;font-size:12px;'>";
+  h += "<thead><tr style='background:#123a63;color:#fff;'>";
+  h += "<th style='padding:8px;border:1px solid #cbd5e1;'>Data</th>";
+  h += "<th style='padding:8px;border:1px solid #cbd5e1;'>Loja</th>";
+  h += "<th style='padding:8px;border:1px solid #cbd5e1;'>Time</th>";
+  h += "<th style='padding:8px;border:1px solid #cbd5e1;'>Etiqueta</th>";
+  h += "<th style='padding:8px;border:1px solid #cbd5e1;'>Valor</th>";
+  h += "<th style='padding:8px;border:1px solid #cbd5e1;'>Descrição</th>";
+  h += "<th style='padding:8px;border:1px solid #cbd5e1;'>Status</th>";
+  h += "</tr></thead><tbody>";
+
+  prev.forEach(function(r){
+    h += "<tr>";
+    h += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + esc_(r.data) + "</td>";
+    h += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + esc_(r.loja) + "</td>";
+    h += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + esc_(r.time) + "</td>";
+    h += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + esc_(r.etiqueta) + "</td>";
+    h += "<td style='padding:8px;border:1px solid #e2e8f0;text-align:right;'>" + esc_(fmtBRL_(r.valor)) + "</td>";
+    h += "<td style='padding:8px;border:1px solid #e2e8f0;'>" + esc_(r.descricao) + "</td>";
+    h += "<td style='padding:8px;border:1px solid #e2e8f0;text-align:center;'>" + badge_(r.statusAnalise) + "</td>";
+    h += "</tr>";
+  });
+
+  h += "</tbody></table></div>";
+  h += "</div></div>";
+
+  return h;
+}
+
+function exportAnaliseGastosLineItemXlsx(req) {
+  vektorAssertLineItemAnalysisRole_();
+  vektorAssertFunctionAllowed_("getAnaliseGastosLineItemAnalysis");
+
+  try {
+    req = req || {};
+
+    var res = getAnaliseGastosLineItemAnalysis(req);
+    if (!res || !res.ok) {
+      return { ok:false, error:(res && res.error) ? res.error : "Falha ao gerar análise." };
+    }
+
+    var empresa = String(res.empresa || "");
+    var dtIni = String((res.periodo && res.periodo.dtIni) || "");
+    var dtFim = String((res.periodo && res.periodo.dtFim) || "");
+
+    var blob = vektorLineItemXlsxBlob_(res.rows || [], empresa, dtIni, dtFim);
+
+    return {
+      ok: true,
+      filename: blob.getName(),
+      base64: Utilities.base64Encode(blob.getBytes()),
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    };
+
+  } catch (e) {
+    return { ok:false, error:(e && e.message) ? e.message : String(e) };
+  }
+}
+
+function sendAnaliseGastosLineItemAnalysisEmail(req) {
+  vektorAssertLineItemAnalysisRole_();
+  vektorAssertFunctionAllowed_("sendAnaliseGastosLineItemAnalysisEmail");
+
+  try {
+    req = req || {};
+
+    var ctx = vektorGetUserRole_();
+    var to = String((ctx && ctx.email) || Session.getActiveUser().getEmail() || "").trim().toLowerCase();
+    if (!to) throw new Error("Não foi possível identificar o e-mail do usuário logado.");
+
+    var res = getAnaliseGastosLineItemAnalysis(req);
+    if (!res || !res.ok) {
+      return { ok:false, error:(res && res.error) ? res.error : "Falha ao gerar análise." };
+    }
+
+    var empresa = String(res.empresa || "");
+    var dtIni = String((res.periodo && res.periodo.dtIni) || "");
+    var dtFim = String((res.periodo && res.periodo.dtFim) || "");
+
+    var html = vektorLineItemEmailHtml_({
+      empresa: empresa,
+      dtIni: dtIni,
+      dtFim: dtFim,
+      resumo: res.resumo || {},
+      rows: res.rows || []
+    });
+
+    var xlsxBlob = vektorLineItemXlsxBlob_(res.rows || [], empresa, dtIni, dtFim);
+
+    var assunto = vektorBuildSubject_(empresa, "Vektor - Grupo SBF") +
+      " Line-item analysis | " + dtIni + " a " + dtFim;
+
+    GmailApp.sendEmail(to, assunto, " ", {
+      from: "vektor@gruposbf.com.br",
+      name: "Vektor - Grupo SBF",
+      htmlBody: html,
+      attachments: [xlsxBlob]
+    });
+
+    return {
+      ok: true,
+      to: to,
+      empresa: empresa,
+      rows: (res.rows || []).length
+    };
+
+  } catch (e) {
+    return { ok:false, error:(e && e.message) ? e.message : String(e) };
   }
 }
 
@@ -19635,7 +20623,7 @@ function removerTriggersAjusteLimiteMensalVektor() {
   return { ok: true };
 }
 
- // ==========TESTES===============//
+ // ==========TESTES===============//getAnaliseGastosMedianas(req)
 
 function TESTAR_POLITICA() {
   var txt = vektorPolicyLoadText_();
