@@ -2924,6 +2924,26 @@ display: none;
         </div>
       </div>
 
+      <div id="vektorModuleBlockedModal"
+     class="fixed inset-0 z-[10040] hidden items-center justify-center"
+     style="display:none;">
+  <div class="absolute inset-0 bg-black/50" onclick="window.vektorCloseModuleBlockedModal_()"></div>
+
+  <div class="relative bg-white rounded-2xl shadow-2xl w-[92%] max-w-[460px] p-5 border border-slate-200">
+    <div class="text-base font-extrabold text-slate-900">Acesso não disponível</div>
+    <div id="vektorModuleBlockedMsg" class="mt-2 text-sm text-slate-600">
+      Você não possui acesso a este módulo.
+    </div>
+
+    <div class="mt-4 flex justify-end">
+      <button type="button"
+              onclick="window.vektorCloseModuleBlockedModal_()"
+              class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        Fechar
+      </button>
+    </div>
+  </div>
+</div>
 
   <!-- =======================
      OVERLAY MANUTENÇÃO
@@ -7397,6 +7417,45 @@ function vektorShowClaraModule_() {
   }
 }
 
+window.vektorOpenModuleBlockedModal_ = function (msg) {
+  var m = document.getElementById("vektorModuleBlockedModal");
+  var t = document.getElementById("vektorModuleBlockedMsg");
+  if (t) t.textContent = String(msg || "Você não possui acesso a este módulo.");
+  if (!m) return;
+  m.classList.remove("hidden");
+  m.style.display = "flex";
+};
+
+window.vektorCloseModuleBlockedModal_ = function () {
+  var m = document.getElementById("vektorModuleBlockedModal");
+  if (!m) return;
+  m.style.display = "none";
+  m.classList.add("hidden");
+};
+
+window.vektorTryOpenModule_ = function (moduleKey, onAllowed) {
+  var mod = String(moduleKey || "").trim().toUpperCase();
+  if (!mod) return;
+
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (res && res.ok && res.allowed) {
+        if (typeof onAllowed === "function") onAllowed();
+        return;
+      }
+
+      window.vektorOpenModuleBlockedModal_(
+        (res && res.error) ? res.error : "Você não possui acesso a este módulo."
+      );
+    })
+    .withFailureHandler(function (err) {
+      window.vektorOpenModuleBlockedModal_(
+        (err && err.message) ? err.message : "Falha ao validar acesso ao módulo."
+      );
+    })
+    .vektorCanOpenModule(mod);
+};
+
 function vektorOpenInitialLanding_(landingView) {
   var landing = String(landingView || "").trim().toUpperCase();
 
@@ -8039,13 +8098,18 @@ function bindLoginHandlers_() {
     }
   });
 
-    byId("vektorHubCardClara")?.addEventListener("click", function () {
-      try {
-        vektorShowClaraModule_();
-      } catch (e) {
-        console.error("Erro ao abrir módulo Clara:", e);
+   byId("vektorHubCardClara")?.addEventListener("click", function () {
+  try {
+    window.vektorTryOpenModule_("CLARA", function () {
+      vektorShowClaraModule_();
+      if (typeof vektorGlobalPreloadStart_ === "function") {
+        vektorGlobalPreloadStart_();
       }
     });
+  } catch (e) {
+    console.error("Erro ao validar/abrir módulo Clara:", e);
+  }
+});
 
   (function () {
     var btn = document.getElementById("vektorTopHomeBtn");
@@ -8512,59 +8576,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // sem token: exige login
   openModal_();
-
-    byId("vektorLoginBtn")?.addEventListener("click", attempt_);
-
-    // Botão "Login com Google" -> preenche com e-mail do Google Workspace (do template)
-    byId("vektorLoginGoogleBtn")?.addEventListener("click", function () {
-      try {
-        const emailGoogle = (typeof USER_EMAIL_REPLACED !== "undefined" ? String(USER_EMAIL_REPLACED || "").trim() : "");
-        if (!emailGoogle) {
-          setError_("Não foi possível capturar seu e-mail do Google. Digite manualmente.");
-          return;
-        }
-        const inp = byId("vektorLoginEmail");
-        if (inp) inp.value = emailGoogle;
-
-        // opcional: já dispara o login automaticamente
-        attempt_();
-      } catch (e) {
-        setError_("Falha ao aplicar Login com Google.");
-      }
-    });
-
-    byId("vektorLoginEmail")?.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        attempt_();
-      }
-    });
-
-    byId("vektorHubCardClara")?.addEventListener("click", function () {
-  try {
-    vektorShowClaraModule_();
-    if (typeof vektorGlobalPreloadStart_ === "function") {
-      vektorGlobalPreloadStart_();
-    }
-  } catch (e) {
-    console.error("Erro ao abrir módulo Clara:", e);
-  }
-});
-
-(function(){
-  var btn = document.getElementById("vektorTopHomeBtn");
-  if (!btn) return;
-
-  if (vektorIsAdmin_()) {
-    btn.classList.remove("hidden");
-    btn.style.display = "inline-flex";
-  }
-
-  btn.addEventListener("click", function(){
-    vektorShowHubView_();
-  });
-})();
-
     setTimeout(function(){ try { byId("vektorLoginEmail")?.focus(); } catch(_){} }, 50);
   });
 })();
