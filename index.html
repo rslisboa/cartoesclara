@@ -1410,6 +1410,221 @@ display: none;
 }
 
 /* =========================
+   Modal claro - Line-item analysis (Análise de Gastos)
+   ========================= */
+#analiseGastos_lineItemModal{
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none;
+}
+#analiseGastos_lineItemModal.hidden{ display:none !important; }
+
+#analiseGastos_lineItemModalBackdrop{
+  position:absolute;
+  inset:0;
+  background: rgba(15,23,42,0.45);
+  backdrop-filter: blur(2px);
+}
+
+#analiseGastos_lineItemModalPanel{
+  position:absolute;
+  left:50%;
+  top:56px;
+  transform:translateX(-50%);
+  width:min(1360px, calc(100vw - 30px));
+  max-height:calc(100vh - 88px);
+  background:#f8fafc;
+  border:1px solid #dbeafe;
+  border-radius:18px;
+  box-shadow:0 28px 60px rgba(2,6,23,0.28);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+#analiseGastos_lineItemModalHeader{
+  background: linear-gradient(180deg, #061a3a 0%, #0b244f 100%);
+  color:#fff;
+  border-bottom:1px solid rgba(255,255,255,0.10);
+  padding:14px 16px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+
+#analiseGastos_lineItemModalTitle{
+  font-size:16px;
+  font-weight:1000;
+  line-height:1.1;
+}
+#analiseGastos_lineItemModalSub{
+  margin-top:5px;
+  font-size:12px;
+  font-weight:800;
+  color:rgba(226,232,240,0.90);
+  line-height:1.25;
+}
+
+#analiseGastos_lineItemModalClose{
+  border:1px solid rgba(255,255,255,0.16);
+  background:rgba(255,255,255,0.08);
+  color:#fff;
+  border-radius:12px;
+  min-width:40px;
+  height:40px;
+  font-size:22px;
+  font-weight:900;
+  line-height:1;
+  cursor:pointer;
+}
+#analiseGastos_lineItemModalClose:hover{
+  background:rgba(255,255,255,0.14);
+}
+
+#analiseGastos_lineItemModalBody{
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+  min-height:0;
+  flex:1;
+}
+
+#analiseGastos_lineItemCards{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:12px;
+}
+@media (max-width:1100px){
+  #analiseGastos_lineItemCards{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:680px){
+  #analiseGastos_lineItemCards{ grid-template-columns:1fr; }
+}
+
+.analiseGastosLineItemCard{
+  background:#ffffff;
+  border:2px double #005E27;
+  border-radius:14px;
+  box-shadow:0 10px 22px rgba(0,0,0,0.06);
+  padding:12px;
+  overflow:hidden;
+  position:relative;
+}
+.analiseGastosLineItemCard::before{
+  content:"";
+  position:absolute;
+  inset:auto -10% -10% -10%;
+  height:58%;
+  background:
+    radial-gradient(120% 90% at 0% 100%, rgba(181,255,32,0.16) 0%, rgba(181,255,32,0.06) 42%, rgba(181,255,32,0.00) 70%);
+  pointer-events:none;
+  z-index:0;
+}
+.analiseGastosLineItemCard > *{ position:relative; z-index:1; }
+
+#analiseGastos_lineItemActions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+#analiseGastos_lineItemSummaryTxt{
+  font-size:12px;
+  font-weight:900;
+  color:#475569;
+}
+
+#analiseGastos_lineItemTableWrap{
+  flex:1;
+  min-height:0;
+  border:1px solid #cbd5e1;
+  border-radius:14px;
+  background:#ffffff;
+  overflow:auto;
+}
+
+#analiseGastos_lineItemTable{
+  width:100%;
+  min-width:1120px;
+  border-collapse:separate;
+  border-spacing:0;
+  color:#0f172a;
+  background:#fff;
+}
+
+#analiseGastos_lineItemTable thead th{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#061a3a;
+  color:#ffffff;
+  border-bottom:2px solid rgba(181,255,32,0.55);
+  border-right:1px solid rgba(255,255,255,0.08);
+  padding:10px 10px;
+  font-size:12px;
+  font-weight:1000;
+  text-align:center;
+  white-space:nowrap;
+}
+
+#analiseGastos_lineItemTable tbody td{
+  border-right:1px solid #e2e8f0;
+  border-bottom:1px solid #e2e8f0;
+  padding:9px 10px;
+  font-size:12px;
+  vertical-align:middle;
+}
+
+#analiseGastos_lineItemTable tbody tr:nth-child(even) td{
+  background:#f8fafc;
+}
+
+#analiseGastos_lineItemTable td.num{
+  text-align:right;
+  font-weight:900;
+  white-space:nowrap;
+}
+
+.analiseLineBadgeOk,
+.analiseLineBadgeWarn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:24px;
+  padding:0 10px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:1000;
+  border:1px solid transparent;
+  white-space:nowrap;
+}
+
+.analiseLineBadgeOk{
+  background:rgba(34,197,94,0.16);
+  border-color:rgba(34,197,94,0.40);
+  color:#166534;
+}
+
+.analiseLineBadgeWarn{
+  background:rgba(248,113,113,0.16);
+  border-color:rgba(248,113,113,0.40);
+  color:#7f1d1d;
+}
+
+#analiseGastos_lineItemMsg{
+  padding:18px;
+  text-align:center;
+  font-size:13px;
+  font-weight:900;
+  color:#475569;
+}
+
+/* =========================
    FLUXO NUMERÁRIO SAP
    ========================= */
 .sapNumCard{
@@ -3665,6 +3880,9 @@ display: none;
   </main>
 </div>
 
+<? var __lineItemAllowedRoles = ["Administrador","Analista Pro","Analista","Compras_DI"]; ?>
+<? var __canLineItemAnalysis = __lineItemAllowedRoles.indexOf(String(userRole || "")) >= 0; ?>
+
 <!-- VIEW: ANALISE DE GASTOS -->
 <div id="analiseGastosView"
      class="hidden"
@@ -3689,6 +3907,14 @@ display: none;
 
           <!-- Direita superior: botões -->
           <div style="display:flex; align-items:flex-start; gap:8px; margin-left:auto;">
+
+              <? if (__canLineItemAnalysis) { ?>
+              <button id="analiseGastos_btnLineItem" type="button"
+                      style="height:36px; padding:0 14px; border:1px solid rgba(181,255,32,0.35); border-radius:10px; font-weight:900; font-size:12px; background:rgba(181,255,32,0.10); color:#eaffb8; cursor:pointer; white-space:nowrap;">
+                Line-item analysis
+              </button>
+            <? } ?>
+
             <button id="analiseGastos_btnCsv" type="button"
                   style="height:36px; padding:0 14px; border:1px solid rgba(148,163,184,0.35); border-radius:10px; font-weight:900; font-size:12px; background:rgba(255,255,255,0.06); color:#ffffff; cursor:pointer; white-space:nowrap;">
             Download CSV
@@ -3995,6 +4221,111 @@ display: none;
     </div>
   </div>
 </div>
+
+<? if (__canLineItemAnalysis) { ?>
+<div id="analiseGastos_lineItemModal" class="hidden">
+  <div id="analiseGastos_lineItemModalBackdrop"></div>
+
+  <div id="analiseGastos_lineItemModalPanel">
+    <div id="analiseGastos_lineItemModalHeader">
+      <div>
+        <div id="analiseGastos_lineItemModalTitle">Line-item analysis</div>
+        <div id="analiseGastos_lineItemModalSub">
+          Conferência automática da aderência entre a etiqueta utilizada e o item descrito pelo usuário.
+        </div>
+      </div>
+
+      <button id="analiseGastos_lineItemModalClose" type="button">×</button>
+    </div>
+
+    <div id="analiseGastos_lineItemModalBody">
+      <div id="analiseGastos_lineItemCards">
+        <div class="analiseGastosLineItemCard">
+          <div class="analiseGastosCardLabel">Total analisado</div>
+          <div id="analiseGastos_lineItem_kpiTotal" class="analiseGastosCardValue">—</div>
+          <div class="analiseGastosCardSub">Transações no recorte aplicado</div>
+        </div>
+
+        <div class="analiseGastosLineItemCard">
+          <div class="analiseGastosCardLabel">% De acordo</div>
+          <div id="analiseGastos_lineItem_kpiOkPct" class="analiseGastosCardValue">—</div>
+          <div class="analiseGastosCardSub">Percentual de aderência</div>
+        </div>
+
+        <div class="analiseGastosLineItemCard">
+          <div class="analiseGastosCardLabel">% Verificar</div>
+          <div id="analiseGastos_lineItem_kpiWarnPct" class="analiseGastosCardValue">—</div>
+          <div class="analiseGastosCardSub">Linhas com divergência ou ambiguidade</div>
+        </div>
+
+        <div class="analiseGastosLineItemCard">
+          <div class="analiseGastosCardLabel">Valor de acordo</div>
+          <div id="analiseGastos_lineItem_kpiOkValor" class="analiseGastosCardValue">—</div>
+          <div class="analiseGastosCardSub">Somatório das linhas validadas</div>
+        </div>
+
+        <div class="analiseGastosLineItemCard">
+          <div class="analiseGastosCardLabel">Valor verificar</div>
+          <div id="analiseGastos_lineItem_kpiWarnValor" class="analiseGastosCardValue">—</div>
+          <div class="analiseGastosCardSub">Somatório das linhas para revisão</div>
+        </div>
+      </div>
+
+      <div id="analiseGastos_lineItemActions">
+  <div id="analiseGastos_lineItemSummaryTxt">—</div>
+
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <label for="analiseGastos_lineItemStatusFilter"
+           style="font-size:12px;font-weight:900;color:#475569;">
+      Status:
+    </label>
+
+    <select id="analiseGastos_lineItemStatusFilter"
+            style="height:36px;padding:0 12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;font-size:12px;font-weight:800;">
+      <option value="">Todos</option>
+      <option value="De acordo">De acordo</option>
+      <option value="Verificar">Verificar</option>
+    </select>
+
+    <button id="analiseGastos_lineItemBtnCsv" type="button"
+            style="height:36px; padding:0 14px; border:1px solid rgba(148,163,184,0.35); border-radius:10px; font-weight:900; font-size:12px; background:#ffffff; color:#0f172a; cursor:pointer; white-space:nowrap;">
+      Exportar Excel
+    </button>
+
+    <button id="analiseGastos_lineItemBtnEmail" type="button"
+            style="height:36px; padding:0 14px; border:none; border-radius:10px; font-weight:900; font-size:12px; background:#006b2c; color:#ffffff; cursor:pointer; white-space:nowrap;">
+      Enviar por e-mail
+    </button>
+  </div>
+</div>
+
+      <div id="analiseGastos_lineItemTableWrap">
+        <table id="analiseGastos_lineItemTable">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Loja</th>
+              <th>Time</th>
+              <th>Etiqueta</th>
+              <th>Valor</th>
+              <th>Descrição</th>
+              <th>Status Análise</th>
+              <th>Motivo Análise</th>
+              <th>Conta Sugerida</th>
+              <th>Etiqueta Sugerida</th>
+            </tr>
+          </thead>
+          <tbody id="analiseGastos_lineItemTbody">
+            <tr>
+              <td colspan="10" id="analiseGastos_lineItemMsg">Clique no botão para carregar a análise.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<? } ?>
 
         <!-- Modal: Detalhe de Estabelecimentos (pivot mensal) -->
         <div id="analiseGastos_estabModal" class="hidden" aria-hidden="true">
@@ -7550,6 +7881,9 @@ window.vektorResetCachesEmpresa_ = function() {
   window.__analiseGastosTx = [];
   window.__analiseGastosLastFilteredTx = [];
   window.__analiseGastosLastFilteredMeta = null;
+  window.__analiseGastosLineItemRes = null;
+  window.__analiseGastosLineItemKey = "";
+  window.__analiseGastosLineItemBusy = false;
 
   // =========================
   // FLUXO NUMERÁRIO SAP
@@ -10276,9 +10610,17 @@ function vektorAnaliseGastosInitOnce_(){
 
   const btnMediana = document.getElementById("analiseGastos_btnMediana");
   const btnCsv = document.getElementById("analiseGastos_btnCsv");
+  const btnLineItem = document.getElementById("analiseGastos_btnLineItem");
+
   const medModal = document.getElementById("analiseGastos_medModal");
   const medModalClose = document.getElementById("analiseGastos_medModalClose");
   const medModalBackdrop = document.getElementById("analiseGastos_medModalBackdrop");
+
+  const lineItemModalClose = document.getElementById("analiseGastos_lineItemModalClose");
+  const lineItemModalBackdrop = document.getElementById("analiseGastos_lineItemModalBackdrop");
+  const lineItemBtnCsv = document.getElementById("analiseGastos_lineItemBtnCsv");
+  const lineItemBtnEmail = document.getElementById("analiseGastos_lineItemBtnEmail");
+  const lineItemStatusFilter = document.getElementById("analiseGastos_lineItemStatusFilter");
 
   const selTime = document.getElementById("analiseGastos_selTime");
   const selLoja = document.getElementById("analiseGastos_selLoja");
@@ -10309,73 +10651,72 @@ function vektorAnaliseGastosInitOnce_(){
 
   // Estado inicial da tabela (sem carregar automaticamente)
   const tb = document.getElementById("analiseGastos_tbody");
-  if (tb && !tb.dataset.initMsgDone) {
-    tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:14px;font-weight:900;color:#334155;">Informe o período e clique em Buscar para consultar os gastos.</td></tr>`;
-    tb.dataset.initMsgDone = "1";
+  if (tb && !tb.__analiseInitMsgDone) {
+    tb.__analiseInitMsgDone = true;
+    tb.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align:center;padding:16px;font-weight:900;color:#475569;">
+          Informe o período e clique em Buscar para consultar os gastos.
+        </td>
+      </tr>`;
   }
 
-  // filtros se respeitando (Time x Loja x Categoria) + apply local
-  if (selTime) {
-    selTime.addEventListener("change", function(){
-      // ao trocar Time, limpa Loja para evitar combinação inválida persistida
-      if (selLoja) selLoja.value = "";
-      try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
+  // bind filtros multi
+  [selTime, selLoja, selCat].forEach(function(sel){
+    if (!sel || sel.__bindAnaliseMultiAll) return;
+    sel.__bindAnaliseMultiAll = true;
+
+    sel.addEventListener("change", function(){
+      try { vektorNormalizeMultiAll_(sel); } catch(e){ console.error(e); }
+      try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(e){ console.error(e); }
       vektorAnaliseGastosApply_();
     });
-  }
-
-  if (selLoja) {
-    selLoja.addEventListener("change", function(){
-      try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
-      vektorAnaliseGastosApply_();
-    });
-  }
-
-  if (selCat) {
-    selCat.addEventListener("change", function(){
-      try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
-      vektorAnaliseGastosApply_();
-    });
-  }
-
-  if (macroSelAno && !macroSelAno.__bindMacroAnoChange) {
-  macroSelAno.__bindMacroAnoChange = true;
-
-  macroSelAno.addEventListener("change", function(){
-    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
   });
 
-  // fallback para alguns comportamentos de UI/browser
-  macroSelAno.addEventListener("input", function(){
-    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
-  });
-}
+  // conta contábil
+  if (selConta && !selConta.__bindAGConta) {
+    selConta.__bindAGConta = true;
+    selConta.addEventListener("change", function(){
+      try { vektorNormalizeMultiAll_(selConta); } catch(e){ console.error(e); }
+      try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(e){ console.error(e); }
+      vektorAnaliseGastosApply_();
+    });
+  }
 
   // mudar datas NÃO busca automático; apenas reaplica local se já houver dataset
-  if (dtIniEl) dtIniEl.addEventListener("change", function(){
-  try { vektorAnaliseGastosClampDateInputs_(); } catch(e){ console.error(e); }
-  vektorAnaliseGastosApply_();
-});
-if (dtFimEl) dtFimEl.addEventListener("change", function(){
-  try { vektorAnaliseGastosClampDateInputs_(); } catch(e){ console.error(e); }
-  vektorAnaliseGastosApply_();
-});
+  if (dtIniEl && !dtIniEl.__bindAGDate) {
+    dtIniEl.__bindAGDate = true;
+    dtIniEl.addEventListener("change", function(){
+      try { vektorAnaliseGastosClampDateInputs_(); } catch(e){ console.error(e); }
+      vektorAnaliseGastosApply_();
+    });
+  }
 
-  // ✅ Ano/Mês -> restringe período e aplica localmente (sem buscar automático)
-if (selAno) {
-  selAno.addEventListener("change", function(){
-    try { vektorAnaliseGastosRebuildMesByAno_(); } catch(e){ console.error(e); }
-    try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
-    vektorAnaliseGastosApply_();
-  });
-}
+  if (dtFimEl && !dtFimEl.__bindAGDate) {
+    dtFimEl.__bindAGDate = true;
+    dtFimEl.addEventListener("change", function(){
+      try { vektorAnaliseGastosClampDateInputs_(); } catch(e){ console.error(e); }
+      vektorAnaliseGastosApply_();
+    });
+  }
 
-if (selMes) {
-  selMes.addEventListener("change", function(){
-    try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
-    vektorAnaliseGastosApply_();
-  });
-}
+  // Ano/Mês -> restringe período e aplica localmente (sem buscar automático)
+  if (selAno && !selAno.__bindAGAnoMes) {
+    selAno.__bindAGAnoMes = true;
+    selAno.addEventListener("change", function(){
+      try { vektorAnaliseGastosRebuildMesByAno_(); } catch(e){ console.error(e); }
+      try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
+      vektorAnaliseGastosApply_();
+    });
+  }
+
+  if (selMes && !selMes.__bindAGAnoMes) {
+    selMes.__bindAGAnoMes = true;
+    selMes.addEventListener("change", function(){
+      try { vektorAnaliseGastosSyncPeriodoByAnoMes_(); } catch(e){ console.error(e); }
+      vektorAnaliseGastosApply_();
+    });
+  }
 
   // sort thead (bind 1x)
   try {
@@ -10403,7 +10744,7 @@ if (selMes) {
     }
   } catch(_) {}
 
-  // ✅ único botão da página: Buscar
+  // único botão da página: Buscar
   // Ele mesmo garante meta (ACL + filtros) e depois busca dataset
   if (btnBuscar && !btnBuscar.__bindAnaliseBuscar) {
     btnBuscar.__bindAnaliseBuscar = true;
@@ -10412,146 +10753,190 @@ if (selMes) {
     });
   }
 
-  // ✅ botão "Média de Gastos" (modal de MEDIANA)
-if (btnMediana && !btnMediana.__bindMedianaOpen) {
-  btnMediana.__bindMedianaOpen = true;
-  btnMediana.addEventListener("click", function(){
-    try { vektorAnaliseGastosOpenMedianaModal_(); } catch(e){ console.error(e); }
-  });
-}
-
-if (btnCsv && !btnCsv.__bindAnaliseCsv) {
-  btnCsv.__bindAnaliseCsv = true;
-  btnCsv.addEventListener("click", function(){
-    try { vektorAnaliseGastosExportCsv_(); } catch(e){ console.error(e); }
-  });
-}
-
-if (selConta && !selConta.__bindAGConta) {
-  selConta.__bindAGConta = true;
-  selConta.addEventListener("change", function(){
-    try { vektorAnaliseGastosRebuildFilterOptions_(); } catch(_) {}
-  });
-}
-
-// ✅ fechar modal de mediana
-if (medModalClose && !medModalClose.__bindMedianaClose) {
-  medModalClose.__bindMedianaClose = true;
-  medModalClose.addEventListener("click", function(){
-    try { vektorAnaliseGastosCloseMedianaModal_(); } catch(e){ console.error(e); }
-  });
-}
-if (medModalBackdrop && !medModalBackdrop.__bindMedianaClose) {
-  medModalBackdrop.__bindMedianaClose = true;
-  medModalBackdrop.addEventListener("click", function(){
-    try { vektorAnaliseGastosCloseMedianaModal_(); } catch(e){ console.error(e); }
-  });
-}
-
-  // ✅ abrir Macro Visões (garante meta/ACL carregada)
-if (btnMacro && !btnMacro.__bindMacroOpen) {
-  btnMacro.__bindMacroOpen = true;
-  btnMacro.addEventListener("click", function(){
-    vektorAnaliseGastosEnsureMeta_(function(){
-      try { vektorAnaliseGastosOpenMacroModal_(); } catch(e){ console.error(e); }
+  // botão "Média de Gastos" (modal de MEDIANA)
+  if (btnMediana && !btnMediana.__bindMedianaOpen) {
+    btnMediana.__bindMedianaOpen = true;
+    btnMediana.addEventListener("click", function(){
+      try { vektorAnaliseGastosOpenMedianaModal_(); } catch(e){ console.error(e); }
     });
-  });
-}
+  }
 
-// ✅ fechar modal Macro
-if (btnMacroFechar && !btnMacroFechar.__bindMacroClose) {
-  btnMacroFechar.__bindMacroClose = true;
-  btnMacroFechar.addEventListener("click", function(){
-    try { vektorAnaliseGastosCloseMacroModal_(); } catch(e){ console.error(e); }
-  });
-}
+  if (btnCsv && !btnCsv.__bindAnaliseCsv) {
+    btnCsv.__bindAnaliseCsv = true;
+    btnCsv.addEventListener("click", function(){
+      try { vektorAnaliseGastosExportCsv_(); } catch(e){ console.error(e); }
+    });
+  }
 
-// ✅ atualizar gráficos do modal Macro
-if (btnMacroAtualizar && !btnMacroAtualizar.__bindMacroLoad) {
-  btnMacroAtualizar.__bindMacroLoad = true;
-  btnMacroAtualizar.addEventListener("click", function(){
-    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
-  });
-}
+  // botão "Line-item analysis"
+  if (btnLineItem && !btnLineItem.__bindLineItemOpen) {
+    btnLineItem.__bindLineItemOpen = true;
+    btnLineItem.addEventListener("click", function(){
+      try { vektorAnaliseGastosOpenLineItemModal_(); } catch(e){ console.error(e); }
+    });
+  }
 
-// ✅ auto-update ao trocar filtros do modal
-if (macroSelLoja && !macroSelLoja.__bindMacroChange) {
-  macroSelLoja.__bindMacroChange = true;
-  macroSelLoja.addEventListener("change", function(){
-    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
-  });
-}
+  if (lineItemModalClose && !lineItemModalClose.__bindLineItemClose) {
+    lineItemModalClose.__bindLineItemClose = true;
+    lineItemModalClose.addEventListener("click", function(){
+      try { vektorAnaliseGastosCloseLineItemModal_(); } catch(e){ console.error(e); }
+    });
+  }
 
-if (macroSelCat && !macroSelCat.__bindMacroChange) {
-  macroSelCat.__bindMacroChange = true;
-  macroSelCat.addEventListener("change", function(){
-    try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
-  });
-}
+  if (lineItemModalBackdrop && !lineItemModalBackdrop.__bindLineItemClose) {
+    lineItemModalBackdrop.__bindLineItemClose = true;
+    lineItemModalBackdrop.addEventListener("click", function(){
+      try { vektorAnaliseGastosCloseLineItemModal_(); } catch(e){ console.error(e); }
+    });
+  }
 
-// ✅ abrir modal de detalhe por estabelecimentos (pivot mensal)
-if (cardEstabWrap && !cardEstabWrap.__bindEstabPivotOpen) {
-  cardEstabWrap.__bindEstabPivotOpen = true;
+  if (lineItemBtnCsv && !lineItemBtnCsv.__bindLineItemCsv) {
+    lineItemBtnCsv.__bindLineItemCsv = true;
+    lineItemBtnCsv.addEventListener("click", function(){
+      try { vektorAnaliseGastosExportLineItemCsv_(); } catch(e){ console.error(e); }
+    });
+  }
 
-  cardEstabWrap.addEventListener("click", function(){
-    try { vektorAnaliseGastosOpenEstabPivotModal_(); } catch(e){ console.error(e); }
-  });
+  if (lineItemBtnEmail && !lineItemBtnEmail.__bindLineItemEmail) {
+    lineItemBtnEmail.__bindLineItemEmail = true;
+    lineItemBtnEmail.addEventListener("click", function(){
+      try { vektorAnaliseGastosSendLineItemEmail_(); } catch(e){ console.error(e); }
+    });
+  }
 
-  // acessibilidade por teclado
-  cardEstabWrap.addEventListener("keydown", function(ev){
-    if (!ev) return;
-    if (ev.key === "Enter" || ev.key === " ") {
-      ev.preventDefault();
-      try { vektorAnaliseGastosOpenEstabPivotModal_(); } catch(e){ console.error(e); }
-    }
-  });
-}
-
-// ✅ fechar modal de estabelecimentos
-if (estabModalClose && !estabModalClose.__bindEstabPivotClose) {
-  estabModalClose.__bindEstabPivotClose = true;
-  estabModalClose.addEventListener("click", function(){
-    try { vektorAnaliseGastosCloseEstabPivotModal_(); } catch(e){ console.error(e); }
-  });
-}
-
-if (estabModalBackdrop && !estabModalBackdrop.__bindEstabPivotClose) {
-  estabModalBackdrop.__bindEstabPivotClose = true;
-  estabModalBackdrop.addEventListener("click", function(){
-    try { vektorAnaliseGastosCloseEstabPivotModal_(); } catch(e){ console.error(e); }
-  });
-}
-
-// ✅ filtro textual da pivot (modal de estabelecimentos)
-if (estabPivotSearch && !estabPivotSearch.__bindPivotSearch) {
-  estabPivotSearch.__bindPivotSearch = true;
-
-  estabPivotSearch.addEventListener("input", function(){
-    try { vektorAnaliseGastosEstabPivotApplySearch_(); } catch(e){ console.error(e); }
-  });
-}
-
-if (estabPivotSearchClear && !estabPivotSearchClear.__bindPivotSearchClear) {
-  estabPivotSearchClear.__bindPivotSearchClear = true;
-
-  estabPivotSearchClear.addEventListener("click", function(){
+  if (lineItemStatusFilter && !lineItemStatusFilter.__bindLineItemStatus) {
+  lineItemStatusFilter.__bindLineItemStatus = true;
+  lineItemStatusFilter.addEventListener("change", function(){
     try {
-      var inp = document.getElementById("analiseGastos_estabPivotSearch");
-      if (inp) inp.value = "";
-      vektorAnaliseGastosEstabPivotApplySearch_();
-      if (inp) inp.focus();
+      if (window.__analiseGastosLineItemRes) {
+        vektorAnaliseGastosRenderLineItemAnalysis_(window.__analiseGastosLineItemRes);
+      }
     } catch(e){ console.error(e); }
   });
 }
 
-// ✅ exportar CSV
-if (estabPivotExportCsv && !estabPivotExportCsv.__bindPivotCsv) {
-  estabPivotExportCsv.__bindPivotCsv = true;
-  estabPivotExportCsv.addEventListener("click", function(){
-    try { vektorAnaliseGastosEstabPivotExportCsv_(); } catch(e){ console.error(e); }
-  });
-}
+  // fechar modal de mediana
+  if (medModalClose && !medModalClose.__bindMedianaClose) {
+    medModalClose.__bindMedianaClose = true;
+    medModalClose.addEventListener("click", function(){
+      try { vektorAnaliseGastosCloseMedianaModal_(); } catch(e){ console.error(e); }
+    });
+  }
 
+  if (medModalBackdrop && !medModalBackdrop.__bindMedianaClose) {
+    medModalBackdrop.__bindMedianaClose = true;
+    medModalBackdrop.addEventListener("click", function(){
+      try { vektorAnaliseGastosCloseMedianaModal_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  // abrir Macro Visões (garante meta/ACL carregada)
+  if (btnMacro && !btnMacro.__bindMacroOpen) {
+    btnMacro.__bindMacroOpen = true;
+    btnMacro.addEventListener("click", function(){
+      vektorAnaliseGastosEnsureMeta_(function(){
+        try { vektorAnaliseGastosOpenMacroModal_(); } catch(e){ console.error(e); }
+      });
+    });
+  }
+
+  if (btnMacroFechar && !btnMacroFechar.__bindMacroClose) {
+    btnMacroFechar.__bindMacroClose = true;
+    btnMacroFechar.addEventListener("click", function(){
+      try { vektorAnaliseGastosCloseMacroModal_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  if (btnMacroAtualizar && !btnMacroAtualizar.__bindMacroRefresh) {
+    btnMacroAtualizar.__bindMacroRefresh = true;
+    btnMacroAtualizar.addEventListener("click", function(){
+      try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  if (macroSelAno && !macroSelAno.__bindMacroChange) {
+    macroSelAno.__bindMacroChange = true;
+    macroSelAno.addEventListener("change", function(){
+      try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  if (macroSelLoja && !macroSelLoja.__bindMacroChange) {
+    macroSelLoja.__bindMacroChange = true;
+    macroSelLoja.addEventListener("change", function(){
+      try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  if (macroSelCat && !macroSelCat.__bindMacroChange) {
+    macroSelCat.__bindMacroChange = true;
+    macroSelCat.addEventListener("change", function(){
+      try { vektorAnaliseGastosMacroLoad_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  // abrir modal de detalhe por estabelecimentos (pivot mensal)
+  if (cardEstabWrap && !cardEstabWrap.__bindEstabPivotOpen) {
+    cardEstabWrap.__bindEstabPivotOpen = true;
+
+    cardEstabWrap.addEventListener("click", function(){
+      try { vektorAnaliseGastosOpenEstabPivotModal_(); } catch(e){ console.error(e); }
+    });
+
+    // acessibilidade por teclado
+    cardEstabWrap.addEventListener("keydown", function(ev){
+      if (!ev) return;
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        try { vektorAnaliseGastosOpenEstabPivotModal_(); } catch(e){ console.error(e); }
+      }
+    });
+  }
+
+  // fechar modal de estabelecimentos
+  if (estabModalClose && !estabModalClose.__bindEstabPivotClose) {
+    estabModalClose.__bindEstabPivotClose = true;
+    estabModalClose.addEventListener("click", function(){
+      try { vektorAnaliseGastosCloseEstabPivotModal_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  if (estabModalBackdrop && !estabModalBackdrop.__bindEstabPivotClose) {
+    estabModalBackdrop.__bindEstabPivotClose = true;
+    estabModalBackdrop.addEventListener("click", function(){
+      try { vektorAnaliseGastosCloseEstabPivotModal_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  // filtro textual da pivot (modal de estabelecimentos)
+  if (estabPivotSearch && !estabPivotSearch.__bindPivotSearch) {
+    estabPivotSearch.__bindPivotSearch = true;
+
+    estabPivotSearch.addEventListener("input", function(){
+      try { vektorAnaliseGastosEstabPivotApplySearch_(); } catch(e){ console.error(e); }
+    });
+  }
+
+  if (estabPivotSearchClear && !estabPivotSearchClear.__bindPivotSearchClear) {
+    estabPivotSearchClear.__bindPivotSearchClear = true;
+
+    estabPivotSearchClear.addEventListener("click", function(){
+      try {
+        var inp = document.getElementById("analiseGastos_estabPivotSearch");
+        if (inp) inp.value = "";
+        vektorAnaliseGastosEstabPivotApplySearch_();
+        if (inp) inp.focus();
+      } catch(e){ console.error(e); }
+    });
+  }
+
+  // exportar CSV
+  if (estabPivotExportCsv && !estabPivotExportCsv.__bindPivotCsv) {
+    estabPivotExportCsv.__bindPivotCsv = true;
+    estabPivotExportCsv.addEventListener("click", function(){
+      try { vektorAnaliseGastosEstabPivotExportCsv_(); } catch(e){ console.error(e); }
+    });
+  }
 }
 
 /* --------- BACKEND: meta (times/lojas/categorias permitidas) --------- */
@@ -11012,6 +11397,270 @@ function vektorAnaliseGastosExportCsv_(){
     try { document.body.removeChild(a); } catch(_) {}
     try { URL.revokeObjectURL(url); } catch(_) {}
   }, 120);
+}
+
+function vektorAnaliseGastosLineItemCurrentReq_(){
+  const dtIni = document.getElementById("analiseGastos_dtIni")?.value || "";
+  const dtFim = document.getElementById("analiseGastos_dtFim")?.value || "";
+
+  const selTime  = document.getElementById("analiseGastos_selTime");
+  const selLoja  = document.getElementById("analiseGastos_selLoja");
+  const selCat   = document.getElementById("analiseGastos_selCategoria");
+  const selConta = document.getElementById("analiseGastos_selContaContabil");
+
+  const time  = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selTime)  : [];
+  const loja  = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selLoja)  : [];
+  const cat   = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selCat)   : [];
+  const conta = (typeof vektorGetMultiValues_ === "function") ? vektorGetMultiValues_(selConta) : [];
+
+  return {
+    empresa: (typeof vektorEmpresaAtual_ === "function") ? vektorEmpresaAtual_() : "CENTAURO",
+    dtIni: dtIni,
+    dtFim: dtFim,
+    time: time,
+    loja: loja,
+    categoria: cat,
+    contaContabil: conta
+  };
+}
+
+function vektorAnaliseGastosOpenLineItemModal_(){
+  var m = document.getElementById("analiseGastos_lineItemModal");
+  if (!m) return;
+
+  m.classList.remove("hidden");
+  m.style.display = "block";
+
+  vektorAnaliseGastosLoadLineItemAnalysis_();
+}
+
+function vektorAnaliseGastosCloseLineItemModal_(){
+  var m = document.getElementById("analiseGastos_lineItemModal");
+  if (!m) return;
+
+  m.classList.add("hidden");
+  m.style.display = "none";
+}
+
+function vektorAnaliseGastosLineItemSetMsg_(txt){
+  const tb = document.getElementById("analiseGastos_lineItemTbody");
+  if (!tb) return;
+  tb.innerHTML = `<tr><td colspan="10" id="analiseGastos_lineItemMsg">${vektorSafe_(txt || "")}</td></tr>`;
+}
+
+function vektorAnaliseGastosLoadLineItemAnalysis_(){
+  const req = vektorAnaliseGastosLineItemCurrentReq_();
+
+  if (!req.dtIni || !req.dtFim) {
+    vektorAnaliseGastosLineItemSetMsg_("Informe início e fim do período antes de abrir a análise.");
+    return;
+  }
+  if (req.dtIni > req.dtFim) {
+    vektorAnaliseGastosLineItemSetMsg_("Período inválido: início maior que fim.");
+    return;
+  }
+
+  const cacheKey = JSON.stringify(req);
+  if (window.__analiseGastosLineItemRes && window.__analiseGastosLineItemKey === cacheKey) {
+    vektorAnaliseGastosRenderLineItemAnalysis_(window.__analiseGastosLineItemRes);
+    return;
+  }
+
+  window.__analiseGastosLineItemBusy = true;
+  vektorAnaliseGastosLineItemSetMsg_("Processando line-item analysis...");
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      window.__analiseGastosLineItemBusy = false;
+
+      if (!res || !res.ok) {
+        vektorAnaliseGastosLineItemSetMsg_("Falha: " + vektorSafe_(res && res.error ? res.error : "erro desconhecido"));
+        return;
+      }
+
+      window.__analiseGastosLineItemRes = res;
+      window.__analiseGastosLineItemKey = cacheKey;
+
+      vektorAnaliseGastosRenderLineItemAnalysis_(res);
+    })
+    .withFailureHandler(function(err){
+      window.__analiseGastosLineItemBusy = false;
+      vektorAnaliseGastosLineItemSetMsg_("Falha: " + vektorSafe_(err && err.message ? err.message : err));
+    })
+    .getAnaliseGastosLineItemAnalysis(req);
+}
+
+function vektorAnaliseGastosLineItemBadgeHtml_(row){
+  const s = String((row && row.statusAnalise) || "");
+  const cls = (s === "De acordo") ? "analiseLineBadgeOk" : "analiseLineBadgeWarn";
+  const title = vektorSafe_((row && row.motivoAnalise) || "");
+  return `<span class="${cls}" title="${title}">${vektorSafe_(s || "—")}</span>`;
+}
+
+function vektorAnaliseGastosRenderLineItemAnalysis_(res){
+  const resumo = (res && res.resumo) || {};
+  const allRows = Array.isArray(res && res.rows) ? res.rows : [];
+  const statusFilter = document.getElementById("analiseGastos_lineItemStatusFilter");
+  const wantedStatus = statusFilter ? String(statusFilter.value || "").trim() : "";
+
+  const rows = wantedStatus
+    ? allRows.filter(function(r){ return String(r.statusAnalise || "") === wantedStatus; })
+    : allRows.slice();
+
+  const kpiTotal = document.getElementById("analiseGastos_lineItem_kpiTotal");
+  const kpiOkPct = document.getElementById("analiseGastos_lineItem_kpiOkPct");
+  const kpiWarnPct = document.getElementById("analiseGastos_lineItem_kpiWarnPct");
+  const kpiOkValor = document.getElementById("analiseGastos_lineItem_kpiOkValor");
+  const kpiWarnValor = document.getElementById("analiseGastos_lineItem_kpiWarnValor");
+  const summaryTxt = document.getElementById("analiseGastos_lineItemSummaryTxt");
+  const tb = document.getElementById("analiseGastos_lineItemTbody");
+
+  // ✅ KPIs sempre sobre o universo completo analisado, não sobre o filtro visual
+  if (kpiTotal) kpiTotal.textContent = String(resumo.total ?? "0");
+  if (kpiOkPct) kpiOkPct.textContent = String((resumo.deAcordoPct ?? 0)) + "%";
+  if (kpiWarnPct) kpiWarnPct.textContent = String((resumo.verificarPct ?? 0)) + "%";
+  if (kpiOkValor) kpiOkValor.textContent = vektorFmtBRL_(resumo.deAcordoValor || 0);
+  if (kpiWarnValor) kpiWarnValor.textContent = vektorFmtBRL_(resumo.verificarValor || 0);
+
+  if (summaryTxt) {
+    summaryTxt.textContent =
+      "Total analisado: " + String(resumo.total || 0) +
+      " | Exibindo: " + String(rows.length || 0) +
+      " | Empresa: " + String((res && res.empresa) || "—");
+  }
+
+  if (!tb) return;
+
+  if (!rows.length) {
+    tb.innerHTML = `<tr><td colspan="10" id="analiseGastos_lineItemMsg">Nenhuma transação encontrada para o filtro aplicado.</td></tr>`;
+    return;
+  }
+
+  tb.innerHTML = rows.map(function(r){
+  return `
+    <tr>
+      <td>${vektorSafe_(r.data || "")}</td>
+      <td>${vektorSafe_(r.loja || "")}</td>
+      <td>${vektorSafe_(r.time || "")}</td>
+      <td title="${vektorSafe_((r.contaContabil || "") + (r.contaContabil ? " - " : "") + (r.etiqueta || ""))}">
+        ${vektorSafe_(r.etiqueta || "")}
+      </td>
+      <td class="num">${vektorSafe_(vektorFmtBRL_(r.valor || 0))}</td>
+      <td title="${vektorSafe_(r.itemExtraido || "")}">
+        ${vektorSafe_(r.descricao || "")}
+      </td>
+      <td style="text-align:center;">
+        ${vektorAnaliseGastosLineItemBadgeHtml_(r)}
+      </td>
+      <td>${vektorSafe_(r.motivoAnalise || "")}</td>
+      <td>${vektorSafe_(r.contaSugerida || "")}</td>
+      <td>${vektorSafe_(r.etiquetaSugerida || "")}</td>
+    </tr>
+  `;
+}).join("");
+}
+
+function vektorAnaliseGastosBuildLineItemExportRows_(){
+  const res = window.__analiseGastosLineItemRes || {};
+  const allRows = Array.isArray(res.rows) ? res.rows : [];
+  const statusFilter = document.getElementById("analiseGastos_lineItemStatusFilter");
+  const wantedStatus = statusFilter ? String(statusFilter.value || "").trim() : "";
+
+  const rows = wantedStatus
+    ? allRows.filter(function(r){ return String(r.statusAnalise || "") === wantedStatus; })
+    : allRows.slice();
+
+  const out = [[
+    "Data",
+    "Loja",
+    "Time",
+    "Etiqueta",
+    "Conta Contábil",
+    "Valor",
+    "Descrição",
+    "Item Extraído",
+    "Status Análise",
+    "Motivo Análise",
+    "Conta Sugerida",
+    "Etiqueta Sugerida"
+  ]];
+
+  rows.forEach(function(r){
+    out.push([
+      r.data || "",
+      r.loja || "",
+      r.time || "",
+      r.etiqueta || "",
+      r.contaContabil || "",
+      Number(r.valor || 0) || 0,
+      r.descricao || "",
+      r.itemExtraido || "",
+      r.statusAnalise || "",
+      r.motivoAnalise || "",
+      r.contaSugerida || "",
+      r.etiquetaSugerida || ""
+    ]);
+  });
+
+  return out;
+}
+
+function vektorAnaliseGastosExportLineItemCsv_(){
+  const req = vektorAnaliseGastosLineItemCurrentReq_();
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.ok || !res.base64) {
+        alert("Falha ao gerar Excel: " + (res && res.error ? res.error : "erro desconhecido"));
+        return;
+      }
+
+      const bytes = atob(res.base64);
+      const len = bytes.length;
+      const arr = new Uint8Array(len);
+      for (let i = 0; i < len; i++) arr[i] = bytes.charCodeAt(i);
+
+      const blob = new Blob(
+        [arr],
+        { type: res.mimeType || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+      );
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.filename || "Vektor_LineItemAnalysis.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    })
+    .withFailureHandler(function(err){
+      alert("Falha ao gerar Excel: " + (err && err.message ? err.message : err));
+    })
+    .exportAnaliseGastosLineItemXlsx(req);
+}
+
+function vektorAnaliseGastosSendLineItemEmail_(){
+  const req = vektorAnaliseGastosLineItemCurrentReq_();
+
+  if (!req.dtIni || !req.dtFim) {
+    alert("Informe início e fim do período antes de enviar.");
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res){
+      if (!res || !res.ok) {
+        alert("Falha ao enviar e-mail: " + (res && res.error ? res.error : "erro desconhecido"));
+        return;
+      }
+      alert("Relatório enviado para " + (res.to || "seu e-mail") + ".");
+    })
+    .withFailureHandler(function(err){
+      alert("Falha ao enviar e-mail: " + (err && err.message ? err.message : err));
+    })
+    .sendAnaliseGastosLineItemAnalysisEmail(req);
 }
 
 // =========================
