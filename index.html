@@ -3188,7 +3188,7 @@ display: none;
           </div>
 
           <p class="-mt-1 w-full text-sm font-semibold leading-6 text-slate-200">
-            Ambiente central para gestão integrada dos sistemas financeiros corporativos do Grupo SBF. Acesse abaixo o módulo desejado para acompanhar operações, análises, monitoramentos e futuras soluções financeiras em uma única plataforma.
+            Ambiente central para gestão integrada dos sistemas corporativos da área de Operações Financeiras do Grupo SBF. Acesse abaixo o módulo desejado para acompanhar operações, análises, monitoramentos e futuras soluções em uma única plataforma.
           </p>
         </div>
       </div>
@@ -7173,6 +7173,7 @@ display: none;
             <option value="PENDENCIAS">Pendências</option>
             <option value="USO_IRREGULAR">Possível irregularidade</option>
             <option value="ITENS_IRREGULARES">Possíveis itens irregulares</option>
+            <option value="DEMISSOES">Demissões</option>
           </select>
         </div>
 
@@ -8790,6 +8791,7 @@ function carregarAlertasRecentes() {
     if (x.startsWith("LIMITE")) return "LIMITE";
     if (x.startsWith("USO_IRREGULAR")) return "USO_IRREGULAR";
     if (x.startsWith("ITENS_IRREGULARES")) return "ITENS_IRREGULARES";
+    if (x.startsWith("DEMISSOES")) return "DEMISSOES";
     return x; // fallback
   };
 
@@ -8853,6 +8855,7 @@ function carregarAlertasRecentes() {
     if (x === "LIMITE") return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800'>Limite</span>";
     if (x.startsWith("PENDENCIAS")) return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800'>Pendências</span>";
     if (x.startsWith("USO_IRREGULAR")) return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800'>Possível irregularidade</span>";
+    if (x.startsWith("DEMISSOES")) return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-sky-100 text-sky-800'>Demissões</span>";
     return "<span class='px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-800'>" + (t || "Outro") + "</span>";
   };
 
