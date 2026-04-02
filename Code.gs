@@ -489,12 +489,14 @@ try {
 // =======================
 var VEKTOR_EMAILS_SHEET = "VEKTOR_EMAILS";
 var VEKTOR_ACESSOS_SHEET = "VEKTOR_ACESSOS";
+var VEKTOR_MODULOS_SHEET = "VEKTOR_MODULOS";
 
 // Usa a mesma planilha do Clara (BaseClara / Info_limites etc.)
 var VEKTOR_ACL_SPREADSHEET_ID = "1_XW0IqbYjiCPpqtwdEi1xPxDlIP2MSkMrLGbeinLIeI";
 
 var VEKTOR_ACL_CACHE_EMAILS = "VEKTOR_ACL_EMAILS_V1";
 var VEKTOR_ACL_CACHE_ACESSOS = "VEKTOR_ACL_ACESSOS_V1";
+var VEKTOR_ACL_CACHE_MODULOS = "VEKTOR_ACL_MODULOS_V1";
 var VEKTOR_ACL_CACHE_TTL = 120; // 2 min
 
 function vektorNorm_(s) {
@@ -544,6 +546,50 @@ function vektorLoadEmailsRoleMap_() {
 
   var out = { byEmail: byEmail };
   cache.put(VEKTOR_ACL_CACHE_EMAILS, JSON.stringify(out), VEKTOR_ACL_CACHE_TTL);
+  return out;
+}
+
+function vektorLoadModulesAccessMap_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(VEKTOR_ACL_CACHE_MODULOS);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) {}
+  }
+
+  var ss = SpreadsheetApp.openById(VEKTOR_ACL_SPREADSHEET_ID);
+  var sh = ss.getSheetByName(VEKTOR_MODULOS_SHEET);
+  if (!sh) throw new Error('Aba "' + VEKTOR_MODULOS_SHEET + '" não encontrada.');
+
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return { byEmail: {} };
+
+  var header = values[0].map(function (h) { return vektorNorm_(h); });
+  var iEmail  = header.indexOf("EMAIL");
+  var iModulo = header.indexOf("MODULO");
+  var iAtivo  = header.indexOf("ATIVO");
+
+  if (iEmail < 0 || iModulo < 0 || iAtivo < 0) {
+    throw new Error('Cabeçalho inválido em "' + VEKTOR_MODULOS_SHEET + '". Esperado: EMAIL, MODULO, ATIVO.');
+  }
+
+  var byEmail = {};
+
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+
+    var email = vektorNormEmail_(row[iEmail]);
+    var modulo = String(row[iModulo] || "").trim().toUpperCase();
+    var ativo = vektorIsAtivo_(row[iAtivo]);
+
+    if (!email || !modulo) continue;
+    if (!ativo) continue;
+
+    if (!byEmail[email]) byEmail[email] = {};
+    byEmail[email][modulo] = true;
+  }
+
+  var out = { byEmail: byEmail };
+  cache.put(VEKTOR_ACL_CACHE_MODULOS, JSON.stringify(out), VEKTOR_ACL_CACHE_TTL);
   return out;
 }
 
@@ -628,6 +674,48 @@ function vektorGetUserRole_() {
   throw new Error("Acesso não disponível. Solicite a liberação junto ao administrador do sistema.");
     }
   return { email: sess, role: rec.role };
+}
+
+function vektorUserHasModuleAccess_(email, modulo) {
+  var em = String(email || "").trim().toLowerCase();
+  var mod = String(modulo || "").trim().toUpperCase();
+  if (!em || !mod) return false;
+
+  var map = vektorLoadModulesAccessMap_();
+  return !!(map && map.byEmail && map.byEmail[em] && map.byEmail[em][mod] === true);
+}
+
+function vektorAssertModuleAllowed_(modulo) {
+  var ctx = vektorGetUserRole_();
+  var ok = vektorUserHasModuleAccess_(ctx.email, modulo);
+  if (!ok) {
+    throw new Error("Você não possui acesso a este módulo.");
+  }
+  return {
+    email: ctx.email,
+    role: ctx.role,
+    modulo: String(modulo || "").trim().toUpperCase()
+  };
+}
+
+function vektorCanOpenModule(modulo) {
+  try {
+    var ctx = vektorAssertModuleAllowed_(modulo);
+    return {
+      ok: true,
+      allowed: true,
+      modulo: ctx.modulo,
+      email: ctx.email,
+      role: ctx.role
+    };
+  } catch (e) {
+    return {
+      ok: true,
+      allowed: false,
+      modulo: String(modulo || "").trim().toUpperCase(),
+      error: (e && e.message) ? e.message : String(e)
+    };
+  }
 }
 
 function vektorAssertFunctionAllowed_(fnName) {
@@ -4838,6 +4926,148 @@ function normalizarDataParaISO_(input) {
   return "2025-12-01";
 }
 
+var VEKTOR_DEMISSOES_NOTIFY_TAB = "Vektor_Demissoes_Notificadas";
+
+function vektorGetOrCreateDemissoesNotifySheet_() {
+  var ss = SpreadsheetApp.openById(VEKTOR_METRICAS_SHEET_ID);
+  var sh = ss.getSheetByName(VEKTOR_DEMISSOES_NOTIFY_TAB);
+
+  if (!sh) {
+    sh = ss.insertSheet(VEKTOR_DEMISSOES_NOTIFY_TAB);
+    sh.appendRow([
+      "notify_key",
+      "empresa",
+      "matricula",
+      "email_corporativo",
+      "cargo",
+      "filial",
+      "status",
+      "data_afastamento",
+      "email_enviado_em"
+    ]);
+    sh.getRange(1, 1, 1, 9).setFontWeight("bold");
+    sh.setFrozenRows(1);
+  }
+
+  return sh;
+}
+
+function vektorDemissaoNotifyKey_(row, empresa) {
+  var emp = String(empresa || "").trim().toUpperCase();
+  return [
+    emp,
+    String(row.matricula || "").trim(),
+    String(row.des_email_corporativo || "").trim().toLowerCase(),
+    String(row.des_titulo_cargo || "").trim(),
+    String(row.nom_apelido_filial || "").trim(),
+    String(row.nom_afastamento || "").trim(),
+    String(row.dat_afastamento || "").trim()
+  ].join("||");
+}
+
+function vektorDemissoesNotificadasMap_() {
+  var sh = vektorGetOrCreateDemissoesNotifySheet_();
+  var lastRow = sh.getLastRow();
+  if (lastRow < 2) return {};
+
+  var values = sh.getRange(2, 1, lastRow - 1, 1).getValues();
+  var map = {};
+
+  values.forEach(function(r){
+    var k = String((r && r[0]) || "").trim();
+    if (k) map[k] = true;
+  });
+
+  return map;
+}
+
+function vektorDemissaoRegistrarNotificada_(row, empresa) {
+  var sh = vektorGetOrCreateDemissoesNotifySheet_();
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var ts = Utilities.formatDate(new Date(), tz, "yyyy-MM-dd HH:mm:ss");
+  var emp = String(empresa || "").trim().toUpperCase();
+  var key = vektorDemissaoNotifyKey_(row, emp);
+
+  sh.appendRow([
+    key,
+    emp,
+    String(row.matricula || "").trim(),
+    String(row.des_email_corporativo || "").trim(),
+    String(row.des_titulo_cargo || "").trim(),
+    String(row.nom_apelido_filial || "").trim(),
+    String(row.nom_afastamento || "").trim(),
+    String(row.dat_afastamento || "").trim(),
+    ts
+  ]);
+}
+
+function vektorSaudacaoHora_() {
+  var tz = Session.getScriptTimeZone() || "America/Sao_Paulo";
+  var hh = Number(Utilities.formatDate(new Date(), tz, "H"));
+
+  if (hh < 12) return "Bom dia";
+  if (hh < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+function vektorAssuntoDemissao_(empresa) {
+  var emp = String(empresa || "").trim().toUpperCase();
+  return emp === "FISIA"
+    ? "[ALERTA CLARA - FISIA] DESLIGAMENTOS"
+    : "[ALERTA CLARA - CENTAURO] DESLIGAMENTOS";
+}
+
+function vektorHtmlDemissaoGerente_(row, empresa) {
+  function esc_(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  var saudacao = vektorSaudacaoHora_();
+  var emp = String(empresa || "").trim().toUpperCase();
+
+  var html = "";
+  html += "<div style='font-family:Arial,Helvetica,sans-serif;color:#0f172a;'>";
+  html +=   "<p style='margin:0 0 12px 0;'>" + esc_(saudacao) + ".</p>";
+  html +=   "<p style='margin:0 0 12px 0;'>";
+  html +=     "Identificamos um novo desligamento de gerente na base monitorada do Vektor para a empresa <b>" + esc_(emp) + "</b>.";
+  html +=   "</p>";
+  html +=   "<p style='margin:0 0 12px 0;'>";
+  html +=     "Favor verificar o bloqueio/cancelamento do cartão Clara vinculado ao colaborador e a inativação do usuário na plataforma da Clara.";
+  html +=   "</p>";
+
+  html +=   "<div style='overflow:auto; border:1px solid #e2e8f0; border-radius:12px;'>";
+  html +=     "<table style='width:100%; border-collapse:separate; border-spacing:0; font-size:12px;'>";
+  html +=       "<thead><tr style='background:#0b1220; color:#fff;'>";
+  html +=         "<th style='padding:8px; text-align:left;'>Matrícula</th>";
+  html +=         "<th style='padding:8px; text-align:left;'>E-mail</th>";
+  html +=         "<th style='padding:8px; text-align:left;'>Cargo</th>";
+  html +=         "<th style='padding:8px; text-align:left;'>Filial</th>";
+  html +=         "<th style='padding:8px; text-align:left;'>Status</th>";
+  html +=         "<th style='padding:8px; text-align:left;'>Data</th>";
+  html +=       "</tr></thead>";
+  html +=       "<tbody><tr>";
+  html +=         "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + esc_(row.matricula) + "</td>";
+  html +=         "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + esc_(row.des_email_corporativo) + "</td>";
+  html +=         "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + esc_(row.des_titulo_cargo) + "</td>";
+  html +=         "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + esc_(row.nom_apelido_filial) + "</td>";
+  html +=         "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + esc_(row.nom_afastamento) + "</td>";
+  html +=         "<td style='padding:8px; border-top:1px solid #e2e8f0;'>" + esc_(row.dat_afastamento) + "</td>";
+  html +=       "</tr></tbody>";
+  html +=     "</table>";
+  html +=   "</div>";
+
+  html +=   "<p style='margin:12px 0 0 0;'>";
+  html +=     "Mensagem automática gerada pelo Vektor - Grupo SBF.";
+  html +=   "</p>";
+  html += "</div>";
+
+  return html;
+}
+
 function getUltimasDemissoesGerentes(empresa) {
   vektorAssertFunctionAllowed_("getUltimasDemissoesGerentes");
 
@@ -4946,6 +5176,103 @@ function getUltimasDemissoesGerentes(empresa) {
 
   } catch (e) {
     return { ok: false, error: e && e.message ? e.message : String(e) };
+  }
+}
+
+function vektorMonitorarNovasDemissoesGerentes() {
+  try {
+    var empresas = ["CENTAURO", "FISIA"];
+    var jaNotificadas = vektorDemissoesNotificadasMap_();
+    var sh = vektorGetOrCreateDemissoesNotifySheet_();
+    var isPrimeiraCarga = sh.getLastRow() < 2;
+
+    var pendentes = [];
+
+    empresas.forEach(function(emp){
+      var res = getUltimasDemissoesGerentes(emp);
+      if (!res || !res.ok || !Array.isArray(res.rows)) return;
+
+      (res.rows || []).forEach(function(row){
+        var key = vektorDemissaoNotifyKey_(row, emp);
+        if (jaNotificadas[key]) return;
+
+        if (isPrimeiraCarga) {
+          vektorDemissaoRegistrarNotificada_(row, emp);
+          jaNotificadas[key] = true;
+          return;
+        }
+
+        pendentes.push({
+          empresa: emp,
+          row: row,
+          key: key
+        });
+      });
+    });
+
+    if (!pendentes.length) {
+      return { ok: true, enviados: 0, primeiraCarga: isPrimeiraCarga };
+    }
+
+    var aliases = [];
+    try { aliases = GmailApp.getAliases(); } catch (_) {}
+    var podeUsarAlias = aliases.indexOf("vektor@gruposbf.com.br") >= 0;
+
+    var enviados = 0;
+    var falhas = [];
+
+    pendentes.forEach(function(item){
+      try {
+        GmailApp.sendEmail(
+          "contasareceber@gruposbf.com.br",
+          vektorAssuntoDemissao_(item.empresa),
+          " ",
+          {
+            htmlBody: vektorHtmlDemissaoGerente_(item.row, item.empresa),
+            name: "Vektor - Grupo SBF",
+            from: podeUsarAlias ? "vektor@gruposbf.com.br" : undefined
+          }
+        );
+
+        try {
+            registrarAlertaEnviado_(
+              "DEMISSOES",
+              String(item.row.nom_apelido_filial || "").trim(),
+              "", // time não existe nessa query
+              "Matrícula=" + String(item.row.matricula || "").trim() +
+                " | Cargo=" + String(item.row.des_titulo_cargo || "").trim() +
+                " | Status=" + String(item.row.nom_afastamento || "").trim() +
+                " | Data=" + String(item.row.dat_afastamento || "").trim(),
+              "contasareceber@gruposbf.com.br",
+              "AUTO_DEMISSOES",
+              item.empresa
+            );
+          } catch (eLog) {
+            Logger.log("Falha ao registrar alerta de demissão no log: " + (eLog && eLog.message ? eLog.message : eLog));
+          }
+        vektorDemissaoRegistrarNotificada_(item.row, item.empresa);
+        enviados++;
+      } catch (eEnvio) {
+        falhas.push({
+          empresa: item.empresa,
+          matricula: String(item.row.matricula || ""),
+          erro: (eEnvio && eEnvio.message) ? eEnvio.message : String(eEnvio)
+        });
+      }
+    });
+
+    return {
+      ok: true,
+      enviados: enviados,
+      falhas: falhas,
+      primeiraCarga: false
+    };
+
+  } catch (e) {
+    return {
+      ok: false,
+      error: (e && e.message) ? e.message : String(e)
+    };
   }
 }
 
@@ -20623,7 +20950,36 @@ function removerTriggersAjusteLimiteMensalVektor() {
   return { ok: true };
 }
 
- // ==========TESTES===============//getAnaliseGastosMedianas(req)
+function instalarTriggerMonitorDemissoesGerentes() {
+  var handler = "vektorMonitorarNovasDemissoesGerentes";
+
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === handler) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  ScriptApp.newTrigger(handler)
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  return { ok: true };
+}
+
+function removerTriggerMonitorDemissoesGerentes() {
+  var handler = "vektorMonitorarNovasDemissoesGerentes";
+
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === handler) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  return { ok: true };
+}
+
+ // ==========TESTES===============//
 
 function TESTAR_POLITICA() {
   var txt = vektorPolicyLoadText_();
