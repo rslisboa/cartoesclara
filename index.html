@@ -30743,6 +30743,9 @@ window.vektorAuxRenderPreviewZfi_ = function(res){
 window.vektorAuxAplicarFiltroStatusZfi_ = function(){
   const body = document.getElementById("auxZfiBody");
   const selStatus = document.getElementById("auxZfiStatusSel");
+  const qtd = document.getElementById("auxZfiResumoQtd");
+  const val = document.getElementById("auxZfiResumoValor");
+
   if (!body) return;
 
   const data = window.__auxZfiPreview || {};
@@ -30751,15 +30754,26 @@ window.vektorAuxAplicarFiltroStatusZfi_ = function(){
 
   data.statusFilter = filtro;
 
-  let rows = allRows.filter(function(r){
+  const rows = allRows.filter(function(r){
     const st = String(r.statusCode || "OK");
 
     if (filtro === "TODOS") return true;
-    if (filtro === "PROBLEMA") return st === "SEM_ETIQUETA" || st === "MULTIPLAS_ETIQUETAS";
+    if (filtro === "PROBLEMA") {
+      return st === "SEM_ETIQUETA" || st === "MULTIPLAS_ETIQUETAS_USOU_PRIMEIRA";
+    }
     return st === filtro;
   });
 
   data.rows = rows.slice();
+
+  // cards dinâmicos conforme filtro
+  const qtdFiltrada = rows.length;
+  const valorFiltrado = rows.reduce(function(acc, r){
+    return acc + (Number(r.valor || 0) || 0);
+  }, 0);
+
+  if (qtd) qtd.textContent = String(qtdFiltrada || 0);
+  if (val) val.textContent = window.vektorAuxFmtMoneyBr_(valorFiltrado || 0);
 
   if (!rows.length) {
     body.innerHTML = "<p class='text-sm text-slate-700'>Nenhuma transação encontrada para o filtro selecionado.</p>";
@@ -30768,8 +30782,13 @@ window.vektorAuxAplicarFiltroStatusZfi_ = function(){
 
   let html = "";
 
-  const qtdSemEtiqueta = allRows.filter(function(r){ return String(r.statusCode || "") === "SEM_ETIQUETA"; }).length;
-  const qtdMultiplas = allRows.filter(function(r){ return String(r.statusCode || "") === "MULTIPLAS_ETIQUETAS"; }).length;
+  const qtdSemEtiqueta = allRows.filter(function(r){
+    return String(r.statusCode || "") === "SEM_ETIQUETA";
+  }).length;
+
+  const qtdMultiplas = allRows.filter(function(r){
+    return String(r.statusCode || "") === "MULTIPLAS_ETIQUETAS_USOU_PRIMEIRA";
+  }).length;
 
   if (qtdSemEtiqueta || qtdMultiplas) {
     html +=
@@ -30811,9 +30830,21 @@ window.vektorAuxAplicarFiltroStatusZfi_ = function(){
     if (st === "SEM_ETIQUETA") {
       statusLabel = "Sem etiqueta";
       statusColor = "#b45309";
-    } else if (st === "MULTIPLAS_ETIQUETAS") {
-      statusLabel = "Múltiplas etiquetas";
+    } else if (st === "MULTIPLAS_ETIQUETAS_USOU_PRIMEIRA") {
+      statusLabel = "Múltiplas etiquetas - usou a primeira";
       statusColor = "#b91c1c";
+    } else if (st === "ETIQUETA_INFERIDA") {
+      statusLabel = "Etiqueta inferida";
+      statusColor = "#1d4ed8";
+    } else if (st === "HISTORICO_ESTORNO") {
+      statusLabel = "Histórico de estorno";
+      statusColor = "#7c3aed";
+    } else if (st === "RATEIO_LOJAS") {
+      statusLabel = "Rateio de lojas";
+      statusColor = "#0f766e";
+    } else if (st === "CC_SOBRESCRITO_DESCRICAO") {
+      statusLabel = "CC pela descrição";
+      statusColor = "#92400e";
     }
 
     html += "<tr" + (problema ? " style='background:#fff7ed;'" : "") + ">";
