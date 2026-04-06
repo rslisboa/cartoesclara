@@ -912,7 +912,7 @@ try {
   return template
   .evaluate()
   .setTitle('Grupo SBF | Vektor')
-  .setFaviconUrl('https://raw.githubusercontent.com/rslisboa/cartoesclara/ce030011860b128fc826cd763582f60c0d68890c/Logo_Vektor_0503_2.png')
+  .setFaviconUrl('https://raw.githubusercontent.com/rslisboa/cartoesclara/344748b9c9cc7b95f90c9bed73c826d3c0569ba7/Icon_0204.png')
   .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 
   }
@@ -2253,7 +2253,8 @@ function vektorAjusteLimiteMensalEnviar_(empresa) {
     VEKTOR_AJUSTE_LIMITE_TO,
     assunto,
     " ",
-    {
+    { 
+      from: "vektor@gruposbf.com.br",
       htmlBody: htmlBody,
       name: "Vektor - Grupo SBF",
       replyTo: VEKTOR_AJUSTE_LIMITE_REPLYTO
@@ -17086,6 +17087,10 @@ function getComparativoFaturasClara(extratoAtualOpt, extratoAnteriorOpt, empresa
   }
 }
 
+function getComparativoFaturasClaraCore_(extratoAtualOpt, extratoAnteriorOpt, empresa) {
+  return getComparativoFaturasClara(extratoAtualOpt, extratoAnteriorOpt, empresa);
+}
+
 function getComparativoFaturasClaraParaChat() {
   vektorAssertFunctionAllowed_("getComparativoFaturasClaraParaChat");
   return getComparativoFaturasClaraCore_("", "");
@@ -17281,6 +17286,44 @@ function vektorZfiNormDesc_(s) {
   return s.toUpperCase();
 }
 
+function vektorZfiIsEstorno_(estabelecimentoRaw, valor) {
+  var estabNorm = vektorZfiNormDesc_(estabelecimentoRaw || "");
+  var v = Number(valor || 0) || 0;
+  return /^ESTORNO\b/.test(estabNorm) && v < 0;
+}
+
+function vektorZfiNormEstabEstorno_(estabelecimentoRaw) {
+  var s = vektorZfiNormDesc_(estabelecimentoRaw || "");
+
+  // remove prefixos mais comuns de estorno
+  s = s.replace(/^ESTORNO\b(?:\s+DE|\s+DA|\s+DO|\s+DAS|\s+DOS)?[\s\-:\/]*/i, "").trim();
+
+  // normaliza separadores e espaços
+  s = s.replace(/\s*\*\s*/g, "*");
+  s = s.replace(/\s+/g, " ").trim();
+
+  return s;
+}
+
+function vektorZfiAbsMoneyKey_(valor) {
+  return Math.abs(Number(valor || 0) || 0).toFixed(2);
+}
+
+function vektorZfiChaveEstornoMatch_(lojaNum, estabelecimentoRaw, valor) {
+  var loja4 = vektorZfiLoja4_(lojaNum);
+  var estab = vektorZfiNormEstabEstorno_(estabelecimentoRaw);
+  var valorKey = vektorZfiAbsMoneyKey_(valor);
+  if (!loja4 || !estab) return "";
+  return [loja4, valorKey, estab].join("||");
+}
+
+function vektorZfiChaveEstornoMatchSemLoja_(estabelecimentoRaw, valor) {
+  var estab = vektorZfiNormEstabEstorno_(estabelecimentoRaw);
+  var valorKey = vektorZfiAbsMoneyKey_(valor);
+  if (!estab) return "";
+  return [valorKey, estab].join("||");
+}
+
 function vektorZfiExtrairLojasRateio_(descricaoRaw) {
   var txtOrig = String(descricaoRaw || "").trim();
   var txt = vektorZfiNormDesc_(txtOrig);
@@ -17361,12 +17404,32 @@ function vektorZfiExtratosAnteriores2_(todosExtratos, extratoAtual) {
   return out;
 }
 
+function vektorZfiExtratosBuscaEstorno_(todosExtratos, extratoAtual) {
+  var lista = Array.isArray(todosExtratos) ? todosExtratos.slice() : [];
+  var idx = lista.indexOf(extratoAtual);
+  if (idx < 0) return { atual: [], anterior: [] };
+
+  var atual = [extratoAtual];
+  var anterior = [];
+
+  if (idx - 1 >= 0) anterior.push(lista[idx - 1]);
+
+  return {
+    atual: atual,
+    anterior: anterior
+  };
+}
+
 function vektorZfiConstruirIndiceHistoricoEtiquetas_(linhas, idxs, extratosHistorico) {
   var histSet = {};
-  (extratosHistorico || []).forEach(function(x){ histSet[String(x || "").trim()] = true; });
+  (extratosHistorico || []).forEach(function(x){
+    histSet[String(x || "").trim()] = true;
+  });
 
   var byEstab = {};
   var byDesc  = {};
+  var byChaveExata = {};
+  var byValorEstab = {};
 
   function add_(mapa, key, etiqueta) {
     key = String(key || "").trim();
@@ -17383,14 +17446,33 @@ function vektorZfiConstruirIndiceHistoricoEtiquetas_(linhas, idxs, extratosHisto
     var etiquetaInfo = vektorZfiResolverEtiquetas_(row[idxs.idxEtiq]);
     if (!etiquetaInfo.conta2) return;
 
-    var estab = vektorZfiNormDesc_(row[idxs.idxEstab]);
-    var desc  = vektorZfiNormDesc_(row[idxs.idxDesc]);
+    var estabRaw = row[idxs.idxEstab];
+    var descRaw  = row[idxs.idxDesc];
+    var valor    = Number(row[idxs.idxValor] || 0) || 0;
+    var lojaNum  = vektorZfiLojaNum_(row[idxs.idxLoja]);
+
+    var estab = vektorZfiNormDesc_(estabRaw);
+    var desc  = vektorZfiNormDesc_(descRaw);
 
     add_(byEstab, estab, etiquetaInfo.conta2);
     add_(byDesc, desc, etiquetaInfo.conta2);
+
+    // índice apenas para transação original positiva
+    if (valor > 0 && !vektorZfiIsEstorno_(estabRaw, valor)) {
+      var chaveExata   = vektorZfiChaveEstornoMatch_(lojaNum, estabRaw, valor);
+      var chaveSemLoja = vektorZfiChaveEstornoMatchSemLoja_(estabRaw, valor);
+
+      add_(byChaveExata, chaveExata, etiquetaInfo.conta2);
+      add_(byValorEstab, chaveSemLoja, etiquetaInfo.conta2);
+    }
   });
 
-  return { byEstab: byEstab, byDesc: byDesc };
+  return {
+    byEstab: byEstab,
+    byDesc: byDesc,
+    byChaveExata: byChaveExata,
+    byValorEstab: byValorEstab
+  };
 }
 
 function vektorZfiPickEtiquetaHist_(bucket) {
@@ -17524,7 +17606,8 @@ function getPreviewArquivoZFIVektor(req) {
           etiquetasInferidas:0,
           rateiosAplicados:0,
           ccSobrescrito:0,
-          valorTotal:0
+          valorTotal:0,
+          historicoEstorno:0
         }
       };
     }
@@ -17576,13 +17659,34 @@ function getPreviewArquivoZFIVektor(req) {
     });
 
     var extratosHist = vektorZfiExtratosAnteriores2_(extratosUnicos, extratoAlvo);
+    var extratosBuscaEstorno = vektorZfiExtratosBuscaEstorno_(extratosUnicos, extratoAlvo);
 
     var histIdx = vektorZfiConstruirIndiceHistoricoEtiquetas_(linhas, {
       idxExtrato: idxExtrato,
       idxEtiq: idxEtiq,
       idxEstab: idxEstab,
-      idxDesc: idxDesc
+      idxDesc: idxDesc,
+      idxValor: idxValor,
+      idxLoja: idxLoja
     }, extratosHist);
+
+    var histIdxEstornoAtual = vektorZfiConstruirIndiceHistoricoEtiquetas_(linhas, {
+      idxExtrato: idxExtrato,
+      idxEtiq: idxEtiq,
+      idxEstab: idxEstab,
+      idxDesc: idxDesc,
+      idxValor: idxValor,
+      idxLoja: idxLoja
+    }, extratosBuscaEstorno.atual);
+
+    var histIdxEstornoAnterior = vektorZfiConstruirIndiceHistoricoEtiquetas_(linhas, {
+      idxExtrato: idxExtrato,
+      idxEtiq: idxEtiq,
+      idxEstab: idxEstab,
+      idxDesc: idxDesc,
+      idxValor: idxValor,
+      idxLoja: idxLoja
+    }, extratosBuscaEstorno.anterior);
 
     var previewRows = [];
     var csvRows = [];
@@ -17592,6 +17696,7 @@ function getPreviewArquivoZFIVektor(req) {
     var etiquetasInferidas = 0;
     var rateiosAplicados = 0;
     var ccSobrescrito = 0;
+    var historicoEstorno = 0;
 
     for (var i = 0; i < linhas.length; i++) {
       var row = linhas[i];
@@ -17638,22 +17743,76 @@ function getPreviewArquivoZFIVektor(req) {
           multiplasEtiquetasUsouPrimeira += 1;
         }
 
-        if (!conta2) {
-          var estabKey = vektorZfiNormDesc_(itemTx.estabelecimentoRaw);
-          var descKey  = vektorZfiNormDesc_(itemTx.descricaoRaw);
+          if (!conta2) {
+            var estabKey = vektorZfiNormDesc_(itemTx.estabelecimentoRaw);
+            var descKey  = vektorZfiNormDesc_(itemTx.descricaoRaw);
 
-          var tagHist = vektorZfiPickEtiquetaHist_(histIdx.byEstab[estabKey]) ||
-                        vektorZfiPickEtiquetaHist_(histIdx.byDesc[descKey]);
+            var isEstorno = vektorZfiIsEstorno_(itemTx.estabelecimentoRaw, itemTx.valor);
 
-          if (tagHist) {
-            conta2 = tagHist;
-            statusCode = "ETIQUETA_INFERIDA";
-            etiquetasInferidas += 1;
-          } else {
-            statusCode = "SEM_ETIQUETA";
-            semEtiqueta += 1;
+            var keyLojaEstabValor = vektorZfiChaveEstornoMatch_(
+              itemTx.lojaNum,
+              itemTx.estabelecimentoRaw,
+              itemTx.valor
+            );
+
+            var keyValorEstab = vektorZfiChaveEstornoMatchSemLoja_(
+              itemTx.estabelecimentoRaw,
+              itemTx.valor
+            );
+
+            var tagHist = "";
+
+            if (isEstorno) {
+              // 1) match exato na fatura alvo: loja + valor + estabelecimento
+              tagHist =
+                vektorZfiPickEtiquetaHist_(histIdxEstornoAtual.byChaveExata[keyLojaEstabValor]) ||
+                "";
+
+              // 2) match exato na fatura anterior
+              if (!tagHist) {
+                tagHist =
+                  vektorZfiPickEtiquetaHist_(histIdxEstornoAnterior.byChaveExata[keyLojaEstabValor]) ||
+                  "";
+              }
+
+              // 3) fallback controlado na fatura alvo: valor + estabelecimento
+              if (!tagHist) {
+                tagHist =
+                  vektorZfiPickEtiquetaHist_(histIdxEstornoAtual.byValorEstab[keyValorEstab]) ||
+                  "";
+              }
+
+              // 4) fallback controlado na fatura anterior: valor + estabelecimento
+              if (!tagHist) {
+                tagHist =
+                  vektorZfiPickEtiquetaHist_(histIdxEstornoAnterior.byValorEstab[keyValorEstab]) ||
+                  "";
+              }
+            }
+
+            // 5) fallback legado
+            if (!tagHist) {
+              tagHist =
+                vektorZfiPickEtiquetaHist_(histIdx.byEstab[estabKey]) ||
+                vektorZfiPickEtiquetaHist_(histIdx.byDesc[descKey]);
+            }
+
+            if (tagHist) {
+              conta2 = tagHist;
+
+              if (isEstorno) {
+                statusCode = "HISTORICO_ESTORNO";
+                historicoEstorno += 1;
+              } else {
+                statusCode = "ETIQUETA_INFERIDA";
+              }
+
+              etiquetasInferidas += 1;
+            } else {
+              statusCode = "SEM_ETIQUETA";
+              semEtiqueta += 1;
+            }
           }
-        }
 
         // prioridade de status visual
         if (lojasRateio.length >= 2) {
@@ -17736,6 +17895,7 @@ function getPreviewArquivoZFIVektor(req) {
         rateiosAplicados: rateiosAplicados,
         ccSobrescrito: ccSobrescrito,
         valorTotal: valorTotal,
+        historicoEstorno: historicoEstorno,
         dataLancamentoBr: vektorZfiFmtDateBr_(dataLanc),
         dataLancamentoArquivo: Utilities.formatDate(dataLanc, tz, "yyyy-MM-dd"),
         dataVencimentoBr: vektorZfiFmtDateBr_(dataVenc),
