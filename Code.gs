@@ -17475,6 +17475,60 @@ function vektorZfiConstruirIndiceHistoricoEtiquetas_(linhas, idxs, extratosHisto
   };
 }
 
+function vektorZfiConstruirIndiceHistoricoRecenteEstornoPorEstab_(linhas, idxs, dataRef, diasJanela) {
+  var byEstab = {};
+
+  var ref = (dataRef instanceof Date && !isNaN(dataRef.getTime()))
+    ? new Date(dataRef.getTime())
+    : new Date();
+
+  ref.setHours(23, 59, 59, 999);
+
+  var dias = Number(diasJanela || 120) || 120; // ~4 meses
+  var dtMin = new Date(ref.getTime());
+  dtMin.setHours(0, 0, 0, 0);
+  dtMin.setDate(dtMin.getDate() - dias);
+
+  function add_(mapa, key, etiqueta) {
+    key = String(key || "").trim();
+    etiqueta = String(etiqueta || "").trim();
+    if (!key || !etiqueta) return;
+    if (!mapa[key]) mapa[key] = {};
+    mapa[key][etiqueta] = (mapa[key][etiqueta] || 0) + 1;
+  }
+
+  function parseRowDate_(v) {
+    if (Object.prototype.toString.call(v) === "[object Date]" && !isNaN(v.getTime())) {
+      return new Date(v.getTime());
+    }
+    var d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  (linhas || []).forEach(function(row){
+    var dt = parseRowDate_(row[idxs.idxData]);
+    if (!dt) return;
+    if (dt < dtMin || dt > ref) return;
+
+    var etiquetaInfo = vektorZfiResolverEtiquetas_(row[idxs.idxEtiq]);
+    if (!etiquetaInfo.conta2) return;
+
+    var estabRaw = row[idxs.idxEstab];
+    var valor    = Number(row[idxs.idxValor] || 0) || 0;
+
+    // só transação original histórica
+    if (valor <= 0) return;
+    if (vektorZfiIsEstorno_(estabRaw, valor)) return;
+
+    var estabKey = vektorZfiNormEstabEstorno_(estabRaw);
+    add_(byEstab, estabKey, etiquetaInfo.conta2);
+  });
+
+  return {
+    byEstab: byEstab
+  };
+}
+
 function vektorZfiPickEtiquetaHist_(bucket) {
   if (!bucket) return "";
   var best = "";
@@ -17535,42 +17589,66 @@ function vektorZfiCsvExcelSafeText_(s) {
   return '="' + v.replace(/"/g, '""') + '"';
 }
 
+function vektorZfiStatusLabel_(statusCode) {
+  var s = String(statusCode || "").trim().toUpperCase();
+
+  switch (s) {
+    case "HISTORICO_ESTORNO":
+      return "Histórico de estorno";
+    case "ETIQUETA_INFERIDA":
+      return "Etiqueta inferida";
+    case "MULTIPLAS_ETIQUETAS_USOU_PRIMEIRA":
+      return "Múltiplas etiquetas";
+    case "CC_SOBRESCRITO_DESCRICAO":
+      return "CC pela descrição";
+    case "RATEIO_LOJAS":
+      return "Rateio de lojas";
+    case "SEM_ETIQUETA":
+      return "Sem etiqueta";
+    case "OK":
+      return "OK";
+    default:
+      return s || "";
+  }
+}
+
 function vektorZfiBuildCsvRow_(obj) {
   var empresaCodigo = String(obj && obj.empresaCodigo ? obj.empresaCodigo : "7010").trim();
 
   return [
-    vektorZfiCsvExcelSafeText_(obj.dataTransacaoArquivo), // Data
-    "CC",                     // Tipo Doc
-    empresaCodigo,            // Empresa
-    vektorZfiCsvExcelSafeText_(obj.dataLancamentoArquivo), // Data Lanç.
-    obj.mesLancamento,        // Mês
-    "BRL",                    // Moeda
-    obj.referencia,           // Referencia
-    "31",                     // Chave Lanç.
-    "244135",                 // Conta
-    "",                       // Rz.Esp.
-    obj.montante1,            // Montante
-    "",                       // Centro de custo
-    "",                       // Elemento PEP
-    "",                       // Ordem
-    vektorZfiCsvExcelSafeText_(obj.locNeg), // Loc.Neg.
-    vektorZfiCsvExcelSafeText_(obj.dataEfetiva1), // Data Efetiva
-    "",                       // Cond.Pag.
-    "",                       // Dias
-    vektorZfiCsvExcelSafeText_(obj.dataVencimentoArquivo), // Data Venc.
-    obj.atribuicao,           // Atribuição
-    obj.textoItem,            // Texto do item
-    "40",                     // Chave Lanç.2
-    obj.conta2 ? vektorZfiCsvExcelSafeText_(obj.conta2) : "", // Conta 2
-    obj.montante2,            // Montante
+    obj.modCode ? vektorZfiCsvExcelSafeText_(obj.modCode) : "", // MOD CODE
+    vektorZfiCsvExcelSafeText_(obj.dataTransacaoArquivo),       // Data
+    "CC",                                                       // Tipo Doc
+    empresaCodigo,                                              // Empresa
+    vektorZfiCsvExcelSafeText_(obj.dataLancamentoArquivo),      // Data Lanç.
+    obj.mesLancamento,                                          // Mês
+    "BRL",                                                      // Moeda
+    obj.referencia,                                             // Referencia
+    "31",                                                       // Chave Lanç.
+    "244135",                                                   // Conta
+    "",                                                         // Rz.Esp.
+    obj.montante1,                                              // Montante
+    "",                                                         // Centro de custo
+    "",                                                         // Elemento PEP
+    "",                                                         // Ordem
+    vektorZfiCsvExcelSafeText_(obj.locNeg),                     // Loc.Neg.
+    vektorZfiCsvExcelSafeText_(obj.dataEfetiva1),               // Data Efetiva
+    "",                                                         // Cond.Pag.
+    "",                                                         // Dias
+    vektorZfiCsvExcelSafeText_(obj.dataVencimentoArquivo),      // Data Venc.
+    obj.atribuicao,                                             // Atribuição
+    obj.textoItem,                                              // Texto do item
+    "40",                                                       // Chave Lanç.2
+    obj.conta2 ? vektorZfiCsvExcelSafeText_(obj.conta2) : "",   // Conta 2
+    obj.montante2,                                              // Montante
     obj.centroCusto2 ? vektorZfiCsvExcelSafeText_(obj.centroCusto2) : "", // Centro de custo
-    "",                       // Elemento PEP
-    "",                       // Ordem
-    vektorZfiCsvExcelSafeText_(obj.dataEfetiva2), // Data Efetiva
-    obj.textoCampoNota,       // Texto do campo Nota
-    "",                       // coluna vazia
-    obj.atribuicao2,          // Atrib. 2
-    ""                        // rze 2
+    "",                                                         // Elemento PEP
+    "",                                                         // Ordem
+    vektorZfiCsvExcelSafeText_(obj.dataEfetiva2),               // Data Efetiva
+    obj.textoCampoNota,                                         // Texto do campo Nota
+    "",                                                         // coluna vazia
+    obj.atribuicao2,                                            // Atrib. 2
+    ""                                                          // rze 2
   ];
 }
 
@@ -17688,6 +17766,13 @@ function getPreviewArquivoZFIVektor(req) {
       idxLoja: idxLoja
     }, extratosBuscaEstorno.anterior);
 
+    var histIdxEstornoRecente = vektorZfiConstruirIndiceHistoricoRecenteEstornoPorEstab_(linhas, {
+      idxData: idxData,
+      idxEtiq: idxEtiq,
+      idxEstab: idxEstab,
+      idxValor: idxValor
+    }, dataLanc, 180);
+
     var previewRows = [];
     var csvRows = [];
     var valorTotal = 0;
@@ -17745,16 +17830,15 @@ function getPreviewArquivoZFIVektor(req) {
 
           if (!conta2) {
             var estabKey = vektorZfiNormDesc_(itemTx.estabelecimentoRaw);
+            var estabKeyEstorno = vektorZfiNormEstabEstorno_(itemTx.estabelecimentoRaw);
             var descKey  = vektorZfiNormDesc_(itemTx.descricaoRaw);
 
             var isEstorno = vektorZfiIsEstorno_(itemTx.estabelecimentoRaw, itemTx.valor);
-
             var keyLojaEstabValor = vektorZfiChaveEstornoMatch_(
               itemTx.lojaNum,
               itemTx.estabelecimentoRaw,
               itemTx.valor
             );
-
             var keyValorEstab = vektorZfiChaveEstornoMatchSemLoja_(
               itemTx.estabelecimentoRaw,
               itemTx.valor
@@ -17763,54 +17847,44 @@ function getPreviewArquivoZFIVektor(req) {
             var tagHist = "";
 
             if (isEstorno) {
-              // 1) match exato na fatura alvo: loja + valor + estabelecimento
+              // 1ª rodada: match exato (fatura alvo e anterior)
               tagHist =
                 vektorZfiPickEtiquetaHist_(histIdxEstornoAtual.byChaveExata[keyLojaEstabValor]) ||
-                "";
+                vektorZfiPickEtiquetaHist_(histIdxEstornoAnterior.byChaveExata[keyLojaEstabValor]);
 
-              // 2) match exato na fatura anterior
-              if (!tagHist) {
-                tagHist =
-                  vektorZfiPickEtiquetaHist_(histIdxEstornoAnterior.byChaveExata[keyLojaEstabValor]) ||
-                  "";
-              }
-
-              // 3) fallback controlado na fatura alvo: valor + estabelecimento
+              // 1,5ª rodada: valor + estabelecimento (fatura alvo e anterior)
               if (!tagHist) {
                 tagHist =
                   vektorZfiPickEtiquetaHist_(histIdxEstornoAtual.byValorEstab[keyValorEstab]) ||
-                  "";
+                  vektorZfiPickEtiquetaHist_(histIdxEstornoAnterior.byValorEstab[keyValorEstab]);
               }
 
-              // 4) fallback controlado na fatura anterior: valor + estabelecimento
+              // 2ª rodada: histórico recente por estabelecimento normalizado (~4 meses)
               if (!tagHist) {
-                tagHist =
-                  vektorZfiPickEtiquetaHist_(histIdxEstornoAnterior.byValorEstab[keyValorEstab]) ||
-                  "";
+                tagHist = vektorZfiPickEtiquetaHist_(histIdxEstornoRecente.byEstab[estabKeyEstorno]);
+              }
+
+              if (tagHist) {
+                conta2 = tagHist;
+                statusCode = "HISTORICO_ESTORNO";
+                historicoEstorno += 1;
               }
             }
 
-            // 5) fallback legado
-            if (!tagHist) {
+            // fallback genérico
+            if (!conta2) {
               tagHist =
                 vektorZfiPickEtiquetaHist_(histIdx.byEstab[estabKey]) ||
                 vektorZfiPickEtiquetaHist_(histIdx.byDesc[descKey]);
-            }
 
-            if (tagHist) {
-              conta2 = tagHist;
-
-              if (isEstorno) {
-                statusCode = "HISTORICO_ESTORNO";
-                historicoEstorno += 1;
-              } else {
+              if (tagHist) {
+                conta2 = tagHist;
                 statusCode = "ETIQUETA_INFERIDA";
+                etiquetasInferidas += 1;
+              } else {
+                statusCode = "SEM_ETIQUETA";
+                semEtiqueta += 1;
               }
-
-              etiquetasInferidas += 1;
-            } else {
-              statusCode = "SEM_ETIQUETA";
-              semEtiqueta += 1;
             }
           }
 
@@ -17829,6 +17903,7 @@ function getPreviewArquivoZFIVektor(req) {
         var obj = {
           empresa: empresaAtual,
           empresaCodigo: empresaCodigo,
+          modCode: vektorZfiStatusLabel_(statusCode),
 
           dataTransacaoArquivo: vektorZfiFmtDateDdMmYyyyDigits_(itemTx.dataTx, VEKTOR_ZFI_DATA_SEM_ZERO_ESQUERDA),
           dataTransacaoBr: vektorZfiFmtDateBr_(itemTx.dataTx),
