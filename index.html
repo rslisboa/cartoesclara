@@ -6179,6 +6179,7 @@ display: none;
           <option value="OK">OK</option>
           <option value="SEM_ETIQUETA">Sem etiqueta</option>
           <option value="ETIQUETA_INFERIDA">Etiqueta inferida</option>
+          <option value="HISTORICO_ESTORNO">Histórico de estorno</option>
           <option value="MULTIPLAS_ETIQUETAS_USOU_PRIMEIRA">Múltiplas etiquetas - usou a primeira</option>
           <option value="RATEIO_LOJAS">Rateio de lojas</option>
           <option value="CC_SOBRESCRITO_DESCRICAO">CC pela descrição</option>
@@ -30728,6 +30729,7 @@ window.vektorAuxRenderPreviewZfi_ = function(res){
     sem.title =
       "Sem etiqueta: " + String(summary.semEtiqueta || 0) +
       " | Inferidas: " + String(summary.etiquetasInferidas || 0) +
+      " | Histórico de estorno: " + String(summary.historicoEstorno || 0) +
       " | Múltiplas (usou primeira): " + String(summary.multiplasEtiquetasUsouPrimeira || 0);
   }
   if (val) val.textContent = window.vektorAuxFmtMoneyBr_(summary.valorTotal || 0);
