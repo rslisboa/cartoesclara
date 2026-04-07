@@ -7755,7 +7755,7 @@ window.vektorSelecionarEmpresa_ = function(empresa) {
       window.__vektorEmpresaAtual = String(res.empresaAtual || emp).toUpperCase();
 
       try {
-        window.vektorAuxResetState_ && window.vektorAuxResetState_();
+        window.vektorAuxInvalidateCache_ && window.vektorAuxInvalidateCache_();
       } catch(e) {
         console.error(e);
       }
@@ -7926,6 +7926,19 @@ window.vektorRestartPreloadAfterEmpresaChange_ = function () {
     window.__cicloResumoTxFiltered = [];
     window.__cicloResumoTxExport = [];
 
+    // Consultas Auxiliares
+    window.__vektorAuxCache = window.vektorAuxBuildCache_ ? window.vektorAuxBuildCache_("") : null;
+    window.__auxFaturasLista = [];
+    window.__auxSaldosData = null;
+    window.__auxSaldosState = { time: "", loja: "", acao: "" };
+    window.__auxViewMode = "FATURAS";
+
+    // Fluxo Numerário SAP
+    window.__fluxoNumerarioSapMeta = null;
+    window.__fluxoNumerarioSapBusy = false;
+    window.__fluxoNumerarioSapEmpresaLoaded = "";
+    window.__fluxoNumerarioSapData = null;
+
     // Envio de Pendências
       try {
         if (typeof window.vektorEnvPendResetState_ === "function") {
@@ -7997,6 +8010,27 @@ window.vektorResetCachesEmpresa_ = function() {
   // =========================
   window.__fluxoNumerarioSapMeta = null;
   window.__fluxoNumerarioSapBusy = false;
+
+  window.__fluxoNumerarioSapEmpresaLoaded = "";
+window.__fluxoNumerarioSapData = null;
+
+// =========================
+// CONSULTAS AUXILIARES
+// =========================
+window.__vektorAuxCache = window.vektorAuxBuildCache_ ? window.vektorAuxBuildCache_("") : null;
+window.__auxFaturasLista = [];
+window.__auxSaldosData = null;
+window.__auxSaldosState = { time: "", loja: "", acao: "" };
+window.__auxViewMode = "FATURAS";
+
+try {
+  const fat = document.getElementById("auxFaturasConteudo");
+  const dem = document.getElementById("auxDemConteudo");
+  const sal = document.getElementById("auxSaldosConteudo");
+  if (fat) fat.innerHTML = "";
+  if (dem) dem.innerHTML = "";
+  if (sal) sal.innerHTML = "";
+} catch(_) {}
 
   // =========================
   // RESUMO DO CICLO
@@ -8331,7 +8365,7 @@ function vektorGlobalPreloadStart_(){
     return;
   }
 
-    try {
+  try {
     if (typeof window.vektorSetSidebarLoadingState_ === "function") {
       window.vektorSetSidebarLoadingState_(true);
     }
@@ -8347,6 +8381,12 @@ function vektorGlobalPreloadStart_(){
   }
   if (vektorCanPreloadByNavBtn_("navMyAlertsBtn")) {
     tasks.myAlerts = { done:false, ok:false };
+  }
+  if (vektorCanPreloadByNavBtn_("navConsultasAuxBtn")) {
+    tasks.consultasAux = { done:false, ok:false };
+  }
+  if (vektorCanPreloadByNavBtn_("navFluxoNumerarioSapBtn")) {
+    tasks.fluxoNumerarioSap = { done:false, ok:false };
   }
 
   const keys = Object.keys(tasks);
@@ -8375,6 +8415,7 @@ function vektorGlobalPreloadStart_(){
           try {
             window.__vektorResumoCicloPreloaded = res || null;
           } catch(_) {}
+
           vektorGlobalPreloadFinishTask_(
             "resumoCiclo",
             !!(res && res.ok),
@@ -8426,6 +8467,92 @@ function vektorGlobalPreloadStart_(){
       }
     } catch(_) {
       vektorGlobalPreloadFinishTask_("myAlerts", false, "Alertas Programados indisponíveis.");
+    }
+  }
+
+  // 4) Consultas Auxiliares
+  if (tasks.consultasAux) {
+    try {
+      const empAtual = (typeof window.vektorEmpresaAtual_ === "function")
+        ? String(window.vektorEmpresaAtual_() || "").trim().toUpperCase()
+        : "CENTAURO";
+
+      const cache = window.vektorAuxGetCache_ ? window.vektorAuxGetCache_() : null;
+      const pronto =
+        !!cache &&
+        String(cache.empresa || "") === empAtual &&
+        cache.faturasLoaded === true &&
+        cache.demissoesLoaded === true &&
+        cache.saldosLoaded === true;
+
+      if (pronto) {
+        vektorGlobalPreloadFinishTask_("consultasAux", true, "Consultas Auxiliares prontas.");
+      } else {
+        let pend = 3;
+        let okAll = true;
+
+        function doneOne(ok){
+          if (!ok) okAll = false;
+          pend--;
+          if (pend <= 0) {
+            vektorGlobalPreloadFinishTask_(
+              "consultasAux",
+              okAll,
+              okAll ? "Consultas Auxiliares prontas." : "Consultas Auxiliares parcialmente indisponíveis."
+            );
+          }
+        }
+
+        try {
+          window.vektorAuxLoadFaturas && window.vektorAuxLoadFaturas();
+          setTimeout(function(){ doneOne(true); }, 50);
+        } catch(_) {
+          doneOne(false);
+        }
+
+        try {
+          window.vektorAuxLoadDemissoes && window.vektorAuxLoadDemissoes();
+          setTimeout(function(){ doneOne(true); }, 50);
+        } catch(_) {
+          doneOne(false);
+        }
+
+        try {
+          window.vektorAuxLoadSaldos && window.vektorAuxLoadSaldos();
+          setTimeout(function(){ doneOne(true); }, 50);
+        } catch(_) {
+          doneOne(false);
+        }
+      }
+    } catch(_) {
+      vektorGlobalPreloadFinishTask_("consultasAux", false, "Consultas Auxiliares indisponíveis.");
+    }
+  }
+
+  // 5) Fluxo Numerário SAP
+  if (tasks.fluxoNumerarioSap) {
+    try {
+      const empAtual = (typeof window.vektorEmpresaAtual_ === "function")
+        ? String(window.vektorEmpresaAtual_() || "").trim().toUpperCase()
+        : "CENTAURO";
+
+      if (window.__fluxoNumerarioSapMeta && window.__fluxoNumerarioSapEmpresaLoaded === empAtual) {
+        vektorGlobalPreloadFinishTask_("fluxoNumerarioSap", true, "Fluxo Numerário SAP pronto.");
+      } else {
+        vektorFluxoNumerarioSapEnsureMeta_(function(ok){
+          if (ok) {
+            window.__fluxoNumerarioSapEmpresaLoaded = empAtual;
+          }
+
+          vektorGlobalPreloadFinishTask_(
+            "fluxoNumerarioSap",
+            !!ok,
+            ok ? "Fluxo Numerário SAP pronto." : "Fluxo Numerário SAP indisponível."
+          );
+        });
+      }
+    } catch(_) {
+      vektorGlobalPreloadFinishTask_("fluxoNumerarioSap", false, "Fluxo Numerário SAP indisponível.");
     }
   }
 }
@@ -16970,10 +17097,24 @@ window.vektorAuxResetState_ = function(){
 };
 
 window.vektorOpenConsultasAuxiliares = function(){
+  const empAtual = (typeof window.vektorEmpresaAtual_ === "function"
+    ? window.vektorEmpresaAtual_()
+    : "CENTAURO");
+
+  const emp = String(empAtual || "CENTAURO").trim().toUpperCase();
+
   vektorSetActiveNavBtn_("navConsultasAuxBtn");
   vektorShowConsultasAuxView_();
-  window.vektorAuxResetState_ && window.vektorAuxResetState_();
-  window.vektorAuxShowFaturas(true);
+
+  const cache = window.vektorAuxGetCache_ ? window.vektorAuxGetCache_() : null;
+
+  if (!cache || String(cache.empresa || "") !== emp) {
+    if (window.vektorAuxInvalidateCache_) {
+      window.vektorAuxInvalidateCache_();
+    }
+  }
+
+  window.vektorAuxShowFaturas(false);
 };
 
 function vektorShowBasesVektorView_(){
@@ -31970,6 +32111,15 @@ window.vektorAuxLoadFaturas = function(){
   const box = document.getElementById("auxFaturasConteudo");
   if (!box) return;
 
+  const cache = window.vektorAuxGetCache_ ? window.vektorAuxGetCache_() : null;
+
+  if (cache && cache.faturasLoaded && cache.faturasHtml) {
+    box.innerHTML = cache.faturasHtml;
+    window.__auxFaturasLista = Array.isArray(cache.faturasLista) ? cache.faturasLista.slice() : [];
+    window.vektorAuxHydrateFaturasToolbar_ && window.vektorAuxHydrateFaturasToolbar_(window.__auxFaturasLista);
+    return;
+  }
+
   box.innerHTML =
     "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Carregando faturas…</span></div>";
 
@@ -31988,10 +32138,18 @@ window.vektorAuxLoadFaturas = function(){
         });
 
         window.__auxFaturasLista = faturasOrdenadas.slice();
-        window.vektorAuxHydrateFaturasToolbar_(faturasOrdenadas);
+        window.vektorAuxHydrateFaturasToolbar_ && window.vektorAuxHydrateFaturasToolbar_(faturasOrdenadas);
 
         const htmlTabela = vektorMontarTabelaFaturas_("Tabela completa de faturas", faturasOrdenadas);
-        box.innerHTML = "<div>" + htmlTabela + "</div>";
+        const htmlFinal = "<div>" + htmlTabela + "</div>";
+
+        box.innerHTML = htmlFinal;
+
+        if (cache) {
+          cache.faturasLoaded = true;
+          cache.faturasHtml = htmlFinal;
+          cache.faturasLista = faturasOrdenadas.slice();
+        }
       } catch (e) {
         console.error("Erro ao renderizar faturas (aux):", e);
         box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao renderizar tabela de faturas.</p>";
@@ -32070,21 +32228,89 @@ function vektorAuxSetView_(mode){
   window.__auxViewMode = mode;
 }
 
+window.vektorAuxBuildCache_ = function(empresa){
+  return {
+    empresa: String(empresa || "").trim().toUpperCase(),
+    faturasLoaded: false,
+    demissoesLoaded: false,
+    saldosLoaded: false,
+    faturasHtml: "",
+    demissoesHtml: "",
+    saldosHtml: "",
+    faturasLista: [],
+    saldosData: null
+  };
+};
+
+window.vektorAuxGetCache_ = function(){
+  const empAtual = (typeof window.vektorEmpresaAtual_ === "function"
+    ? window.vektorEmpresaAtual_()
+    : "CENTAURO");
+
+  const emp = String(empAtual || "CENTAURO").trim().toUpperCase();
+
+  if (!window.__vektorAuxCache || String(window.__vektorAuxCache.empresa || "") !== emp) {
+    window.__vektorAuxCache = window.vektorAuxBuildCache_(emp);
+  }
+
+  return window.__vektorAuxCache;
+};
+
+window.vektorAuxInvalidateCache_ = function(){
+  const empAtual = (typeof window.vektorEmpresaAtual_ === "function"
+    ? window.vektorEmpresaAtual_()
+    : "CENTAURO");
+
+  window.__vektorAuxCache = window.vektorAuxBuildCache_(empAtual);
+  window.__auxFaturasLista = [];
+  window.__auxSaldosData = null;
+  window.__auxSaldosState = { time: "", loja: "", acao: "" };
+  window.__auxViewMode = "FATURAS";
+
+  const fat = document.getElementById("auxFaturasConteudo");
+  const dem = document.getElementById("auxDemConteudo");
+  const sal = document.getElementById("auxSaldosConteudo");
+
+  if (fat) fat.innerHTML = "";
+  if (dem) dem.innerHTML = "";
+  if (sal) sal.innerHTML = "";
+};
+
 window.vektorAuxShowFaturas = function(forceReload){
   vektorAuxSetView_("FATURAS");
 
-  if (forceReload !== false) {
+  const box = document.getElementById("auxFaturasConteudo");
+  const cache = window.vektorAuxGetCache_ ? window.vektorAuxGetCache_() : null;
+
+  if (forceReload === true || !cache || !cache.faturasLoaded) {
     window.vektorAuxLoadFaturas && window.vektorAuxLoadFaturas();
+    return;
+  }
+
+  if (box && cache.faturasHtml) {
+    box.innerHTML = cache.faturasHtml;
+  }
+
+  window.__auxFaturasLista = Array.isArray(cache.faturasLista) ? cache.faturasLista.slice() : [];
+};
+
+window.vektorAuxShowDemissoes = function(forceReload){
+  vektorAuxSetView_("DEM");
+
+  const box = document.getElementById("auxDemConteudo");
+  const cache = window.vektorAuxGetCache_ ? window.vektorAuxGetCache_() : null;
+
+  if (forceReload === true || !cache || !cache.demissoesLoaded) {
+    window.vektorAuxLoadDemissoes && window.vektorAuxLoadDemissoes();
+    return;
+  }
+
+  if (box && cache.demissoesHtml) {
+    box.innerHTML = cache.demissoesHtml;
   }
 };
 
-window.vektorAuxShowDemissoes = function(){
-  vektorAuxSetView_("DEM");
-  window.vektorAuxLoadDemissoes && window.vektorAuxLoadDemissoes();
-};
-
-window.vektorAuxShowSaldos = function(){
-  // 🔒 ROLE (front) — mantém trava atual
+window.vektorAuxShowSaldos = function(forceReload){
   try {
     const roleTxt = (typeof USER_ROLE_REPLACED !== "undefined" ? String(USER_ROLE_REPLACED || "") : "").trim().toLowerCase();
     const podeVerSaldos =
@@ -32098,12 +32324,33 @@ window.vektorAuxShowSaldos = function(){
   } catch (_) {}
 
   vektorAuxSetView_("SALDOS");
-  window.vektorAuxLoadSaldos && window.vektorAuxLoadSaldos();
+
+  const cache = window.vektorAuxGetCache_ ? window.vektorAuxGetCache_() : null;
+
+  if (forceReload === true || !cache || !cache.saldosLoaded || !cache.saldosData) {
+    window.vektorAuxLoadSaldos && window.vektorAuxLoadSaldos();
+    return;
+  }
+
+  window.__auxSaldosData = {
+    ok: true,
+    rows: Array.isArray(cache.saldosData.rows) ? cache.saldosData.rows.slice() : [],
+    periodo: cache.saldosData.periodo || {}
+  };
+
+  window.vektorAuxSaldosRender_ && window.vektorAuxSaldosRender_();
 };
 
 window.vektorAuxLoadDemissoes = function(){
   const box = document.getElementById("auxDemConteudo");
   if (!box) return;
+
+  const cache = window.vektorAuxGetCache_ ? window.vektorAuxGetCache_() : null;
+
+  if (cache && cache.demissoesLoaded && cache.demissoesHtml) {
+    box.innerHTML = cache.demissoesHtml;
+    return;
+  }
 
   box.innerHTML =
     "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Consultando desligamentos (BigQuery)…</span></div>";
@@ -32123,7 +32370,13 @@ window.vektorAuxLoadDemissoes = function(){
 
         const rows = res.rows || [];
         if (!rows.length) {
-          box.innerHTML = "<p class='text-sm text-slate-700'>Nenhuma demissão encontrada no período consultado.</p>";
+          const htmlVazio = "<p class='text-sm text-slate-700'>Nenhuma demissão encontrada no período consultado.</p>";
+          box.innerHTML = htmlVazio;
+
+          if (cache) {
+            cache.demissoesLoaded = true;
+            cache.demissoesHtml = htmlVazio;
+          }
           return;
         }
 
@@ -32155,6 +32408,11 @@ window.vektorAuxLoadDemissoes = function(){
 
         box.innerHTML = html;
 
+        if (cache) {
+          cache.demissoesLoaded = true;
+          cache.demissoesHtml = html;
+        }
+
       } catch(e){
         console.error("Erro ao renderizar demissões (aux):", e);
         box.innerHTML = "<p class='text-sm text-slate-700'>Erro ao renderizar tabela de demissões.</p>";
@@ -32175,6 +32433,19 @@ window.vektorAuxLoadDemissoes = function(){
 window.vektorAuxLoadSaldos = function () {
   const box = document.getElementById("auxSaldosConteudo");
   if (!box) return;
+
+  const cache = window.vektorAuxGetCache_ ? window.vektorAuxGetCache_() : null;
+
+  if (cache && cache.saldosLoaded && cache.saldosData) {
+    window.__auxSaldosData = {
+      ok: true,
+      rows: Array.isArray(cache.saldosData.rows) ? cache.saldosData.rows.slice() : [],
+      periodo: cache.saldosData.periodo || {}
+    };
+
+    vektorAuxSaldosRender_();
+    return;
+  }
 
   box.innerHTML =
     "<div class='vektor-loading'><div class='vektor-spinner'></div><span>Consultando relação de saldos…</span></div>";
@@ -32202,12 +32473,19 @@ window.vektorAuxLoadSaldos = function () {
           return;
         }
 
-        // guarda dataset bruto para filtros + drilldown
         window.__auxSaldosData = {
           ok: true,
           rows: Array.isArray(res.rows) ? res.rows.slice() : [],
           periodo: res.periodo || {}
         };
+
+        if (cache) {
+          cache.saldosLoaded = true;
+          cache.saldosData = {
+            rows: Array.isArray(res.rows) ? res.rows.slice() : [],
+            periodo: res.periodo || {}
+          };
+        }
 
         vektorAuxSaldosRender_();
       } catch (e) {
