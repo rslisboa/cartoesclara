@@ -1,0 +1,18 @@
+var VEKTOR_POWER_BI_MODULE_KEY = "POWER_BI";
+var VEKTOR_POWER_BI_TITLE = "Business Intelligence Hub";
+
+var VEKTOR_POWER_BI_EMBED_URL =
+  "https://app.powerbi.com/reportEmbed?reportId=aabf3eb8-d013-4156-a652-632f33d67c20&autoAuth=true&ctid=5321c435-f908-48b5-8ed0-ee6c2aedcc05&actionBarEnabled=true";
+
+function vektorGetPowerBiEmbedData() {
+  var ctx = vektorAssertModuleAllowed_(VEKTOR_POWER_BI_MODULE_KEY);
+
+  return {
+    ok: true,
+    modulo: VEKTOR_POWER_BI_MODULE_KEY,
+    title: VEKTOR_POWER_BI_TITLE,
+    embedUrl: VEKTOR_POWER_BI_EMBED_URL,
+    email: ctx.email,
+    role: ctx.role
+  };
+}
