@@ -3197,7 +3197,7 @@ display: none;
         <div class="mb-5 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h2 class="text-lg font-black text-slate-900">Módulos disponíveis</h2>
-            <p class="text-sm font-semibold text-slate-500">Hoje apenas o módulo Clara está habilitado.</p>
+            <p class="text-sm font-semibold text-slate-500">Os módulos disponíveis são exibidos abaixo conforme a governança de acesso do Vektor.</p>
           </div>
         </div>
 
@@ -3226,7 +3226,7 @@ display: none;
 
               <div class="mt-6 flex items-center justify-between">
                 <div class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
-                  Módulo atual
+                  Módulo Gestão
                 </div>
                 <div class="inline-flex items-center gap-2 rounded-xl bg-[#061a3a] px-4 py-2 text-sm font-extrabold text-white">
                   Acessar
@@ -3236,18 +3236,48 @@ display: none;
             </div>
           </button>
 
-          <div class="rounded-[24px] border-[3px] border-double border-black bg-slate-50 p-6 opacity-80">
-            <div class="w-14 h-14 rounded-2xl bg-slate-200 text-slate-500 flex items-center justify-center text-2xl">＋</div>
-            <h3 class="mt-6 text-2xl font-black tracking-tight text-slate-700">Próximos módulos</h3>
-            <p class="mt-3 text-sm leading-6 font-semibold text-slate-500">
-              Em construção
-            </p>
-          </div>
+            <button
+                id="vektorHubCardPowerBi"
+                type="button"
+                class="group relative overflow-hidden rounded-[24px] border-[3px] border-double border-black bg-white p-6 text-left shadow-[0_20px_45px_rgba(15,23,42,0.08)] transition duration-200 hover:-translate-y-1 hover:shadow-[0_28px_60px_rgba(15,23,42,0.14)]">
+                <div class="absolute inset-0 opacity-0 transition duration-200 group-hover:opacity-100"
+                    style="background:linear-gradient(135deg, rgba(59,130,246,0.08), rgba(15,45,92,0.10));"></div>
+
+                <div class="relative">
+                  <div class="flex items-center justify-between gap-4">
+                    <div class="w-14 h-14 rounded-2xl bg-[#0f2d5c] text-white flex items-center justify-center text-2xl shadow-lg">📊</div>
+                    <div class="inline-flex items-center rounded-full bg-sky-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-sky-700 border border-sky-200">
+                      Ativo
+                    </div>
+                  </div>
+
+                  <h3 class="mt-6 text-2xl font-black tracking-tight text-slate-900">
+                    Business Intelligence Hub
+                  </h3>
+
+                  <p class="mt-3 text-sm leading-6 font-semibold text-slate-500">
+                    Relatórios analíticos e dashboards executivos integrados ao ecossistema Vektor.
+                  </p>
+
+                  <div class="mt-6 flex items-center justify-between">
+                    <div class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                      Módulo Analítico
+                    </div>
+                    <div class="inline-flex items-center gap-2 rounded-xl bg-[#0f2d5c] px-4 py-2 text-sm font-extrabold text-white">
+                      Acessar
+                      <span>→</span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<?!= include('vektor_modulo_powerbi_htm'); ?>
 
   <!-- MÓDULO VEKTOR / CLARA -->
   <div id="vektorShell" class="h-screen flex px-4 py-6 gap-4 items-stretch overflow-hidden">
@@ -7343,6 +7373,7 @@ function vektorShowHubView_() {
   var hub = document.getElementById("vektorHubView");
   var shell = document.getElementById("vektorShell");
   var topbar = document.getElementById("vektor-topbar");
+  var powerBi = document.getElementById("vektorPowerBiView");
 
   if (hub) {
     hub.classList.remove("hidden");
@@ -7354,9 +7385,14 @@ function vektorShowHubView_() {
     shell.style.display = "none";
   }
 
-  // HUB sem o topo inteiro do módulo Clara
   if (topbar) {
     topbar.style.display = "none";
+  }
+
+  // ✅ garante que a página do Power BI saia da frente do hub
+  if (powerBi) {
+    powerBi.classList.add("hidden");
+    powerBi.style.display = "none";
   }
 
   try {
@@ -7371,10 +7407,17 @@ function vektorShowClaraModule_() {
   var hub = document.getElementById("vektorHubView");
   var shell = document.getElementById("vektorShell");
   var topbar = document.getElementById("vektor-topbar");
+  var powerBi = document.getElementById("vektorPowerBiView");
 
   if (hub) {
     hub.classList.add("hidden");
     hub.style.display = "none";
+  }
+
+  // ✅ garante que o módulo Power BI não fique ativo por baixo/por cima
+  if (powerBi) {
+    powerBi.classList.add("hidden");
+    powerBi.style.display = "none";
   }
 
   if (shell) {
@@ -7418,6 +7461,9 @@ function vektorShowClaraModule_() {
     console.error("Falha ao animar topbar premium:", e);
   }
 }
+
+window.vektorShowHubView_ = vektorShowHubView_;
+window.vektorShowClaraModule_ = vektorShowClaraModule_;
 
 window.vektorOpenModuleBlockedModal_ = function (msg) {
   var m = document.getElementById("vektorModuleBlockedModal");
@@ -8120,6 +8166,21 @@ function bindLoginHandlers_() {
   }
 });
 
+byId("vektorHubCardPowerBi")?.addEventListener("click", function () {
+  try {
+    window.vektorTryOpenModule_("POWER_BI", function () {
+      if (window.vektorShowPowerBiModule_) {
+        window.vektorShowPowerBiModule_();
+      }
+      if (window.vektorPowerBiLoad_) {
+        window.vektorPowerBiLoad_(false);
+      }
+    });
+  } catch (e) {
+    console.error("Erro ao validar/abrir módulo Power BI:", e);
+  }
+});
+
   (function () {
     var btn = document.getElementById("vektorTopHomeBtn");
     if (!btn) return;
@@ -8131,6 +8192,19 @@ function bindLoginHandlers_() {
       vektorShowHubView_();
     });
   })();
+
+  (function () {
+  var btn = document.getElementById("vektorPowerBiBackBtn");
+  if (!btn || btn.__boundBackHub) return;
+
+  btn.__boundBackHub = true;
+
+  btn.addEventListener("click", function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    vektorShowHubView_();
+  });
+})();
 }
 
 window.__vektorGlobalPreloadState = {
