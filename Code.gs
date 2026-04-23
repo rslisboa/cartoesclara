@@ -935,6 +935,8 @@ function vektorPolicyAssistantAsk(question, history) {
     question = String(question || "").trim();
     if (!question) return { ok: false, error: "Pergunta vazia." };
 
+    history = Array.isArray(history) ? history : [];
+
     // ✅ small talk: não chama RAG/Vertex
     var qLow = question.toLowerCase();
     if (
@@ -944,17 +946,26 @@ function vektorPolicyAssistantAsk(question, history) {
       qLow === "show" || qLow === "perfeito" ||
       qLow === "obg" || qLow === "brigado" || qLow === "brigada"
     ) {
-      return { ok: true, answer: "De nada! Se quiser, me diga sua dúvida sobre a política." };
+      return { ok: true, answer: "De nada! Se quiser, posso te ajudar com dúvidas sobre a Política Clara ou sobre como usar o Vektor." };
     }
+
+    var askDomain = vektorPolicyDetectAskDomain_(question);
 
     var policyText = vektorPolicyLoadText_();
     if (!policyText) return { ok: false, error: "Não consegui ler o documento da política." };
 
-    // ✅ chunking por seção (vale pra política toda)
-    var chunks = vektorPolicyChunkText_(policyText, 1200);
+    var systemGuideText = vektorSystemGuideLoadText_();
+    if (!systemGuideText) {
+      // Não quebra o funcionamento atual.
+      systemGuideText = "";
+    }
+
+    // ✅ chunking por domínio
+    var policyChunks = vektorPolicyChunkText_(policyText, 1200);
+    var systemChunks = systemGuideText ? vektorSystemGuideChunkText_(systemGuideText, 1200) : [];
 
     // ------------------------------
-    // ✅ roteamento genérico por intenção
+    // ✅ roteamento genérico por intenção na política
     // ------------------------------
     function routeSectionIds_(q) {
       var s = String(q || "").toLowerCase();
@@ -971,273 +982,135 @@ function vektorPolicyAssistantAsk(question, history) {
       var wantsTermo = /(termo de responsabilidade|termo clara|aceite|formaliza[cç][aã]o do aceite|formulario|google forms|pdf assinado|reenviado ao departamento financeiro|termo assinado)/.test(s);
 
       var sec = [];
-      // Regras principais por tema
-      if (wantsPermission) sec.push("9");                  // Restrições de uso
-      if (wantsAccountability) sec.push("8", "8.1");       // Prestação / Bloqueio
-      if (wantsLimit) sec.push("7", "Anexo II");           // Limite dos cartões
-      if (wantsFraud) sec.push("10", "10.1");              // Monitoramento / Canal
-      if (wantsRoles) sec.push("5");                       // Responsabilidades
-      if (wantsDefs) sec.push("4");                        // Definições
-      if (wantsServicenow) sec.push("Anexo II");           // Solicitações no ServiceNow
+      if (wantsPermission) sec.push("9");
+      if (wantsAccountability) sec.push("8", "8.1");
+      if (wantsLimit) sec.push("7", "Anexo II");
+      if (wantsFraud) sec.push("10", "10.1");
+      if (wantsRoles) sec.push("5");
+      if (wantsDefs) sec.push("4");
+      if (wantsServicenow) sec.push("Anexo II");
       if (wantsStoreChange) sec.push("Anexo II", "5");
       if (wantsLabels) sec.push("Anexo I", "8");
       if (wantsTermo) sec.push("5.1");
 
-      // fallback: se nada casou, não força seção (deixa ranker escolher)
       return sec;
     }
 
-    var wanted = routeSectionIds_(question);
+    var wantedPolicyIds = routeSectionIds_(question);
 
     // ------------------------------
-    // ✅ índice simples por seção (a partir do prefixo "§ <id> | <título>")
+    // ✅ índice simples por seção da política
     // ------------------------------
-    var byId = {};
-    (chunks || []).forEach(function(c){
+    var policyById = {};
+    (policyChunks || []).forEach(function(c){
       var m = String(c || "").match(/^§\s*([^\|]+)\|\s*(.+?)\s*\n/);
       if (!m) return;
       var id = String(m[1] || "").trim();
       if (!id) return;
-      if (!byId[id]) byId[id] = c;
+      if (!policyById[id]) policyById[id] = c;
     });
 
     // ------------------------------
-    // ✅ seleciona seeds por seção roteada
+    // ✅ seeds da política
     // ------------------------------
-    var seed = [];
-    (wanted || []).forEach(function(id){
-      if (byId[id]) seed.push(byId[id]);
+    var policySeed = [];
+    (wantedPolicyIds || []).forEach(function(id){
+      if (policyById[id]) policySeed.push(policyById[id]);
     });
 
     // ------------------------------
-    // ✅ ranker para completar com os mais relevantes
+    // ✅ ranker da política
     // ------------------------------
-    var topK = 10; // limite final que você já usa
+    function rankPolicyChunks_(q, chunks, seed, topK) {
+      q = String(q || "").toLowerCase();
 
-    // ============================================
-// ✅ SEED FORÇADO POR TEMA (anti “base insuficiente”)
-// Cole antes do ranker: vektorPolicyPickTopChunks_(...)
-// ============================================
-function vektorNormNoAcc_(s){
-  s = String(s || "").toLowerCase();
-  try { s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch(_){}
-  return s;
-}
+      var tokens = q
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w\s]/g, " ")
+        .split(/\s+/)
+        .filter(Boolean);
 
-function vektorSeedWindow_(chunks, anchor){
-  var a = vektorNormNoAcc_(anchor);
-  if (!a) return null;
+      var stop = {
+        "a":1,"o":1,"e":1,"de":1,"da":1,"do":1,"das":1,"dos":1,"para":1,"por":1,"com":1,
+        "como":1,"onde":1,"que":1,"quais":1,"qual":1,"no":1,"na":1,"nos":1,"nas":1,
+        "um":1,"uma":1,"me":1,"eu":1
+      };
+      tokens = tokens.filter(function(t){ return !stop[t]; });
 
-  for (var i = 0; i < (chunks || []).length; i++) {
-    var c = String(chunks[i] || "");
-    if (!c) continue;
+      var seedSet = {};
+      (seed || []).forEach(function(s){ seedSet[String(s)] = true; });
 
-    if (vektorNormNoAcc_(c).indexOf(a) >= 0) {
-      return c; // retorna o chunk completo, com prefixo "§ ..."
-    }
-  }
+      var ranked = (chunks || []).map(function(c){
+        var s = String(c || "");
+        var norm = s.toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-  return null;
-}
+        var score = 0;
 
-function vektorSeedPushUnique_(arr, chunk){
-  if (!chunk) return;
-  if (arr.indexOf(chunk) < 0) arr.push(chunk);
-}
+        if (seedSet[s]) score += 100;
 
-// --- Detecta tema da pergunta
-var qn = vektorNormNoAcc_(question);
+        tokens.forEach(function(tok){
+          if (!tok) return;
+          if (norm.indexOf(tok) >= 0) score += 5;
+        });
 
-// janela padrão (equilíbrio)
-var FORCE_WINDOW = 1600;
+        if (/^§\s*/.test(s)) score += 1;
 
-// Map de temas -> regex -> anchors
-var TOPIC_SEEDS = [
-  // 5.2 / 4.12 (férias, afastamento, demissão)
-  {
-    re: /\b(ferias|afastamento|licenca|ausencia|portador temporario|temporario|substituto|substituicao|demissao|desligamento)\b/,
-    anchors: [
-      "5.2.", "procedimento em casos de afastamento", "demissao do gerente",
-      "4.12.", "portador temporario", "nos afastamentos temporarios"
-    ]
-  },
-
-  // 7 (limite mensal/diário, ciclo 06)
-  {
-    re: /\b(limite|mensal|diario|por dia|por mes|ciclo|06|faturamento|aumento de limite)\b/,
-    anchors: [
-      "7.", "7. limite dos cartoes",
-      "importante destacar que o limite disponivel e mensal", // frase assinatura
-      "o limite e reestabelecido", "todo dia 06",
-      "solicitacoes de aumento de limite", "servicenow"
-    ]
-  },
-
-  // 8 (prestação de contas / 48h / comprovante / etiqueta / descrição)
-  {
-    re: /\b(prestacao de contas|prestar contas|comprovante|nota fiscal|recibo|etiqueta|descricao|48 horas|prazo)\b/,
-    anchors: [
-      "8.", "8. prestacao de contas",
-      "48 horas", "8.1.", "bloqueio preventivo do cartao",
-      "inserir etiqueta", "anexar o comprovante fiscal", "preencher o campo \"descricao\""
-    ]
-  },
-
-  // 8.1 bloqueio + desbloqueio via ServiceNow (Anexo II)
-  {
-    re: /\b(bloqueio|desbloqueio|cartao bloqueado|bloqueado preventivamente|regularizacao|servicenow)\b/,
-    anchors: [
-      "8.1.", "bloqueio preventivo do cartao",
-      "o desbloqueio devera ser solicitado", "servicenow",
-      "anexo ii", "solicitacao de desbloqueio de cartao"
-    ]
-  },
-
-  // contestação (prazo 2 dias úteis) – aparece na seção de prestação/contestação
-  {
-    re: /\b(contestacao|contestar|chargeback|disputa|compra irregular|suporte da clara)\b/,
-    anchors: [
-      "contestacao", "suporte da clara", "2 dias uteis", "contato@clara.com"
-    ]
-  },
-
-  // 9 – restrições de uso: saques, cashback, milhas, familiares etc.
-  {
-    re: /\b(restricao|proibido|vedado|nao pode|saque|dinheiro|cashback|milhas|fidelidade|cpf|familiares|conflito de interesses)\b/,
-    anchors: [
-      "9.", "9. restricoes de uso",
-      "nao e permitido realizar adiantamentos", "saques",
-      "cashback", "milhas", "cpf",
-      "conflito de interesses"
-    ]
-  },
-
-  // 9.1 – despesas pessoais / ressarcimento (prazo 2 dias úteis)
-  {
-    re: /\b(despesa pessoal|uso indevido|ressarcimento|reembolsar|devolver|pix|transferencia)\b/,
-    anchors: [
-      "9.1.", "utilizacao indevida do cartao", "despesas pessoais",
-      "ressarcimento", "2 dias uteis",
-      "despesa pessoal - uso indevido"
-    ]
-  },
-
-  // 9.2 – patrimonial / itens de valor elevado (obrigatório compras)
-  {
-    re: /\b(patrimonial|infraestrutura|valor elevado|eletrodomestico|eletronico|notebook|celular|impressora|moveis|mobiliario|geladeira|micro-ondas|compras)\b/,
-    anchors: [
-      "9.2.", "aquisição de itens patrimoniais", "valor elevado",
-      "obrigatoria a solicitacao via area de compras"
-    ]
-  },
-
-  // 10 – monitoramento / auditoria / fraudes (típico)
-  {
-    re: /\b(auditoria|monitoramento|fraude|fiscalizacao|compliance|medidas disciplinares|medidas corretivas)\b/,
-    anchors: [
-      "10.", "monitoramento", "auditoria", "fraudes",
-      "medidas disciplinares", "medidas corretivas"
-    ]
-  },
-
-  // Anexos: etiquetas / ServiceNow
-  {
-    re: /\b(etiquetas|codigo sap|anexo i|anexo ii|servicenow|chamado)\b/,
-    anchors: [
-      "anexo i", "quadro de etiquetas", "codigo sap",
-      "anexo ii", "solicitacoes no servicenow"
-    ]
-  },
-
-  // 5.1 Sobre o termo de responsabilidade
-
-  {
-  re: /\b(termo de responsabilidade|termo clara|aceite|google forms|formulario|formulário|pdf assinado|termo assinado)\b/,
-  anchors: [
-    "termo de responsabilidade",
-    "formalização do aceite",
-    "formalizacao do aceite",
-    "a liberação para uso do cartão está condicionada à formalização do aceite",
-    "o gerente receberá um link de um formulário",
-    "google forms",
-    "será gerado o documento do termo em formato pdf",
-    "deverá ser assinado e reenviado ao departamento financeiro"
-  ]
-}
-];
-
-// Aplica: se match no tema, injeta janelas ao redor das âncoras no seed
-for (var t = 0; t < TOPIC_SEEDS.length; t++){
-  var topic = TOPIC_SEEDS[t];
-  if (!topic.re.test(qn)) continue;
-
-  var anchors = topic.anchors || [];
-  for (var a = 0; a < anchors.length; a++){
-    var winTxt = vektorSeedWindow_(chunks, anchors[a]);
-    vektorSeedPushUnique_(seed, winTxt);
-  }
-}
-
-// (opcional) limite de seed para não “estourar” tokens por acidente
-if (seed.length > 6) seed = seed.slice(0, 6);
-
-    var ranked = vektorPolicyPickTopChunks_(question, chunks, topK);
-
-    // monta lista final sem duplicar: seeds + ranked
-    var finalChunks = [];
-    seed.forEach(function(c){
-      if (finalChunks.indexOf(c) < 0) finalChunks.push(c);
-    });
-    ranked.forEach(function(c){
-      if (finalChunks.indexOf(c) < 0) finalChunks.push(c);
-    });
-
-    // corta no máximo 5 para não explodir tokens
-    finalChunks = finalChunks.slice(0, topK);
-
-    // ✅ cap por chunk (reduz custo sem matar cobertura)
-      var MAX_CHARS_PER_CHUNK = 1600;
-      finalChunks = finalChunks.map(function(c){
-        c = String(c || "");
-        if (c.length <= MAX_CHARS_PER_CHUNK) return c;
-        return c.slice(0, MAX_CHARS_PER_CHUNK) + "…";
+        return { chunk: s, score: score };
       });
 
-    // fallback defensivo
-    if (!finalChunks.length) finalChunks = [policyText.substring(0, 3500)];
+      ranked.sort(function(a,b){ return b.score - a.score; });
 
-    // gera resposta
-      var answer = vektorVertexGeneratePolicyAnswer_(question, finalChunks, history || []);
+      var out = [];
+      var seen = {};
+      ranked.forEach(function(item){
+        if (out.length >= topK) return;
+        var c = String(item.chunk || "");
+        if (!c || seen[c]) return;
+        if (item.score <= 0) return;
+        seen[c] = true;
+        out.push(c);
+      });
 
-      // prefixa assinatura
-      var sig = "gemini-2.5-flash";
-      var finalAnswer = sig + "\n" + String(answer || "");
+      return out;
+    }
 
-      // ✅ LOG na VEKTOR_POLICY_HIST (antes do return)
-      try {
-        var userEmail = "";
-        try { userEmail = String(Session.getActiveUser().getEmail() || "").trim().toLowerCase(); } catch(_) {}
-        var sectionsCsv = (wanted || []).map(String).join(",");
-        var assunto = vektorPolicyAssuntoFromSections_(wanted);
+    var topPolicyChunks = [];
+    var topSystemChunks = [];
 
-        vektorPolicyHistAppend_({
-          userEmail: userEmail,
-          assunto: assunto,
-          sectionsCsv: sectionsCsv,
-          question: question,
-          answer: finalAnswer,
-          model: sig,
-          empresa: vektorGetEmpresaContext_().empresaAtual
-        });
-      } catch (eLog) {
-        // não quebra resposta por erro de log
-      }
+    if (askDomain === "policy" || askDomain === "hybrid") {
+      topPolicyChunks = rankPolicyChunks_(question, policyChunks, policySeed, 10);
+    }
 
-      // retorna
-      return { ok: true, answer: finalAnswer };
+    if (askDomain === "system" || askDomain === "hybrid") {
+      topSystemChunks = vektorSystemGuidePickTopChunks_(question, systemChunks, 8);
+    }
+
+    // fallback de segurança: se for system e nada casou, tenta mandar alguns chunks genéricos do sistema
+    if (askDomain === "system" && (!topSystemChunks || !topSystemChunks.length) && systemChunks.length) {
+      topSystemChunks = systemChunks.slice(0, 6);
+    }
+
+    var res = vektorVertexGeneratePolicyAnswer_(
+      question,
+      {
+        domain: askDomain,
+        policy: topPolicyChunks,
+        system: topSystemChunks
+      },
+      history
+    );
+
+    return {
+      ok: true,
+      answer: String(res || "")
+    };
 
   } catch (e) {
-    return { ok: false, error: (e && e.message) ? e.message : String(e) };
+    return {
+      ok: false,
+      error: (e && e.message) ? e.message : String(e)
+    };
   }
 }
 
@@ -1382,6 +1255,193 @@ function vektorPolicyLoadText_() {
     .replace(/&#39;/g, "'");
 
   return text.trim();
+}
+
+// -----------------------------
+// Lê o HTML local com a base de uso do sistema Vektor
+// -----------------------------
+function vektorSystemGuideLoadText_() {
+  var html = HtmlService.createHtmlOutputFromFile("vektor_system_source").getContent();
+
+  var m = html.match(/<textarea[^>]*id=["']vektor-system-text["'][^>]*>([\s\S]*?)<\/textarea>/i);
+  if (!m || !m[1]) return "";
+
+  var text = String(m[1] || "");
+
+  text = text
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  return text.trim();
+}
+
+// -----------------------------
+// Quebra a base do sistema em blocos por @PAGE
+// -----------------------------
+function vektorSystemGuideChunkText_(text, chunkSize) {
+  text = String(text || "").replace(/\r/g, "").trim();
+  var maxLen = Math.max(2500, Number(chunkSize || 1200) * 3);
+  if (!text) return [];
+
+  var lines = text.split("\n");
+
+  function isHeaderLine_(ln) {
+    return /^@PAGE\s*\|\s*/i.test(String(ln || "").trim());
+  }
+
+  function parseHeader_(ln) {
+    var s = String(ln || "").trim();
+    var m = s.match(/^@PAGE\s*\|\s*(.+)$/i);
+    if (!m) return null;
+    return { id: String(m[1] || "").trim(), title: String(m[1] || "").trim() };
+  }
+
+  var headers = [];
+  for (var i = 0; i < lines.length; i++) {
+    if (!isHeaderLine_(lines[i])) continue;
+    var h = parseHeader_(lines[i]);
+    if (!h || !h.id) continue;
+    headers.push({ idx: i, id: h.id, title: h.title || "" });
+  }
+
+  if (!headers.length) {
+    var outFallback = [];
+    for (var k = 0; k < text.length; k += Math.max(500, Number(chunkSize || 1200))) {
+      var sub = text.substring(k, k + Math.max(500, Number(chunkSize || 1200))).trim();
+      if (sub) outFallback.push(sub);
+    }
+    return outFallback;
+  }
+
+  var out = [];
+  for (var j = 0; j < headers.length; j++) {
+    var start = headers[j].idx;
+    var end = (j + 1 < headers.length) ? headers[j + 1].idx : lines.length;
+
+    var id = headers[j].id;
+    var title = headers[j].title || "";
+
+    var body = lines.slice(start, end).join("\n").trim();
+    if (!body) continue;
+
+    var prefix = "@PAGE | " + (title || id) + "\n";
+    var chunk = prefix + body;
+
+    if (chunk.length <= maxLen) {
+      out.push(chunk);
+      continue;
+    }
+
+    var parts = body.split(/\n\s*\n/g);
+    var acc = prefix;
+
+    for (var p = 0; p < parts.length; p++) {
+      var block = String(parts[p] || "").trim();
+      if (!block) continue;
+
+      if ((acc + "\n\n" + block).length > maxLen) {
+        if (acc.trim() && acc.trim() !== prefix.trim()) out.push(acc.trim());
+        acc = prefix + block;
+      } else {
+        acc += (acc === prefix ? "" : "\n\n") + block;
+      }
+    }
+
+    if (acc.trim() && acc.trim() !== prefix.trim()) out.push(acc.trim());
+  }
+
+  return out;
+}
+
+// -----------------------------
+// Detecta se a pergunta é sobre política, sistema ou ambos
+// -----------------------------
+function vektorPolicyDetectAskDomain_(question) {
+  var s = String(question || "").toLowerCase();
+
+  var hasPolicy =
+    /(pode|posso|permitid|proibid|restriç|restric|prestação|prestacao|nota|comprovante|cupom|recibo|etiqueta|responsabil|termo|limite|fatura|bloqueio|fraude|canal de denúncia|canal de denuncia)/.test(s);
+
+  var hasSystem =
+    /(vektor|sistema|página|pagina|tela|menu|botão|botao|filtro|filtros|onde vejo|onde fica|como faço|como usar|como acessar|como consultar|como abrir|pendências do ciclo|pendencias do ciclo|análise de gastos|analise de gastos|alertas programados|radar de irregularidade|envio de pendências|envio de pendencias|consultas auxiliares|fluxo numerário sap|fluxo numerario sap|custo vertex|estado operacional|analista vektor)/.test(s);
+
+  if (hasPolicy && hasSystem) return "hybrid";
+  if (hasSystem) return "system";
+  return "policy";
+}
+
+// -----------------------------
+// Seleciona trechos mais relevantes da base do sistema
+// -----------------------------
+function vektorSystemGuidePickTopChunks_(question, chunks, topK) {
+  question = String(question || "").toLowerCase().trim();
+  chunks = Array.isArray(chunks) ? chunks : [];
+  topK = Number(topK || 8);
+  if (topK < 1) topK = 1;
+
+  var qTokens = question
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  var stop = {
+    "a":1,"o":1,"e":1,"de":1,"da":1,"do":1,"das":1,"dos":1,"para":1,"por":1,"com":1,
+    "como":1,"onde":1,"que":1,"quais":1,"qual":1,"no":1,"na":1,"nos":1,"nas":1,
+    "um":1,"uma":1,"me":1,"eu":1,"ver":1,"usar":1,"consigo":1
+  };
+
+  qTokens = qTokens.filter(function(t){ return !stop[t]; });
+
+  var synonymBoosts = [
+    { re: /(pend[eê]ncias? do ciclo|pendencias? do ciclo|pend[eê]ncias? das lojas|pendencias? das lojas)/, page: "Pendências do Ciclo", score: 50 },
+    { re: /(an[aá]lise de gastos|analise de gastos|gastos|conta cont[aá]bil|conta contabil)/, page: "Análise de Gastos", score: 50 },
+    { re: /(alertas programados|alertas|valores contabilizados)/, page: "Alertas Programados", score: 50 },
+    { re: /(radar de irregularidade|itens irregulares|irregularidade)/, page: "Radar de Irregularidade", score: 50 },
+    { re: /(envio de pend[eê]ncias|envio de pendencias)/, page: "Envio de Pendências", score: 50 },
+    { re: /(consultas auxiliares|faturas|consulta auxiliar)/, page: "Consultas Auxiliares", score: 50 },
+    { re: /(fluxo numer[aá]rio sap|fluxo numerario sap|sangria|sangrias)/, page: "Fluxo Numerário SAP", score: 50 },
+    { re: /(custo vertex|custo da ia|consumo do vertex|vertex)/, page: "Custo Vertex", score: 50 },
+    { re: /(estado operacional|status do sistema)/, page: "Estado Operacional", score: 50 },
+    { re: /(analista vektor|assistente|chat)/, page: "Analista - Vektor", score: 50 }
+  ];
+
+  var ranked = chunks.map(function(c){
+    var s = String(c || "");
+    var norm = s.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    var score = 0;
+
+    qTokens.forEach(function(tok){
+      if (!tok) return;
+      if (norm.indexOf(tok) >= 0) score += 6;
+    });
+
+    synonymBoosts.forEach(function(rule){
+      if (rule.re.test(question) && s.indexOf(rule.page) >= 0) {
+        score += rule.score;
+      }
+    });
+
+    if (/^@PAGE\s*\|\s*/i.test(s)) score += 2;
+    if (/Como usar:/i.test(s)) score += 2;
+    if (/Fluxo operacional:/i.test(s)) score += 2;
+    if (/Funções relacionadas:/i.test(s)) score += 1;
+
+    return { chunk: s, score: score };
+  });
+
+  ranked.sort(function(a,b){ return b.score - a.score; });
+
+  return ranked
+    .filter(function(x){ return x.score > 0; })
+    .slice(0, topK)
+    .map(function(x){ return x.chunk; });
 }
 
 // -----------------------------
@@ -1879,99 +1939,109 @@ function vektorFmtUsdWithBrl_(usdValue){
 // Chamada ao Vertex Gemini
 // -----------------------------
 
-function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
-  var systemText =
-  "Você é o Assistente da Política de Cartões Clara do Grupo SBF.\n" +
-  "Responda com base apenas nos trechos fornecidos da política.\n" +
-  "Não invente regras, exceções, prazos, valores, permissões ou interpretações que não estejam sustentados nesses trechos.\n" +
-  "Responda em português do Brasil, de forma natural, clara, objetiva e profissional.\n" +
-  "\n" +
-  "Estilo e fluidez (sem perder rigor):\n" +
-  "• Responda como um assistente humano, com frases curtas e conectivos naturais quando fizer sentido.\n" +
-  "• Evite jargão desnecessário, repetição mecânica e tom robótico.\n" +
-  "• Se a regra estiver explícita, comece com a conclusão e depois explique de forma simples.\n" +
-  "• Se a pergunta for continuação da anterior, considere o contexto recente da conversa.\n" +
-  "• Não use linguagem dura ou punitiva; seja objetivo e cordial.\n" +
-  "\n" +
-  "Quando não houver base suficiente:\n" +
-  "• Se os trechos não trouxerem base clara para responder com segurança, diga isso de forma natural.\n" +
-  "• Nesses casos, finalize com: \"Base insuficiente nos trechos fornecidos\".\n" +
-  "\n" +
-  "IMPORTANTE SOBRE OS TRECHOS:\n" +
-  "• O <TÍTULO> é o texto após a barra \"|\" no cabeçalho do trecho.\n" +
-  "• Cada trecho começa com um cabeçalho no formato: \"§ <SEÇÃO> | <TÍTULO>\".\n" +
-  "• Use esse <SEÇÃO> como referência (ex.: § 9, § 8.1, § Anexo II).\n" +
-  "\n" +
-  "Regras de exatidão:\n" +
-  "• Use \"deve\", \"não deve\", \"pode\" e \"não pode\" apenas quando isso estiver explícito nos trechos.\n" +
-  "• Sempre que afirmar uma regra, cite a base no final usando a seção e o título: \"Base: § <SEÇÃO> — <TÍTULO>\".\n" +
-  "• Se houver conflito entre trechos, sinalize o conflito e oriente validação com o time de Compliance.\n" +
-  "\n" +
-  "Formato da resposta:\n" +
-  "• Comece com uma resposta direta.\n" +
-  "• Depois, explique em 1 ou 2 parágrafos curtos.\n" +
-  "• Se existir exceção, condição ou ação necessária, apresente como: \"Condição:\", \"Exceção:\" ou \"Ação:\".\n" +
-  "• Final obrigatório: \"Base: § <SEÇÃO> — <TÍTULO>\" ou \"Base insuficiente nos trechos fornecidos\".\n" +
-  "\n" +
-  "Regras para consultas de ETIQUETAS (Anexo I):\n" +
-  "• Se o usuário pedir a lista completa de etiquetas, não cole a tabela inteira.\n" +
-  "• Responda com um resumo curto, com alguns exemplos, e informe que a lista completa está no Anexo I.\n" +
-  "• Se o usuário perguntar por um item específico, indique diretamente a etiqueta correspondente, se ela estiver coberta pelos trechos.\n" +
-  "\n" +
-  "Pergunta de esclarecimento (somente se necessário):\n" +
-  "• Se faltar um dado essencial para aplicar a regra, faça apenas 1 pergunta objetiva.\n" +
-  "• Não gere hipóteses e não responda com suposições.\n";
+function vektorVertexGeneratePolicyAnswer_(question, contextPack, history) {
+  contextPack = contextPack || {};
+  history = Array.isArray(history) ? history : [];
 
-  // ============================
-  // ✅ Histórico curto (para resolver “isso/isso aí”)
-  // ============================
-  function vektorPolicyFmtHistory_(hist) {
-    if (!Array.isArray(hist) || !hist.length) return "";
-    // usa só os últimos 2 itens (1 turno) para economizar tokens
-    var last = hist.slice(-4);
-    var out = last.map(function(h){
-      var role = String((h && h.role) || "").toLowerCase();
-      var text = String((h && h.text) || "");
-      // corta para não inflar tokens (ajuste se quiser)
-      if (text.length > 600) text = text.substring(0, 600) + "…";
-      if (role === "assistant") return "ASSISTENTE (anterior): " + text;
-      return "USUÁRIO (anterior): " + text;
-    }).join("\n");
-    return out ? ("CONTEXTO DA CONVERSA (último turno):\n" + out + "\n\n") : "";
+  var domain = String(contextPack.domain || "policy");
+  var policyChunks = Array.isArray(contextPack.policy) ? contextPack.policy : [];
+  var systemChunks = Array.isArray(contextPack.system) ? contextPack.system : [];
+
+  var systemText =
+    "Você é o Analista Vektor do Grupo SBF.\n" +
+    "Você responde dois tipos de dúvida:\n" +
+    "1) dúvidas sobre a Política de Cartões Clara;\n" +
+    "2) dúvidas sobre como utilizar o sistema Vektor.\n" +
+    "\n" +
+    "Regras obrigatórias:\n" +
+    "• Use apenas os trechos fornecidos no contexto.\n" +
+    "• Não invente páginas, filtros, botões, passos, regras, exceções, permissões ou prazos.\n" +
+    "• Se a pergunta for sobre política, responda com base nos TRECHOS DA POLÍTICA.\n" +
+    "• Se a pergunta for sobre uso do sistema, responda com base nos TRECHOS DO SISTEMA.\n" +
+    "• Se a pergunta misturar política e sistema, deixe explícito o que é regra da política e o que é operação do sistema.\n" +
+    "• Se os trechos forem insuficientes, diga isso de forma objetiva.\n" +
+    "\n" +
+    "Estilo de resposta:\n" +
+    "• Responda em português do Brasil.\n" +
+    "• Responda de forma clara, detalhada e natural.\n" +
+    "• Quando a pergunta for operacional, explique o fluxo de uso da tela de forma prática.\n"
+    "• Para dúvidas sobre o sistema, descreva o passo a passo completo sempre que houver base suficiente: informe a página correta, como acessá-la, o que aguardar carregar, quais filtros usar, o que consultar na tabela/cards/modais e o fluxo esperado da tela.\n" +
+    "• Para dúvidas sobre política, explique a regra com clareza, incluindo contexto prático quando os trechos permitirem.\n" +
+    "• Evite respostas excessivamente curtas quando houver informação suficiente para detalhar.\n" +
+    "• Prefira detalhar mais do que resumir, desde que tudo esteja sustentado nos trechos fornecidos.\n" +
+    "• Não responda de forma vaga ou genérica quando o contexto trouxer elementos específicos.\n" +
+    "\n" +
+    "Forma de responder:\n" +
+    "• Quando a resposta vier da política, cite naturalmente no próprio texto a seção usada, com sua numeração, por exemplo: § 9.2.\n" +
+    "• Quando a resposta vier do sistema, cite naturalmente no próprio texto a página usada, sem precisar criar um bloco final fixo.\n" +
+    "• Responda de forma natural, fluida e menos robotizada.\n" +
+    "• Não use títulos fixos como 'Explicação:' ou 'Base:' salvo se for realmente necessário.\n" +
+    "• Quando a pergunta for simples, responda em texto corrido.\n" +
+    "• Quando a pergunta exigir orientação operacional, você pode organizar em passos, mas sem excesso de rigidez.\n" +
+    "• Sempre que possível, incorpore a base da resposta naturalmente no próprio texto, sem criar um bloco final artificial.\n" +
+    "• Só mencione explicitamente a base no fim quando isso for realmente útil para dar segurança à resposta.\n";
+
+  function histToText_(hist) {
+    var arr = Array.isArray(hist) ? hist : [];
+    if (!arr.length) return "";
+
+    var lines = [];
+    for (var i = 0; i < arr.length; i++) {
+      var item = arr[i] || {};
+      var role = String(item.role || "").trim().toLowerCase();
+      var text = String(item.text || "").trim();
+      if (!text) continue;
+
+      if (role === "user") lines.push("Usuário: " + text);
+      else if (role === "assistant") lines.push("Assistente: " + text);
+    }
+
+    return lines.length ? ("HISTÓRICO RECENTE:\n" + lines.join("\n") + "\n\n") : "";
   }
 
-  var histText = vektorPolicyFmtHistory_(history);
+  function formatPolicyChunks_(arr) {
+    arr = Array.isArray(arr) ? arr : [];
+    if (!arr.length) return "(sem trechos de política selecionados)";
+
+    return arr.map(function (t, i) {
+      var s = String(t || "");
+      var m = s.match(/^§\s*([^\|]+)\|\s*([^\n]+)\n/);
+      var sec = m ? String(m[1] || "").trim() : "";
+      var ttl = m ? String(m[2] || "").trim() : "";
+      var head = (sec || ttl) ? ("§ " + sec + " — " + ttl) : ("Trecho Política " + (i + 1));
+      return "Trecho Política " + (i + 1) + " (" + head + "):\n" + s;
+    }).join("\n\n");
+  }
+
+  function formatSystemChunks_(arr) {
+    arr = Array.isArray(arr) ? arr : [];
+    if (!arr.length) return "(sem trechos de sistema selecionados)";
+
+    return arr.map(function (t, i) {
+      var s = String(t || "");
+      var m = s.match(/^@PAGE\s*\|\s*([^\n]+)\n/i);
+      var ttl = m ? String(m[1] || "").trim() : "";
+      var head = ttl ? ("@PAGE — " + ttl) : ("Trecho Sistema " + (i + 1));
+      return "Trecho Sistema " + (i + 1) + " (" + head + "):\n" + s;
+    }).join("\n\n");
+  }
+
+  var histText = histToText_(history);
 
   var userText =
-  histText +
-  "PERGUNTA DO USUÁRIO (atual):\n" + String(question || "").trim() + "\n\n" +
-  "TRECHOS DA POLÍTICA:\n\n" +
-  (topChunks || []).map(function (t, i) {
-    var s = String(t || "");
-    // Cabeçalho esperado no início do chunk: "§ <SEÇÃO> | <TÍTULO>\n"
-    var m = s.match(/^§\s*([^\|]+)\|\s*([^\n]+)\n/);
-    var sec = m ? String(m[1] || "").trim() : "";
-    var ttl = m ? String(m[2] || "").trim() : "";
+    histText +
+    "DOMÍNIO DETECTADO:\n" + domain + "\n\n" +
+    "PERGUNTA DO USUÁRIO (atual):\n" + String(question || "").trim() + "\n\n" +
+    "TRECHOS DA POLÍTICA:\n\n" + formatPolicyChunks_(policyChunks) + "\n\n" +
+    "TRECHOS DO SISTEMA:\n\n" + formatSystemChunks_(systemChunks);
 
-    // Exibe o nome da seção/título para facilitar citação na "Base"
-    var head = (sec || ttl) ? ("§ " + sec + " — " + ttl) : ("Trecho " + (i + 1));
-
-    return "Trecho " + (i + 1) + " (" + head + "):\n" + s;
-  }).join("\n\n");
-
-  var url =
-    "https://" + VEKTOR_VERTEX_LOCATION + "-aiplatform.googleapis.com/v1/" +
-    "projects/" + VEKTOR_VERTEX_PROJECT_ID +
-    "/locations/" + VEKTOR_VERTEX_LOCATION +
-    "/publishers/google/models/" + VEKTOR_VERTEX_MODEL +
-    ":generateContent";
-
-  var payload = {
+  var req = {
     contents: [
       {
         role: "user",
         parts: [
-          { text: systemText + "\n\n" + userText }
+          { text: systemText },
+          { text: userText }
         ]
       }
     ],
@@ -1983,13 +2053,19 @@ function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
     }
   };
 
+  var url =
+    "https://us-central1-aiplatform.googleapis.com/v1/projects/" + VEKTOR_VERTEX_PROJECT_ID +
+    "/locations/" + VEKTOR_VERTEX_LOCATION +
+    "/publishers/google/models/" + VEKTOR_VERTEX_MODEL +
+    ":generateContent";
+
   var resp = UrlFetchApp.fetch(url, {
     method: "post",
     contentType: "application/json",
     headers: {
       Authorization: "Bearer " + ScriptApp.getOAuthToken()
     },
-    payload: JSON.stringify(payload),
+    payload: JSON.stringify(req),
     muteHttpExceptions: true
   });
 
@@ -2002,7 +2078,6 @@ function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
 
   var json = JSON.parse(body);
 
-  // Junta TODAS as parts de texto
   var parts =
     json &&
     json.candidates &&
@@ -2021,21 +2096,18 @@ function vektorVertexGeneratePolicyAnswer_(question, topChunks, history) {
     throw new Error("Vertex retornou resposta vazia.");
   }
 
-  // usageMetadata oficial do Vertex
   var usage = (json && json.usageMetadata) ? json.usageMetadata : {};
   var promptTokens = Number(usage.promptTokenCount || 0);
   var outputTokens = Number(usage.candidatesTokenCount || 0);
   var totalTokens = (promptTokens + outputTokens);
   var modelVersion = String((json && json.modelVersion) || VEKTOR_VERTEX_MODEL);
 
-  // usuário atual (se disponível)
   var email = "";
   try {
     var ctx = vektorGetUserRole_();
     email = String((ctx && ctx.email) || "");
   } catch (_) {}
 
-  // registra consumo do mês
   vektorVertexTrackUsage_({
     model: VEKTOR_VERTEX_MODEL,
     modelVersion: modelVersion,
@@ -6729,8 +6801,11 @@ function vektorQueryPendenciasRecusadas_(ini, fim, empresa) {
     var pendDesc   = vektorIsBlank_(row[iDesc]);
 
     // ✅ NOVO: divergência NF/recibo (coluna L - Nota do aprovador)
-    var notaAprov = String(row[iNotaAprov] || "");
-    var pendDivergNF = /nf\/?recibo\s+divergente/i.test(notaAprov);
+    // Considera a pendência sempre que o texto contiver a expressão,
+    // mesmo que venha com complemento antes/depois e com variações de separador.
+    var notaAprov = String(row[iNotaAprov] || "").trim();
+
+    var pendDivergNF = /nf\s*[\/\-\–\—]?\s*recibo\s+divergente/i.test(notaAprov);
 
     // Se não tiver nenhuma pendência, ignora
     if (!pendRecibo && !pendEtq && !pendDesc && !pendDivergNF) continue;
