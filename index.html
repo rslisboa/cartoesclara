@@ -3328,11 +3328,11 @@ display: none;
                 </div>
 
                 <h3 class="mt-6 text-2xl font-black tracking-tight text-slate-900">
-                  AR
+                  Automações
                 </h3>
 
                 <p class="mt-3 text-sm leading-6 font-semibold text-slate-500">
-                  Módulo dedicado à área de Contas a Receber, com automações operacionais e visuais contábeis relacionados a contas específicas.
+                  Módulo dedicado à automações via RPA (robotic process aumation) e demais automatizações, relacionados a contas contábeis e projetos específicos.
                 </p>
 
                 <div class="mt-6 flex items-center justify-between">
@@ -7481,6 +7481,14 @@ function vektorShowHubView_() {
     agentesIa.style.display = "none";
   }
 
+    try {
+    if (typeof window.vektorHideArModule_ === "function") {
+      window.vektorHideArModule_();
+    }
+  } catch (e) {
+    console.error("Falha ao esconder módulo AR/RPA:", e);
+  }
+
   try {
     var nm = document.getElementById("vektorHubUserName");
     var rl = document.getElementById("vektorHubUserRole");
@@ -7509,6 +7517,14 @@ function vektorShowClaraModule_() {
   if (agentesIa) {
     agentesIa.classList.add("hidden");
     agentesIa.style.display = "none";
+  }
+
+    try {
+    if (typeof window.vektorHideArModule_ === "function") {
+      window.vektorHideArModule_();
+    }
+  } catch (e) {
+    console.error("Falha ao esconder módulo AR/RPA:", e);
   }
 
   if (shell) {
@@ -8499,12 +8515,27 @@ function vektorGlobalPreloadFinishTask_(key, ok, statusTxt){
 function vektorGlobalPreloadStart_(){
   const st = window.__vektorGlobalPreloadState || {};
 
-  if (st.running) return;
-
-  if (st.done) {
-    vektorHomePreloadSetProgress_(st.total || 1, st.total || 1, "Filtros principais disponíveis.");
+  if (st.running) {
     return;
   }
+
+  if (st.done) {
+    try {
+      if (typeof window.vektorSetSidebarLoadingState_ === "function") {
+        window.vektorSetSidebarLoadingState_(false);
+      }
+    } catch(_) {}
+
+    try {
+      vektorHomePreloadHide_();
+    } catch(_) {}
+
+    return;
+  }
+
+  try {
+    vektorHomePreloadReset_();
+  } catch(_) {}
 
   try {
     if (typeof window.vektorSetSidebarLoadingState_ === "function") {
@@ -8532,10 +8563,16 @@ function vektorGlobalPreloadStart_(){
 
   const keys = Object.keys(tasks);
 
-  if (!keys.length) {
-    vektorHomePreloadHide_();
-    return;
-  }
+    if (!keys.length) {
+      try {
+        if (typeof window.vektorSetSidebarLoadingState_ === "function") {
+          window.vektorSetSidebarLoadingState_(false);
+        }
+      } catch(_) {}
+
+      vektorHomePreloadHide_();
+      return;
+    }
 
   window.__vektorGlobalPreloadState = {
     running: true,
@@ -8739,10 +8776,9 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 }
 
-    // aplica estado salvo
-    let saved = null;
-    try { saved = localStorage.getItem(KEY); } catch(e) {}
-    apply_(saved === "1");
+   // abertura inicial do Vektor sempre com menu expandido
+    try { localStorage.setItem(KEY, "0"); } catch(e) {}
+    apply_(false);
 
     // click toggle
     btn.addEventListener("click", function(){
