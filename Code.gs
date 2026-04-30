@@ -866,6 +866,13 @@ function encerrarSessaoVektor(token) {
  * Serve o HTML do chat (index.html)
  */
 function doGet(e) {
+  e = e || {};
+  var p = e.parameter || {};
+
+  if (p.rpa_action) {
+    return vektorRpaApiHandleGet_(p);
+  }
+
   // pega o e-mail do usuário logado no domínio
   var email = Session.getActiveUser().getEmail() || "";
 
